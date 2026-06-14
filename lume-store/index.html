@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUMÉ™ — Lash &amp; Brow Renewal Serum | Fuller-Looking Lashes in 8 Weeks</title>
+  <meta name="description" content="LUMÉ Lash & Brow Renewal Serum — the prostaglandin-free, peptide-powered serum for fuller, healthier-looking lashes and brows in as little as 8 weeks. Vegan, cruelty-free. Free shipping." />
+  <meta property="og:title" content="LUMÉ™ — Lash & Brow Renewal Serum" />
+  <meta property="og:description" content="Fuller-looking lashes & brows in 8 weeks. Prostaglandin-free. Vegan. Cruelty-free." />
+  <meta property="og:type" content="product" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="announce" id="top">
+    <div class="announce-track">
+      <span>✦ FREE SHIPPING OVER $35</span><span>✦ PROSTAGLANDIN-FREE FORMULA</span><span>✦ VEGAN &amp; CRUELTY-FREE</span><span>✦ 60-DAY RESULTS GUARANTEE</span>
+      <span>✦ FREE SHIPPING OVER $35</span><span>✦ PROSTAGLANDIN-FREE FORMULA</span><span>✦ VEGAN &amp; CRUELTY-FREE</span><span>✦ 60-DAY RESULTS GUARANTEE</span>
+    </div>
+  </div>
+
+  <header class="nav">
+    <a href="#top" class="brand">LUMÉ<sup>™</sup></a>
+    <nav class="nav-links">
+      <a href="#results">Results</a>
+      <a href="#how">How It Works</a>
+      <a href="#shop">Shop</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <button class="cart-btn" id="openCart" aria-label="Open cart">Bag · <span class="cart-count" id="cartCount">0</span></button>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">PEPTIDE-POWERED · PROSTAGLANDIN-FREE</span>
+      <h1>Fuller-looking lashes &amp; brows in <em>8 weeks.</em></h1>
+      <p class="sub">LUMÉ's nightly conditioning serum nourishes lashes and brows with a clean blend of peptides, biotin &amp; castor oil — for the appearance of fuller, healthier, more defined hairs. No extensions. No appointments. No prostaglandins.</p>
+      <div class="stars-row">
+        <span class="stars">★★★★★</span>
+        <span class="rcount">4.9 · 6,300+ five-star reviews</span>
+      </div>
+      <div class="hero-cta">
+        <button class="cta" data-add="LUMÉ Lash &amp; Brow Serum — 1 Bottle" data-price="34.95">Shop Now — from $34.95</button>
+        <span class="guarantee">🌿 60-day results guarantee</span>
+      </div>
+      <div class="badges">
+        <span>🐰 Cruelty-Free</span><span>🌱 Vegan</span><span>🧪 Dermatologist-Tested</span><span>🚫 Prostaglandin-Free</span>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <!-- Before / After slider -->
+      <div class="ba" id="ba" style="--pos:50%">
+        <div class="ba-img ba-after">
+          <svg viewBox="0 0 300 200" aria-label="After">
+            <use href="#eye-base"/>
+            <g stroke="#2b2118" stroke-width="2.4" stroke-linecap="round" fill="none">
+              <path d="M70 78 q-6 -34 -10 -44"/><path d="M92 70 q-3 -36 -6 -50"/>
+              <path d="M114 66 q0 -38 0 -54"/><path d="M138 64 q3 -40 6 -56"/>
+              <path d="M162 64 q6 -38 12 -54"/><path d="M186 68 q10 -34 18 -48"/>
+              <path d="M208 74 q14 -28 24 -40"/><path d="M226 82 q18 -22 30 -30"/>
+            </g>
+          </svg>
+          <span class="ba-tag">After · 8 weeks</span>
+        </div>
+        <div class="ba-img ba-before" id="baBefore">
+          <svg viewBox="0 0 300 200" aria-label="Before">
+            <use href="#eye-base"/>
+            <g stroke="#2b2118" stroke-width="2.2" stroke-linecap="round" fill="none">
+              <path d="M88 74 q-2 -10 -3 -15"/><path d="M116 70 q0 -11 0 -16"/>
+              <path d="M146 69 q1 -11 2 -16"/><path d="M176 71 q3 -10 5 -15"/>
+              <path d="M204 76 q5 -9 8 -13"/>
+            </g>
+          </svg>
+          <span class="ba-tag ba-tag-b">Before</span>
+        </div>
+        <div class="ba-handle" id="baHandle"><span>‹ ›</span></div>
+        <input type="range" min="0" max="100" value="50" class="ba-range" id="baRange" aria-label="Drag to compare before and after" />
+      </div>
+      <p class="visual-cap">← Drag to see the difference</p>
+    </div>
+  </section>
+
+  <!-- Shared SVG eye base -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <g id="eye-base">
+        <rect width="300" height="200" fill="#f3e7dc"/>
+        <path d="M40 110 Q150 50 260 110 Q150 150 40 110 Z" fill="#fff" stroke="#c9a98f" stroke-width="2"/>
+        <circle cx="150" cy="108" r="30" fill="#8a5a3b"/>
+        <circle cx="150" cy="108" r="13" fill="#2b1d12"/>
+        <circle cx="142" cy="100" r="5" fill="#fff" opacity=".85"/>
+        <path d="M40 110 Q150 50 260 110" fill="none" stroke="#2b2118" stroke-width="3"/>
+      </g>
+    </defs>
+  </svg>
+
+  <!-- Trust strip -->
+  <section class="strip">
+    <div class="strip-item"><strong>97%</strong><span>saw fuller-looking lashes*</span></div>
+    <div class="strip-item"><strong>8 wks</strong><span>to visible results</span></div>
+    <div class="strip-item"><strong>0</strong><span>prostaglandins, parabens, sulfates</span></div>
+    <div class="strip-item"><strong>1</strong><span>nightly swipe — that's it</span></div>
+  </section>
+
+  <!-- Results timeline -->
+  <section class="results" id="results">
+    <h2>What to expect</h2>
+    <p class="section-sub">Consistency is everything — one swipe along your lash line and brows each night.</p>
+    <div class="timeline">
+      <div class="tl"><span class="tl-week">Week 2</span><p>Lashes feel softer, more conditioned and hydrated.</p></div>
+      <div class="tl"><span class="tl-week">Week 4</span><p>Brows look more defined; sparse spots appear fuller.</p></div>
+      <div class="tl"><span class="tl-week">Week 6</span><p>Lashes look noticeably longer and lifted.</p></div>
+      <div class="tl tl-best"><span class="tl-week">Week 8</span><p>Your fullest, healthiest-looking lashes &amp; brows yet.</p></div>
+    </div>
+  </section>
+
+  <!-- How it works / ingredients -->
+  <section class="how" id="how">
+    <h2>Clean, conditioning, <em>prostaglandin-free.</em></h2>
+    <p class="section-sub">No harsh actives that darken or irritate the lid — just nourishing, well-loved ingredients.</p>
+    <div class="ingredients">
+      <div class="ing"><span class="ing-ico">🧬</span><h3>Biotin &amp; Peptides</h3><p>Support stronger, more resilient-looking lash and brow hairs.</p></div>
+      <div class="ing"><span class="ing-ico">🌿</span><h3>Castor &amp; Linseed Oil</h3><p>Classic conditioners that soften and add visible shine.</p></div>
+      <div class="ing"><span class="ing-ico">💧</span><h3>Panthenol (Pro-Vit B5)</h3><p>Deeply hydrates to reduce breakage and brittleness.</p></div>
+      <div class="ing"><span class="ing-ico">🛡️</span><h3>Vitamin E</h3><p>Antioxidant protection from daily environmental stress.</p></div>
+    </div>
+  </section>
+
+  <!-- Why vs extensions -->
+  <section class="versus">
+    <h2>Why women are ditching extensions</h2>
+    <div class="vs-table">
+      <div class="vs-col vs-us">
+        <h3>LUMÉ Serum</h3>
+        <ul>
+          <li>✔ ~$1 per day</li>
+          <li>✔ Your own natural lashes</li>
+          <li>✔ 10 seconds at home</li>
+          <li>✔ No salon, no glue, no damage</li>
+        </ul>
+      </div>
+      <div class="vs-col vs-them">
+        <h3>Lash Extensions</h3>
+        <ul>
+          <li>✘ $150+ every few weeks</li>
+          <li>✘ Can weaken natural lashes</li>
+          <li>✘ 2-hour appointments + fills</li>
+          <li>✘ Glue, irritation, upkeep</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Shop / bundles -->
+  <section class="shop" id="shop">
+    <h2>Choose your routine</h2>
+    <p class="section-sub">Results build over 8+ weeks — most customers start with the 2-bottle kit.</p>
+    <div class="cards">
+      <div class="bundle">
+        <h3>1 Bottle</h3>
+        <p class="b-desc">~1 month supply</p>
+        <p class="b-price">$34.95</p>
+        <button class="cta-2" data-add="LUMÉ Lash &amp; Brow Serum — 1 Bottle" data-price="34.95">Add to Bag</button>
+      </div>
+      <div class="bundle best">
+        <div class="flag">★ BEST RESULTS</div>
+        <h3>2 Bottles</h3>
+        <p class="b-desc">Full 8-week routine — save 20%</p>
+        <p class="b-price">$55.90 <span class="b-was">$69.90</span></p>
+        <button class="cta-2 cta-best" data-add="LUMÉ Lash &amp; Brow Serum — 2-Bottle Kit" data-price="55.90">Add to Bag</button>
+      </div>
+      <div class="bundle">
+        <h3>3 Bottles</h3>
+        <p class="b-desc">Best value — save 28%</p>
+        <p class="b-price">$74.95 <span class="b-was">$104.85</span></p>
+        <button class="cta-2" data-add="LUMÉ Lash &amp; Brow Serum — 3-Bottle Set" data-price="74.95">Add to Bag</button>
+      </div>
+    </div>
+    <p class="subscribe-note">💡 Tip: offer “Subscribe &amp; Save 15%” at checkout — lash serum is a perfect repeat-purchase product.</p>
+  </section>
+
+  <!-- Reviews -->
+  <section class="reviews" id="reviews">
+    <h2>Loved by 100,000+ lashes <span class="grad">★ 4.9</span></h2>
+    <div class="review-grid">
+      <div class="review"><div class="stars">★★★★★</div><p>"I genuinely didn't think it would work. Week 6 and my friends keep asking if I got extensions. I didn't."</p><span class="who">— Priya S. · Verified Buyer</span></div>
+      <div class="review"><div class="stars">★★★★★</div><p>"My brows had thinned out so badly from over-plucking in my 20s. This filled in the sparse gaps. Obsessed."</p><span class="who">— Hannah L. · Verified Buyer</span></div>
+      <div class="review"><div class="stars">★★★★★</div><p>"Prostaglandin-free was a must for me — no irritation, no dark lids, just longer-looking lashes. Repurchasing."</p><span class="who">— Gabriela M. · Verified Buyer</span></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <h2>Your questions, answered</h2>
+    <div class="faq-list">
+      <details><summary>How long until I see results?</summary><p>Most people notice conditioned, softer lashes within 2 weeks and a visibly fuller appearance around 6–8 weeks of nightly use. Consistency is key.</p></details>
+      <details><summary>Is it really prostaglandin-free?</summary><p>Yes. Our formula relies on conditioning peptides, biotin, and botanical oils — not prostaglandin analogs — to support the look of fuller lashes and brows without common irritation concerns.</p></details>
+      <details><summary>How do I use it?</summary><p>Once nightly on clean, dry skin: swipe along the upper lash line like eyeliner, and brush through your brows. Let it absorb before bed.</p></details>
+      <details><summary>Is it safe for sensitive eyes and contact lenses?</summary><p>It's formulated to be gentle, vegan, and free from parabens and sulfates. As with any eye-area product, patch test first and remove contacts before applying.</p></details>
+      <details><summary>What if it doesn't work for me?</summary><p>You're protected by our 60-day results guarantee. If you're not happy, reach out for a full refund.</p></details>
+    </div>
+  </section>
+
+  <section class="final">
+    <h2>Your lashes, but <em>more.</em></h2>
+    <button class="cta" data-add="LUMÉ Lash &amp; Brow Serum — 1 Bottle" data-price="34.95">Shop LUMÉ — from $34.95</button>
+    <p class="final-mini">🌿 Vegan · 🐰 Cruelty-free · 🚫 Prostaglandin-free · 🔁 60-day guarantee</p>
+  </section>
+
+  <footer class="footer">
+    <div class="brand">LUMÉ<sup>™</sup></div>
+    <p>Clean, conditioning lash &amp; brow care.</p>
+    <div class="foot-links"><a href="#results">Results</a><a href="#how">Ingredients</a><a href="#faq">FAQ</a><a href="mailto:hello@lumebeauty.com">Contact</a></div>
+    <small class="disclaimer">*Based on a self-assessment consumer panel; results vary. These statements have not been evaluated by the FDA. This product is a cosmetic and is not intended to diagnose, treat, cure, or prevent any disease. Demo store template — replace claims, reviews, and statistics with your own verified data before launch.</small>
+    <small>© 2026 LUMÉ Beauty. All rights reserved.</small>
+  </footer>
+
+  <div class="sticky-buy" id="stickyBuy">
+    <div class="sb-info"><strong>LUMÉ Lash &amp; Brow Serum</strong><span>from $34.95</span></div>
+    <button class="cta" data-add="LUMÉ Lash &amp; Brow Serum — 1 Bottle" data-price="34.95">Add to Bag</button>
+  </div>
+
+  <div class="cart-overlay" id="cartOverlay"></div>
+  <aside class="cart-drawer" id="cartDrawer" aria-hidden="true">
+    <div class="cart-head"><h3>Your Bag</h3><button id="closeCart" aria-label="Close bag">✕</button></div>
+    <div class="cart-items" id="cartItems"><p class="cart-empty">Your bag is empty. ✨</p></div>
+    <div class="cart-foot">
+      <div class="cart-total"><span>Subtotal</span><strong id="cartTotal">$0.00</strong></div>
+      <button class="cta checkout" id="checkout">Checkout</button>
+      <p class="cart-note">Free shipping over $35 · Shipping &amp; taxes at checkout.</p>
+    </div>
+  </aside>
+
+  <script src="script.js"></script>
+</body>
+</html>

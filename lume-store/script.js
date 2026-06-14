@@ -5,6 +5,8 @@ const cartItemsEl = $('#cartItems');
 const cartCountEl = $('#cartCount');
 const cartTotalEl = $('#cartTotal');
 
+function decode(s) { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; }
+
 function render() {
   const count = cart.reduce((n, i) => n + i.qty, 0);
   const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
@@ -12,7 +14,7 @@ function render() {
   cartTotalEl.textContent = '$' + total.toFixed(2);
 
   if (!cart.length) {
-    cartItemsEl.innerHTML = '<p class="cart-empty">Your cart is empty — let the duels begin. 🧲</p>';
+    cartItemsEl.innerHTML = '<p class="cart-empty">Your bag is empty. ✨</p>';
     return;
   }
   cartItemsEl.innerHTML = cart.map((i, idx) => `
@@ -27,6 +29,7 @@ function render() {
 }
 
 function addToCart(name, price) {
+  name = decode(name);
   const existing = cart.find((i) => i.name === name);
   if (existing) existing.qty++;
   else cart.push({ name, price: parseFloat(price), qty: 1 });
@@ -44,7 +47,6 @@ $('#openCart').addEventListener('click', openCart);
 $('#closeCart').addEventListener('click', closeCart);
 overlay.addEventListener('click', closeCart);
 
-// Add-to-cart buttons (event delegation)
 document.addEventListener('click', (e) => {
   const add = e.target.closest('[data-add]');
   if (add) { addToCart(add.dataset.add, add.dataset.price); return; }
@@ -54,35 +56,24 @@ document.addEventListener('click', (e) => {
 
 $('#checkout').addEventListener('click', () => {
   if (!cart.length) return;
-  // In a live Shopify store this routes to /cart/checkout.
-  alert('🧲 Redirecting to secure checkout…\n\n(Demo) Connect this button to your Shopify checkout to go live.');
+  // In a live Shopify store, route this to /checkout.
+  alert('✨ Redirecting to secure checkout…\n\n(Demo) Connect this button to your Shopify checkout to go live.');
 });
 
-// ---- Sticky buy bar shows after hero scrolls away ----
+// ---- Sticky buy bar ----
 const sticky = $('#stickyBuy');
 const hero = document.querySelector('.hero');
 new IntersectionObserver(([entry]) => {
   sticky.classList.toggle('show', !entry.isIntersecting);
 }, { threshold: 0 }).observe(hero);
 
-// ---- "Watching now" live counter jitter ----
-const live = document.querySelector('.pill-live');
-if (live) {
-  let n = 217;
-  setInterval(() => {
-    n += Math.floor(Math.random() * 7) - 3;
-    n = Math.max(180, Math.min(260, n));
-    live.innerHTML = `<i></i> ${n} watching now`;
-  }, 3200);
-}
-
-// ---- Board snap demo on click ----
-const board = $('#board');
-if (board) {
-  board.addEventListener('click', () => {
-    board.classList.add('snap');
-    setTimeout(() => board.classList.remove('snap'), 900);
-  });
+// ---- Before/After slider ----
+const ba = $('#ba');
+const baRange = $('#baRange');
+if (ba && baRange) {
+  const update = () => ba.style.setProperty('--pos', baRange.value + '%');
+  baRange.addEventListener('input', update);
+  update();
 }
 
 render();
