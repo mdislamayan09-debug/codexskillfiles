@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/github-hero.svg" alt="Iknowdesign Skill — design intelligence for Claude Code" width="100%" />
+  <img src="assets/github-hero-v2.svg" alt="Iknowdesign Skill — design intelligence for Claude Code" width="100%" />
 
   <p><strong>A design-only Agent Skills library for art direction, typography, composition, responsive hierarchy, motion, brand systems, visual fidelity, and evidence-based critique.</strong></p>
 
