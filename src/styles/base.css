@@ -1,0 +1,171 @@
+:root {
+  --ink: #e8e2d4;
+  --ink-dim: rgba(232, 226, 212, 0.62);
+  --ink-faint: rgba(232, 226, 212, 0.32);
+  --brass: #c9a86a;
+  --brass-dim: rgba(201, 168, 106, 0.45);
+  --teal: #5ff2d6;
+  --teal-dim: rgba(95, 242, 214, 0.35);
+  --ember: #ff7a3d;
+  --danger: #e2533a;
+  --panel: rgba(14, 16, 17, 0.78);
+  --panel-edge: rgba(201, 168, 106, 0.28);
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ui-scale: 1;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #070809;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+#ui-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-size: calc(15px * var(--ui-scale));
+}
+
+/* ------------------------------------------------------------------ Loading */
+
+#loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 90% at 50% 38%, rgba(95, 242, 214, 0.06), transparent 60%),
+    radial-gradient(80% 60% at 50% 120%, rgba(201, 168, 106, 0.08), transparent 70%),
+    #070809;
+  z-index: 50;
+  transition: opacity 1.2s ease;
+}
+
+#loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-inner {
+  width: min(460px, 86vw);
+  text-align: center;
+}
+
+.loading-crest svg {
+  width: 88px;
+  height: 88px;
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 1.4;
+  opacity: 0.8;
+  animation: crest-turn 18s linear infinite;
+  filter: drop-shadow(0 0 12px rgba(95, 242, 214, 0.35));
+}
+
+@keyframes crest-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(38px, 7vw, 64px);
+  letter-spacing: 0.32em;
+  margin: 18px 0 4px;
+  padding-left: 0.32em;
+  color: #f0eadb;
+}
+
+.loading-tagline {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  color: var(--ink-dim);
+  margin: 0 0 36px;
+}
+
+.loading-bar {
+  height: 2px;
+  background: rgba(232, 226, 212, 0.12);
+  overflow: hidden;
+}
+
+#loading-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--brass), var(--teal));
+  transition: width 0.25s ease;
+}
+
+#loading-stage {
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  min-height: 1.4em;
+}
+
+.fatal-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #070809;
+  z-index: 100;
+  padding: 24px;
+}
+
+.fatal-error .box {
+  max-width: 560px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  padding: 28px 32px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.fatal-error h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.fatal-error code {
+  display: block;
+  margin-top: 12px;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+  font-size: 12px;
+}

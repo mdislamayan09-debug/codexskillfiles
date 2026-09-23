@@ -1,0 +1,174 @@
+import * as THREE from 'three';
+import { AERIAL_SAMPLE } from '../atmosphere/atmosphereGlsl';
+
+// Every lit or fogged material in STILLWILD runs through this module:
+//  * the fog chunks are replaced with physically based aerial perspective
+//    (froxel LUT) plus exponential height fog, shared by reference so one
+//    uniform update reaches every material;
+//  * material-specific shader patches (wind, terrain, dissolve…) compose in a
+//    deterministic order with a matching program cache key;
+//  * cascaded shadow setup (CSM) is chained rather than overwritten.
+
+export type ShaderObject = THREE.WebGLProgramParametersWithUniforms;
+
+export interface ShaderPatch {
+  key: string;
+  apply(shader: ShaderObject, material: THREE.Material): void;
+}
+
+/** Shared uniform objects. Assigned once by `installAtmosphereChunks`. */
+export const sharedUniforms: Record<string, THREE.IUniform> = {};
+
+const FOG_PARS_VERTEX = /* glsl */ `
+#ifdef USE_FOG
+  varying vec3 vAtmoViewPos;
+#endif
+`;
+
+const FOG_VERTEX = /* glsl */ `
+#ifdef USE_FOG
+  vAtmoViewPos = mvPosition.xyz;
+#endif
+`;
+
+export const ATMO_FRAGMENT_PARS = /* glsl */ `
+uniform sampler2D uAerialLUT;
+uniform float uAerialMaxDistance;
+uniform float uAerialIntensity;
+uniform vec2 uResolution;
+uniform vec3 uSunDir;
+uniform float uFogDensity;
+uniform float uFogHeight;
+uniform float uFogFalloff;
+uniform vec3 uFogColorAmbient;
+uniform vec3 uFogColorSun;
+${AERIAL_SAMPLE}
+
+float atmoPhaseHG(float cosTheta, float g) {
+  float g2 = g * g;
+  return (1.0 - g2) / (4.0 * 3.14159265 * pow(max(1e-4, 1.0 + g2 - 2.0 * g * cosTheta), 1.5));
+}
+
+// Exponential height fog integrated along the view ray.
+float atmoHeightFog(vec3 camPos, vec3 worldPos, float dist) {
+  if (uFogDensity <= 0.0) return 0.0;
+  float dy = worldPos.y - camPos.y;
+  float base = uFogDensity * exp(-uFogFalloff * (camPos.y - uFogHeight));
+  float k = uFogFalloff * dy;
+  float integral = abs(k) > 1e-4 ? (1.0 - exp(-k)) / k : 1.0;
+  return 1.0 - exp(-base * dist * integral);
+}
+
+vec3 applyAtmosphere(vec3 color, vec3 viewPos) {
+  float dist = length(viewPos);
+  vec2 suv = gl_FragCoord.xy / uResolution;
+  vec4 ap = sampleAerialLUT(uAerialLUT, suv, dist, uAerialMaxDistance);
+  color = color * ap.a + ap.rgb * uAerialIntensity;
+  vec3 worldPos = (viewPos - viewMatrix[3].xyz) * mat3(viewMatrix);
+  vec3 rayDir = normalize(worldPos - cameraPosition);
+  float fog = atmoHeightFog(cameraPosition, worldPos, dist);
+  vec3 fogColor = uFogColorAmbient + uFogColorSun * atmoPhaseHG(dot(rayDir, uSunDir), 0.55) * 4.0;
+  return mix(color, fogColor, fog);
+}
+`;
+
+const FOG_PARS_FRAGMENT = /* glsl */ `
+#ifdef USE_FOG
+  varying vec3 vAtmoViewPos;
+  ${ATMO_FRAGMENT_PARS}
+#endif
+`;
+
+const FOG_FRAGMENT = /* glsl */ `
+#ifdef USE_FOG
+  gl_FragColor.rgb = applyAtmosphere(gl_FragColor.rgb, vAtmoViewPos);
+#endif
+`;
+
+const ATMO_UNIFORM_NAMES = [
+  'uAerialLUT',
+  'uAerialMaxDistance',
+  'uAerialIntensity',
+  'uResolution',
+  'uSunDir',
+  'uFogDensity',
+  'uFogHeight',
+  'uFogFalloff',
+  'uFogColorAmbient',
+  'uFogColorSun',
+];
+
+export function injectSharedUniforms(shader: ShaderObject, names: readonly string[] = ATMO_UNIFORM_NAMES): void {
+  for (const name of names) {
+    const uniform = sharedUniforms[name];
+    if (uniform) shader.uniforms[name] = uniform;
+  }
+}
+
+let installed = false;
+
+/**
+ * Replaces Three's fog with aerial perspective + height fog for every
+ * built-in material and makes sure every program receives the shared uniforms.
+ */
+export function installAtmosphereChunks(uniforms: Record<string, THREE.IUniform>): void {
+  Object.assign(sharedUniforms, uniforms);
+  if (installed) return;
+  installed = true;
+  THREE.ShaderChunk.fog_pars_vertex = FOG_PARS_VERTEX;
+  THREE.ShaderChunk.fog_vertex = FOG_VERTEX;
+  THREE.ShaderChunk.fog_pars_fragment = FOG_PARS_FRAGMENT;
+  THREE.ShaderChunk.fog_fragment = FOG_FRAGMENT;
+  // Default hook for materials without their own patches.
+  THREE.Material.prototype.onBeforeCompile = function onBeforeCompile(shader: ShaderObject) {
+    injectSharedUniforms(shader);
+  };
+}
+
+interface PatchState {
+  patches: ShaderPatch[];
+  csmHook?: (shader: ShaderObject, renderer: THREE.WebGLRenderer) => void;
+}
+
+const patchStates = new WeakMap<THREE.Material, PatchState>();
+
+function rebuildHook(material: THREE.Material, state: PatchState): void {
+  material.onBeforeCompile = (shader, renderer) => {
+    state.csmHook?.call(material, shader, renderer);
+    injectSharedUniforms(shader);
+    for (const patch of state.patches) patch.apply(shader, material);
+  };
+  const key = state.patches.map((p) => p.key).join('|') + (state.csmHook ? '|csm' : '');
+  material.customProgramCacheKey = () => key;
+  material.needsUpdate = true;
+}
+
+/** Adds a shader patch to a material (idempotent per key). */
+export function addPatch(material: THREE.Material, patch: ShaderPatch): void {
+  let state = patchStates.get(material);
+  if (!state) {
+    state = { patches: [] };
+    patchStates.set(material, state);
+  }
+  if (state.patches.some((p) => p.key === patch.key)) return;
+  state.patches.push(patch);
+  rebuildHook(material, state);
+}
+
+/** Captures the hook CSM.setupMaterial installed so later patches chain it. */
+export function adoptCsmHook(material: THREE.Material): void {
+  let state = patchStates.get(material);
+  if (!state) {
+    state = { patches: [] };
+    patchStates.set(material, state);
+  }
+  state.csmHook = material.onBeforeCompile as PatchState['csmHook'];
+  rebuildHook(material, state);
+}
+
+/** Replace exactly one occurrence of `search` in shader source or throw (catches Three upgrades). */
+export function replaceOnce(source: string, search: string, replacement: string, label: string): string {
+  const index = source.indexOf(search);
+  if (index < 0) throw new Error(`Shader patch "${label}" could not find: ${search.slice(0, 60)}`);
+  return source.slice(0, index) + replacement + source.slice(index + search.length);
+}

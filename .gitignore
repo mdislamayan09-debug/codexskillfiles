@@ -1,0 +1,12 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+artifacts/captures/
+artifacts/world-preview/
+artifacts/tmp/
+*.log
+.DS_Store
+.unlazy/
+.unlazy-hook-state.json
+.claude/settings.local.json
