@@ -608,7 +608,7 @@ export class Building {
       const top = this.freshTop(point.x, point.z, yaw);
       const fresh = { x: point.x, y: top.y, z: point.z, yaw };
       const t: Target = { grid: null, fresh, i: 0, j: 0, level: 0, dir: 0, depth: top.depth, valid: true, reason: '' };
-      if (this.world.waterDepthAt(point.x, point.z) > 0.4) return { ...t, valid: false, reason: 'in deep water' };
+      if (this.world.waterDepthAt(point.x, point.z) > 0.4 && !Number.isFinite(this.world.iceAt(point.x, point.z))) return { ...t, valid: false, reason: 'in deep water' };
       if (top.depth > MAX_DEPTH) return { ...t, valid: false, reason: 'ground too uneven' };
       if (Math.hypot(point.x - origin.x, point.z - origin.z) > 7) return { ...t, valid: false, reason: 'too far' };
       return t;
@@ -710,7 +710,7 @@ export class Building {
     // Terrain poking through the deck.
     const corners = this.cellHeights(g, i, j);
     if (Math.max(...corners) > g.y + 0.35) return { ...t, reason: 'ground in the way' };
-    if (this.world.waterDepthAt(c.x, c.z) > 1.5) return { ...t, reason: 'in deep water' };
+    if (this.world.waterDepthAt(c.x, c.z) > 1.5 && !Number.isFinite(this.world.iceAt(c.x, c.z))) return { ...t, reason: 'in deep water' };
     return { ...t, valid: true };
   }
 
@@ -724,7 +724,7 @@ export class Building {
       [0, 0],
     ]) {
       const w = this.toWorld(g, i * CELL + a * (HALF - 0.1), j * CELL + b * (HALF - 0.1));
-      out.push(this.world.heightAt(w.x, w.z));
+      out.push(this.world.groundAt(w.x, w.z));
     }
     return out;
   }

@@ -252,29 +252,39 @@ void layerMud(vec2 uv, out vec3 col, out float h) {
 }
 
 void layerGranite(vec2 uv, out vec3 col, out float h) {
-  // Fractured facets: per-cell planes give the chiselled look of real rock.
-  vec4 v = pvoronoi(uv * 5.0, vec2(5.0), 1.0);
-  vec2 cellUv = uv * 5.0;
-  vec3 ch = hash32(floor(cellUv) + v.z * 13.0);
-  float facet = dot(fract(cellUv) - 0.5, (ch.xy - 0.5) * 0.9) + ch.z * 0.3;
+  // Irregular blocks, not tiles: fractures on domain-warped coordinates at
+  // two scales. Blocks sit at slightly different depths with rounded edges;
+  // only some joints open into cracks, and their width wanders.
+  vec2 warp = vec2(pfbm(uv * 2.0 + 1.7, vec2(2.0), 4), pfbm(uv * 2.0 - 4.1, vec2(2.0), 4));
+  vec2 wuv = uv + warp * 0.1;
+  vec4 v = pvoronoi(wuv * 4.0, vec2(4.0), 1.0);
+  vec4 s = pvoronoi(wuv * 13.0 + 0.37, vec2(13.0), 1.0);
+  float block = v.z;
   float edge = v.y - v.x;
-  float crack = 1.0 - smoothstep(0.0, 0.06, edge);
+  float bevel = smoothstep(0.0, 0.14, edge);
+  float open = smoothstep(0.1, 0.55, pnoise(wuv * 6.0 + block * 3.0, vec2(6.0)) * 0.5 + 0.5);
+  float crack = (1.0 - smoothstep(0.0, 0.02 + 0.035 * open, edge)) * (0.25 + 0.75 * open);
+  float chip = (1.0 - smoothstep(0.0, 0.045, s.y - s.x)) * step(0.45, s.z);
+  float large = pfbm(uv * 1.5, vec2(1.5), 4);
   float detail = pfbm(uv * 24.0, vec2(24.0), 4);
   float micro = pfbm(uv * 90.0, vec2(90.0), 2);
   float strata = pnoise(vec2(uv.y * 30.0 + pnoise(uv * 4.0, vec2(4.0)) * 2.0, 0.5), vec2(30.0, 1.0));
-  h = 0.5 + 0.25 * facet + 0.12 * detail + 0.04 * micro - 0.35 * crack;
+  h = 0.5 + 0.16 * large + 0.14 * (block - 0.5) * bevel + 0.08 * bevel + 0.1 * detail + 0.04 * micro - 0.32 * crack - 0.07 * chip;
   vec3 base = mix(vec3(0.19, 0.185, 0.17), vec3(0.36, 0.345, 0.32), 0.5 + 0.5 * detail);
-  base *= 0.9 + 0.2 * ch.z;
+  // Each block weathers a little differently; large-scale staining ties them together.
+  base *= 0.9 + 0.16 * block + 0.1 * large;
+  float stain = smoothstep(0.2, 0.7, pfbm(uv * 3.0 + 5.0, vec2(3.0), 4));
+  base = mix(base, base * vec3(0.78, 0.72, 0.64), stain * 0.45);
   // Mineral speckle.
   float speck = hash12(floor(uv * 256.0));
   base = mix(base, vec3(0.52, 0.48, 0.45), step(0.93, speck) * 0.6);
   base = mix(base, vec3(0.07, 0.07, 0.07), step(speck, 0.05) * 0.5);
   base *= 1.0 + 0.08 * strata;
-  // Lichen crusts.
-  float lichen = smoothstep(0.35, 0.55, pfbm(uv * 7.0 + 9.0, vec2(7.0), 5));
-  vec3 lichenCol = mix(vec3(0.38, 0.38, 0.28), vec3(0.4, 0.33, 0.14), hash12(floor(uv * 7.0)));
+  // Lichen crusts, thicker on the upper faces of blocks.
+  float lichen = smoothstep(0.35, 0.55, pfbm(uv * 7.0 + 9.0, vec2(7.0), 5)) * (0.5 + 0.5 * bevel);
+  vec3 lichenCol = mix(vec3(0.38, 0.38, 0.28), vec3(0.4, 0.33, 0.14), hash12(vec2(block * 37.0, 3.0)));
   col = mix(base, lichenCol, lichen * 0.55);
-  col *= 1.0 - crack * 0.65;
+  col *= 1.0 - crack * 0.62 - chip * 0.12;
 }
 
 void layerBasalt(vec2 uv, out vec3 col, out float h) {

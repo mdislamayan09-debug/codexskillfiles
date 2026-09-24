@@ -2,7 +2,7 @@
 
 This roadmap is ordered so the game is **playable and polished at the end of every milestone**. Nothing ships as a placeholder that a later milestone is expected to replace wholesale; each milestone deepens systems that already work.
 
-Status legend: ✅ done · 🟡 in progress · ⬜ not started. The live state of each item is tracked in `artifacts/game-progress.md`.
+Status legend: ✅ done · 🟡 in progress · ⬜ not started. The live state of each item is tracked in `docs/PROGRESS.md`.
 
 ---
 

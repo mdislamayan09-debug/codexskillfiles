@@ -124,31 +124,59 @@ export class TitleScreen {
 
   private playIntro(difficulty: Difficulty): void {
     this.hide();
+    this.hooks.onNewGame(difficulty);
+    this.narrate(INTRO, () => this.hooks.onBegin());
+  }
+
+  /**
+   * Lines of narration over black. Click, E or Space moves on; Esc or Skip
+   * ends it. An optional closing card (title and a line) holds at the end.
+   */
+  narrate(lines: readonly string[], onDone: () => void, closing?: { title: string; sub: string }): void {
     this.introOpen = true;
     this.intro.innerHTML = '';
     this.intro.classList.add('open');
     const text = el('p', 'title-intro-text', this.intro);
     const skip = el('button', 'title-back title-skip', this.intro, 'Skip');
-    this.hooks.onNewGame(difficulty);
     let i = 0;
     let timer = 0;
     let swap = 0;
+    let card = false;
     const finish = () => {
       if (!this.introOpen) return;
       this.introOpen = false;
       window.clearTimeout(timer);
       window.clearTimeout(swap);
       this.intro.classList.remove('open');
-      this.hooks.onBegin();
+      onDone();
     };
-    const next = () => {
-      window.clearTimeout(timer);
-      if (i >= INTRO.length) {
+    const showCard = () => {
+      if (!closing) {
         finish();
         return;
       }
+      card = true;
       text.classList.remove('show');
-      const line = INTRO[i];
+      swap = window.setTimeout(() => {
+        text.innerHTML = '';
+        el('span', 'title-intro-card', text, closing.title);
+        el('span', 'title-intro-sub', text, closing.sub);
+        text.classList.add('show');
+      }, 700);
+      timer = window.setTimeout(finish, 9000);
+    };
+    const next = () => {
+      window.clearTimeout(timer);
+      if (card) {
+        finish();
+        return;
+      }
+      if (i >= lines.length) {
+        showCard();
+        return;
+      }
+      text.classList.remove('show');
+      const line = lines[i];
       i += 1;
       swap = window.setTimeout(() => {
         text.textContent = line;

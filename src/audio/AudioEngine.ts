@@ -519,27 +519,47 @@ export class AudioEngine {
     return { g: 1 / (1 + d / range), pan };
   }
 
-  /** The Wardens: roars, stomps, crashes and the tolling of a freed Bellstone. */
-  warden(kind: 'roar' | 'stomp' | 'step' | 'charge' | 'crash' | 'roots' | 'rootsWarn' | 'crack' | 'calm', x: number, y: number, z: number, strength = 1): void {
+  /**
+   * The Wardens: roars, stomps, crashes and eruptions, pitched per Warden
+   * (`pitch`) and coloured by its element (water, ice, fire, mud, roots).
+   */
+  warden(
+    kind: 'roar' | 'stomp' | 'step' | 'charge' | 'crash' | 'roots' | 'rootsWarn' | 'crack' | 'calm',
+    x: number,
+    y: number,
+    z: number,
+    strength = 1,
+    pitch = 1,
+    element: 'roots' | 'geyser' | 'ice' | 'lava' | 'mud' = 'roots',
+  ): void {
     if (!this.ctx) return;
     const { g: near, pan } = this.spatial(x, y, z, kind === 'step' ? 10 : 22);
     const g = near * strength;
     const t = this.ctx.currentTime;
+    const f = (hz: number) => hz * pitch;
     switch (kind) {
       case 'roar':
       case 'charge': {
         const long = kind === 'roar' ? 1 : 0.7;
         // Two growling voices, a breath of noise and a chest rumble.
-        this.tone({ type: 'sawtooth', freq: 82, freqEnd: 50, attack: 0.25, decay: 2.1 * long, gain: 0.2 * g, pan, reverb: 0.8, fm: { ratio: 0.5, index: 2.6 } });
-        this.tone({ type: 'sawtooth', freq: 123, freqEnd: 74, attack: 0.3, decay: 1.7 * long, gain: 0.08 * g, pan, reverb: 0.8, detune: 14 });
-        this.burst({ buffer: this.pink, type: 'bandpass', freq: 560, freqEnd: 240, q: 1.3, attack: 0.3, decay: 1.9 * long, gain: 0.5 * g, pan, reverb: 0.7 });
-        this.burst({ buffer: this.brown, type: 'lowpass', freq: 240, attack: 0.2, decay: 2.2 * long, gain: 0.7 * g, pan });
+        this.tone({ type: 'sawtooth', freq: f(82), freqEnd: f(50), attack: 0.25, decay: 2.1 * long, gain: 0.2 * g, pan, reverb: 0.8, fm: { ratio: 0.5, index: 2.6 } });
+        this.tone({ type: 'sawtooth', freq: f(123), freqEnd: f(74), attack: 0.3, decay: 1.7 * long, gain: 0.08 * g, pan, reverb: 0.8, detune: 14 });
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: f(560), freqEnd: f(240), q: 1.3, attack: 0.3, decay: 1.9 * long, gain: 0.5 * g, pan, reverb: 0.7 });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: f(240), attack: 0.2, decay: 2.2 * long, gain: 0.7 * g, pan });
         if (kind === 'charge') this.burst({ buffer: this.brown, type: 'lowpass', freq: 130, attack: 0.4, decay: 2.8, gain: 0.8 * g, pan, when: t + 0.3 });
         break;
       }
       case 'stomp':
         this.tone({ freq: 58, freqEnd: 26, attack: 0.004, decay: 1.0, gain: 0.7 * g, pan, reverb: 0.6 });
         this.burst({ buffer: this.brown, type: 'lowpass', freq: 380, freqEnd: 50, attack: 0.005, decay: 1.6, gain: 1.0 * g, pan, reverb: 0.5 });
+        if (element === 'geyser' || element === 'mud') {
+          // A slap of water (or mud) thrown up and falling back.
+          this.burst({ buffer: this.pink, type: 'bandpass', freq: element === 'mud' ? 500 : 1600, freqEnd: element === 'mud' ? 250 : 700, q: 0.7, attack: 0.02, decay: 1.1, gain: 0.5 * g, pan, reverb: 0.4 });
+        } else if (element === 'ice') {
+          for (let i = 0; i < 6; i += 1) this.tone({ freq: 2200 + this.rand() * 2600, decay: 0.2 + this.rand() * 0.5, gain: 0.05 * g, pan, when: t + this.rand() * 0.3, reverb: 0.7 });
+        } else if (element === 'lava') {
+          this.burst({ type: 'highpass', freq: 3500, attack: 0.1, decay: 1.2, gain: 0.12 * g, pan, when: t + 0.1 });
+        }
         this.burst({ type: 'highpass', freq: 1400, decay: 0.2, gain: 0.18 * g, pan, when: t + 0.02 });
         for (let i = 0; i < 6; i += 1) this.burst({ buffer: this.pink, type: 'bandpass', freq: 900 + this.rand() * 1600, decay: 0.05, gain: 0.08 * g, pan: pan + (this.rand() - 0.5) * 0.4, when: t + 0.15 + this.rand() * 0.6 });
         break;
@@ -553,14 +573,31 @@ export class AudioEngine {
         this.burst({ buffer: this.brown, type: 'lowpass', freq: 520, freqEnd: 70, attack: 0.01, decay: 1.8, gain: 0.9 * g, pan, reverb: 0.5 });
         break;
       case 'rootsWarn':
-        // Creaking wood working its way up through the ground.
-        this.tone({ type: 'sawtooth', freq: 120, freqEnd: 260, attack: 0.5, decay: 0.6, gain: 0.05 * g, pan, fm: { ratio: 1.5, index: 3 } });
+        // Something working its way up through the ground.
+        if (element === 'geyser' || element === 'mud') this.burst({ buffer: this.pink, type: 'bandpass', freq: 300, freqEnd: 1200, q: 2, attack: 0.9, decay: 0.3, gain: 0.25 * g, pan });
+        else if (element === 'lava') this.burst({ type: 'highpass', freq: 2000, freqEnd: 5000, attack: 0.9, decay: 0.3, gain: 0.08 * g, pan });
+        else if (element === 'ice') this.tone({ freq: 1800, freqEnd: 3600, attack: 0.9, decay: 0.3, gain: 0.03 * g, pan, fm: { ratio: 3.1, index: 2 } });
+        else this.tone({ type: 'sawtooth', freq: 120, freqEnd: 260, attack: 0.5, decay: 0.6, gain: 0.05 * g, pan, fm: { ratio: 1.5, index: 3 } });
         this.burst({ buffer: this.brown, type: 'lowpass', freq: 90, freqEnd: 260, attack: 0.9, decay: 0.3, gain: 0.5 * g, pan });
         break;
       case 'roots':
-        for (let i = 0; i < 9; i += 1) this.burst({ type: 'highpass', freq: 1300 + this.rand() * 2600, decay: 0.03 + this.rand() * 0.08, gain: 0.22 * g, pan, when: t + this.rand() * 0.25 });
+        if (element === 'geyser' || element === 'mud') {
+          // A geyser: a roar of water, then the spray falling back.
+          this.burst({ buffer: this.pink, type: 'bandpass', freq: element === 'mud' ? 420 : 1200, freqEnd: element === 'mud' ? 260 : 2600, q: 0.6, attack: 0.03, decay: 1.4, gain: 0.6 * g, pan, reverb: 0.4 });
+          this.burst({ buffer: this.white, type: 'highpass', freq: element === 'mud' ? 1200 : 3000, attack: 0.3, decay: 1.2, gain: 0.12 * g, pan, when: t + 0.5 });
+          if (element === 'mud') for (let i = 0; i < 5; i += 1) this.tone({ freq: 90 + this.rand() * 80, freqEnd: 60, decay: 0.12, gain: 0.2 * g, pan, when: t + 0.2 + i * 0.12 });
+        } else if (element === 'ice') {
+          for (let i = 0; i < 7; i += 1) this.tone({ freq: 1500 + this.rand() * 3000, decay: 0.3 + this.rand() * 0.8, gain: 0.06 * g, pan, when: t + this.rand() * 0.15, reverb: 0.8, fm: { ratio: 1.41 + this.rand(), index: 1.3 } });
+          this.burst({ type: 'highpass', freq: 2600, decay: 0.3, gain: 0.35 * g, pan });
+        } else if (element === 'lava') {
+          this.burst({ buffer: this.brown, type: 'lowpass', freq: 300, freqEnd: 80, attack: 0.01, decay: 1.2, gain: 0.8 * g, pan, reverb: 0.4 });
+          this.burst({ type: 'highpass', freq: 4000, attack: 0.05, decay: 1.4, gain: 0.14 * g, pan });
+          for (let i = 0; i < 8; i += 1) this.burst({ type: 'bandpass', freq: 1500 + this.rand() * 3000, q: 3, decay: 0.03, gain: 0.12 * g, pan, when: t + 0.1 + this.rand() * 0.8 });
+        } else {
+          for (let i = 0; i < 9; i += 1) this.burst({ type: 'highpass', freq: 1300 + this.rand() * 2600, decay: 0.03 + this.rand() * 0.08, gain: 0.22 * g, pan, when: t + this.rand() * 0.25 });
+          this.burst({ buffer: this.pink, type: 'bandpass', freq: 800, decay: 0.6, gain: 0.35 * g, pan, reverb: 0.3 });
+        }
         this.tone({ freq: 90, freqEnd: 40, decay: 0.4, gain: 0.45 * g, pan });
-        this.burst({ buffer: this.pink, type: 'bandpass', freq: 800, decay: 0.6, gain: 0.35 * g, pan, reverb: 0.3 });
         break;
       case 'crack':
         for (let i = 0; i < 5; i += 1) this.tone({ freq: 1800 + this.rand() * 3200, decay: 0.3 + this.rand() * 0.9, gain: 0.06 * g, pan, when: t + i * 0.03, reverb: 0.9, fm: { ratio: 1.41 + this.rand(), index: 1.2 } });

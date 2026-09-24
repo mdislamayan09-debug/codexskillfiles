@@ -232,4 +232,24 @@ export const LORE: { id: string; title: string; text: string }[] = [
     title: 'Mossback',
     text: 'The Warden of Hollowpine was a calf that followed the Choirmaster’s daughter through the young birches. When the note began it lay down beside the first bell. Unable to die, it grew a forest instead.',
   },
+  {
+    id: 'lore:tidemother',
+    title: 'Tidemother',
+    text: 'She ferried the harbour-master’s children through the shallows. When the note froze a wave mid-fall, she curled around the Drowned Bell, and the sea forgot how to move.',
+  },
+  {
+    id: 'lore:emberjaw',
+    title: 'Emberjaw',
+    text: 'The Smith-Mother’s hound slept by the anvils where the Veyr cast their bells. The last bell was poured as the note began; it never cooled, and neither did he.',
+  },
+  {
+    id: 'lore:rimebrow',
+    title: 'Rimebrow',
+    text: 'The Choirmaster sang the note into Frostglass to keep it safe. The white ram that watched the skaters stood guard on the ice for a thousand winters.',
+  },
+  {
+    id: 'lore:oldcroak',
+    title: 'Old Croak',
+    text: 'The choir rehearsed in the reeds, bells at their wrists, and an old toad hummed along half a note flat. When the water rose, he held their bells above it.',
+  },
 ];

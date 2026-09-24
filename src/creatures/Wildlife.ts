@@ -264,7 +264,7 @@ export class Wildlife {
       id: this.nextId++,
       species,
       rig,
-      pos: new THREE.Vector3(x, this.world.heightAt(x, z), z),
+      pos: new THREE.Vector3(x, this.world.groundAt(x, z), z),
       yaw: this.rng() * Math.PI * 2,
       speed: 0,
       scale,
@@ -619,7 +619,7 @@ export class Wildlife {
     let nx = c.pos.x + fx * c.speed * dt;
     let nz = c.pos.z + fz * c.speed * dt;
     // Keep out of deep water and off cliffs: turn away instead.
-    const ground = this.world.heightAt(nx, nz);
+    const ground = this.world.groundAt(nx, nz);
     const water = this.world.waterLevelAt(nx, nz);
     if (water > ground + 0.35 || this.world.slopeAt(nx, nz) > 0.62) {
       c.yaw += Math.PI * (0.5 + this.rng() * 0.5);
@@ -646,7 +646,7 @@ export class Wildlife {
       nx = px + (ox / od) * minD;
       nz = pz + (oz / od) * minD;
     }
-    c.pos.set(nx, this.world.heightAt(nx, nz), nz);
+    c.pos.set(nx, this.world.groundAt(nx, nz), nz);
   }
 
   private animate(c: Creature, dt: number, now: number): void {
@@ -668,8 +668,8 @@ export class Wildlife {
     const e = 0.6 * c.scale;
     const fx = -Math.sin(c.yaw);
     const fz = -Math.cos(c.yaw);
-    const hf = this.world.heightAt(c.pos.x + fx * e, c.pos.z + fz * e);
-    const hb = this.world.heightAt(c.pos.x - fx * e, c.pos.z - fz * e);
+    const hf = this.world.groundAt(c.pos.x + fx * e, c.pos.z + fz * e);
+    const hb = this.world.groundAt(c.pos.x - fx * e, c.pos.z - fz * e);
     const pitch = Math.atan2(hb - hf, e * 2);
     mesh.rotation.set(-pitch * 0.8, c.yaw, 0, 'YXZ');
     if (c.state === 'dead') mesh.position.y -= smoothstep(1, 3, (now - c.deadTime) * 0.02) * 0.1;

@@ -75,8 +75,8 @@ export class Inventory {
   }
 
   private slotOrder(hotbarFirst: boolean): number[] {
-    const hot = Array.from({ length: HOTBAR_SIZE }, (_, i) => i);
-    const pack = Array.from({ length: this.slots.length - HOTBAR_SIZE }, (_, i) => i + HOTBAR_SIZE);
+    const hot = Array.from({ length: Math.min(HOTBAR_SIZE, this.slots.length) }, (_, i) => i);
+    const pack = Array.from({ length: Math.max(0, this.slots.length - HOTBAR_SIZE) }, (_, i) => i + HOTBAR_SIZE);
     return hotbarFirst ? [...hot, ...pack] : [...pack, ...hot];
   }
 

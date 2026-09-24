@@ -401,17 +401,18 @@ export class Structures {
 
   /** Terrain or a built floor, whichever is the ground near height y. */
   private groundAt(x: number, z: number, y: number): number {
-    return Math.max(this.world.heightAt(x, z), this.surfaceAt ? this.surfaceAt(x, z, y) : -Infinity);
+    return Math.max(this.world.groundAt(x, z), this.surfaceAt ? this.surfaceAt(x, z, y) : -Infinity);
   }
 
   private validate(type: StructureType, x: number, z: number, from: THREE.Vector3): string {
     const r = FOOTPRINT[type];
     if (Math.hypot(x - from.x, z - from.z) > 5) return 'too far';
-    const onDeck = this.ghostPos.y > this.world.heightAt(x, z) + 0.1;
+    const onDeck = this.ghostPos.y > this.world.groundAt(x, z) + 0.1;
+    const onIce = Number.isFinite(this.world.iceAt(x, z));
     if (!onDeck) {
-      if (this.world.waterDepthAt(x, z) > -0.05) return 'in water';
+      if (!onIce && this.world.waterDepthAt(x, z) > -0.05) return 'in water';
       // Slope across the footprint.
-      const h = [this.world.heightAt(x - r, z), this.world.heightAt(x + r, z), this.world.heightAt(x, z - r), this.world.heightAt(x, z + r)];
+      const h = [this.world.groundAt(x - r, z), this.world.groundAt(x + r, z), this.world.groundAt(x, z - r), this.world.groundAt(x, z + r)];
       if (Math.max(...h) - Math.min(...h) > r * 0.9) return 'too steep';
     }
     for (const p of this.placed) {
@@ -451,7 +452,7 @@ export class Structures {
 
   /** Put a structure into the world directly (dropped packs, story set pieces). */
   drop(type: StructureType, x: number, z: number, yaw: number, extra: Partial<StructureData> = {}): StructureData {
-    const data: StructureData = { id: `s${this.nextId++}`, type, x, y: this.world.heightAt(x, z), z, yaw, ...extra };
+    const data: StructureData = { id: `s${this.nextId++}`, type, x, y: this.world.groundAt(x, z), z, yaw, ...extra };
     this.add(data);
     return data;
   }

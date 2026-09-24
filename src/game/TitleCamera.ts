@@ -70,7 +70,7 @@ export class TitleCamera {
     const ground = Math.max(this.world.heightAt(vp.x, vp.z), this.world.waterLevelAt(vp.x, vp.z));
     this.start.set(vp.x, ground + vp.height, vp.z);
     const [tx, tz, th] = vp.target;
-    this.look.set(tx, this.world.heightAt(tx, tz) + th, tz);
+    this.look.set(tx, this.world.groundAt(tx, tz) + th, tz);
     this.forward.copy(this.look).sub(this.start).setY(0).normalize();
     this.right.set(-this.forward.z, 0, this.forward.x);
     this.smoothY = this.start.y;

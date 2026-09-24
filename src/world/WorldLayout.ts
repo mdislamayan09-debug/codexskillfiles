@@ -351,6 +351,8 @@ export const LANDMARKS: readonly LandmarkDef[] = [
     x: 667,
     z: 385,
     mound: { height: 30, radius: 70 },
+    // A rock shelf under the headland: room for Tidemother to fight.
+    pad: { radius: 34, falloff: 22, height: 6 },
     blurb: 'At low tide you can hear it ringing under the cliffs.',
     discoverRadius: 110,
   },

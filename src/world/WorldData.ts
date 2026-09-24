@@ -220,11 +220,29 @@ export class WorldData {
    * Marches a ray against the terrain. Returns distance or -1.
    * Coarse steps then bisection; good to ~2 cm.
    */
+  /** Top of the ice over a frozen lake at (x, z), or -Infinity. */
+  iceAt(x: number, z: number): number {
+    for (const lake of this.lakes) {
+      if (!lake.frozen) continue;
+      const dx = x - lake.x;
+      const dz = z - lake.z;
+      if (dx * dx + dz * dz > (lake.radius * 1.5 + 12) ** 2) continue;
+      const level = this.waterLevelAt(x, z);
+      if (Math.abs(level - lake.level) < 0.35 && level > this.heightAt(x, z)) return lake.level + 0.06;
+    }
+    return -Infinity;
+  }
+
+  /** What you stand on: the terrain, or ice where a lake is frozen over it. */
+  groundAt(x: number, z: number): number {
+    return Math.max(this.heightAt(x, z), this.iceAt(x, z));
+  }
+
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number, out?: THREE.Vector3): number {
     let t = 0;
     let prevT = 0;
     let step = 0.5;
-    let above = origin.y - this.heightAt(origin.x, origin.z) >= 0;
+    let above = origin.y - this.groundAt(origin.x, origin.z) >= 0;
     if (!above) return 0;
     while (t < maxDistance) {
       prevT = t;
@@ -232,14 +250,14 @@ export class WorldData {
       const x = origin.x + dir.x * t;
       const y = origin.y + dir.y * t;
       const z = origin.z + dir.z * t;
-      const gap = y - this.heightAt(x, z);
+      const gap = y - this.groundAt(x, z);
       if (gap < 0) {
         let lo = prevT;
         let hi = t;
         for (let i = 0; i < 14; i += 1) {
           const mid = (lo + hi) * 0.5;
           const my = origin.y + dir.y * mid;
-          if (my - this.heightAt(origin.x + dir.x * mid, origin.z + dir.z * mid) < 0) hi = mid;
+          if (my - this.groundAt(origin.x + dir.x * mid, origin.z + dir.z * mid) < 0) hi = mid;
           else lo = mid;
         }
         if (out) out.copy(dir).multiplyScalar(hi).add(origin);

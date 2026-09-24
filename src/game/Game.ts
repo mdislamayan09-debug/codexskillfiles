@@ -21,6 +21,7 @@ import { Viewmodel } from '../player/Viewmodel';
 import { AudioEngine, type AudioState } from '../audio/AudioEngine';
 import { SPECIES, Wildlife } from '../creatures/Wildlife';
 import { WardenSystem } from '../creatures/Warden';
+import { WARDENS } from '../creatures/WardenDefs';
 import { Precipitation, WEATHER_LABELS, WeatherSystem, type WeatherKind } from '../world/Weather';
 import { Gathering, type GatherContext } from './Gathering';
 import { Structures, type StructureData, type StructureType } from './Structures';
@@ -29,13 +30,15 @@ import { InventoryScreen } from '../ui/InventoryScreen';
 import { MapScreen, type MapPin } from '../ui/MapScreen';
 import { QuestTracker } from '../story/Quests';
 import { StoryWorld } from '../story/StoryWorld';
-import { BELL_MEMORIES, DIALOGUE, TUNING_ORDER } from '../story/StoryData';
+import { Stillheart } from '../story/Stillheart';
+import { BELL_MEMORIES, DIALOGUE, EPILOGUE, TUNING_ORDER } from '../story/StoryData';
 import { DialogueBox, Journal, QuestTrackerHud } from '../ui/StoryUi';
 import { itemDef } from './items';
 import { RECIPES } from './recipes';
 import { craft } from '../ui/InventoryScreen';
 import { DeathScreen, Menu } from '../ui/Menu';
 import { TitleScreen } from '../ui/TitleScreen';
+import { PadNavigator } from '../ui/PadNavigator';
 import { TitleCamera, type ShotStart } from './TitleCamera';
 import { Hud, type CompassMarker } from '../ui/Hud';
 import { bearingOf, MASK } from '../world/gen/generateWorld';
@@ -101,6 +104,7 @@ export class Game {
   mapScreen!: MapScreen;
   quests!: QuestTracker;
   story!: StoryWorld;
+  stillheart!: Stillheart;
   dialogue!: DialogueBox;
   journal!: Journal;
   questHud!: QuestTrackerHud;
@@ -187,6 +191,8 @@ export class Game {
   private introHold = false;
   /** Container (chest, dropped pack) open in the inventory screen. */
   private openContainer: StructureData | null = null;
+  /** Controller navigation for the DOM screens. */
+  private readonly padNav = new PadNavigator();
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const params = new URLSearchParams(location.search);
@@ -324,6 +330,9 @@ export class Game {
     });
     for (const material of this.story.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.story.group);
+    this.stillheart = new Stillheart(this.world);
+    for (const material of this.stillheart.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.stillheart.group);
     const obstacleScratch: TreeCollider[] = [];
     this.wardens = new WardenSystem(this.world, this.events, {
       player: () => {
@@ -336,7 +345,7 @@ export class Game {
       },
       knockPlayer: (x, y, z) => this.player.knock(x, y, z),
       shake: (amount) => this.view.addTrauma(amount),
-      sound: (kind, x, y, z, strength) => this.audio.warden(kind, x, y, z, strength),
+      sound: (kind, x, y, z, strength, pitch, element) => this.audio.warden(kind, x, y, z, strength, pitch, element),
       say: (speaker, text, seconds = 6) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
       obstacles: (x, z, r) => this.vegetation.collidersNear(x, z, r, obstacleScratch),
     });
@@ -446,7 +455,7 @@ export class Game {
     const waterOut: WaterAt = { surface: 0, depth: 0, frozen: false, flowX: 0, flowZ: 0 };
     return {
       groundHeight: (x, z, y) => {
-        const natural = Math.max(world.heightAt(x, z), this.props.heightAt(x, z));
+        const natural = Math.max(world.groundAt(x, z), this.props.heightAt(x, z));
         return y === undefined ? natural : Math.max(natural, this.building.surfaceAt(x, z, y));
       },
       groundNormal: (x, z, out, y) => {
@@ -455,6 +464,8 @@ export class Game {
           const deck = this.building.surfaceAt(x, z, y);
           if (deck > world.heightAt(x, z) && deck >= this.props.heightAt(x, z)) return out.set(0, 1, 0);
         }
+        // Ice is flat.
+        if (world.iceAt(x, z) > world.heightAt(x, z)) return out.set(0, 1, 0);
         const rock = this.props.heightAt(x, z);
         if (rock <= world.heightAt(x, z)) return world.smoothNormalAt(x, z, out);
         // On a boulder: numeric normal of the combined ground.
@@ -479,15 +490,17 @@ export class Game {
         // The Warden is solid, and so are walls.
         for (const c of this.wardens.colliders()) if (Math.hypot(c.x - x, c.z - z) < r + c.radius) out.push(c);
         this.building.collidersNear(x, z, r, out);
+        this.stillheart.collidersNear(x, z, r, out);
         return out;
       },
       surface: (x, z) => this.surfaceAt(x, z),
-      boundary: VEIL_RADIUS + 60,
+      boundary: VEIL_RADIUS - 8,
     };
   }
 
   private surfaceAt(x: number, z: number): string {
     const w = this.world;
+    if (Number.isFinite(w.iceAt(x, z))) return 'rock';
     if (w.waterDepthAt(x, z) > 0.05) return 'water';
     if (w.maskAt(x, z, MASK.snow) > 0.4) return 'snow';
     if (w.maskAt(x, z, MASK.sand) > 0.45) return 'sand';
@@ -545,6 +558,14 @@ export class Game {
       gpu: this.gpuName,
     });
     this.death = new DeathScreen(root, () => this.respawn());
+    this.padNav.onBack = () => {
+      if (this.title.isIntroPlaying) this.title.skipIntro();
+      else if (this.menu.isOpen) this.closeMenu();
+      else if (this.inventoryScreen.isOpen) this.closeInventory();
+      else if (this.mapScreen.isOpen) this.closeMap();
+      else if (this.journal.isOpen) this.closeJournal();
+      else if (this.mode === 'title') (document.querySelector('.title-difficulty.open .title-back') as HTMLElement | null)?.click();
+    };
     this.title = new TitleScreen(root, {
       continueMeta: () => this.latestSave(),
       onContinue: () => {
@@ -611,6 +632,8 @@ export class Game {
       this.audio.stinger(kind !== 'biome');
       // Lore pages fill the journal.
       if (kind === 'lore') this.discovered.add(id);
+      // Five bells rung and the heart of the island reached: the ending.
+      if (id === 'quest:held_note') window.setTimeout(() => this.playEnding(), 2500);
     });
     this.events.on('died', ({ cause }) => {
       this.deathCause = cause;
@@ -695,8 +718,8 @@ export class Game {
       load: (data) => this.building.load(data as ReturnType<Building['serialize']>),
     });
     this.saves.register('wardens', {
-      save: () => ({ mossback: this.wardens.serialize() }),
-      load: (data) => this.wardens.load((data as { mossback?: { calmed?: boolean } }).mossback ?? null),
+      save: () => this.wardens.serialize(),
+      load: (data) => this.wardens.load(data),
     });
     this.saves.register('meta', {
       save: () => ({ playtime: this.playtime }),
@@ -1009,8 +1032,11 @@ export class Game {
       saw_stillheart: 'rim_lookout',
       echo_lantern: 'singing_stones',
       duskhound: 'hollow_elder',
-      warden_hollowpine: 'bell_hollowpine',
-      rung_bell_hollowpine: 'bell_hollowpine',
+      reached_heart: 'stillheart',
+      ...Object.fromEntries(WARDENS.flatMap((w) => [
+        [w.flag, w.bell],
+        [`rung_${w.bell}`, w.bell],
+      ])),
     };
     const lid = byFlag[step.target];
     return lid ? lmPos(lid) : null;
@@ -1109,9 +1135,10 @@ export class Game {
     lines.forEach((line, i) => {
       window.setTimeout(() => this.events.emit('subtitle', { speaker: line.speaker, text: line.text, duration: 6.5 }), 1800 + i * 7000);
     });
-    if (id === 'bell_hollowpine') {
-      this.events.emit('discovered', { id: 'lore:mossback', name: 'Mossback', kind: 'lore' });
-      this.inventory.add('warden_antler', 1);
+    const warden = WARDENS.find((w) => w.bell === id);
+    if (warden) {
+      this.events.emit('discovered', { id: `lore:${warden.id}`, name: warden.name, kind: 'lore' });
+      this.inventory.add(warden.trophy, 1);
       this.inventory.add('songstone', 3);
     }
     this.saveSession('auto');
@@ -1145,6 +1172,26 @@ export class Game {
     }
     const progress = this.dismantleTimer > 0 ? ` ${Math.round((this.dismantleTimer / 0.9) * 100)}%` : '';
     return { key: 'E', text: `Hold to dismantle ${name}${progress}` };
+  }
+
+  /** The epilogue over black, then the island is yours to keep wandering. */
+  private playEnding(): void {
+    if (this.mode !== 'play') return;
+    this.introHold = true;
+    this.input.exitPointerLock();
+    this.hud.setVisible(false);
+    this.audio.bellToll();
+    this.saveSession('auto');
+    this.title.narrate(
+      EPILOGUE,
+      () => {
+        this.introHold = false;
+        this.hud.setVisible(true);
+        this.input.requestPointerLock();
+        this.events.emit('notify', { text: 'The island is yours. Keep wandering.', icon: 'compass', tone: 'good' });
+      },
+      { title: 'STILLWILD', sub: 'Thank you for playing. The island is yours to wander.' },
+    );
   }
 
   /** Sleep through the night: time jumps to dawn, body recovers, needs drop. */
@@ -1210,6 +1257,9 @@ export class Game {
   private update(dt: number): void {
     this.frame += 1;
     this.input.poll();
+    // With a controller, menus and screens are driven by d-pad, A and B.
+    const onScreen = this.mode === 'title' || this.title.isIntroPlaying || this.menu.isOpen || this.inventoryScreen.isOpen || this.mapScreen.isOpen || this.journal.isOpen || this.deathCause !== null;
+    this.padNav.update(dt, onScreen);
     if (this.input.wasPressed('debug', true)) {
       this.debugVisible = !this.debugVisible;
       this.debugEl?.classList.toggle('show', this.debugVisible);
@@ -1285,6 +1335,7 @@ export class Game {
       this.intent.crouch = false;
     }
     this.player.update(dt, this.intent);
+    this.updateHush();
     this.survival.update(dt, this.climate());
 
     // Hotbar.
@@ -1438,7 +1489,7 @@ export class Game {
       for (const lm of LANDMARKS) {
         const d = Math.hypot(lm.x - p.x, lm.z - p.z);
         if (!this.seen.has(lm.id) && d < 260) this.seen.add(lm.id);
-        if (!this.discovered.has(lm.id) && d < Math.max(28, (lm.pad?.radius ?? 16) + 10)) {
+        if (!this.discovered.has(lm.id) && d < (lm.discoverRadius ?? Math.max(28, (lm.pad?.radius ?? 16) + 10))) {
           this.discovered.add(lm.id);
           this.seen.add(lm.id);
           this.events.emit('discovered', { id: lm.id, name: lm.name, kind: 'landmark' });
@@ -1475,6 +1526,7 @@ export class Game {
     if (this.mode === 'play') this.view.update(dt, this.player, this.camera, this.viewOptions());
     this.updateWeather(dt);
     this.updateEnvironment(dt);
+    this.updateStillheart(dt);
     this.terrain.update(this.camera, this.elapsed);
     if (this.mode === 'play') this.grass.setPusher(0, this.player.position, 0.6);
     this.grass.update(this.camera, this.reducedMotion ? 0 : this.elapsed);
@@ -1536,6 +1588,32 @@ export class Game {
     this.timings.frameMs = performance.now() - t;
     this.updateUi(dt);
     this.publishDiagnostics();
+  }
+
+  private updateStillheart(dt: number): void {
+    const q = this.quests;
+    const open = q.isActive('held_note') || q.isDone('held_note');
+    const night = 1 - THREE.MathUtils.smoothstep(this.sunDir.y, -0.12, 0.12);
+    this.stillheart.update(dt, open, q.isDone('held_note'), night, this.camera.position);
+  }
+
+  private hushNoticeAt = -100;
+
+  /** The Hush turns you back until the bells have rung; inside, the Heart waits. */
+  private updateHush(): void {
+    const p = this.player.position;
+    const push = this.stillheart.barrier(p.x, p.z);
+    if (push) {
+      p.x = push.x;
+      p.z = push.z;
+      this.player.velocity.x *= -0.2;
+      this.player.velocity.z *= -0.2;
+      if (this.elapsed - this.hushNoticeAt > 8) {
+        this.hushNoticeAt = this.elapsed;
+        this.events.emit('subtitle', { speaker: '', text: 'The light is solid as glass, and humming. It will not let you through.', duration: 4 });
+      }
+    }
+    if (this.quests.isActive('held_note') && Math.hypot(p.x, p.z) < 36) this.quests.setFlag('reached_heart');
   }
 
   private updateWeather(dt: number): void {
@@ -2031,11 +2109,14 @@ export class Game {
         this.inventory.add('wood', wood);
         return { removed: piece.type, wood };
       },
-      /** Mossback: state, or a debug action (wake | calm | reset | stagger | hurt). */
-      warden: (action?: 'wake' | 'calm' | 'reset' | 'stagger' | 'hurt' | 'hold' | 'release', amount = 0) => {
-        if (action) this.wardens.debug(action, amount);
-        return { ...this.wardens.debugState, knotPositions: this.wardens.knotPositions(), boss: this.wardens.status() };
+      /** A Warden (default Mossback): state, or a debug action (wake | calm | reset | stagger | hurt | hold | release). */
+      warden: (action?: 'wake' | 'calm' | 'reset' | 'stagger' | 'hurt' | 'hold' | 'release', amount = 0, id = 'mossback') => {
+        const w = this.wardens.get(id);
+        if (!w) throw new Error(`Unknown Warden ${id}`);
+        if (action) w.debug(action, amount);
+        return { ...w.debugState, knotPositions: w.knotPositions(), boss: w.status() };
       },
+      wardens: () => this.wardens.wardens.map((w) => ({ id: w.def.id, bell: w.def.bell, mode: w.mode, x: w.position.x, y: w.position.y, z: w.position.z })),
       setTime: (hours: number) => {
         this.clock.set(this.clock.day, hours);
       },

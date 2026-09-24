@@ -115,11 +115,11 @@ export class StoryWorld {
   private lm(id: string): { x: number; y: number; z: number } {
     const l = LANDMARKS.find((d) => d.id === id);
     if (!l) throw new Error(`Unknown landmark ${id}`);
-    return { x: l.x, y: this.world.heightAt(l.x, l.z), z: l.z };
+    return { x: l.x, y: this.world.groundAt(l.x, l.z), z: l.z };
   }
 
   private ground(x: number, z: number): number {
-    return this.world.heightAt(x, z);
+    return this.world.groundAt(x, z);
   }
 
   private add(mesh: THREE.Object3D, x: number, z: number, yOffset = 0): THREE.Object3D {
