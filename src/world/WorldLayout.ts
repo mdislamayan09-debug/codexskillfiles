@@ -243,8 +243,9 @@ export const LANDMARKS: readonly LandmarkDef[] = [
     name: "Jonah Reed's Cabin",
     biome: BIOME.Hollowpine,
     kind: 'camp',
-    x: -470,
-    z: -120,
+    // On the dry bank above the pond, not in it.
+    x: -491,
+    z: -113,
     pad: { radius: 11, falloff: 12 },
     blurb: 'A trapper lived here once. His traps are still set.',
   },

@@ -1,6 +1,7 @@
 import type { QuestTracker } from '../story/Quests';
 import type { Line } from '../story/StoryData';
 import { LANDMARKS } from '../world/WorldLayout';
+import { LANDMARK_LORE } from '../story/LandmarkData';
 import { icon } from './icons';
 
 // Conversation box, journal and the on-screen quest tracker.
@@ -197,6 +198,8 @@ export class Journal {
         for (const q of done) el('div', 'journal-done', this.body, q.title);
       }
     } else if (this.tab === 'places') {
+      const curios = [...quests.flags].filter((f) => f.startsWith('found:')).length;
+      if (curios > 0) el('div', 'inv-label', this.body, `Curiosities found · ${curios}`);
       const found = LANDMARKS.filter((l) => discovered.has(l.id));
       el('div', 'inv-label', this.body, `${found.length} of ${LANDMARKS.length} discovered`);
       for (const l of found) {
@@ -217,6 +220,12 @@ export class Journal {
 }
 
 export const LORE: { id: string; title: string; text: string }[] = [
+  ...LANDMARK_LORE,
+  {
+    id: 'lore:starfall',
+    title: 'Starfall',
+    text: 'Stars fall here more often than they should, as if the sky is trying to reach something. The metal they leave is cold and hums a note just above hearing: the same note, always.',
+  },
   {
     id: 'lore:undersong',
     title: 'The Undersong',

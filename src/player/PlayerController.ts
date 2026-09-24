@@ -75,6 +75,8 @@ export interface PlayerEnvironment {
   surface(x: number, z: number): string;
   /** Soft world boundary radius. */
   boundary: number;
+  /** Keep the body inside enclosing spaces (cave walls): adjust position and velocity. */
+  confine?(p: THREE.Vector3, v: THREE.Vector3, radius: number): void;
 }
 
 export interface StaminaBudget {
@@ -128,6 +130,8 @@ export class PlayerController {
 
   private coyote = 0;
   private jumpBuffer = 0;
+  private dashTime = 0;
+  private readonly dashVel = new THREE.Vector2();
   private peakY = 0;
   private stride = 0;
   private leftFoot = false;
@@ -154,6 +158,18 @@ export class PlayerController {
       this.setState('swim');
     }
     this.peakY = this.position.y;
+  }
+
+  /** A dodge: a burst along (dx, dz) at `speed` for `seconds`, overriding steering. */
+  dash(dx: number, dz: number, speed: number, seconds: number): void {
+    if (this.state !== 'ground' && this.state !== 'air') return;
+    const d = Math.hypot(dx, dz) || 1;
+    this.dashVel.set((dx / d) * speed, (dz / d) * speed);
+    this.dashTime = seconds;
+  }
+
+  get dashing(): boolean {
+    return this.dashTime > 0;
   }
 
   /** External shove (a Warden's charge, a shockwave): adds velocity and lifts off. */
@@ -195,6 +211,7 @@ export class PlayerController {
   update(dt: number, intent: ControlIntent): void {
     dt = Math.min(dt, 1 / 20);
     this.stateTime += dt;
+    this.dashTime = Math.max(0, this.dashTime - dt);
     const T = PLAYER_TUNING;
     const p = this.position;
     const v = this.velocity;
@@ -281,19 +298,25 @@ export class PlayerController {
     target *= clamp(1 - uphill * 0.9, 0.55, 1.12);
 
     // Try to climb when walking into a wall of rock or a steep slope.
-    if (moving && intent.moveY > 0.5 && this.tryStartClimb(wishX, wishZ)) return;
+    if (this.dashTime <= 0 && moving && intent.moveY > 0.5 && this.tryStartClimb(wishX, wishZ)) return;
 
-    // Accelerate toward the wish velocity.
-    const tx = wishX * target;
-    const tz = wishZ * target;
-    const rate = moving ? T.accel : T.decel;
-    const dvx = tx - v.x;
-    const dvz = tz - v.z;
-    const dl = Math.hypot(dvx, dvz);
-    const step = Math.min(dl, rate * dt);
-    if (dl > 1e-5) {
-      v.x += (dvx / dl) * step;
-      v.z += (dvz / dl) * step;
+    if (this.dashTime > 0) {
+      // Mid-dodge: the burst carries you.
+      v.x = this.dashVel.x;
+      v.z = this.dashVel.y;
+    } else {
+      // Accelerate toward the wish velocity.
+      const tx = wishX * target;
+      const tz = wishZ * target;
+      const rate = moving ? T.accel : T.decel;
+      const dvx = tx - v.x;
+      const dvz = tz - v.z;
+      const dl = Math.hypot(dvx, dvz);
+      const step = Math.min(dl, rate * dt);
+      if (dl > 1e-5) {
+        v.x += (dvx / dl) * step;
+        v.z += (dvz / dl) * step;
+      }
     }
 
     // Unwalkable slopes: slide downhill and refuse to climb them by walking.
@@ -585,6 +608,7 @@ export class PlayerController {
         v.z -= nz * into;
       }
     }
+    this.env.confine?.(p, v, T.radius);
   }
 
   private applyBoundary(): void {

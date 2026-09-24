@@ -10,6 +10,7 @@ import type { VegetationSystem } from '../vegetation/VegetationSystem';
 import { BIOME, BIOME_COUNT, WORLD_HALF, WORLD_SEED } from '../WorldConfig';
 import type { WorldData } from '../WorldData';
 import { LANDMARKS } from '../WorldLayout';
+import { plannedCaves } from '../Caves';
 import {
   berryGeometry,
   clayGeometry,
@@ -150,6 +151,9 @@ export class PropSystem {
     for (const lm of LANDMARKS) {
       const r = lm.pad ? lm.pad.radius + 6 : 10;
       this.clearings.push({ x: lm.x, z: lm.z, r });
+    }
+    for (const cave of plannedCaves(world)) {
+      for (const n of cave.nodes.slice(0, 4)) this.clearings.push({ x: n.x, z: n.z, r: n.r * 2.2 });
     }
     const rock = createRockMaterial(baker);
     const prop = createPropMaterial();

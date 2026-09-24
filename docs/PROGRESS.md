@@ -23,11 +23,17 @@ saves screenshots under `artifacts/playtest/`. Start the dev server
 | `scripts/capture-stillheart.mjs` | The Hush barrier, entering Hallowmere, the ending, resuming after it |
 | `scripts/capture-title.mjs` | Title screen, new game, intro, wake-up, continue, quit to title |
 | `scripts/capture-landmarks.mjs` | A picture of every landmark, a cache payout, a trap |
+| `scripts/playtest-archery.mjs` | Drawing and loosing, arrows sticking and recovered, rooks shot for feathers, gulls in flight, a sprigbuck hunted, farm plots planted, watered, grown and harvested |
+| `scripts/playtest-caves.mjs` | Walking into all four caves, the walls holding, chamber floors, darkness and a torch, the deep caches |
+| `scripts/playtest-combat.mjs` | Dodging with invulnerability, blocking, parrying (the attacker reels), no guard from behind, lock-on |
+| `scripts/playtest-sidestories.mjs` | Wren's field notes, Ilyr's four caves (in any order) and Tock's workshop, played through and paid out |
+| `scripts/playtest-sky.mjs` | A meteor shower, a fallen star found and gathered, a Starglass Lantern made from it, an eclipse |
+| `scripts/playtest-curiosities.mjs` | Curiosities spread over the island, one of each kind found once and rewarded |
 | `scripts/capture.mjs` | Scenic views for visual review (`--views`, `--quality`) |
 
 `npm test` runs the unit tests (`tests/unit/`). They check story data,
-quest logic, the inventory, save round trips, the seeded RNG, noise and
-landmark caches.
+quest logic, the inventory, save round trips, the seeded RNG, noise,
+landmark caches, farming growth and the combat rules.
 
 ## Milestones
 
@@ -62,7 +68,7 @@ landmark caches.
 - **HUD:** compass with learned landmarks, vitals, prompts, notifications
   and discovery banners.
 
-### M2 Survival, gathering, crafting, building: 🟡
+### M2 Survival, gathering, crafting, building: ✅
 
 - Hunger, thirst, body temperature, wetness and stamina, each with soft
   penalties. A roof keeps off rain and wind, and a fire warms.
@@ -72,8 +78,12 @@ landmark caches.
   cooking pot and smelter.
 - Tools, weapons and armour tiers.
 - Structures: campfires, bedrolls (you wake there), chests, stations,
-  lantern posts and rain collectors.
-- ⬜ Farming: plots can be built, but seeds, growth and harvest are next.
+  lantern posts and rain collectors (which fill in the rain).
+- Farming: six crops (flax, lanternberries, cap mushrooms, yarrow, moonmoss,
+  frostmint) grow over in-game hours. They grow at full rate on wet soil and
+  a fifth of it dry. Rain waters them unless a roof is over the plot, and so
+  does a waterskin. Climate matters: frostmint thrives in the cold, mushrooms
+  in the fen. Berries and herbs fruit again after picking.
 - Timber building: foundations, walls, doorways, floors, roofs and stairs
   on a 3 m grid. Walls snap to edges, storeys are walkable, and pieces can
   be dismantled for a refund.
@@ -81,15 +91,24 @@ landmark caches.
   quitting, and resumed with Continue. Death follows the difficulty: Explorer keeps the pack, Survivor drops it where you fell,
   Harsh loses it.
 
-### M3 Creatures and combat: 🟡
+### M3 Creatures and combat: ✅
 
 - ✅ Wildlife: grazing herds, hares, boars, crabs and duskhounds that hunt at
   night. Each has perception, flee and attack behaviour, weak points and
   drops.
+- ✅ Birds: rooks, gulls, herons and snowfinches flock by habitat. They
+  wheel and glide, land to forage, flush when approached and call. A downed
+  bird gives feathers (for fletching) and meat.
 - ✅ Melee with stamina, reach and weak points.
-- 🟡 Bows can be crafted and arrows exist as items, but bows still strike
-  at close range. Arrows in flight are next.
-- ⬜ Dodge, block and parry, and lock-on. The inputs are reserved.
+- ✅ Archery: hold to draw (a longer draw hits harder and flies straighter;
+  holding full draw costs stamina), release to loose. Arrows fly under
+  gravity and stick in soil, bark, timber and hide, quivering. They can be
+  pulled out again, and come back when a kill is butchered. Songstone arrows
+  bite deeper into Warden knots.
+- ✅ Defence: a dodge with a moment of invulnerability; a raised guard
+  blocks blows from the front for stamina and breaks when stamina runs
+  out; a guard raised just in time parries and staggers the attacker;
+  lock-on keeps a target under the crosshair.
 
 ### M4 World content: 🟡
 
@@ -100,18 +119,33 @@ landmark caches.
 - 🟡 Landmarks: 25 set pieces, each with a cache that holds items and a
   journal page. Among them are the galleon, the lighthouse, the floating
   isle, the frozen titan, the monastery, the stilt village and the ziggurat.
-  Built in `src/story/Landmarks.ts`.
-- ⬜ Walkable cave interiors. Cave landmarks are entrances for now.
+  Built in `src/story/Landmarks.ts` from an architecture kit
+  (`landmarkKit.ts`): voussoir arches, walls with real window openings,
+  shingled roofs, a lofted ship hull and a sculpted colossal face. Stone
+  and timber are textured in world space.
+- ✅ Caves: the Whispering Cave, Crystal Grotto, Lava Tubes and Ice Caves
+  open on their mounds' flanks, slope down under the rock and end in a
+  chamber with the cache. It is dark underground: sun and sky light are cut
+  off in every material, so a torch matters. Crystals and lava glow, ice
+  hangs from the roof, water drips and echoes.
 - 🟡 Puzzles: the Singing Stones (strike in order). Prisms and echo bridges
   are not built yet.
+- ✅ Curiosities: about seventy small finds between the named places, laid
+  out from the world seed. Veyr cairns have a line carved into the
+  capstone, lost expedition packs hold supplies, songstone shrines give a
+  Heartsong fragment, and echo stones still hold a voice. Each is found
+  once, and the journal keeps count.
 
-### M5 Story and survivors: 🟡
+### M5 Story and survivors: ✅
 
 - ✅ Dialogue with subtitles, and survivors who move to the camp once
   found: Captain Varga, Tock, Dr. Okafor and Ilyr.
 - ✅ Main quest: the crash, the stones, the Rim, the five bells and the
   Held Note.
-- ⬜ Personal side stories for each survivor.
+- ✅ Side stories: Tock's workshop (a smelter and iron; he reforges a pick),
+  Wren's field notes (a rook brought down with a bow, the Crystal Grotto's
+  glow), Ilyr's *What the Rock Remembers* (listen in all four cave chambers,
+  in any order; each chamber still says something), and Varga's log.
 
 ### M6 Wardens and endgame: ✅
 
@@ -130,13 +164,18 @@ landmark caches.
   city of Hallowmere with its towers, bridges and Crown rings, and an
   ending when the note is released. The game carries on afterwards.
 
-### M7 Weather and world events: 🟡
+### M7 Weather and world events: ✅
 
 - ✅ Regional weather: clear, cloud, fog, rain, storms with lightning, snow
   and ashfall.
 - ✅ Hazards: cold, heat, drowning and falls.
 - ✅ Northern lights over the Frostveil.
-- ⬜ Rare events: meteor showers, eclipses and time-slips.
+- ✅ Meteor showers on about one night in five: streaks fan out from one
+  radiant, busiest in the small hours. Each shower drops a star a few
+  hundred metres away, marked by a pillar of light until dawn; its
+  starmetal makes a Starglass Lantern.
+- ✅ Eclipses: some afternoons the moon covers the sun for an hour. Light
+  fails, stars come out and the corona shows round the dark disc.
 
 ### M8 Polish and release: 🟡
 
@@ -151,12 +190,7 @@ landmark caches.
 
 ## Next up
 
-1. Farming: seeds, growth over days, watering and harvest.
-2. Archery: drawing, arrows in flight, recovering arrows.
-3. Caves you can walk into (Whispering Cave, Crystal Grotto, Ice Caves,
-   Lava Tubes).
-4. Dodge and block, lock-on for Warden fights.
-5. Survivor side stories and a second puzzle type (prisms).
-6. Visual polish: bark and forest edges, and denser grass near the camera
-   on High and above.
-7. Rare events and more curiosities between the landmarks.
+1. A second puzzle type (prisms and light).
+2. Visual polish: bark and forest edges, denser grass near the camera on
+   High and above, and creature detail.
+3. Frame-time measurements on Apple silicon.

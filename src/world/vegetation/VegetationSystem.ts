@@ -12,6 +12,7 @@ import {
 import { MASK } from '../gen/generateWorld';
 import { BIOME_COUNT, WORLD_HALF, WORLD_SEED } from '../WorldConfig';
 import { LANDMARKS } from '../WorldLayout';
+import { plannedCaves } from '../Caves';
 import { VIEWPOINTS } from '../../game/Viewpoints';
 import type { WorldData } from '../WorldData';
 import { BIOME_FLORA } from './ecology';
@@ -117,6 +118,7 @@ export class VegetationSystem {
   private readonly projScreen = new THREE.Matrix4();
   private readonly sphere = new THREE.Sphere();
   private readonly clearings: { x: number; z: number; r: number }[] = [];
+  private readonly heroColliders: TreeCollider[] = [];
   private readonly biomeScratch = new Float32Array(BIOME_COUNT);
   readonly materials: THREE.Material[] = [];
   readonly leafMaterial: THREE.MeshStandardMaterial;
@@ -141,6 +143,11 @@ export class VegetationSystem {
     }
     // Photo viewpoints stay clear of trunks.
     for (const vp of VIEWPOINTS) this.clearings.push({ x: vp.x, z: vp.z, r: 5 });
+    // Cave mouths open onto bare rock.
+    for (const cave of plannedCaves(world)) {
+      for (const n of cave.nodes.slice(0, 4)) this.clearings.push({ x: n.x, z: n.z, r: n.r * 2.4 });
+      this.clearings.push({ x: cave.mouth.x - cave.dir.x * 5, z: cave.mouth.z - cave.dir.y * 5, r: 7 });
+    }
     const leafMaterial = createLeafMaterial(shared, textures, options.alphaToCoverage);
     const leafDepth = createVegetationDepthMaterial(shared, textures);
     const barkDepth = createVegetationDepthMaterial(shared, null);
@@ -556,8 +563,41 @@ export class VegetationSystem {
   }
 
   /** Trunk colliders within `radius` of (x, z). */
+  /**
+   * A one-off hero tree (the Hollow Elder): the forest's own bark and leaf
+   * materials, wind and shadows, drawn once and never felled.
+   */
+  hero(species: SpeciesConfig, x: number, y: number, z: number, seed: number): { height: number; trunkRadius: number } {
+    const lod0 = generateTree(species, { seed, lod: 0 });
+    const shadow = generateTree(species, { seed, lod: 2 });
+    const m = new THREE.Matrix4().makeTranslation(x, y, z);
+    const bark = this.barkFactory(species.bark);
+    const add = (geometry: THREE.BufferGeometry, material: THREE.Material, depth: THREE.Material, proxy: boolean) => {
+      const mesh = new THREE.InstancedMesh(geometry, material, 1);
+      mesh.setMatrixAt(0, m);
+      mesh.count = 1;
+      mesh.frustumCulled = false;
+      mesh.castShadow = proxy;
+      mesh.receiveShadow = !proxy;
+      mesh.customDepthMaterial = depth;
+      if (proxy) mesh.layers.set(LAYER_SHADOW_PROXY);
+      this.group.add(mesh);
+    };
+    add(lod0.bark, bark, this.barkDepth, false);
+    if (lod0.leaves) add(lod0.leaves, this.leafMaterial, this.leafDepth, false);
+    add(shadow.bark, bark, this.barkDepth, true);
+    if (shadow.leaves) add(shadow.leaves, this.leafMaterial, this.leafDepth, true);
+    this.heroColliders.push({ x, z, radius: lod0.trunkRadius * 1.1, height: lod0.height });
+    return { height: lod0.height, trunkRadius: lod0.trunkRadius };
+  }
+
   collidersNear(x: number, z: number, radius: number, out: TreeCollider[]): TreeCollider[] {
     out.length = 0;
+    for (const c of this.heroColliders) {
+      const dx = c.x - x;
+      const dz = c.z - z;
+      if (dx * dx + dz * dz < (radius + c.radius) * (radius + c.radius)) out.push(c);
+    }
     const c0x = Math.floor((x - radius) / CELL);
     const c1x = Math.floor((x + radius) / CELL);
     const c0z = Math.floor((z - radius) / CELL);

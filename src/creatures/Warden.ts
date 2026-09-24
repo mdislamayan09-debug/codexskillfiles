@@ -49,6 +49,15 @@ type Mode =
   | 'return'
   | 'calmed';
 
+/** What a strike did: `t` is the distance along the ray, `attach` what was struck. */
+export interface WardenHit {
+  hit: boolean;
+  weak: boolean;
+  broke: boolean;
+  t?: number;
+  attach?: THREE.Object3D;
+}
+
 interface Knot {
   name: 'left' | 'right' | 'heart';
   bone: number;
@@ -410,7 +419,7 @@ export class Warden {
   }
 
   /** The player's swing: knots first, then the body (thick hide and dressing). */
-  hit(origin: THREE.Vector3, dir: THREE.Vector3, reach: number, damage: number): { hit: boolean; weak: boolean; broke: boolean } {
+  hit(origin: THREE.Vector3, dir: THREE.Vector3, reach: number, damage: number): WardenHit {
     if (this.mode === 'calmed' || this.mode === 'return') return { hit: false, weak: false, broke: false };
     let best: Knot | null = null;
     let bestT = reach + 0.6;
@@ -424,9 +433,13 @@ export class Warden {
       }
     }
     let bodyT = Infinity;
+    let bodyBone: number = BONE.chest;
     for (const s of this.bodySpheres()) {
       const t = raySphere(origin, dir, s.center, s.radius);
-      if (t >= 0 && t < bodyT) bodyT = t;
+      if (t >= 0 && t < bodyT) {
+        bodyT = t;
+        bodyBone = s.bone;
+      }
     }
     if (best && bestT <= bodyT + 0.4) {
       const dealt = damage * 3;
@@ -445,7 +458,7 @@ export class Warden {
       this.applyDamage(dealt);
       this.pose.flinch = 1;
       this.events.emit('hit', { target: 'warden', material: 'songstone', x: best.world.x, y: best.world.y, z: best.world.z });
-      return { hit: true, weak: true, broke };
+      return { hit: true, weak: true, broke, t: bestT, attach: best.mesh };
     }
     if (bodyT <= reach + 0.3) {
       const dealt = damage * 0.25;
@@ -453,7 +466,7 @@ export class Warden {
       this.pose.flinch = Math.max(this.pose.flinch, 0.35);
       const p = this.tmp.copy(origin).addScaledVector(dir, bodyT);
       this.events.emit('hit', { target: 'warden', material: this.def.element.kind === 'ice' || this.def.element.kind === 'lava' ? 'stone' : 'wood', x: p.x, y: p.y, z: p.z });
-      return { hit: true, weak: false, broke: false };
+      return { hit: true, weak: false, broke: false, t: bodyT, attach: this.rig.bones[bodyBone] };
     }
     return { hit: false, weak: false, broke: false };
   }
@@ -462,11 +475,11 @@ export class Warden {
     return this.mode === 'winded' || this.mode === 'stagger';
   }
 
-  private bodySpheres(): { center: THREE.Vector3; radius: number }[] {
+  private bodySpheres(): { center: THREE.Vector3; radius: number; bone: number }[] {
     const b = this.rig.bones;
     const look = this.def.look;
-    const out: { center: THREE.Vector3; radius: number }[] = [];
-    const add = (bone: number, radius: number) => out.push({ center: b[bone].getWorldPosition(new THREE.Vector3()), radius });
+    const out: { center: THREE.Vector3; radius: number; bone: number }[] = [];
+    const add = (bone: number, radius: number) => out.push({ center: b[bone].getWorldPosition(new THREE.Vector3()), radius, bone });
     add(BONE.spine, this.bodyR * 1.05);
     add(BONE.chest, this.bodyR * 1.1);
     add(BONE.neck, this.bodyR * 0.65);
@@ -1200,7 +1213,7 @@ export class WardenSystem {
     }
   }
 
-  hit(origin: THREE.Vector3, dir: THREE.Vector3, reach: number, damage: number): { hit: boolean; weak: boolean; broke: boolean } {
+  hit(origin: THREE.Vector3, dir: THREE.Vector3, reach: number, damage: number): WardenHit {
     const { w, d } = this.nearest();
     if (d > 40) return { hit: false, weak: false, broke: false };
     return w.hit(origin, dir, reach, damage);

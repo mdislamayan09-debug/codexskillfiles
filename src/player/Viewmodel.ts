@@ -93,6 +93,21 @@ export class Viewmodel {
     meat: viewmodelMaterial(0x8a3024, 0.55),
     cooked: viewmodelMaterial(0x5a2e16, 0.6),
   };
+  /** The bow, its string and a nocked arrow, posed in camera space. */
+  private readonly bowRig = new THREE.Group();
+  private bow: {
+    id: string;
+    upper: THREE.Group;
+    lower: THREE.Group;
+    strings: [THREE.Mesh, THREE.Mesh];
+    arrow: THREE.Group;
+    tip: THREE.Vector3;
+    brace: number;
+  } | null = null;
+  private readonly tmpA = new THREE.Vector3();
+  private readonly tmpB = new THREE.Vector3();
+  private readonly yAxis = new THREE.Vector3(0, 1, 0);
+  private guard = 0;
   private swayX = 0;
   private swayY = 0;
   private bob = 0;
@@ -102,12 +117,14 @@ export class Viewmodel {
 
   constructor() {
     this.root.name = 'viewmodel';
-    this.light = new THREE.PointLight(0xffa35a, 0, 14, 2);
+    this.light = new THREE.PointLight(0xffa35a, 0, 18, 2);
     this.light.castShadow = false;
     // Held lights sit ahead of the hand so the glove isn't blown out.
     this.light.position.set(0.05, 0.4, -1.1);
     this.root.add(this.light);
     this.root.add(this.arm);
+    this.root.add(this.bowRig);
+    this.bowRig.visible = false;
     this.buildArm();
     this.arm.add(this.holder);
     this.holder.position.set(0, 0, 0);
@@ -225,7 +242,7 @@ export class Viewmodel {
       flame.position.y = 0.52;
       g.add(flame);
       visual.flame = flame;
-      visual.light = { color: new THREE.Color(1, 0.62, 0.32), intensity: 16, flicker: 0.25 };
+      visual.light = { color: new THREE.Color(1, 0.62, 0.32), intensity: 24, flicker: 0.25 };
     } else if (kind === 'lantern') {
       g.add(this.handle(0.1, 0.008, m.brass, 0.02));
       const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.12, 8, 1, true), m.brass);
@@ -233,7 +250,7 @@ export class Viewmodel {
       const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), m.glass);
       core.position.y = 0.16;
       g.add(cage, core);
-      visual.light = { color: new THREE.Color(0.4, 1, 0.9), intensity: 4.5, flicker: 0.05 };
+      visual.light = id === 'star_lantern' ? { color: new THREE.Color(0.78, 0.88, 1), intensity: 14, flicker: 0.02 } : { color: new THREE.Color(0.4, 1, 0.9), intensity: 4.5, flicker: 0.05 };
     } else if (kind === 'spear') {
       const shaft = this.handle(1.5, 0.014, m.wood, 0.55);
       const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.12, 5), id.startsWith('iron') ? m.iron : m.flint);
@@ -252,10 +269,7 @@ export class Viewmodel {
       neck.position.y = 0.16;
       g.add(bag, neck);
     } else if (kind === 'bow') {
-      const limb = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.012, 5, 24, Math.PI * 0.8), m.wood);
-      limb.rotation.set(0, Math.PI / 2, Math.PI / 2 + Math.PI * 0.1);
-      limb.position.set(0, 0.0, 0.3);
-      g.add(limb);
+      // Drawn by the bow rig (see poseBow); the fist holds nothing.
     } else if (def.category === 'food' || def.category === 'medicine') {
       let mesh: THREE.Mesh;
       if (id === 'berries' || id === 'berry_mash') mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 1), m.berry);
@@ -293,9 +307,115 @@ export class Viewmodel {
     this.equipTimer = 1;
   }
 
+  /** Limbs, grip and string for `id` (a longbow is longer and darker). */
+  private buildBow(id: string): void {
+    if (this.bow) this.bowRig.remove(this.bow.upper, this.bow.lower, ...this.bow.strings, this.bow.arrow);
+    const long = id === 'longbow';
+    const L = long ? 0.78 : 0.6;
+    const limbMat = long ? this.materials.darkWood : this.materials.wood;
+    const limb = (sign: number): THREE.Group => {
+      const pts = [
+        new THREE.Vector3(0, 0.05 * sign, 0),
+        new THREE.Vector3(0, L * 0.35 * sign, 0.02),
+        new THREE.Vector3(0, L * 0.7 * sign, 0.07),
+        new THREE.Vector3(0, L * 0.92 * sign, 0.125),
+        new THREE.Vector3(0, L * sign, 0.12),
+      ];
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const tube = new THREE.TubeGeometry(curve, 20, 0.011, 6, false);
+      // Taper toward the tip.
+      const pos = tube.getAttribute('position');
+      for (let i = 0; i < pos.count; i += 1) {
+        const y = Math.abs(pos.getY(i));
+        const k = 1 - (y / L) * 0.55;
+        const cx = 0;
+        pos.setX(i, cx + pos.getX(i) * k);
+      }
+      tube.computeVertexNormals();
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(tube, limbMat));
+      return g;
+    };
+    const upper = limb(1);
+    const lower = limb(-1);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.13, 8), this.materials.leather);
+    upper.add(grip);
+    const stringMat = this.materials.lashing;
+    const strings: [THREE.Mesh, THREE.Mesh] = [
+      new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 1, 4), stringMat),
+      new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 1, 4), stringMat),
+    ];
+    // A nocked arrow pointing away down -Z from the string.
+    const arrow = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.72, 6), this.materials.wood);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.36;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.05, 4), this.materials.flint);
+    head.rotation.x = -Math.PI / 2;
+    head.position.z = -0.745;
+    arrow.add(shaft, head);
+    for (let k = 0; k < 3; k += 1) {
+      const vane = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.1), this.materials.cloth);
+      vane.rotation.set(Math.PI / 2, (k / 3) * Math.PI * 2, 0);
+      vane.position.set(Math.cos((k / 3) * Math.PI * 2) * 0.008, Math.sin((k / 3) * Math.PI * 2) * 0.008, -0.07);
+      arrow.add(vane);
+    }
+    this.bowRig.add(upper, lower, ...strings, arrow);
+    this.bow = { id, upper, lower, strings, arrow, tip: new THREE.Vector3(0, L, 0.12), brace: 0.12 };
+    this.setLayer(this.bowRig);
+  }
+
+  /** Flex the limbs, pull the string back to the nock and place the drawing hand there. */
+  private poseBow(draw: number, nocked: boolean, sway: THREE.Vector2, bob: number, time: number): void {
+    const b = this.bow;
+    if (!b) return;
+    const pull = draw * draw * (3 - 2 * draw);
+    // A full draw holds steady, then trembles as the arm tires.
+    const tremble = pull > 0.95 ? Math.sin(time * 23) * 0.0015 : 0;
+    this.bowRig.position.set(-0.075 + sway.x * 0.05, -0.1 - (1 - pull) * 0.05 + sway.y * 0.05 + bob + tremble, -0.66 + pull * 0.06);
+    this.bowRig.rotation.set(0.04, 0.05 - pull * 0.04, 0.2 - pull * 0.08);
+    const flex = pull * 0.14;
+    b.upper.rotation.x = flex;
+    b.lower.rotation.x = -flex;
+    // Limb tips after flexing (rotation about X at the grip).
+    const up = this.tmpA.set(0, b.tip.y * Math.cos(flex) - b.tip.z * Math.sin(flex), b.tip.y * Math.sin(flex) + b.tip.z * Math.cos(flex));
+    const lo = this.tmpB.set(0, -up.y, up.z);
+    const nock = new THREE.Vector3(0, 0, b.brace + pull * 0.5);
+    const place = (mesh: THREE.Mesh, a: THREE.Vector3, c: THREE.Vector3) => {
+      const d = new THREE.Vector3().subVectors(c, a);
+      mesh.position.copy(a).addScaledVector(d, 0.5);
+      mesh.scale.set(1, d.length(), 1);
+      mesh.quaternion.setFromUnitVectors(this.yAxis, d.normalize());
+    };
+    place(b.strings[0], up, nock);
+    place(b.strings[1], lo, nock);
+    b.arrow.visible = nocked;
+    b.arrow.position.copy(nock);
+    // The drawing hand sits on the string.
+    const hand = nock.clone().applyEuler(this.bowRig.rotation).add(this.bowRig.position);
+    this.arm.position.set(hand.x + 0.035, hand.y - 0.035, hand.z + 0.03);
+    this.arm.rotation.set(-0.15, -0.35, 0.55);
+  }
+
   update(
     dt: number,
-    state: { held: string | null; swing: number; speed: number; sprinting: boolean; lookX: number; lookY: number; grounded: boolean; reducedMotion: boolean; climbing: boolean; swimming: boolean },
+    state: {
+      held: string | null;
+      swing: number;
+      speed: number;
+      sprinting: boolean;
+      lookX: number;
+      lookY: number;
+      grounded: boolean;
+      reducedMotion: boolean;
+      climbing: boolean;
+      swimming: boolean;
+      /** Bow pull, 0..1, and whether an arrow is on the string. */
+      draw?: number;
+      nocked?: boolean;
+      /** Guard raised (0..1). */
+      guard?: number;
+    },
   ): void {
     this.time += dt;
     this.flameUniforms.uTime.value = this.time;
@@ -337,8 +457,21 @@ export class Viewmodel {
       -0.19 - this.lower * 0.35 - this.equipTimer * 0.25 + this.swayY * 0.05 + bobY + breathe - swingDrop,
       -0.4,
     );
-    // Tool held angled forward and inward, like a real grip at rest.
-    this.arm.rotation.set(-0.55 + swingAngle, -0.28 + this.swayX * 0.2, 0.32 + (this.current?.twoHanded ? 0.35 : 0));
+    // Tool held angled forward and inward, like a real grip at rest; a
+    // raised guard brings it across the body.
+    this.guard += ((state.guard ?? 0) - this.guard) * Math.min(1, dt * 14);
+    const gd = this.guard;
+    this.arm.position.x -= gd * 0.14;
+    this.arm.position.y += gd * 0.1;
+    this.arm.rotation.set(-0.55 + swingAngle + gd * 0.35, -0.28 + this.swayX * 0.2 - gd * 0.2, 0.32 + (this.current?.twoHanded ? 0.35 : 0) + gd * 1.05);
+
+    // Bows: the rig takes over from the fist pose.
+    const isBow = !hidden && this.currentId !== null && itemDef(this.currentId).tool?.kind === 'bow';
+    this.bowRig.visible = isBow && this.lower < 0.6;
+    if (isBow && this.currentId) {
+      if (this.bow?.id !== this.currentId) this.buildBow(this.currentId);
+      this.poseBow(state.draw ?? 0, state.nocked ?? false, new THREE.Vector2(this.swayX, this.swayY), bobY - this.lower * 0.3 - this.equipTimer * 0.2, this.time);
+    }
 
     // Carried light: torch flicker, lantern glow.
     const light = this.current?.light;

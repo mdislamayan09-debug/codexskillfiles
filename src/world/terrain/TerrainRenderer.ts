@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { addPatch, replaceOnce } from '../../render/materials/MaterialPatches';
-import { LAYER_COUNT, LAYER_HEIGHT_BIAS, LAYER_TILE_METERS } from '../../render/terrain/terrainLayers';
+import { LAYER_COUNT, LAYER_HEIGHT_BIAS, LAYER_SIDE_STRETCH, LAYER_TILE_METERS } from '../../render/terrain/terrainLayers';
 import type { TerrainMaterialBaker } from '../../render/terrain/TerrainMaterialBaker';
 import type { WorldData } from '../WorldData';
 import {
@@ -85,6 +85,7 @@ export class TerrainRenderer {
       uLayerNormal: { value: baker.normalRough.texture },
       uLayerTile: { value: LAYER_TILE_METERS.slice(0, LAYER_COUNT) },
       uLayerHeightBias: { value: LAYER_HEIGHT_BIAS.slice(0, LAYER_COUNT) },
+      uLayerStretch: { value: LAYER_SIDE_STRETCH.slice(0, LAYER_COUNT).map(([a, b]) => new THREE.Vector2(a, b)) },
       uWetness: { value: 0 },
       uSnowCover: { value: 0 },
       uTerrainTime: { value: 0 },

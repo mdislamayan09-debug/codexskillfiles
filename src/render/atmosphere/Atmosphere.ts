@@ -18,6 +18,8 @@ export interface AtmosphereState {
   /** Extra Mie haze (1 = clear day, >1 hazy/foggy). */
   mieScale: number;
   cameraAltitude: number;
+  /** 0..1 of the sun covered by the moon. */
+  eclipse?: number;
 }
 
 /**
@@ -44,6 +46,7 @@ export class Atmosphere {
     uSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
     uSunIntensity: { value: SUN_ILLUMINANCE },
+    uEclipse: { value: 0 },
     uMoonIntensity: { value: MOON_ILLUMINANCE },
     uViewPosMM: { value: new THREE.Vector3(0, GROUND_RADIUS_MM + 0.0002, 0) },
     uMieScale: { value: 1 },
@@ -141,7 +144,9 @@ export class Atmosphere {
     u.uSunColor.value.setRGB(sunT[0], sunT[1], sunT[2]);
     const moonT = transmittanceToSpace(state.moonDir.y, state.cameraAltitude, mie);
     u.uMoonColor.value.setRGB(moonT[0] * 0.78, moonT[1] * 0.86, moonT[2] * 1.0);
-    u.uSunIntensity.value = SUN_ILLUMINANCE;
+    const eclipse = state.eclipse ?? 0;
+    u.uSunIntensity.value = SUN_ILLUMINANCE * (1 - 0.97 * eclipse);
+    u.uEclipse.value = eclipse;
     u.uMoonIntensity.value = MOON_ILLUMINANCE * (0.25 + 0.75 * state.moonPhaseLight);
 
     // Aerial perspective from the dominant light.

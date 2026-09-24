@@ -20,6 +20,15 @@ export interface ShaderPatch {
 /** Shared uniform objects. Assigned once by `installAtmosphereChunks`. */
 export const sharedUniforms: Record<string, THREE.IUniform> = {};
 
+/**
+ * Caves (see world/Caves): spheres along the active cave where sun and sky
+ * cannot reach. Registered up front so every program gets them.
+ */
+export const CAVE_SPHERES = 28;
+sharedUniforms.uCaveSpheres = { value: Array.from({ length: CAVE_SPHERES }, () => new THREE.Vector4()) };
+sharedUniforms.uCaveWeights = { value: new Array<number>(CAVE_SPHERES).fill(0) };
+sharedUniforms.uCaveCount = { value: 0 };
+
 const FOG_PARS_VERTEX = /* glsl */ `
 #ifdef USE_FOG
   varying vec3 vAtmoViewPos;
@@ -44,14 +53,44 @@ uniform float uFogFalloff;
 uniform vec3 uFogColorAmbient;
 uniform vec3 uFogColorSun;
 uniform vec3 uLightDir;
+uniform vec4 uCaveSpheres[${CAVE_SPHERES}];
+uniform float uCaveWeights[${CAVE_SPHERES}];
+uniform int uCaveCount;
 ${CLOUD_UNIFORMS}
 ${AERIAL_SAMPLE}
 ${CLOUD_SHADOW_GLSL}
 
-// Direct sun/moon visibility beyond shadow maps: moving cloud shadows.
+// How deep inside a cave a point is: 0 outside .. 1 far from daylight.
+float atmoCaveDark(vec3 worldPos) {
+  float dark = 0.0;
+  for (int i = 0; i < ${CAVE_SPHERES}; i++) {
+    if (i >= uCaveCount) break;
+    vec4 s = uCaveSpheres[i];
+    vec3 e = worldPos - s.xyz;
+    float d = length(vec3(e.x, e.y / 0.75, e.z));
+    dark = max(dark, uCaveWeights[i] * (1.0 - smoothstep(s.w * 1.35, s.w * 1.7, d)));
+  }
+  return dark;
+}
+
+// Inside the open volume of a cave (the terrain is cut away here).
+float atmoCaveInside(vec3 worldPos) {
+  for (int i = 0; i < ${CAVE_SPHERES}; i++) {
+    if (i >= uCaveCount) break;
+    vec4 s = uCaveSpheres[i];
+    // Mouth spheres reach a little wider so the hillside opens cleanly;
+    // nothing below the tunnel floor is ever cut.
+    vec3 e = worldPos - s.xyz;
+    if (length(vec3(e.x, e.y / 0.75, e.z)) < s.w * 1.02 && worldPos.y > s.y - s.w * 0.8) return 1.0;
+  }
+  return 0.0;
+}
+
+// Direct sun/moon visibility beyond shadow maps: moving cloud shadows, and
+// no sun at all underground.
 float atmoSunVisibility(vec3 viewPos) {
   vec3 worldPos = (viewPos - viewMatrix[3].xyz) * mat3(viewMatrix);
-  return atmoCloudShadow(worldPos, uLightDir);
+  return atmoCloudShadow(worldPos, uLightDir) * (1.0 - atmoCaveDark(worldPos));
 }
 
 float atmoPhaseHG(float cosTheta, float g) {
@@ -73,10 +112,11 @@ vec3 applyAtmosphere(vec3 color, vec3 viewPos) {
   float dist = length(viewPos);
   vec2 suv = gl_FragCoord.xy / uResolution;
   vec4 ap = sampleAerialLUT(uAerialLUT, suv, dist, uAerialMaxDistance);
-  color = color * ap.a + ap.rgb * uAerialIntensity;
   vec3 worldPos = (viewPos - viewMatrix[3].xyz) * mat3(viewMatrix);
+  float cave = atmoCaveDark(worldPos);
+  color = color * mix(ap.a, 1.0, cave) + ap.rgb * uAerialIntensity * (1.0 - cave);
   vec3 rayDir = normalize(worldPos - cameraPosition);
-  float fog = atmoHeightFog(cameraPosition, worldPos, dist);
+  float fog = atmoHeightFog(cameraPosition, worldPos, dist) * (1.0 - cave);
   vec3 fogColor = uFogColorAmbient + uFogColorSun * atmoPhaseHG(dot(rayDir, uSunDir), 0.55) * 4.0;
   return mix(color, fogColor, fog);
 }
@@ -107,6 +147,9 @@ const ATMO_UNIFORM_NAMES = [
   'uFogColorAmbient',
   'uFogColorSun',
   'uLightDir',
+  'uCaveSpheres',
+  'uCaveWeights',
+  'uCaveCount',
   'uCloudWeather',
   'uCloudOffset',
   'uCloudWeatherScale',
@@ -137,6 +180,17 @@ export function installAtmosphereChunks(uniforms: Record<string, THREE.IUniform>
   THREE.ShaderChunk.fog_vertex = FOG_VERTEX;
   THREE.ShaderChunk.fog_pars_fragment = FOG_PARS_FRAGMENT;
   THREE.ShaderChunk.fog_fragment = FOG_FRAGMENT;
+  // Sky light and reflections fade out inside caves too.
+  THREE.ShaderChunk.lights_fragment_end += `
+#ifdef USE_FOG
+{
+  vec3 caveWorld = (geometryPosition - viewMatrix[3].xyz) * mat3(viewMatrix);
+  float caveK = 1.0 - 0.95 * atmoCaveDark(caveWorld);
+  reflectedLight.indirectDiffuse *= caveK;
+  reflectedLight.indirectSpecular *= caveK;
+}
+#endif
+`;
   // Default hook for materials without their own patches.
   THREE.Material.prototype.onBeforeCompile = function onBeforeCompile(shader: ShaderObject) {
     injectSharedUniforms(shader);

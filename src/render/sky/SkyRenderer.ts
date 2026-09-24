@@ -46,6 +46,7 @@ export class SkyRenderer {
       uSunDir: a.uSunDir,
       uMoonDir: a.uMoonDir,
       uSunIntensity: a.uSunIntensity,
+      uEclipse: a.uEclipse,
       uMoonIntensity: a.uMoonIntensity,
       uMoonPhaseLight: { value: 1 },
       uStarRotation: { value: new THREE.Matrix3() },

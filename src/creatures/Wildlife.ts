@@ -221,6 +221,8 @@ export interface Creature {
   deadTime: number;
   looted: boolean;
   flinch: number;
+  /** Extra recovery after a parried strike (s). */
+  stagger: number;
 }
 
 export interface WildlifeHooks {
@@ -279,6 +281,7 @@ export class Wildlife {
       deadTime: 0,
       looted: false,
       flinch: 0,
+      stagger: 0,
     };
     this.group.add(rig.mesh);
     this.creatures.push(c);
@@ -427,6 +430,28 @@ export class Wildlife {
     }
   }
 
+  /** The attacker nearest (x, z) was parried: it reels back and recovers slowly. */
+  stagger(x: number, z: number, fromX: number, fromZ: number): void {
+    let best: Creature | null = null;
+    let bd = 3;
+    for (const c of this.creatures) {
+      if (c.state === 'dead') continue;
+      const d = Math.hypot(c.pos.x - x, c.pos.z - z);
+      if (d < bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    if (!best) return;
+    best.stagger = 1.6;
+    best.flinch = 1;
+    const dx = best.pos.x - fromX;
+    const dz = best.pos.z - fromZ;
+    const d = Math.hypot(dx, dz) || 1;
+    best.pos.x += (dx / d) * 0.9;
+    best.pos.z += (dz / d) * 0.9;
+  }
+
   /** Corpse within reach for skinning. */
   corpseNear(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): Creature | null {
     for (const c of this.creatures) {
@@ -571,9 +596,10 @@ export class Wildlife {
         if (c.timer <= 0 && s.attack) {
           // Strike lands only if the player is still in reach and in front.
           if (dist < s.attack.range + 0.6 && (facing > 0.2 || dist < 1.2)) this.hooks.damagePlayer(s.attack.damage, s.name, c.pos.x, c.pos.z);
-          c.attackReady = now + s.attack.cooldown;
+          c.attackReady = now + s.attack.cooldown + c.stagger;
           c.state = 'recover';
-          c.timer = 0.5;
+          c.timer = 0.5 + c.stagger;
+          c.stagger = 0;
         }
         break;
       }

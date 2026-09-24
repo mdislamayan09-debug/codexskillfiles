@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { BIRD_SPECIES } from '../../src/creatures/Birds';
 import { WARDENS } from '../../src/creatures/WardenDefs';
+import { SPECIES } from '../../src/creatures/Wildlife';
 import { ITEMS } from '../../src/game/items';
 import { RECIPES } from '../../src/game/recipes';
-import { BELL_MEMORIES, BELL_WARDENS, DIALOGUE, EPILOGUE, NPCS, QUESTS } from '../../src/story/StoryData';
+import { BELL_MEMORIES, BELL_WARDENS, CAVE_ECHOES, DIALOGUE, EPILOGUE, NPCS, QUESTS } from '../../src/story/StoryData';
+import { CAVE_LOOKS } from '../../src/world/Caves';
 import { LANDMARKS } from '../../src/world/WorldLayout';
 
 // The story is data; these checks keep every reference in it pointing at
@@ -12,6 +15,8 @@ const itemIds = new Set(ITEMS.map((i) => i.id));
 const landmarkIds = new Set(LANDMARKS.map((l) => l.id));
 const npcIds = new Set(NPCS.map((n) => n.id));
 const questIds = new Set(QUESTS.map((q) => q.id));
+const killable = new Set([...SPECIES.map((s) => s.id), ...BIRD_SPECIES.map((b) => b.id)]);
+const caveIds = new Set(Object.keys(CAVE_LOOKS));
 const structureTypes = new Set(['campfire', 'bedroll', 'workbench', 'chest', 'tanning_rack', 'cooking_pot', 'smelter', 'farm_plot', 'rain_collector', 'lantern_post', 'wood_foundation', 'wood_wall', 'wood_doorway', 'wood_floor', 'wood_roof', 'wood_stairs']);
 
 describe('quests', () => {
@@ -31,6 +36,8 @@ describe('quests', () => {
         if (s.kind === 'discover') expect(landmarkIds.has(s.target), where).toBe(true);
         if (s.kind === 'collect' || s.kind === 'craft') expect(itemIds.has(s.target), where).toBe(true);
         if (s.kind === 'place') expect(structureTypes.has(s.target), where).toBe(true);
+        if (s.kind === 'kill') expect(killable.has(s.target), where).toBe(true);
+        if (s.kind === 'flag' && s.target.startsWith('heard:')) expect(caveIds.has(s.target.slice(6)), where).toBe(true);
       }
       for (const [item] of q.rewards) expect(itemIds.has(item), `${q.id} reward ${item}`).toBe(true);
     }
@@ -95,5 +102,12 @@ describe('recipes', () => {
       expect(itemIds.has(r.output), r.id).toBe(true);
       for (const [item] of r.inputs) expect(itemIds.has(item), `${r.id} needs ${item}`).toBe(true);
     }
+  });
+});
+
+describe('caves', () => {
+  it('each have an echo in their chamber', () => {
+    for (const id of caveIds) expect(CAVE_ECHOES[id]?.length, id).toBeGreaterThan(0);
+    for (const id of Object.keys(CAVE_ECHOES)) expect(caveIds.has(id), id).toBe(true);
   });
 });

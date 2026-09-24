@@ -230,15 +230,20 @@ export class Stillheart {
   // The Crown: nested stone rings turning above the crater.
 
   private buildCrown(stone: THREE.Material): void {
+    // An armillary of slender bands, each turning on its own axis: from
+    // far off it should read as a slow, luminous instrument, not a disc.
     const specs = [
-      { r: 78, tube: 4.2, tilt: 0.08 },
-      { r: 58, tube: 3.2, tilt: 0.5 },
-      { r: 40, tube: 2.6, tilt: 1.1 },
-      { r: 24, tube: 2, tilt: 1.45 },
+      { r: 80, tube: 1.5, tilt: 0.34, yaw: 0 },
+      { r: 62, tube: 1.25, tilt: 0.95, yaw: 1.1 },
+      { r: 44, tube: 1.05, tilt: 1.35, yaw: 2.3 },
+      { r: 28, tube: 0.85, tilt: 0.6, yaw: 3.7 },
     ];
     for (const spec of specs) {
       const ring = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.TorusGeometry(spec.r, spec.tube, 12, 160), stone);
+      // Twin bands with a gap, bound together by the inlays.
+      const band = new THREE.TorusGeometry(spec.r, spec.tube, 10, 200);
+      const pair = mergeGeometries([band.clone().translate(0, 0, spec.tube * 1.6), band.translate(0, 0, -spec.tube * 1.6)], false) as THREE.BufferGeometry;
+      const body = new THREE.Mesh(pair, stone);
       body.castShadow = true;
       ring.add(body);
       // Songstone inlays set into the ring at intervals.
@@ -246,14 +251,18 @@ export class Stillheart {
       const count = Math.round(spec.r / 3);
       for (let k = 0; k < count; k += 1) {
         const a = (k / count) * Math.PI * 2;
-        const g = new THREE.BoxGeometry(spec.tube * 0.5, spec.tube * 2.3, spec.tube * 0.5);
+        const g = new THREE.BoxGeometry(spec.tube * 0.7, spec.tube * 0.7, spec.tube * 4.4);
+        g.rotateZ(a);
         g.translate(Math.cos(a) * spec.r, Math.sin(a) * spec.r, 0);
         inlays.push(g);
       }
       ring.add(new THREE.Mesh(mergeGeometries(inlays, false) as THREE.BufferGeometry, this.inlayMaterial));
-      ring.rotation.x = Math.PI / 2 + spec.tilt;
-      ring.userData.spin = 0.02 + spec.tilt * 0.015;
-      this.crown.add(ring);
+      // Each band sits in a gimbal: tilted, then turning about its own axis.
+      const gimbal = new THREE.Group();
+      gimbal.rotation.set(Math.PI / 2 + spec.tilt, spec.yaw, 0);
+      gimbal.add(ring);
+      ring.userData.spin = (0.025 + spec.tilt * 0.02) * (spec.yaw > 2 ? -1 : 1);
+      this.crown.add(gimbal);
       this.rings.push(ring);
     }
     this.crown.position.set(0, this.world.heightAt(0, 0) + CROWN_HEIGHT, 0);

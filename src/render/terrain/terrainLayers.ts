@@ -23,6 +23,27 @@ export const LAYER_COUNT = 14;
 /** World meters covered by one texture tile, per layer. */
 export const LAYER_TILE_METERS = [3.2, 3.4, 4, 3.2, 3, 3.4, 7, 7, 4.5, 2.6, 5.5, 4.5, 7, 4.2];
 
+/**
+ * How each layer is stretched on cliff faces (horizontal, vertical): basalt
+ * shows tall columns, limestone wide bedding planes, granite a little of both.
+ */
+export const LAYER_SIDE_STRETCH: [number, number][] = [
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [1, 0.8],
+  [1.35, 0.3],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+  [0.55, 1.25],
+  [1, 1],
+];
+
 /** Normal strength when converting height to normals, per layer. */
 export const LAYER_NORMAL_STRENGTH = [1.2, 1.3, 1.6, 1.5, 1.8, 1.0, 2.4, 2.2, 1.1, 2.2, 0.8, 1.6, 2.0, 1.7];
 

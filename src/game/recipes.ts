@@ -63,6 +63,7 @@ export const RECIPES: readonly Recipe[] = [
   R('farm_plot', 'farm_plot', 1, 'workbench', 'building', [['wood', 4], ['stick', 6], ['fiber', 4]]),
   R('rain_collector', 'rain_collector', 1, 'workbench', 'building', [['wood', 6], ['cloth', 2]]),
   R('lantern_post', 'lantern_post', 1, 'workbench', 'building', [['wood', 4], ['resin', 2]]),
+  R('star_lantern', 'star_lantern', 1, 'workbench', 'tools', [['star_shard', 2], ['glass_petal', 2], ['iron_ingot', 1]], 2),
   R('cloth', 'cloth', 1, 'workbench', 'materials', [['fiber', 6]], 1),
   R('shortbow', 'shortbow', 1, 'workbench', 'gear', [['wood', 3], ['rope', 2], ['fiber', 4]], 1.4),
   R('flint_arrow', 'flint_arrow', 5, 'workbench', 'gear', [['stick', 3], ['flint', 2], ['feather', 2]]),

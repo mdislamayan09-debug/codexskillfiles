@@ -331,7 +331,8 @@ export class GrassSystem {
         shader.vertexShader = vs;
         let fs = shader.fragmentShader;
         fs = replaceOnce(fs, '#include <common>', `#include <common>\n${GRASS_FRAGMENT_PARS}\nvarying vec3 vGrassWorld;`, 'grass frag pars');
-        fs = replaceOnce(fs, '#include <map_fragment>', GRASS_COLOR_FRAGMENT, 'grass color');
+        // No grass over the open mouth of a cave.
+        fs = replaceOnce(fs, '#include <map_fragment>', `#ifdef USE_FOG\nif (atmoCaveInside(vGrassWorld) > 0.5) discard;\n#endif\n${GRASS_COLOR_FRAGMENT}`, 'grass color');
         fs = replaceOnce(fs, '#include <normal_fragment_begin>', GRASS_NORMAL_FRAGMENT, 'grass normal frag');
         fs = replaceOnce(fs, '#include <lights_fragment_end>', `#include <lights_fragment_end>\n${GRASS_TRANSLUCENCY}`, 'grass translucency');
         shader.fragmentShader = fs;

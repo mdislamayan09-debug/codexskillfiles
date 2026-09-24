@@ -9,6 +9,7 @@ uniform vec3 uViewPosMM;
 uniform vec3 uSunDir;
 uniform vec3 uMoonDir;
 uniform float uSunIntensity;
+uniform float uEclipse;
 uniform float uMoonIntensity;
 uniform float uMoonPhaseLight;
 uniform mat3 uStarRotation;
@@ -161,7 +162,15 @@ vec3 skyRadiance(vec3 rayDir, bool withDiscs) {
       vec3 sunT = getValFromTLUT(uTransmittanceLUTSky, uViewPosMM, uSunDir);
       float r = sqrt(max(0.0, 1.0 - cosSun * cosSun)) / sunRadius;
       float limb = 1.0 - 0.55 * (1.0 - sqrt(max(0.0, 1.0 - r * r)));
-      lum += sunT * limb * 420.0 * (1.0 - uCloudCover * 0.97);
+      lum += sunT * limb * 420.0 * (1.0 - uCloudCover * 0.97) * (1.0 - uEclipse);
+    }
+    // In eclipse: the corona, pale streamers round the dark disc.
+    if (uEclipse > 0.01 && cosSun > cos(sunRadius * 6.0)) {
+      float rr = acos(clamp(cosSun, -1.0, 1.0)) / sunRadius;
+      vec3 d2 = normalize(dir - uSunDir * cosSun);
+      float streams = 0.6 + 0.4 * sin(atan(d2.y, d2.x + 1e-4) * 7.0);
+      float corona = step(1.0, rr) * exp(-(rr - 1.0) * 1.1) * streams;
+      lum += vec3(0.85, 0.9, 1.0) * corona * 3.5 * uEclipse * (1.0 - uCloudCover * 0.9);
     }
   }
   lum += uResonanceTint * uResonance * 0.06 * (0.6 + 0.4 * smoothstep(-0.1, 0.6, dir.y));

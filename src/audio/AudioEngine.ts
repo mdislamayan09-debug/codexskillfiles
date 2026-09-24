@@ -30,6 +30,8 @@ export interface AudioState {
   inDanger: boolean;
   /** 0..1 boss-fight intensity: drums and a low ostinato take over the score. */
   combat: number;
+  /** 0..1 how deep inside a cave: the outdoors fades, echoes grow, water drips. */
+  cave?: number;
 }
 
 const MODES: Record<string, number[]> = {
@@ -66,6 +68,7 @@ export class AudioEngine {
   private loops: Record<string, Loop> = {};
   private volumes = { master: 0.8, music: 0.7, sfx: 0.9, amb: 0.85 };
   private nextBird = 0;
+  private nextDrip = 0;
   private nextCricket = 0;
   private nextFrog = 0;
   private nextCrackle = 0;
@@ -451,6 +454,97 @@ export class AudioEngine {
     }
   }
 
+  /** Birdsong and wingbeats, placed in the world. */
+  birdCall(kind: 'call' | 'flush', call: 'caw' | 'cry' | 'croak' | 'chirp', x: number, y: number, z: number): void {
+    if (!this.ctx) return;
+    const { g, pan } = this.spatial(x, y, z, 30);
+    if (g < 0.03) return;
+    const t = this.ctx.currentTime;
+    if (kind === 'flush') {
+      // A clatter of wings taking off.
+      const beats = 7 + Math.floor(this.rand() * 5);
+      for (let i = 0; i < beats; i += 1) {
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: 380 + this.rand() * 300, q: 0.9, attack: 0.01, decay: 0.07, gain: 0.35 * g, pan, when: t + i * (0.055 + this.rand() * 0.03) });
+      }
+      return;
+    }
+    switch (call) {
+      case 'caw': {
+        const n = 2 + Math.floor(this.rand() * 2);
+        for (let i = 0; i < n; i += 1) {
+          const at = t + i * (0.34 + this.rand() * 0.08);
+          this.tone({ type: 'sawtooth', freq: 560 + this.rand() * 40, freqEnd: 430, attack: 0.02, decay: 0.2, gain: 0.05 * g, pan, when: at, reverb: 0.3, fm: { ratio: 0.5, index: 0.6 } });
+          this.burst({ buffer: this.pink, type: 'bandpass', freq: 1300, q: 2.2, attack: 0.02, decay: 0.16, gain: 0.18 * g, pan, when: at });
+        }
+        break;
+      }
+      case 'cry':
+        this.tone({ type: 'triangle', freq: 2100, freqEnd: 2300, attack: 0.02, decay: 0.09, gain: 0.05 * g, pan, reverb: 0.4 });
+        this.tone({ type: 'triangle', freq: 1850, freqEnd: 880, attack: 0.06, decay: 0.55, gain: 0.07 * g, pan, when: t + 0.12, reverb: 0.5, fm: { ratio: 1.5, index: 0.35 } });
+        break;
+      case 'croak':
+        this.tone({ type: 'sawtooth', freq: 230, freqEnd: 150, attack: 0.03, decay: 0.34, gain: 0.08 * g, pan, reverb: 0.4, fm: { ratio: 0.5, index: 1.4 } });
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: 700, q: 1.5, attack: 0.03, decay: 0.3, gain: 0.2 * g, pan });
+        break;
+      case 'chirp': {
+        const n = 2 + Math.floor(this.rand() * 3);
+        for (let i = 0; i < n; i += 1) {
+          const f = 4200 + this.rand() * 1400;
+          this.tone({ freq: f, freqEnd: f * (1.1 + this.rand() * 0.2), attack: 0.005, decay: 0.05, gain: 0.03 * g, pan, when: t + i * 0.09 });
+        }
+        break;
+      }
+    }
+  }
+
+  /** Bow draw creak, string release and arrow strikes. */
+  arrow(kind: 'draw' | 'release' | 'impact', x: number, y: number, z: number, detail: string, strength: number): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (kind === 'draw') {
+      const long = detail === 'longbow';
+      this.tone({ type: 'sawtooth', freq: long ? 70 : 90, freqEnd: long ? 110 : 140, attack: 0.25, decay: 0.45, gain: 0.025 });
+      this.burst({ buffer: this.pink, type: 'bandpass', freq: 700, freqEnd: 1500, q: 3, attack: 0.3, decay: 0.3, gain: 0.05 });
+      return;
+    }
+    if (kind === 'release') {
+      const s = 0.4 + strength * 0.6;
+      this.tone({ type: 'triangle', freq: 170, freqEnd: 120, attack: 0.002, decay: 0.16, gain: 0.3 * s });
+      this.tone({ freq: 510, freqEnd: 380, attack: 0.002, decay: 0.08, gain: 0.08 * s });
+      this.burst({ buffer: this.pink, type: 'bandpass', freq: 2400, freqEnd: 700, q: 1.2, attack: 0.004, decay: 0.14, gain: 0.25 * s });
+      return;
+    }
+    const { g, pan } = this.spatial(x, y, z, 12);
+    const v = g * (0.5 + strength * 0.5);
+    if (v < 0.02) return;
+    switch (detail) {
+      case 'wood':
+      case 'warden':
+        this.tone({ freq: 240, freqEnd: 120, attack: 0.002, decay: 0.09, gain: 0.35 * v, pan });
+        this.burst({ type: 'bandpass', freq: 1800, q: 1.4, attack: 0.001, decay: 0.03, gain: 0.25 * v, pan });
+        // The shaft buzzes as it quivers.
+        this.tone({ type: 'triangle', freq: 95, attack: 0.01, decay: 0.35, gain: 0.05 * v, pan, fm: { ratio: 0.25, index: 0.8 } });
+        break;
+      case 'flesh':
+        this.tone({ freq: 150, freqEnd: 70, attack: 0.002, decay: 0.1, gain: 0.35 * v, pan });
+        this.burst({ buffer: this.pink, type: 'lowpass', freq: 1200, attack: 0.002, decay: 0.08, gain: 0.3 * v, pan });
+        break;
+      case 'stone':
+      case 'ice':
+        for (let i = 0; i < 3; i += 1) this.tone({ freq: 2000 + this.rand() * 1800, attack: 0.001, decay: 0.05 + this.rand() * 0.05, gain: 0.06 * v, pan, when: t + i * (0.07 + this.rand() * 0.05) });
+        this.burst({ type: 'highpass', freq: 3000, attack: 0.001, decay: 0.03, gain: 0.2 * v, pan });
+        break;
+      case 'water':
+        this.tone({ freq: 700, freqEnd: 180, attack: 0.002, decay: 0.07, gain: 0.12 * v, pan });
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: 1400, attack: 0.005, decay: 0.12, gain: 0.2 * v, pan });
+        break;
+      default:
+        // Soil, sand, snow: a muffled thud.
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 520, freqEnd: 180, attack: 0.002, decay: 0.12, gain: 0.5 * v, pan });
+        this.tone({ freq: 130, freqEnd: 80, attack: 0.002, decay: 0.07, gain: 0.15 * v, pan });
+    }
+  }
+
   pickup(): void {
     this.burst({ buffer: this.pink, type: 'bandpass', freq: 2100, q: 0.8, decay: 0.07, attack: 0.01, gain: 0.1 });
     this.tone({ freq: 880, freqEnd: 1320, decay: 0.08, gain: 0.03, when: (this.ctx?.currentTime ?? 0) + 0.03 });
@@ -675,14 +769,23 @@ export class AudioEngine {
       loop.gain.gain.setTargetAtTime(gain, t, 0.6);
       if (freq) loop.filter.frequency.setTargetAtTime(freq, t, 0.8);
     };
-    const under = s.underwater ? 0.25 : 1;
+    // Underground the weather and the fields fall away behind you.
+    const cave = s.cave ?? 0;
+    const under = (s.underwater ? 0.25 : 1) * (1 - cave * 0.92);
+    this.reverbSend.gain.setTargetAtTime(0.35 + cave * 1.1, t, 0.8);
+    if (cave > 0.25 && t > this.nextDrip) {
+      this.nextDrip = t + 0.4 + this.rand() * 2.2;
+      const f = 1400 + this.rand() * 2400;
+      this.tone({ freq: f, freqEnd: f * 0.55, attack: 0.002, decay: 0.09, gain: 0.05 * cave, pan: this.rand() * 1.4 - 0.7, reverb: 1.2 });
+      if (this.rand() < 0.3) this.tone({ freq: f * 1.5, freqEnd: f, attack: 0.002, decay: 0.05, gain: 0.02 * cave, when: t + 0.05, reverb: 1.2 });
+    }
     set('wind', (0.05 + 0.3 * s.wind * gust) * under, 280 + 520 * s.wind * gust);
     set('leaves', 0.08 * s.forest * (0.3 + 0.7 * gust * s.wind) * under);
     set('surf', 0.2 * s.sea * under);
     set('river', 0.1 * s.river * under);
     set('river2', 0.06 * s.river * under, 2200 + 900 * Math.sin(t * 2.3) * Math.sin(t * 0.7));
     set('fire', 0.14 * s.fire);
-    set('rain', 0.22 * s.rain);
+    set('rain', 0.22 * s.rain * (1 - cave * 0.9));
     set('under', s.underwater ? 0.35 : 0);
     this.muffle.frequency.setTargetAtTime(s.underwater ? 650 : 20000, t, 0.12);
 
@@ -694,7 +797,7 @@ export class AudioEngine {
     }
 
     // Birdsong by day in vegetated places.
-    const birdy = (s.forest * 1.2 + s.meadow * 0.8) * (1 - s.snow * 0.8) * (1 - s.rain);
+    const birdy = (s.forest * 1.2 + s.meadow * 0.8) * (1 - s.snow * 0.8) * (1 - s.rain) * (1 - cave);
     if (day && birdy > 0.05 && t > this.nextBird) {
       this.nextBird = t + (2.5 + this.rand() * 7) / Math.max(0.2, birdy);
       this.bird(birdy);

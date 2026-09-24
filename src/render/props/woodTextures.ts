@@ -176,3 +176,11 @@ function shingles(size: number, seed: number): { map: THREE.CanvasTexture; norma
 export function createWoodTextures(size = 512): WoodTextures {
   return { planks: planks(size, 0x91a7e), shingles: shingles(size, 0x5a1e) };
 }
+
+let shared: WoodTextures | null = null;
+
+/** The shared timber textures (made once, on first use). */
+export function getWoodTextures(): WoodTextures {
+  shared ??= createWoodTextures(512);
+  return shared;
+}

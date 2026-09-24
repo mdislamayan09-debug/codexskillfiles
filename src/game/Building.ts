@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { EventBus } from '../core/Events';
 import { addPatch, replaceOnce } from '../render/materials/MaterialPatches';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
-import { createWoodTextures } from '../render/props/woodTextures';
+import { getWoodTextures } from '../render/props/woodTextures';
 import type { WorldData } from '../world/WorldData';
 
 // Timber building on a snapping grid. A first foundation starts a grid (its
@@ -179,7 +179,7 @@ export class Building {
     private readonly world: WorldData,
     private readonly events: EventBus,
   ) {
-    const tex = createWoodTextures(512);
+    const tex = getWoodTextures();
     const plank = new THREE.MeshStandardMaterial({ map: tex.planks.map, normalMap: tex.planks.normalMap, roughness: 0.84, metalness: 0 });
     plank.normalScale.set(0.9, 0.9);
     const beam = new THREE.MeshStandardMaterial({ map: tex.planks.map, normalMap: tex.planks.normalMap, color: 0x8a7663, roughness: 0.88, metalness: 0 });

@@ -56,6 +56,7 @@ export class Hud {
   private readonly heldName: HTMLElement;
   private readonly prompt: HTMLElement;
   private readonly crosshair: HTMLElement;
+  private readonly lockMark: HTMLElement;
   private readonly notifications: HTMLElement;
   private readonly banner: HTMLElement;
   private readonly subtitle: HTMLElement;
@@ -128,6 +129,7 @@ export class Hud {
     this.staminaRing = this.staminaWrap.querySelector('circle.fg') as SVGCircleElement;
 
     this.crosshair = el('div', 'hud-crosshair', this.root);
+    this.lockMark = el('div', 'hud-lock', this.root);
     this.prompt = el('div', 'hud-prompt', this.root);
 
     // Hotbar.
@@ -186,6 +188,12 @@ export class Hud {
     this.bossLossFraction = Math.max(this.bossFraction, this.bossLossFraction - dt * 0.25);
     this.bossFill.style.transform = `scaleX(${this.bossFraction})`;
     this.bossLoss.style.transform = `scaleX(${this.bossLossFraction})`;
+  }
+
+  /** Show the lock-on marker at a screen point (CSS pixels), or hide it. */
+  setLock(at: { x: number; y: number } | null): void {
+    this.lockMark.classList.toggle('show', at !== null);
+    if (at) this.lockMark.style.transform = `translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px) rotate(45deg)`;
   }
 
   setVisible(visible: boolean): void {

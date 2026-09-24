@@ -52,6 +52,7 @@ uniform sampler2DArray uLayerAlbedo;
 uniform sampler2DArray uLayerNormal;
 uniform float uLayerTile[${LAYER_COUNT}];
 uniform float uLayerHeightBias[${LAYER_COUNT}];
+uniform vec2 uLayerStretch[${LAYER_COUNT}];
 uniform float uWetness;
 uniform float uSnowCover;
 uniform float uTerrainTime;
@@ -160,7 +161,7 @@ vec3 unpackNormal(vec4 t) {
 // perturbed world normal and roughness/ao.
 // Derivatives are passed in (computed in uniform control flow in main):
 // dFdx inside per-pixel branches is undefined in GLSL.
-vec4 sampleLayer(int layer, vec3 pos, vec3 N, float steep, TileVariant tv, vec3 dpdx, vec3 dpdy, out vec3 wn, out vec2 roughAo) {
+vec4 sampleLayer(int layer, vec3 pos, vec3 N, float steep, TileVariant tv, TileVariant tvS, vec3 dpdx, vec3 dpdy, out vec3 wn, out vec2 roughAo) {
   float tile = uLayerTile[layer];
   float fl = float(layer);
   if (steep < 0.5) {
@@ -181,16 +182,21 @@ vec4 sampleLayer(int layer, vec3 pos, vec3 N, float steep, TileVariant tv, vec3 
   // Biplanar: Y plane plus the dominant horizontal axis.
   vec3 an = abs(N);
   bool useX = an.x > an.z;
+  // Faces are stretched along each rock's grain and get their own
+  // anti-tiling (varying with height too), so cliffs never read as tiles.
+  vec2 st = uLayerStretch[layer];
   vec2 uvY = pos.xz / tile;
-  vec2 uvS = (useX ? pos.zy : pos.xy) / tile;
+  vec2 uvS = (useX ? pos.zy : pos.xy) / tile * st;
   vec2 dYx = dpdx.xz / tile;
   vec2 dYy = dpdy.xz / tile;
-  vec2 dSx = (useX ? dpdx.zy : dpdx.xy) / tile;
-  vec2 dSy = (useX ? dpdy.zy : dpdy.xy) / tile;
-  vec4 aY = textureGrad(uLayerAlbedo, vec3(uvY, fl), dYx, dYy);
-  vec4 aS = textureGrad(uLayerAlbedo, vec3(uvS, fl), dSx, dSy);
-  vec4 nY = textureGrad(uLayerNormal, vec3(uvY, fl), dYx, dYy);
-  vec4 nS = textureGrad(uLayerNormal, vec3(uvS, fl), dSx, dSy);
+  vec2 dSx = (useX ? dpdx.zy : dpdx.xy) / tile * st;
+  vec2 dSy = (useX ? dpdy.zy : dpdy.xy) / tile * st;
+  vec4 aY = textureGrad(uLayerAlbedo, vec3(uvY + tv.offA, fl), dYx, dYy);
+  vec4 aSa = textureGrad(uLayerAlbedo, vec3(uvS + tvS.offA, fl), dSx, dSy);
+  vec4 aSb = textureGrad(uLayerAlbedo, vec3(uvS + tvS.offB, fl), dSx, dSy);
+  vec4 aS = mix(aSa, aSb, tvS.blend);
+  vec4 nY = textureGrad(uLayerNormal, vec3(uvY + tv.offA, fl), dYx, dYy);
+  vec4 nS = textureGrad(uLayerNormal, vec3(uvS + (tvS.blend < 0.5 ? tvS.offA : tvS.offB), fl), dSx, dSy);
   float wY = pow(an.y, 3.0);
   float wS = pow(useX ? an.x : an.z, 3.0);
   float sum = wY + wS + 1e-4;
@@ -215,6 +221,9 @@ vec4 sampleLayer(int layer, vec3 pos, vec3 N, float steep, TileVariant tv, vec3 
 
 /** Replaces <map_fragment>: computes the full ground surface. */
 export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
+  #ifdef USE_FOG
+  if (atmoCaveInside(vTerrainPos) > 0.5) discard;
+  #endif
   vec3 tPos = vTerrainPos;
   vec3 tDpdx = dFdx(tPos);
   vec3 tDpdy = dFdy(tPos);
@@ -318,6 +327,7 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
 
   if (camDist < uDetailDistance) {
     TileVariant tv = tileVariant(tPos.xz);
+    TileVariant tvS = tileVariant(tPos.xz * 0.61 + vec2(tPos.y * 0.83, -tPos.y * 0.47));
     vec4 al[4];
     vec3 wn[4];
     vec2 ra[4];
@@ -325,7 +335,7 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
     float hb[4];
     for (int k = 0; k < 4; k++) {
       if (lv[k] <= 0.001) { al[k] = vec4(0.0); wn[k] = tN; ra[k] = vec2(0.85, 1.0); hb[k] = -1.0; continue; }
-      al[k] = sampleLayer(li[k], tPos, tN, steep, tv, tDpdx, tDpdy, wn[k], ra[k]);
+      al[k] = sampleLayer(li[k], tPos, tN, steep, tv, tvS, tDpdx, tDpdy, wn[k], ra[k]);
       hb[k] = al[k].a * uLayerHeightBias[li[k]] + lv[k];
       hmax = max(hmax, hb[k]);
     }

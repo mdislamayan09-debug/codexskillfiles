@@ -302,6 +302,62 @@ export const QUESTS: readonly QuestDef[] = [
     after: ['needle'],
     auto: true,
   },
+  {
+    id: 'tocks_workshop',
+    title: 'A Proper Workshop',
+    main: false,
+    giver: 'tock',
+    summary: 'Tock can’t mend an airship with a rock and good intentions. He wants a smelter at camp, and iron to feed it.',
+    steps: [
+      { id: 'smelter', text: 'Build a smelter', kind: 'place', target: 'smelter', hint: 'Craft one at a workbench from stone and clay.' },
+      { id: 'iron', text: 'Smelt four iron ingots', kind: 'collect', target: 'iron_ingot', count: 4, hint: 'Iron veins show rust-red in the rock. Smelt two ore with coal or wood.' },
+      { id: 'talk', text: 'Bring the ingots to Tock', kind: 'talk', target: 'tock' },
+    ],
+    rewards: [
+      ['iron_pickaxe', 1],
+      ['gears', 2],
+    ],
+    after: ['rescue_tock'],
+    auto: true,
+  },
+  {
+    id: 'field_notes',
+    title: 'Field Notes',
+    main: false,
+    giver: 'wren',
+    summary: 'Wren is cataloguing everything that lives here. The birds fly the same circles every day; she wants a closer look at one, and at whatever makes the Crystal Grotto glow.',
+    steps: [
+      { id: 'rook', text: 'Bring down a rook with a bow', kind: 'kill', target: 'rook', count: 1, hint: 'Rooks flock over the Greensward. Hold the shot a little high at range.' },
+      { id: 'grotto', text: 'Reach the chamber of the Crystal Grotto', kind: 'flag', target: 'heard:crystal_grotto', hint: 'East in the Glasswood. It is dark inside: take a torch.' },
+      { id: 'talk', text: 'Tell Wren what you found', kind: 'talk', target: 'wren' },
+    ],
+    rewards: [
+      ['iron_arrow', 12],
+      ['salve', 2],
+    ],
+    after: ['rescue_wren'],
+    auto: true,
+  },
+  {
+    id: 'rock_remembers',
+    title: 'What the Rock Remembers',
+    main: false,
+    giver: 'ilyr',
+    summary: 'The Veyr listened to the island through its caves. Ilyr asks you to go down into each one and hear what the stone still holds.',
+    steps: [
+      { id: 'whisper', text: 'Listen in the Whispering Cave', kind: 'flag', target: 'heard:whispering_cave', hint: 'On a hill in the Greensward, west of camp.' },
+      { id: 'crystal', text: 'Listen in the Crystal Grotto', kind: 'flag', target: 'heard:crystal_grotto', hint: 'In the Glasswood.' },
+      { id: 'lava', text: 'Listen in the Lava Tubes', kind: 'flag', target: 'heard:lava_tubes', hint: 'In the Cinderreach, under the caldera.' },
+      { id: 'ice', text: 'Listen in the Ice Caves', kind: 'flag', target: 'heard:ice_caves', hint: 'High in the Frostveil.' },
+      { id: 'talk', text: 'Return to Ilyr', kind: 'talk', target: 'ilyr' },
+    ],
+    rewards: [
+      ['heartsong', 1],
+      ['songstone', 4],
+    ],
+    after: ['stones'],
+    auto: true,
+  },
 ];
 
 export interface Line {
@@ -360,6 +416,21 @@ export const DIALOGUE: Record<string, Line[]> = {
     { speaker: 'Ilyr', text: 'Five bells. I heard every one of them. For the first time since the note began, it is not alone.' },
     { speaker: 'Ilyr', text: 'The Veil is thin enough to walk through now. Go to the crater. Stand at the heart of the island and listen.' },
     { speaker: 'Ilyr', text: 'Whatever happens there, you gave us back the end of our song. That is more than anyone ever gave the Veyr.' },
+  ],
+  'tock:tocks_workshop:talk': [
+    { speaker: 'Tock', text: 'Four ingots! Clean pours, too. You’ve got hands for this, you know.' },
+    { speaker: 'Tock', text: 'Here. I reforged the old ship’s pick while you were out. Iron bites where stone just bounces.' },
+    { speaker: 'Tock', text: 'The Meridian’s frame is sound. It’s the rest of the island that’s broken. Clocks, compasses, time. I can fix brass. I can’t fix that.' },
+  ],
+  'wren:field_notes:talk': [
+    { speaker: 'Wren', text: 'Look at this primary feather. Notched, here. Every rook in that flock has the same notch, in the same place.' },
+    { speaker: 'Wren', text: 'It isn’t a flock. It’s one morning, repeating. And the grotto? The crystals are singing. Literally. The song goes solid when it has nowhere to go.' },
+    { speaker: 'Wren', text: 'Take these. Iron heads. Whatever is holding this island still, I would like it to hold still less.' },
+  ],
+  'ilyr:rock_remembers:talk': [
+    { speaker: 'Ilyr', text: 'You heard them. The breath in the hill, the glass voices, the fire that hums, the cold that listens.' },
+    { speaker: 'Ilyr', text: 'Four caves, four parts of one chord. We sang it once, together, and the island answered. Then we stopped, and it kept holding the last note for us.' },
+    { speaker: 'Ilyr', text: 'This is a Heartsong. It was mine. I have less need of a heartbeat than you.' },
   ],
   'varga:idle': [
     { speaker: 'Varga', text: 'Keep the fire fed. Eat when you can, drink when you can. And don’t sleep in the open.' },
@@ -432,3 +503,23 @@ export const EPILOGUE = [
 export const TUNING_ORDER = [2, 0, 3, 1, 4];
 export const GLYPHS = ['○', '△', '◇', '☽', '✶'];
 export const GLYPH_NAMES = ['Circle', 'Rise', 'Diamond', 'Crescent', 'Star'];
+
+/** What each cave's deep chamber still says, the first time you stand in it. */
+export const CAVE_ECHOES: Record<string, Line[]> = {
+  whispering_cave: [
+    { speaker: '', text: 'The hill breathes in. Somewhere in the dark, many voices hum one low note.' },
+    { speaker: 'Echo', text: '…hold it… hold it for us… we will come back for the end of it…' },
+  ],
+  crystal_grotto: [
+    { speaker: '', text: 'The crystals ring faintly as you come near, as if something inside them is still singing.' },
+    { speaker: 'Echo', text: 'Sing it into the glass. Glass forgets nothing.' },
+  ],
+  lava_tubes: [
+    { speaker: '', text: 'The rock hums in the heat. It is the same note, lower, bent by the fire.' },
+    { speaker: 'Echo', text: 'Keep the forges lit. If the song cools, the island cools with it.' },
+  ],
+  ice_caves: [
+    { speaker: '', text: 'Frost creeps across the ice in slow rings, keeping time to something you cannot hear.' },
+    { speaker: 'Echo', text: 'Listen. The cold is only waiting. The cold is very patient.' },
+  ],
+};

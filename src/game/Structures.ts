@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { CropState } from './Farming';
 import type { EventBus } from '../core/Events';
 import { createRng } from '../core/rng';
 import { addPatch, replaceOnce } from '../render/materials/MaterialPatches';
@@ -38,8 +39,8 @@ export interface StructureData {
   contents?: (ItemStack | null)[];
   /** Rain collector water (sips). */
   water?: number;
-  /** Farm plot: crop and planting hour. */
-  crop?: { planted: number; ready: number } | null;
+  /** Farm plot: what is growing (older saves stored {planted, ready}). */
+  crop?: CropState | { planted: number; ready: number } | null;
 }
 
 interface Placed {

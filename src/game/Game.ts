@@ -24,6 +24,11 @@ import { WardenSystem } from '../creatures/Warden';
 import { WARDENS } from '../creatures/WardenDefs';
 import { Precipitation, WEATHER_LABELS, WeatherSystem, type WeatherKind } from '../world/Weather';
 import { Gathering, type GatherContext } from './Gathering';
+import { Archery, ARROW_TYPES, type ArrowHit, type ArrowId, type ArrowSurface, type RestingArrow } from './Archery';
+import { Farming } from './Farming';
+import { Combat, DODGE, type HitResult, type LockCandidate } from './Combat';
+import { Birds } from '../creatures/Birds';
+import { BONE } from '../creatures/CreatureModel';
 import { Structures, type StructureData, type StructureType } from './Structures';
 import { Building, isPieceType, type Piece } from './Building';
 import { InventoryScreen } from '../ui/InventoryScreen';
@@ -31,7 +36,11 @@ import { MapScreen, type MapPin } from '../ui/MapScreen';
 import { QuestTracker } from '../story/Quests';
 import { StoryWorld } from '../story/StoryWorld';
 import { Stillheart } from '../story/Stillheart';
-import { BELL_MEMORIES, DIALOGUE, EPILOGUE, TUNING_ORDER } from '../story/StoryData';
+import { Landmarks } from '../story/Landmarks';
+import { Curiosities } from '../story/Curiosities';
+import { Caves } from '../world/Caves';
+import { eclipseAt, SkyEvents } from '../world/SkyEvents';
+import { BELL_MEMORIES, CAVE_ECHOES, DIALOGUE, EPILOGUE, TUNING_ORDER } from '../story/StoryData';
 import { DialogueBox, Journal, QuestTrackerHud } from '../ui/StoryUi';
 import { itemDef } from './items';
 import { RECIPES } from './recipes';
@@ -46,7 +55,8 @@ import { moonDirection, moonIllumination, moonPhase, starRotation, sunDirection 
 import { TerrainRenderer } from '../world/terrain/TerrainRenderer';
 import { GrassSystem } from '../world/vegetation/GrassSystem';
 import { VegetationSystem, type TreeCollider } from '../world/vegetation/VegetationSystem';
-import { BIOME_COUNT, BIOMES, VEIL_RADIUS } from '../world/WorldConfig';
+import { SPECIES as TREE_SPECIES } from '../world/vegetation/TreeGenerator';
+import { BIOME, BIOME_COUNT, BIOMES, VEIL_RADIUS } from '../world/WorldConfig';
 import { WorldData } from '../world/WorldData';
 import { loadWorld } from '../world/WorldLoader';
 import { LANDMARKS } from '../world/WorldLayout';
@@ -98,6 +108,10 @@ export class Game {
   building!: Building;
   wildlife!: Wildlife;
   wardens!: WardenSystem;
+  birds!: Birds;
+  archery!: Archery;
+  readonly combat = new Combat();
+  farming!: Farming;
   readonly weather = new WeatherSystem();
   precipitation!: Precipitation;
   inventoryScreen!: InventoryScreen;
@@ -105,6 +119,12 @@ export class Game {
   quests!: QuestTracker;
   story!: StoryWorld;
   stillheart!: Stillheart;
+  landmarks!: Landmarks;
+  caves!: Caves;
+  curiosities!: Curiosities;
+  sky!: SkyEvents;
+  /** The player is underground in a cave (floor and walls come from it). */
+  private inCave = false;
   dialogue!: DialogueBox;
   journal!: Journal;
   questHud!: QuestTrackerHud;
@@ -193,6 +213,12 @@ export class Game {
   private openContainer: StructureData | null = null;
   /** Controller navigation for the DOM screens. */
   private readonly padNav = new PadNavigator();
+  /** Sky events already announced (by kind and day). */
+  private readonly skyAnnounced = new Set<string>();
+  /** When the last "no arrows" hint showed (elapsed seconds). */
+  private noArrowsAt = -10;
+  private readonly arrowPoint = new THREE.Vector3();
+  private readonly tmpLock = new THREE.Vector3();
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const params = new URLSearchParams(location.search);
@@ -294,10 +320,7 @@ export class Game {
           const noise = this.player.sprinting ? 1 : this.player.crouching ? 0.2 : this.player.speed > 0.5 ? 0.6 : 0.15;
           return { x: p.x, y: p.y, z: p.z, crouching: this.player.crouching, sprinting: this.player.sprinting, noise };
         },
-        damagePlayer: (amount, source) => {
-          if (this.mode !== 'play' || !this.survival.alive) return;
-          this.survival.damage(amount, source);
-        },
+        damagePlayer: (amount, source, fromX, fromZ) => this.defendAndHurt(amount, source, fromX, fromZ, 'creature'),
         isNight: () => this.clock.isNight,
         cameraFacing: (x, z) => {
           const dir = this.camera.getWorldDirection(this.tmpDir);
@@ -312,6 +335,18 @@ export class Game {
     this.wildlife.cap = this.quality.name === 'low' ? 8 : this.quality.name === 'medium' ? 12 : this.quality.name === 'high' ? 16 : 22;
     for (const material of this.wildlife.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.wildlife.group);
+    this.birds = new Birds(this.world, {
+      player: () => {
+        // On the title screen the camera is the one to fly from.
+        const p = this.mode === 'play' ? this.player.position : this.camera.position;
+        return { x: p.x, y: p.y, z: p.z, crouching: this.mode === 'play' && this.player.crouching, sprinting: this.mode === 'play' && this.player.sprinting };
+      },
+      isNight: () => this.clock.isNight,
+      sound: (kind, call, x, y, z) => this.audio.birdCall(kind, call, x, y, z),
+    });
+    this.birds.cap = { low: 18, medium: 26, high: 34, extra: 42, max: 48 }[this.quality.name];
+    for (const material of this.birds.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.birds.group);
     this.quests = new QuestTracker(this.events, this.inventory);
     this.quests.isSatisfied = (step) => {
       if (step.kind === 'place') return this.structures.nearestOfType(step.target as StructureType, this.player.position.x, this.player.position.z) !== null;
@@ -333,6 +368,57 @@ export class Game {
     this.stillheart = new Stillheart(this.world);
     for (const material of this.stillheart.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.stillheart.group);
+    this.sky = new SkyEvents(this.world, {
+      starfall: (x, y, z) => {
+        this.audio.thunder(1.2, 0.7);
+        this.pipeline.post.flash = 0.35;
+        const p = this.player.position;
+        const bearing = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(bearingOf(x - p.x, z - p.z) / 45) % 8];
+        this.events.emit('notify', { text: `A star falls to the ${bearing}`, icon: 'songstone', tone: 'info' });
+        void y;
+      },
+    });
+    for (const material of this.sky.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.sky.group);
+    this.caves = new Caves(this.world);
+    for (const material of this.caves.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.caves.group);
+    this.landmarks = new Landmarks(this.world, this.story.interactables, {
+      give: (item, count) => this.inventory.add(item, count),
+      hasFlag: (flag) => this.quests.flags.has(flag),
+      setFlag: (flag) => this.quests.setFlag(flag),
+      lore: (id, title) => this.events.emit('discovered', { id, name: title, kind: 'lore' }),
+      say: (speaker, text, seconds = 5) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
+      damage: (amount, source) => {
+        if (this.mode === 'play' && this.survival.alive) this.survival.damage(amount, source);
+      },
+      playerPosition: () => this.player.position,
+    }, this.caves);
+    for (const material of this.landmarks.materials) this.lighting.setupMaterial(material);
+    this.curiosities = new Curiosities(this.world, this.story.interactables, {
+      isFound: (id) => this.quests.flags.has(`found:${id}`),
+      found: (c) => {
+        this.quests.setFlag(`found:${c.id}`);
+        const n = [...this.quests.flags].filter((f) => f.startsWith('found:')).length;
+        this.events.emit('notify', { text: `Curiosities found · ${n} of ${this.curiosities.list.length}`, icon: 'quest', tone: 'info' });
+      },
+      give: (item, count) => this.inventory.add(item, count),
+      say: (speaker, text, seconds = 5) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
+    });
+    for (const material of this.curiosities.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.curiosities.group);
+    // The Hollow Elder: an ancient oak grown by the forest itself.
+    const elder = LANDMARKS.find((l) => l.id === 'hollow_elder');
+    if (elder) {
+      this.vegetation.hero(
+        { ...TREE_SPECIES.oak, id: 'elder', height: [36, 38], trunkRadius: 0.045, limbs: 8, limbLength: 0.6, crownStart: 0.34, leafDensity: 1.7, lean: 0.015 },
+        elder.x,
+        this.world.groundAt(elder.x, elder.z) - 0.6,
+        elder.z,
+        0xe1de4,
+      );
+    }
+    this.scene.add(this.landmarks.group);
     const obstacleScratch: TreeCollider[] = [];
     this.wardens = new WardenSystem(this.world, this.events, {
       player: () => {
@@ -340,10 +426,23 @@ export class Game {
         return { x: p.x, y: p.y, z: p.z, grounded: this.player.grounded, alive: this.mode === 'play' && this.survival.alive };
       },
       damagePlayer: (amount, source) => {
-        if (this.mode !== 'play' || !this.survival.alive) return;
-        this.survival.damage(amount, source);
+        // Wardens strike from where they stand.
+        let wx = this.player.position.x;
+        let wz = this.player.position.z - 1;
+        let best = Infinity;
+        for (const w of this.wardens.wardens) {
+          const d = Math.hypot(w.position.x - this.player.position.x, w.position.z - this.player.position.z);
+          if (w.active && d < best) {
+            best = d;
+            wx = w.position.x;
+            wz = w.position.z;
+          }
+        }
+        this.defendAndHurt(amount, source, wx, wz, 'warden');
       },
-      knockPlayer: (x, y, z) => this.player.knock(x, y, z),
+      knockPlayer: (x, y, z) => {
+        if (this.combat.iframes <= 0) this.player.knock(x, y, z);
+      },
       shake: (amount) => this.view.addTrauma(amount),
       sound: (kind, x, y, z, strength, pitch, element) => this.audio.warden(kind, x, y, z, strength, pitch, element),
       say: (speaker, text, seconds = 6) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
@@ -363,6 +462,18 @@ export class Game {
     this.building = new Building(this.world, this.events);
     for (const material of this.building.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.building.group);
+    this.archery = new Archery({
+      strike: (from, dir, length, damage, arrow) => this.arrowStrike(from, dir, length, damage, arrow),
+      world: (from, dir, length) => this.arrowWorld(from, dir, length),
+      groundAt: (x, z) => this.world.groundAt(x, z),
+      sound: (kind, x, y, z, detail, strength) => this.audio.arrow(kind, x, y, z, detail, strength),
+      splash: (x, y, z) => this.events.emit('splash', { strength: 0.12, x, y, z }),
+    });
+    for (const material of this.archery.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.archery.group);
+    this.farming = new Farming();
+    for (const material of this.farming.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.farming.group);
     // Campfires, chests and benches can stand on built floors.
     this.structures.surfaceAt = (x, z, y) => this.building.surfaceAt(x, z, y);
     this.structures.raycast = (o, d, max, out) => {
@@ -455,10 +566,13 @@ export class Game {
     const waterOut: WaterAt = { surface: 0, depth: 0, frozen: false, flowX: 0, flowZ: 0 };
     return {
       groundHeight: (x, z, y) => {
+        const cave = this.caveFloor(x, z, y);
+        if (cave !== null) return cave;
         const natural = Math.max(world.groundAt(x, z), this.props.heightAt(x, z));
         return y === undefined ? natural : Math.max(natural, this.building.surfaceAt(x, z, y));
       },
       groundNormal: (x, z, out, y) => {
+        if (this.caveFloor(x, z, y) !== null) return out.set(0, 1, 0);
         // Standing on a built floor or stair: level footing.
         if (y !== undefined && this.building.count > 0) {
           const deck = this.building.surfaceAt(x, z, y);
@@ -495,6 +609,7 @@ export class Game {
       },
       surface: (x, z) => this.surfaceAt(x, z),
       boundary: VEIL_RADIUS - 8,
+      confine: (p, v, radius) => this.caves.confine(p, v, radius),
     };
   }
 
@@ -720,6 +835,10 @@ export class Game {
     this.saves.register('wardens', {
       save: () => this.wardens.serialize(),
       load: (data) => this.wardens.load(data),
+    });
+    this.saves.register('sky', {
+      save: () => this.sky.serialize(),
+      load: (data) => this.sky.load(data),
     });
     this.saves.register('meta', {
       save: () => ({ playtime: this.playtime }),
@@ -1005,7 +1124,252 @@ export class Game {
   private skinCorpse(corpse: import('../creatures/Wildlife').Creature): void {
     const knife = this.inventory.held ? itemDef(this.inventory.held.id).tool?.kind === 'knife' : false;
     for (const [item, n] of this.wildlife.loot(corpse, knife)) this.inventory.add(item, n);
+    this.giveArrowsBack(this.archery.recoverFrom(corpse.rig.mesh));
     this.events.emit('gathered', { resource: `corpse:${corpse.species.id}`, x: corpse.pos.x, y: corpse.pos.y, z: corpse.pos.z });
+  }
+
+  /**
+   * Cave floor under (x, z) for a body at `y` (the player's height when not
+   * given), but only where it is underground or in the opened mouth.
+   */
+  private caveFloor(x: number, z: number, y?: number): number | null {
+    if (!this.caves) return null;
+    // Without a height, probe at the player's: at a cave mouth the ground
+    // ahead is the cave floor, not the hillside over it.
+    const probe = y ?? this.player?.position.y;
+    if (probe === undefined) return null;
+    const f = this.caves.floorAt(x, z, probe);
+    if (f === null) return null;
+    const underground = this.world.heightAt(x, z) > probe + 0.35;
+    return underground || this.caves.opened(x, probe + 0.5, z) ? f : null;
+  }
+
+  /** A blow meets the survivor's defence: dodged, parried, blocked or taken. */
+  private defendAndHurt(amount: number, source: string, fromX: number, fromZ: number, by: 'creature' | 'warden'): void {
+    if (this.mode !== 'play' || !this.survival.alive) return;
+    const p = this.player.position;
+    const r = this.combat.incoming(amount, fromX, fromZ, p.x, p.z, this.player.yaw, this.survival);
+    this.reactToDefence(r.result, fromX, fromZ, by);
+    if (r.damage > 0) this.survival.damage(r.damage, source);
+  }
+
+  private reactToDefence(result: HitResult, fromX: number, fromZ: number, by: 'creature' | 'warden'): void {
+    const p = this.player.position;
+    switch (result) {
+      case 'parried':
+        this.audio.hit('songstone');
+        this.view.addTrauma(0.12);
+        this.events.emit('notify', { text: 'Parried!', icon: 'quest', tone: 'good' });
+        if (by === 'creature') this.wildlife.stagger(fromX, fromZ, p.x, p.z);
+        break;
+      case 'blocked':
+        this.audio.hit('wood');
+        this.view.addTrauma(0.08);
+        break;
+      case 'guardBreak':
+        this.audio.hit('wood-glance');
+        this.view.addTrauma(0.25);
+        this.events.emit('notify', { text: 'Your guard breaks', icon: 'heart', tone: 'bad' });
+        break;
+      case 'dodged':
+      case 'hit':
+        break;
+    }
+  }
+
+  /** Living things worth locking on to. */
+  private lockCandidates(): LockCandidate[] {
+    const out: LockCandidate[] = [];
+    for (const c of this.wildlife.creatures) {
+      if (c.state === 'dead') continue;
+      out.push({ kind: 'creature', id: String(c.id), x: c.pos.x, y: c.pos.y + c.species.look.height * c.scale * 0.7, z: c.pos.z });
+    }
+    for (const w of this.wardens.wardens) {
+      if (!w.active) continue;
+      out.push({ kind: 'warden', id: w.def.id, x: w.position.x, y: w.position.y + w.def.look.height * 0.7, z: w.position.z });
+    }
+    return out;
+  }
+
+  /** Where the locked target is now (null when it is gone, dead or calmed). */
+  private lockPoint(lock: LockCandidate): THREE.Vector3 | null {
+    if (lock.kind === 'creature') {
+      const c = this.wildlife.creatures.find((x) => String(x.id) === lock.id);
+      if (!c || c.state === 'dead') return null;
+      return this.tmpLock.set(c.pos.x, c.pos.y + c.species.look.height * c.scale * 0.7, c.pos.z);
+    }
+    const w = this.wardens.wardens.find((x) => x.def.id === lock.id);
+    if (!w || !w.active) return null;
+    return this.tmpLock.set(w.position.x, w.position.y + w.def.look.height * 0.7, w.position.z);
+  }
+
+  /** Dodge, guard and lock-on, before the body moves this frame. */
+  private updateDefence(dt: number, canAct: boolean): void {
+    const input = this.input;
+    const alive = this.survival.alive;
+    const held = this.inventory.held;
+    const tool = held ? itemDef(held.id).tool : undefined;
+    const guardable = !!tool && !['bow', 'torch', 'lantern', 'waterskin'].includes(tool.kind);
+    this.combat.update(dt, alive && canAct && guardable && input.isDown('aim') && this.player.state === 'ground' && this.gathering.swingProgress <= 0);
+    if (alive && canAct && input.wasPressed('dodge') && this.player.state === 'ground') {
+      // Along the stick or keys; straight back when standing still.
+      let mx = this.intent.moveX;
+      let my = this.intent.moveY;
+      if (Math.hypot(mx, my) < 0.2) {
+        mx = 0;
+        my = -1;
+      }
+      const sin = Math.sin(this.player.yaw);
+      const cos = Math.cos(this.player.yaw);
+      const dx = -sin * my + cos * mx;
+      const dz = -cos * my - sin * mx;
+      if (this.combat.dodge(dx, dz, this.survival)) {
+        this.player.dash(dx, dz, DODGE.speed, DODGE.dash);
+        this.audio.swing();
+        this.view.addTrauma(0.05);
+      }
+    }
+    if (alive && canAct && input.wasPressed('lockOn')) {
+      if (this.combat.lock) this.combat.lock = null;
+      else {
+        const eye = this.camera.getWorldPosition(this.tmpOrigin);
+        const fwd = this.camera.getWorldDirection(this.tmpDir);
+        this.combat.lock = this.combat.acquire(this.lockCandidates(), eye, fwd);
+        if (!this.combat.lock) this.events.emit('notify', { text: 'Nothing to lock on to', icon: 'quest', tone: 'info' });
+      }
+    }
+    const lock = this.combat.lock;
+    if (lock) {
+      const at = this.lockPoint(lock);
+      const eye = this.camera.getWorldPosition(this.tmpOrigin);
+      if (!at || at.distanceTo(eye) > 45) this.combat.lock = null;
+      else {
+        // Keep the target under the crosshair, easing the view round.
+        const aim = Combat.aimAt(eye, at.x, at.y, at.z);
+        let dy = aim.yaw - this.player.yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        const k = Math.min(1, dt * 9);
+        this.player.yaw += dy * k;
+        this.player.pitch += (THREE.MathUtils.clamp(aim.pitch, -1.2, 1.2) - this.player.pitch) * k;
+      }
+    }
+  }
+
+  private updateCaveState(): void {
+    const p = this.player.position;
+    this.inCave = this.caves.floorAt(p.x, p.z, p.y) !== null && (this.world.heightAt(p.x, p.z) > p.y + 0.35 || this.caves.opened(p.x, p.y + 0.5, p.z));
+    if (!this.inCave) return;
+    for (const cave of this.caves.caves) {
+      const ch = cave.chamber;
+      if (Math.hypot(p.x - ch.x, p.z - ch.z) > cave.chamberFloor || Math.abs(p.y - ch.floor) > 2) continue;
+      const flag = `heard:${cave.id}`;
+      if (this.quests.flags.has(flag)) continue;
+      this.quests.setFlag(flag);
+      (CAVE_ECHOES[cave.id] ?? []).forEach((line, i) => {
+        window.setTimeout(() => this.events.emit('subtitle', { speaker: line.speaker, text: line.text, duration: 6 }), 600 + i * 6500);
+      });
+    }
+  }
+
+  /** The fallen star: its metal, and a page for the journal. */
+  private gatherStar(): void {
+    if (!this.sky.collect()) return;
+    this.inventory.add('star_shard', 3);
+    this.audio.stinger(true);
+    this.events.emit('discovered', { id: 'lore:starfall', name: 'Starfall', kind: 'lore' });
+    this.saveSession('auto');
+  }
+
+  private giveArrowsBack(arrows: string[]): void {
+    if (arrows.length === 0) return;
+    for (const a of arrows) this.inventory.add(a, 1);
+    this.events.emit('notify', { text: arrows.length === 1 ? 'Recovered an arrow' : `Recovered ${arrows.length} arrows`, icon: 'spear', tone: 'info' });
+  }
+
+  /** Pull out the arrow being looked at, and any others beside it. */
+  private recoverArrows(a: RestingArrow): void {
+    this.giveArrowsBack(this.archery.recoverNear(a.x, a.y, a.z, 1.6));
+    this.audio.pickup();
+  }
+
+  /** Pick up a downed bird: feathers, meat and the arrow that brought it down. */
+  private collectBird(id: number): void {
+    const r = this.birds.collect(id);
+    if (!r) return;
+    for (const [item, n] of r.loot) this.inventory.add(item, n);
+    this.giveArrowsBack(r.arrows);
+    this.events.emit('gathered', { resource: 'bird', x: this.player.position.x, y: this.player.position.y, z: this.player.position.z });
+  }
+
+  /** The first arrow stack in the pack (hotbar first). */
+  private firstArrow(): ArrowId | null {
+    for (const slot of this.inventory.slots) if (slot && (ARROW_TYPES as readonly string[]).includes(slot.id)) return slot.id as ArrowId;
+    return null;
+  }
+
+  /** Wardens, animals and birds along an arrow's flight. */
+  private arrowStrike(from: THREE.Vector3, dir: THREE.Vector3, length: number, damage: number, arrow: ArrowId): ArrowHit | null {
+    // Songstone rings true against the Wardens' knots.
+    const w = this.wardens.hit(from, dir, length, damage * (arrow === 'songstone_arrow' ? 1.6 : 1));
+    if (w.hit) {
+      if (w.weak) this.events.emit('notify', { text: 'Weak point!', icon: 'quest', tone: 'good' });
+      return { t: w.t ?? 0, surface: 'warden', attach: w.attach ?? null };
+    }
+    const bird = this.birds.pick(from, dir, length);
+    const beast = this.wildlife.pick(from, dir, length);
+    let beastT = Infinity;
+    if (beast) {
+      const c = beast.creature;
+      const r = Math.max(0.35, Math.max(c.species.look.length * c.scale * 0.55, c.species.look.height * c.scale * 0.5));
+      beastT = Math.max(0, beast.distance - r * 0.6);
+      if (beastT > length) beastT = Infinity;
+    }
+    if (bird && bird.t <= beastT) {
+      if (this.birds.shoot(bird.id, dir, arrow)) this.events.emit('killed', { species: bird.species });
+      return { t: bird.t, surface: 'flesh', absorb: true };
+    }
+    if (!beast || !Number.isFinite(beastT)) return null;
+    const c = beast.creature;
+    if (c.state !== 'dead') {
+      const p = this.player.position;
+      this.wildlife.damage(c, damage, beast.weak, p.x, p.z, this.elapsed);
+      if (beast.weak) this.events.emit('notify', { text: 'Weak point!', icon: 'quest', tone: 'good' });
+    }
+    return { t: beastT, surface: 'flesh', attach: c.rig.bones[beast.weak ? BONE.neck : BONE.chest] ?? c.rig.mesh };
+  }
+
+  /** Ground, water, trunks, rocks and built pieces along an arrow's flight. */
+  private arrowWorld(from: THREE.Vector3, dir: THREE.Vector3, length: number): ArrowHit | null {
+    let best: ArrowHit | null = null;
+    const consider = (t: number, surface: ArrowSurface) => {
+      if (t >= 0 && t <= length && (!best || t < best.t)) best = { t, surface };
+    };
+    const tg = this.world.raycast(from, dir, length, this.arrowPoint);
+    if (tg >= 0) {
+      const x = this.arrowPoint.x;
+      const z = this.arrowPoint.z;
+      const ice = this.world.iceAt(x, z);
+      let surface: ArrowSurface = 'soil';
+      if (Number.isFinite(ice) && this.arrowPoint.y <= ice + 0.05) surface = 'ice';
+      else if (this.world.maskAt(x, z, MASK.snow) > 0.5) surface = 'snow';
+      else if (this.world.maskAt(x, z, MASK.sand) > 0.5) surface = 'sand';
+      else if (this.world.slopeAt(x, z) > 0.8) surface = 'stone';
+      consider(tg, surface);
+    }
+    // Water: where the flight crosses the surface.
+    const ex = from.x + dir.x * length;
+    const ez = from.z + dir.z * length;
+    const ey = from.y + dir.y * length;
+    const level = this.world.waterLevelAt(ex, ez);
+    if (dir.y < 0 && ey < level && level - this.world.heightAt(ex, ez) > 0.08 && from.y >= level - 0.05) consider((from.y - level) / -dir.y, 'water');
+    const tree = this.vegetation.pickTree(from, dir, length);
+    if (tree && !tree.bush) consider(tree.distance, 'wood');
+    const prop = this.props.pick(from, dir, length);
+    if (prop && (prop.kind === 'boulder' || prop.kind === 'rock_node')) consider(prop.distance, 'stone');
+    const piece = this.building.raycast(from, dir, length);
+    if (piece) consider(piece.t, 'wood');
+    return best;
   }
 
   /** Where the tracked objective points on the compass. */
@@ -1072,9 +1436,8 @@ export class Game {
       case 'rain_collector':
         return (d.water ?? 0) >= 1 ? { key: 'E', text: `Drink · ${Math.floor(d.water ?? 0)} sips` } : { key: null, text: 'Rain Collector · empty' };
       case 'farm_plot': {
-        if (!d.crop) return this.inventory.has('seeds') ? { key: 'E', text: 'Plant Seeds' } : { key: null, text: 'Farm Plot · needs seeds' };
-        const left = d.crop.ready - this.clock.totalHours;
-        return left <= 0 ? { key: 'E', text: 'Harvest' } : { key: null, text: `Growing · ${Math.ceil(left)} h` };
+        const held = this.inventory.held;
+        return this.farming.prompt(d, held?.id ?? null, held?.durability ?? 0, (item) => this.inventory.has(item));
       }
       case 'lantern_post':
         return { key: null, text: name };
@@ -1110,17 +1473,21 @@ export class Game {
           this.survival.drink(20);
         }
         break;
-      case 'farm_plot':
-        if (!d.crop && this.inventory.remove('seeds', 1)) {
-          d.crop = { planted: this.clock.totalHours, ready: this.clock.totalHours + 36 };
-          this.events.emit('notify', { text: 'Seeds planted · ready in a day and a half', icon: 'seed', tone: 'good' });
-        } else if (d.crop && d.crop.ready <= this.clock.totalHours) {
-          d.crop = null;
-          this.inventory.add('berries', 6);
-          this.inventory.add('seeds', 2);
-          this.inventory.add('fiber', 3);
+      case 'farm_plot': {
+        const held = this.inventory.held;
+        const r = this.farming.use(d, held?.id ?? null, held?.durability ?? 0, (item) => this.inventory.has(item), this.clock.totalHours);
+        if (!r) break;
+        if (r.consume) this.inventory.remove(r.consume, 1);
+        if (r.watered && held) {
+          held.durability = Math.max(0, (held.durability ?? 1) - 1);
+          this.events.emit('inventoryChanged', {});
+          this.events.emit('splash', { strength: 0.1, x: d.x, y: d.y + 0.2, z: d.z });
         }
+        for (const [item, n] of r.give ?? []) this.inventory.add(item, n);
+        if (r.message) this.events.emit('notify', { text: r.message, icon: 'seed', tone: 'good' });
+        this.audio.pickup();
         break;
+      }
       default:
         this.openInventory();
     }
@@ -1223,7 +1590,8 @@ export class Game {
 
   private viewOptions() {
     const s = this.settings.all;
-    return { fov: s.fov, headBob: s.headBob, shake: s.cameraShake, reducedMotion: s.reducedMotion || this.reducedMotion };
+    const zoom = this.archery && this.mode === 'play' ? 1 - this.archery.draw * (this.input.isDown('aim') ? 0.28 : 0.08) : 1;
+    return { fov: s.fov * zoom, headBob: s.headBob, shake: s.cameraShake, reducedMotion: s.reducedMotion || this.reducedMotion };
   }
 
   // -------------------------------------------------------------------------
@@ -1292,6 +1660,7 @@ export class Game {
         if (this.mode === 'fly') this.flyCam.update(dt);
         else this.updatePlay(dt);
       }
+      this.birds.update(dt, this.elapsed);
     }
     this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && !this.journal.isOpen && this.survival.alive && this.frame > 30);
     this.input.endFrame();
@@ -1334,7 +1703,9 @@ export class Game {
       this.intent.sprint = false;
       this.intent.crouch = false;
     }
+    this.updateDefence(dt, alive && (this.input.pointerLocked || this.testInput));
     this.player.update(dt, this.intent);
+    this.updateCaveState();
     this.updateHush();
     this.survival.update(dt, this.climate());
 
@@ -1370,6 +1741,8 @@ export class Game {
       const structure = this.structures.pick(origin, dir, 3.2);
       const gatherDist = this.gathering.target ? this.targetDistance() : Infinity;
       const corpse = this.wildlife.corpseNear(origin, dir, 2.8);
+      const carcass = this.birds.pickCarcass(origin, dir, 2.8);
+      const looseArrow = this.archery.pick(origin, dir, 3);
       const storyTarget = this.story.pick(origin, dir, 3.2);
       if (storyTarget) {
         prompt = storyTarget.prompt();
@@ -1380,6 +1753,15 @@ export class Game {
         prompt = { key: 'E', text: `${knife ? 'Skin' : 'Butcher'} ${corpse.species.name}` };
         if (canAct && input.wasPressed('interact')) this.skinCorpse(corpse);
         if (canAct && input.wasPressed('attack')) this.gathering.use(ctx);
+      } else if (this.sky.near(origin.x, origin.z)) {
+        prompt = { key: 'E', text: 'Gather the starmetal' };
+        if (canAct && input.wasPressed('interact')) this.gatherStar();
+      } else if (carcass) {
+        prompt = { key: 'E', text: `Pick up ${carcass.name}` };
+        if (canAct && input.wasPressed('interact')) this.collectBird(carcass.id);
+      } else if (looseArrow && looseArrow.distance < gatherDist) {
+        prompt = { key: 'E', text: `Pick up ${itemDef(looseArrow.type).name}` };
+        if (canAct && input.wasPressed('interact')) this.recoverArrows(looseArrow);
       } else if (structure && Math.hypot(structure.x - origin.x, structure.z - origin.z) < gatherDist) {
         prompt = this.structurePrompt(structure);
         if (canAct && input.wasPressed('interact')) this.useStructure(structure);
@@ -1391,8 +1773,34 @@ export class Game {
       }
     }
     this.gathering.update(dt, ctx);
+    // Bows: hold to draw, let go to loose.
+    const heldDef = held ? itemDef(held.id) : null;
+    const bow = alive && heldDef?.tool?.kind === 'bow' && this.player.state !== 'climb' && this.player.state !== 'swim' ? heldDef.tool : null;
+    const ammo = bow ? this.firstArrow() : null;
+    if (bow && !ammo && canAct && input.wasPressed('attack') && this.elapsed - this.noArrowsAt > 3) {
+      this.noArrowsAt = this.elapsed;
+      this.events.emit('notify', { text: 'No arrows · craft some at a workbench (feathers come from birds)', icon: 'spear', tone: 'warn' });
+    }
+    const steady = clamp(1 - Math.min(1, this.player.speed / 7) * 0.6 - (this.player.grounded ? 0 : 0.4) - (this.survival.stamina < 15 ? 0.3 : 0) + (this.player.crouching ? 0.15 : 0), 0, 1);
+    const loosed = this.archery.handle(dt, bow, ammo, canAct && input.isDown('attack'), canAct && input.wasPressed('attack'), this.camera, steady, this.survival);
+    if (loosed) {
+      this.inventory.remove(loosed.type, 1);
+      this.inventory.wearHeld(1);
+      this.view.addTrauma(0.03 + loosed.draw * 0.04);
+    }
+    if (bow && this.archery.drawing && !prompt) prompt = { key: null, text: `${Math.round(this.archery.draw * 100)}% drawn · ${this.inventory.count(ammo ?? '')} ${ammo ? itemDef(ammo).name.toLowerCase() : 'arrows'}` };
+    this.archery.update(dt);
     this.hud.setPrompt(prompt ? (prompt.key === 'LMB' ? this.input.bindingLabel('attack') : prompt.key === 'E' ? this.input.bindingLabel('interact') : null) : null, prompt ? prompt.text : null);
-    this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, 0);
+    const rain = this.weather.state.rain;
+    this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, rain);
+    this.farming.update(
+      this.structures.all,
+      this.clock.totalHours,
+      (d) => (this.building.sheltered(d.x, d.y + 0.3, d.z) ? 0 : rain + this.weather.state.snow * 0.5),
+      (x, z) => this.world.dominantBiome(x, z),
+      this.camera.position,
+      this.elapsed,
+    );
     this.wildlife.update(dt, this.elapsed, this.camera);
     this.wardens.update(dt);
     this.story.update(dt);
@@ -1511,7 +1919,8 @@ export class Game {
     this.pipeline.atmosphere.uniforms.uSunDir.value.copy(this.sunDir);
     const a = this.pipeline.atmosphere.uniforms;
     // Dominant light for shadows: whichever of sun/moon is brighter here.
-    const sunI = SUN_ILLUMINANCE * THREE.MathUtils.smoothstep(this.sunDir.y, -0.04, 0.06);
+    const eclipse = eclipseAt(this.clock.day, this.clock.hours, this.sky?.forceEclipse ?? false);
+    const sunI = SUN_ILLUMINANCE * THREE.MathUtils.smoothstep(this.sunDir.y, -0.04, 0.06) * (1 - 0.97 * eclipse);
     const moonI = MOON_ILLUMINANCE * (0.25 + 0.75 * moonLight) * THREE.MathUtils.smoothstep(this.moonDir.y, -0.02, 0.1);
     const useSun = sunI >= moonI;
     this.light.direction.copy(useSun ? this.sunDir : this.moonDir);
@@ -1548,7 +1957,17 @@ export class Game {
         reducedMotion: this.viewOptions().reducedMotion,
         climbing: this.player.state === 'climb',
         swimming: this.player.state === 'swim',
+        draw: this.archery.draw,
+        nocked: this.archery.drawing || this.archery.draw > 0.02,
+        guard: this.combat.blocking ? 1 : 0,
       });
+      // The lock-on marker.
+      const lock = this.combat.lock ? this.lockPoint(this.combat.lock) : null;
+      if (lock) {
+        const ndc = lock.clone().project(this.camera);
+        const rect = this.canvas.getBoundingClientRect();
+        this.hud.setLock(ndc.z < 1 ? { x: (ndc.x * 0.5 + 0.5) * rect.width, y: (1 - (ndc.y * 0.5 + 0.5)) * rect.height } : null);
+      } else this.hud.setLock(null);
       // New tool meshes need CSM shadow setup once.
       this.viewmodel.root.traverse((o) => {
         const mesh = o as THREE.Mesh;
@@ -1574,12 +1993,13 @@ export class Game {
         moonPhaseLight: moonIllumination(moonPhase(this.clock.day, this.clock.hours)),
         mieScale: this.weather.state.haze,
         cameraAltitude: this.camera.position.y,
+        eclipse: eclipseAt(this.clock.day, this.clock.hours, this.sky?.forceEclipse ?? false),
       },
       {
         time,
         moonPhaseLight: moonIllumination(moonPhase(this.clock.day, this.clock.hours)),
         starRotation: this.starMatrix,
-        aurora: 0,
+        aurora: this.auroraLevel(),
         cloudCover: THREE.MathUtils.smoothstep(this.pipeline.cloudParams.coverage, 0.62, 0.95),
         resonance: 0,
       },
@@ -1595,6 +2015,30 @@ export class Game {
     const open = q.isActive('held_note') || q.isDone('held_note');
     const night = 1 - THREE.MathUtils.smoothstep(this.sunDir.y, -0.12, 0.12);
     this.stillheart.update(dt, open, q.isDone('held_note'), night, this.camera.position);
+    this.landmarks.update(dt, night, this.camera.position);
+    this.caves.update(dt, this.camera.position);
+    this.curiosities.update(dt);
+    this.sky.update(dt, this.clock.day, this.clock.hours, this.camera.position, this.player?.position.x ?? 0, this.player?.position.z ?? 0);
+    if (this.mode === 'play') {
+      // Tell the player to look up, once each time.
+      const announce = (key: string, text: string) => {
+        if (this.skyAnnounced.has(key)) return;
+        this.skyAnnounced.add(key);
+        this.events.emit('notify', { text, icon: 'moon', tone: 'info' });
+      };
+      if (this.sky.showering(this.clock.day, this.clock.hours)) announce(`shower:${this.clock.hours < 12 ? this.clock.day - 1 : this.clock.day}`, 'Stars are falling tonight');
+      if (eclipseAt(this.clock.day, this.clock.hours, this.sky.forceEclipse) > 0.3) announce(`eclipse:${this.clock.day}`, 'The sun is going dark');
+    }
+  }
+
+  /** Northern lights over the Frostveil, strongest at the Aurora Overlook. */
+  private auroraLevel(): number {
+    const cam = this.camera.position;
+    const frost = this.world.biomeWeights(cam.x, cam.z, this.weatherWeights)[BIOME.Frostveil];
+    const overlook = LANDMARKS.find((l) => l.id === 'aurora_overlook');
+    const near = overlook ? 1 - THREE.MathUtils.smoothstep(Math.hypot(cam.x - overlook.x, cam.z - overlook.z), 200, 900) : 0;
+    const clear = 1 - THREE.MathUtils.smoothstep(this.pipeline.cloudParams.coverage, 0.45, 0.8);
+    return Math.min(1, Math.max(frost * 0.7, near)) * clear;
   }
 
   private hushNoticeAt = -100;
@@ -1662,6 +2106,7 @@ export class Game {
     a.lowHealth = this.mode === 'play' ? this.pipeline.post.lowHealth : 0;
     a.rain = Math.min(1, this.weather.state.rain + this.weather.state.snow * 0.15);
     a.combat = damp(a.combat, this.mode === 'play' && this.wardens.active ? 1 : 0, this.wardens.active ? 2 : 0.35, dt);
+    a.cave = damp(a.cave ?? 0, this.caves.inside(cam.x, cam.y, cam.z), 1.5, dt);
     // Surroundings change slowly: probe a few times a second.
     this.audioProbeTimer -= dt;
     if (this.audioProbeTimer <= 0) {
@@ -1932,6 +2377,7 @@ export class Game {
           this.elapsed += dt;
           this.clock.update(dt);
           this.player.update(dt, this.intent);
+          this.updateCaveState();
           this.survival.update(dt, this.climate());
           this.updateDiscovery(dt);
         }
@@ -1988,8 +2434,16 @@ export class Game {
         const structure = this.structures.pick(origin, dir, 3.2);
         let result = false;
         const corpse = action === 'interact' ? this.wildlife.corpseNear(origin, dir, 2.8) : null;
+        const carcass = action === 'interact' ? this.birds.pickCarcass(origin, dir, 2.8) : null;
+        const looseArrow = action === 'interact' ? this.archery.pick(origin, dir, 3) : null;
         if (corpse) {
           this.skinCorpse(corpse);
+          result = true;
+        } else if (carcass) {
+          this.collectBird(carcass.id);
+          result = true;
+        } else if (looseArrow) {
+          this.recoverArrows(looseArrow);
           result = true;
         } else if (action === 'interact') {
           if (structure) {
@@ -2117,6 +2571,97 @@ export class Game {
         return { ...w.debugState, knotPositions: w.knotPositions(), boss: w.status() };
       },
       wardens: () => this.wardens.wardens.map((w) => ({ id: w.def.id, bell: w.def.bell, mode: w.mode, x: w.position.x, y: w.position.y, z: w.position.z })),
+      /** Draw the held bow for `seconds` and let go (aim first). */
+      shootBow: (seconds = 1, dt = 1 / 30) => {
+        const held = this.inventory.held;
+        const tool = held ? itemDef(held.id).tool : undefined;
+        if (!tool || tool.kind !== 'bow') return { loosed: null, error: 'not holding a bow' };
+        const ammo = this.firstArrow();
+        this.archery.handle(dt, tool, ammo, true, true, this.camera, 1, this.survival);
+        for (let i = 0; i < Math.round(seconds / dt); i += 1) this.archery.handle(dt, tool, ammo, true, false, this.camera, 1, this.survival);
+        const loosed = this.archery.handle(dt, tool, ammo, false, false, this.camera, 1, this.survival);
+        if (loosed) {
+          this.inventory.remove(loosed.type, 1);
+          this.inventory.wearHeld(1);
+        }
+        return { loosed, error: null };
+      },
+      arrows: () => this.archery.debugArrows(),
+      /** Defence: dodge along (dx, dz), raise or lower the guard, lock on. */
+      defend: (action: 'dodge' | 'guard' | 'lower' | 'lock' | 'unlock', dx = 0, dz = 1) => {
+        if (action === 'dodge') {
+          const ok = this.combat.dodge(dx, dz, this.survival);
+          if (ok) this.player.dash(dx, dz, DODGE.speed, DODGE.dash);
+          return { ok };
+        }
+        if (action === 'guard' || action === 'lower') {
+          // For a guard, dx is how long it has been held (0 = just raised).
+          this.combat.dash = 0;
+          this.combat.iframes = 0;
+          this.combat.update(0, action === 'guard');
+          if (action === 'guard') this.combat.guardTime = dx;
+          return { ok: this.combat.blocking, held: this.combat.guardTime };
+        }
+        if (action === 'lock') {
+          const eye = this.camera.getWorldPosition(new THREE.Vector3());
+          const fwd = this.camera.getWorldDirection(new THREE.Vector3());
+          this.combat.lock = this.combat.acquire(this.lockCandidates(), eye, fwd);
+          return { ok: this.combat.lock !== null, lock: this.combat.lock };
+        }
+        this.combat.lock = null;
+        return { ok: true };
+      },
+      combat: () => ({ iframes: this.combat.iframes, blocking: this.combat.blocking, guardTime: this.combat.guardTime, lock: this.combat.lock }),
+      /** Let the creature `id` strike the player now (for defence tests). */
+      strikePlayer: (amount: number, fromX: number, fromZ: number) => {
+        const before = this.survival.health;
+        this.defendAndHurt(amount, 'test', fromX, fromZ, 'creature');
+        return { before, after: this.survival.health };
+      },
+      caves: () => this.caves.debugCaves(),
+      curiosities: () => this.curiosities.list.map((c) => ({ ...c, found: this.quests.flags.has(`found:${c.id}`) })),
+      /** Force a meteor shower tonight, or a star to fall now. */
+      skyEvent: (kind: 'shower' | 'fall' | 'eclipse' | 'clear') => {
+        if (kind === 'shower') this.sky.forceShower = true;
+        if (kind === 'eclipse') this.sky.forceEclipse = true;
+        if (kind === 'clear') {
+          this.sky.forceShower = false;
+          this.sky.forceEclipse = false;
+        }
+        if (kind === 'fall') this.sky.dropStar(this.clock.day, this.player.position.x, this.player.position.z);
+        return { streaks: this.sky.activeStreaks, fallen: this.sky.fallen };
+      },
+      sky: () => ({ streaks: this.sky.activeStreaks, fallen: this.sky.fallen, showering: this.sky.showering(this.clock.day, this.clock.hours) }),
+      gatherStar: () => {
+        const before = this.inventory.count('star_shard');
+        this.gatherStar();
+        return { before, after: this.inventory.count('star_shard') };
+      },
+      caveSpots: () => this.caves.cacheSpots(),
+      inCave: () => ({ inCave: this.inCave, depth: this.caves.inside(this.player.position.x, this.player.position.y + 1, this.player.position.z) }),
+      birds: () => this.birds.debugBirds(),
+      spawnBirds: (species: string, x: number, z: number, count = 5, airborne = false) => this.birds.debugSpawn(species, x, z, count, airborne),
+      /** Let `hours` of game time pass at once (crops grow, fires burn down). */
+      passHours: (hours: number) => {
+        const total = this.clock.totalHours + hours;
+        this.clock.set(Math.floor(total / 24) + 1, total % 24);
+        this.hoursElapsed = hours;
+        this.structures.update(0, hours, this.elapsed, this.player.position.x, this.player.position.z, 0);
+        this.farming.update(this.structures.all, this.clock.totalHours, () => 0, (x, z) => this.world.dominantBiome(x, z), this.camera.position, this.elapsed);
+        return this.clock.totalHours;
+      },
+      plots: () => this.structures.all.filter((d) => d.type === 'farm_plot').map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, crop: d.crop ?? null })),
+      /** A free camera at (x, y, z) looking at (tx, ty, tz). */
+      lookFrom: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => {
+        this.mode = 'fly';
+        this.hud?.setVisible(false);
+        this.flyCam.setPose(new THREE.Vector3(x, y, z), 0, 0);
+        this.flyCam.lookAt(new THREE.Vector3(tx, ty, tz));
+        this.vegetation.prewarm(x, z, 220);
+        this.props.prewarm(x, z);
+        return { x, y, z };
+      },
+      landmarks: () => LANDMARKS.map((l) => ({ id: l.id, name: l.name, x: l.x, y: this.world.groundAt(l.x, l.z), z: l.z })),
       setTime: (hours: number) => {
         this.clock.set(this.clock.day, hours);
       },
