@@ -48,19 +48,41 @@ await page.evaluate(() => {
 const active = (await H('quest')).active;
 check('the three side stories begin', ['field_notes', 'rock_remembers', 'tocks_workshop'].every((q) => active.includes(q)), active);
 
-// Wren: a rook, with a bow.
-await H('teleport', 60, 560, 0);
+// Wren: a rook, with a bow. An open, gentle stretch near the camp with a
+// clear line to the flock, so the shot is a fair one.
+const spot = await page.evaluate(() => {
+  const world = window.game.world;
+  let best = null;
+  for (let k = 0; k < 40; k += 1) {
+    const x = 40 + (k % 8) * 18;
+    const z = 520 + Math.floor(k / 8) * 18;
+    if (world.waterDepthAt(x, z) > 0 || world.waterDepthAt(x + 2, z - 26) > 0) continue;
+    const s = world.slopeAt(x, z) + world.slopeAt(x + 2, z - 13) + world.slopeAt(x + 2, z - 26);
+    const trees = window.game.vegetation.collidersNear(x + 1, z - 13, 16, []).length;
+    const score = s * 4 + trees;
+    if (!best || score < best.score) best = { x, z, score };
+  }
+  return best;
+});
+await H('teleport', spot.x, spot.z, 0);
 await H('give', 'shortbow', 1);
 await H('give', 'flint_arrow', 6);
 await H('selectItem', 'shortbow');
-await H('spawnBirds', 'rook', 62, 534, 5, false);
-await H('renderFrames', 2, 1 / 30);
-const rook = (await H('birds')).find((b) => b.state === 'ground' && b.species === 'rook');
-const range = Math.hypot(rook.x - 60, rook.z - 560);
-await H('aim', rook.x, rook.y + 0.1 + 0.5 * 7.2 * (range / 47.2) ** 2, rook.z);
-await H('shootBow', 1);
-await H('renderFrames', 40, 1 / 30);
-check('a rook brought down counts for Wren', (await step('field_notes')) === 'grotto', { step: await step('field_notes') });
+// Well outside a rook's startle range (14 m walking).
+await H('spawnBirds', 'rook', spot.x + 2, spot.z - 26, 5, false);
+await H('renderFrames', 4, 1 / 30);
+let downed = null;
+for (let attempt = 0; attempt < 3 && !downed; attempt += 1) {
+  const rook = (await H('birds')).find((b) => b.state === 'ground' && b.species === 'rook');
+  if (!rook) break;
+  // Hold over for the drop: a full-draw shortbow arrow leaves at ~47 m/s.
+  const range = Math.hypot(rook.x - spot.x, rook.z - spot.z);
+  await H('aim', rook.x, rook.y + 0.1 + 0.5 * 7.2 * (range / 47.2) ** 2, rook.z);
+  await H('shootBow', 1);
+  await H('renderFrames', 60, 1 / 30);
+  downed = (await H('birds')).find((b) => b.state === 'dead' && b.species === 'rook') ?? null;
+}
+check('a rook brought down counts for Wren', Boolean(downed) && (await step('field_notes')) === 'grotto', { downed, step: await step('field_notes') });
 
 // Ilyr's caves, out of order: the grotto first, then the rest.
 const caves = await H('caves');

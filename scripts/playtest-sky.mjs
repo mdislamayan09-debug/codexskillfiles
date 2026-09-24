@@ -69,17 +69,30 @@ check('its metal can be gathered, once', got.after === got.before + 3, got);
 const again = await H('gatherStar');
 check('and only once', again.after === again.before, again);
 
-// A Starglass Lantern, at a workbench.
+// A Starglass Lantern, at a workbench set on level ground near the camp.
+const bench = await page.evaluate(() => {
+  const world = window.game.world;
+  let best = null;
+  for (let k = 0; k < 40; k += 1) {
+    const x = 40 + (k % 8) * 18;
+    const z = 520 + Math.floor(k / 8) * 18;
+    if (world.waterDepthAt(x, z) > 0) continue;
+    const score = world.slopeAt(x, z) + world.slopeAt(x, z - 3) + window.game.vegetation.collidersNear(x, z - 3, 5, []).length;
+    if (!best || score < best.score) best = { x, z, score };
+  }
+  return best;
+});
+await H('teleport', bench.x, bench.z, 0);
 await H('give', 'workbench', 1);
 await H('selectItem', 'workbench');
-const g = await page.evaluate(({ x, z }) => window.game.world.groundAt(x, z), { x: f.x + 2.2, z: f.z - 0.8 });
-await H('aim', f.x + 2.2, g, f.z - 0.8);
-await H('act', 'place');
+const g = await page.evaluate(({ x, z }) => window.game.world.groundAt(x, z), { x: bench.x, z: bench.z - 3 });
+await H('aim', bench.x, g, bench.z - 3);
+const benchPlaced = await H('act', 'place');
 await H('give', 'glass_petal', 2);
 await H('give', 'iron_ingot', 1);
 const made = await H('craft', 'star_lantern');
 const has = await page.evaluate(() => window.game.inventory.count('star_lantern'));
-check('a Starglass Lantern made from it', has === 1, { made, has });
+check('a Starglass Lantern made from it', benchPlaced.placed === 'workbench' && has === 1, { benchPlaced, made, has });
 
 // An eclipse: the light fails at midday and the corona shows.
 await H('setTime', 13.9);
