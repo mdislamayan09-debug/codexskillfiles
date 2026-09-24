@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { AERIAL_SAMPLE } from '../atmosphere/atmosphereGlsl';
+import { CLOUD_SHADOW_GLSL, CLOUD_UNIFORMS } from '../clouds/cloudGlsl';
 
 // Every lit or fogged material in STILLWILD runs through this module:
 //  * the fog chunks are replaced with physically based aerial perspective
@@ -42,7 +43,16 @@ uniform float uFogHeight;
 uniform float uFogFalloff;
 uniform vec3 uFogColorAmbient;
 uniform vec3 uFogColorSun;
+uniform vec3 uLightDir;
+${CLOUD_UNIFORMS}
 ${AERIAL_SAMPLE}
+${CLOUD_SHADOW_GLSL}
+
+// Direct sun/moon visibility beyond shadow maps: moving cloud shadows.
+float atmoSunVisibility(vec3 viewPos) {
+  vec3 worldPos = (viewPos - viewMatrix[3].xyz) * mat3(viewMatrix);
+  return atmoCloudShadow(worldPos, uLightDir);
+}
 
 float atmoPhaseHG(float cosTheta, float g) {
   float g2 = g * g;
@@ -96,6 +106,14 @@ const ATMO_UNIFORM_NAMES = [
   'uFogFalloff',
   'uFogColorAmbient',
   'uFogColorSun',
+  'uLightDir',
+  'uCloudWeather',
+  'uCloudOffset',
+  'uCloudWeatherScale',
+  'uCloudCoverage',
+  'uCloudBottom',
+  'uCloudTop',
+  'uCloudType',
 ];
 
 export function injectSharedUniforms(shader: ShaderObject, names: readonly string[] = ATMO_UNIFORM_NAMES): void {
@@ -164,6 +182,24 @@ export function adoptCsmHook(material: THREE.Material): void {
   }
   state.csmHook = material.onBeforeCompile as PatchState['csmHook'];
   rebuildHook(material, state);
+}
+
+const DIR_LIGHT_INFO = /getDirectionalLightInfo\(\s*directionalLights?(?:\[\s*\w+\s*\])?\s*,\s*directLight\s*\);/g;
+
+/**
+ * Multiplies every directional light by atmospheric visibility (cloud
+ * shadows). Must run after CSM injects its lights chunk (and again whenever a
+ * new CSM instance re-injects it).
+ */
+export function patchDirectionalLightVisibility(): void {
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  if (chunk.includes('atmoSunVisibility')) return;
+  let count = 0;
+  THREE.ShaderChunk.lights_fragment_begin = chunk.replace(DIR_LIGHT_INFO, (match) => {
+    count += 1;
+    return `${match}\n#ifdef USE_FOG\n\tdirectLight.color *= atmoSunVisibility( geometryPosition );\n#endif\n`;
+  });
+  if (count === 0) throw new Error('Could not patch directional light visibility (Three.js chunk changed?)');
 }
 
 /** Replace exactly one occurrence of `search` in shader source or throw (catches Three upgrades). */

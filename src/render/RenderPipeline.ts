@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Atmosphere, type AtmosphereState } from './atmosphere/Atmosphere';
+import { createCloudUniforms, VolumetricClouds, type CloudParams, type CloudUniforms } from './clouds/VolumetricClouds';
 import { createFullscreenMaterial, createHdrTarget, FullscreenPass } from './FullscreenPass';
 import { installAtmosphereChunks } from './materials/MaterialPatches';
 import { COMPOSITE_FRAG, RESTORE_FRAG } from './post/compositeGlsl';
@@ -10,6 +11,29 @@ import { SkyRenderer, type SkyState } from './sky/SkyRenderer';
 /** Layer 0: opaque + alpha-tested world (MSAA pass 1). Layer 1: water/transparent (pass 2). */
 export const LAYER_MAIN = 0;
 export const LAYER_TRANSPARENT = 1;
+/** Layer 2: shadow-only casters (cheap proxies), rendered only into shadow maps. */
+export const LAYER_SHADOW_PROXY = 2;
+
+/**
+ * Three tests shadow casters against the *main* camera's layers. The main
+ * render list is built before shadows render, so enabling the proxy layer only
+ * inside the shadow pass makes those objects shadow-only.
+ */
+function installShadowProxyLayer(renderer: THREE.WebGLRenderer, layer: number): void {
+  const shadowMap = renderer.shadowMap as THREE.WebGLShadowMap & { __proxyPatched?: boolean };
+  if (shadowMap.__proxyPatched) return;
+  const original = shadowMap.render.bind(shadowMap);
+  shadowMap.render = (lights: THREE.Light[], scene: THREE.Scene, camera: THREE.Camera) => {
+    const mask = camera.layers.mask;
+    camera.layers.enable(layer);
+    try {
+      original(lights, scene, camera);
+    } finally {
+      camera.layers.mask = mask;
+    }
+  };
+  shadowMap.__proxyPatched = true;
+}
 
 export interface GradeSettings {
   whiteBalance: THREE.Color;
@@ -54,6 +78,11 @@ export function defaultGrade(): GradeSettings {
 export class RenderPipeline {
   readonly atmosphere = new Atmosphere();
   readonly sky: SkyRenderer;
+  readonly cloudUniforms: CloudUniforms = createCloudUniforms();
+  /** Direction toward the dominant light (sun by day, moon by night). */
+  readonly lightDir = { value: new THREE.Vector3(0, 1, 0) };
+  clouds: VolumetricClouds | null = null;
+  cloudParams: CloudParams = { coverage: 0.42, type: 0.45, windX: 1, windZ: 0.35, windSpeed: 14 };
   readonly post: PostSettings = {
     toneMapper: 0,
     manualExposure: 1,
@@ -98,7 +127,11 @@ export class RenderPipeline {
     readonly camera: THREE.PerspectiveCamera,
     public quality: QualitySettings,
   ) {
-    installAtmosphereChunks(this.atmosphere.uniforms);
+    const dummyWeather = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+    dummyWeather.needsUpdate = true;
+    this.cloudUniforms.uCloudWeather.value = dummyWeather;
+    installAtmosphereChunks({ ...this.atmosphere.uniforms, ...this.cloudUniforms, uLightDir: this.lightDir });
+    installShadowProxyLayer(renderer, LAYER_SHADOW_PROXY);
     renderer.shadowMap.autoUpdate = false;
     renderer.autoClear = false;
     this.sky = new SkyRenderer(renderer, this.atmosphere);
@@ -174,6 +207,17 @@ export class RenderPipeline {
       }),
     );
     this.createTargets(1, 1);
+    this.configureClouds();
+  }
+
+  private configureClouds(): void {
+    if (this.quality.cloudSteps > 0 && !this.clouds) {
+      this.clouds = new VolumetricClouds(this.renderer, this.atmosphere, this.cloudUniforms, this.quality.cloudSteps >= 72 ? 128 : 64);
+    }
+    if (this.clouds) {
+      this.clouds.steps = this.quality.cloudSteps;
+      this.clouds.setSize(this.width, this.height, this.quality.cloudDivisor);
+    }
   }
 
   /** Pass-1 color after the opaque world + sky (for water refraction). */
@@ -206,6 +250,7 @@ export class RenderPipeline {
     this.quality = quality;
     if (msaaChanged) this.createTargets(this.width, this.height);
     this.resize(true);
+    this.configureClouds();
   }
 
   /** Matches internal targets to the canvas size (call every frame; cheap when unchanged). */
@@ -228,6 +273,7 @@ export class RenderPipeline {
     this.bloom.setSize(w, h);
     this.ssao.setSize(w, h);
     this.godRays.setSize(w, h);
+    this.clouds?.setSize(w, h, this.quality.cloudDivisor);
     this.camera.aspect = cssW / cssH;
     this.camera.updateProjectionMatrix();
     this.atmosphere.uniforms.uResolution.value.set(w, h);
@@ -242,6 +288,15 @@ export class RenderPipeline {
     this.resize();
 
     this.atmosphere.update(renderer, camera, atmosphereState);
+    const sunDir = this.atmosphere.uniforms.uSunDir.value;
+    this.lightDir.value.copy(sunDir.y > -0.06 ? sunDir : this.atmosphere.uniforms.uMoonDir.value);
+    if (this.clouds && this.quality.cloudSteps > 0) {
+      this.clouds.update(renderer, camera, dt, this.time, this.cloudParams);
+      this.sky.setClouds(this.clouds.texture);
+    } else {
+      this.cloudUniforms.uCloudCoverage.value = 0;
+      this.sky.setClouds(null);
+    }
     this.sky.update(camera, skyState);
     const env = this.sky.updateEnvironment(dt);
     if (env) this.scene.environment = env;
@@ -288,7 +343,6 @@ export class RenderPipeline {
 
     // Crepuscular rays when the sun is on screen and above the horizon.
     let godStrength = 0;
-    const sunDir = this.atmosphere.uniforms.uSunDir.value;
     if (this.quality.godRays && sunDir.y > -0.02) {
       this.tmp.copy(camera.position).addScaledVector(sunDir, 1000);
       this.tmp4.set(this.tmp.x, this.tmp.y, this.tmp.z, 1).applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
@@ -342,6 +396,7 @@ export class RenderPipeline {
   /** Snap eye adaptation to the next frame's target (camera cuts, loads). */
   resetExposure(): void {
     this.exposure.forceReset();
+    this.clouds?.reset();
   }
 
   /** Debug probe (stalls the GPU): exposure state. */

@@ -10,9 +10,13 @@ import { TerrainMaterialBaker } from '../render/terrain/TerrainMaterialBaker';
 import { moonDirection, moonIllumination, moonPhase, starRotation, sunDirection } from '../world/Celestial';
 import { TerrainRenderer } from '../world/terrain/TerrainRenderer';
 import { GrassSystem } from '../world/vegetation/GrassSystem';
+import { VegetationSystem } from '../world/vegetation/VegetationSystem';
+import { FoliageTextures } from '../render/vegetation/foliageTextures';
+import { createVegetationShared, type VegetationShared } from '../render/vegetation/treeMaterials';
 import { WorldData } from '../world/WorldData';
 import { loadWorld } from '../world/WorldLoader';
 import { viewpointByName, VIEWPOINTS } from './Viewpoints';
+import { createFullscreenMaterial, FullscreenPass } from '../render/FullscreenPass';
 
 export type ProgressReporter = (stage: string, fraction: number) => void;
 
@@ -34,6 +38,9 @@ export class Game {
   baker!: TerrainMaterialBaker;
   flyCam!: FlyCamera;
   grass!: GrassSystem;
+  vegetation!: VegetationSystem;
+  vegetationShared!: VegetationShared;
+  foliageTextures!: FoliageTextures;
 
   private running = false;
   private rafId = 0;
@@ -48,6 +55,7 @@ export class Game {
   private readonly starMatrix4 = new THREE.Matrix4();
   private readonly starMatrix = new THREE.Matrix3();
   private readonly errors: string[] = [];
+  private debugTexturePass: FullscreenPass | null = null;
   private readonly timings: Record<string, number> = {};
 
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -95,7 +103,7 @@ export class Game {
     this.lighting = new Lighting(this.scene, this.camera, this.quality);
     this.terrain = new TerrainRenderer(this.world, this.baker, {
       gridN: this.quality.terrainGrid,
-      detailDistance: 420,
+      detailDistance: this.quality.terrainDetailDistance,
     });
     this.terrain.setCullDistance(this.quality.shadowDistance);
     this.lighting.setupMaterial(this.terrain.material);
@@ -109,9 +117,20 @@ export class Game {
     for (const material of this.grass.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.grass.group);
 
+    progress('Growing the forests', 0.65);
+    await nextFrame();
+    const t3 = performance.now();
+    this.foliageTextures = new FoliageTextures(this.renderer, 512);
+    this.vegetationShared = createVegetationShared(atmo.uSunDir.value, atmo.uSunColor.value);
+    this.vegetation = new VegetationSystem(this.renderer, this.world, this.vegetationShared, this.foliageTextures, this.vegetationOptions());
+    for (const material of this.vegetation.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.vegetation.group);
+    this.timings.vegetationMs = performance.now() - t3;
+
     this.flyCam = new FlyCamera(this.camera, this.input, this.world);
     const start = viewpointByName(params.get('view') ?? 'crash-site') ?? VIEWPOINTS[0];
     this.applyViewpoint(start.name);
+    this.vegetation.prewarm(this.camera.position.x, this.camera.position.z, 260);
 
     progress('Compiling shaders', 0.8);
     await nextFrame();
@@ -187,6 +206,8 @@ export class Game {
     this.updateEnvironment(dt);
     this.terrain.update(this.camera, this.elapsed);
     this.grass.update(this.camera, this.reducedMotion ? 0 : this.elapsed);
+    this.vegetationShared.uTime.value = this.reducedMotion ? 0 : this.elapsed;
+    this.vegetation.update(this.camera);
     this.renderer.info.reset();
     this.pipeline.render(
       dt,
@@ -202,12 +223,64 @@ export class Game {
         moonPhaseLight: moonIllumination(moonPhase(this.clock.day, this.clock.hours)),
         starRotation: this.starMatrix,
         aurora: 0,
-        cloudCover: 0,
+        cloudCover: THREE.MathUtils.smoothstep(this.pipeline.cloudParams.coverage, 0.62, 0.95),
         resonance: 0,
       },
     );
+    if (this.debugTexturePass) this.debugTexturePass.render(this.renderer, null);
     this.timings.frameMs = performance.now() - t;
     this.publishDiagnostics();
+  }
+
+  /** Debug: draw a baked texture-array layer over the frame (null to clear). */
+  showTexture(name: string | null, layer = 0): void {
+    this.debugTexturePass?.dispose();
+    this.debugTexturePass = null;
+    if (!name) return;
+    const sources: Record<string, THREE.Texture> = {
+      bark: this.foliageTextures.bark.texture,
+      barkNormal: this.foliageTextures.barkNormal.texture,
+      foliage: this.foliageTextures.foliage.texture,
+      foliageNormal: this.foliageTextures.foliageNormal.texture,
+      ground: this.baker.albedoHeight.texture,
+      groundNormal: this.baker.normalRough.texture,
+      impostor: this.vegetation.impostors.albedo.texture,
+      impostorNormal: this.vegetation.impostors.normal.texture,
+    };
+    const tex = sources[name];
+    if (!tex) throw new Error(`Unknown texture ${name}`);
+    const srgb = tex.colorSpace === THREE.SRGBColorSpace;
+    this.debugTexturePass = new FullscreenPass(
+      createFullscreenMaterial({
+        fragmentShader: /* glsl */ `
+          precision highp sampler2DArray;
+          uniform sampler2DArray uTex;
+          uniform float uLayer;
+          uniform float uSrgb;
+          varying vec2 vUv;
+          void main() {
+            vec2 uv = vUv * vec2(1.7778, 1.0);
+            vec2 cell = floor(uv);
+            vec2 f = fract(uv);
+            vec4 t = texture(uTex, vec3(f, uLayer));
+            vec3 c = mix(vec3(0.5) + 0.1 * mod(floor(f.x * 16.0) + floor(f.y * 16.0), 2.0), t.rgb, t.a > 0.0 ? t.a : 1.0);
+            if (uSrgb > 0.5) c = pow(c, vec3(1.0 / 2.2));
+            gl_FragColor = vec4(cell.x > 0.5 ? vec3(t.a) : c, 1.0);
+          }`,
+        uniforms: { uTex: { value: tex }, uLayer: { value: layer }, uSrgb: { value: srgb ? 1 : 0 } },
+      }),
+    );
+  }
+
+  private vegetationOptions() {
+    const q = this.quality;
+    return {
+      lod0Distance: q.name === 'low' ? 30 : q.name === 'medium' ? 38 : q.name === 'high' ? 45 : q.name === 'extra' ? 58 : 75,
+      lod1Distance: q.impostorDistance,
+      maxDistance: q.vegetationDistance,
+      alphaToCoverage: q.msaa > 0,
+      shadowDistance: q.name === 'low' ? 35 : q.name === 'medium' ? 55 : q.name === 'high' ? 80 : q.name === 'extra' ? 115 : 160,
+    };
   }
 
   applyViewpoint(name: string): boolean {
@@ -222,6 +295,7 @@ export class Game {
     this.flyCam.lookAt(target);
     this.clock.set(this.clock.day, vp.hour);
     this.pipeline.resetExposure();
+    this.vegetation?.prewarm(pos.x, pos.z, 260);
     this.stateName = `view:${vp.name}`;
     return true;
   }
@@ -259,6 +333,7 @@ export class Game {
         this.clock.set(this.clock.day, hours);
       },
       viewpoints: () => VIEWPOINTS.map((v) => v.name),
+      showTexture: (name: string | null, layer = 0) => this.showTexture(name, layer),
       probe: () => {
         const a = this.pipeline.atmosphere.uniforms;
         const light = this.lighting.csm.lights[0];
@@ -305,6 +380,7 @@ export class Game {
       world: {
         hours: this.clock.hours,
         terrainNodes: this.terrain?.selectedNodes ?? 0,
+        trees: this.vegetation ? { ...this.vegetation.stats } : null,
         quality: this.quality.name,
       },
       timings: { ...this.timings },

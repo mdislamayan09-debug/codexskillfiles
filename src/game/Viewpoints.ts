@@ -14,7 +14,7 @@ export interface Viewpoint {
 export const VIEWPOINTS: readonly Viewpoint[] = [
   { name: 'crash-site', x: 24, z: 660, height: 2.2, target: [10, 250, 60], hour: 8.4 },
   { name: 'meadow-golden', x: -60, z: 760, height: 2.4, target: [-260, 520, 10], hour: 18.9 },
-  { name: 'hollowpine', x: -520, z: 180, height: 2.0, target: [-700, 120, 8], hour: 10.5 },
+  { name: 'hollowpine', x: -546, z: 2, height: 1.8, target: [-470, -120, 6], hour: 10.5 },
   { name: 'mirror-lake', x: -380, z: 300, height: 4, target: [-520, 260, 0], hour: 16.8 },
   { name: 'coast-cliffs', x: 806, z: -60, height: 3, target: [860, 260, 0], hour: 17.3 },
   { name: 'peaks', x: -250, z: -420, height: 2.2, target: [-420, -760, 120], hour: 13 },

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
-import { adoptCsmHook } from './materials/MaterialPatches';
+import { adoptCsmHook, patchDirectionalLightVisibility } from './materials/MaterialPatches';
 import type { QualitySettings } from './Quality';
 
 /**
@@ -38,6 +38,8 @@ export class Lighting {
       shadowBias: -0.00018,
     });
     csm.fade = true;
+    // CSM (re)injects its lights chunk; layer cloud visibility on top.
+    patchDirectionalLightVisibility();
     for (const light of csm.lights) {
       light.shadow.normalBias = 0.035;
       light.layers.enableAll();

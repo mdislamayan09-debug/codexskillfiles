@@ -36,7 +36,8 @@ async function main(): Promise<void> {
     'Shading the hills': [0.68, 0.76],
     'Surveying the ground': [0.76, 0.8],
     'Mixing pigments': [0.8, 0.86],
-    'Lighting the sky': [0.86, 0.9],
+    'Lighting the sky': [0.84, 0.86],
+    'Growing the forests': [0.86, 0.9],
     'Compiling shaders': [0.9, 0.99],
     Ready: [1, 1],
   };
