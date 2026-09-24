@@ -30,6 +30,8 @@ interface ThreeGameDiagnostics {
   };
   world?: Record<string, unknown>;
   timings?: Record<string, number>;
+  /** Graphics-card milliseconds per stage of the frame (where the browser can time it). */
+  gpu?: Record<string, number>;
   errors?: string[];
 }
 

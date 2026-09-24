@@ -11,3 +11,5 @@ artifacts/playtest/
 .unlazy/
 .unlazy-hook-state.json
 .claude/settings.local.json
+artifacts/review/
+artifacts/perf/

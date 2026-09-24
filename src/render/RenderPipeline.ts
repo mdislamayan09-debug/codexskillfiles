@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Atmosphere, type AtmosphereState } from './atmosphere/Atmosphere';
 import { createCloudUniforms, VolumetricClouds, type CloudParams, type CloudUniforms } from './clouds/VolumetricClouds';
 import { createFullscreenMaterial, createHdrTarget, FullscreenPass } from './FullscreenPass';
+import { GpuTimer } from './GpuTimer';
 import { installAtmosphereChunks } from './materials/MaterialPatches';
 import { COMPOSITE_FRAG, RESTORE_FRAG } from './post/compositeGlsl';
 import { BloomPass, ExposurePass, GodRaysPass, SSAOPass } from './post/PostPasses';
@@ -120,6 +121,8 @@ export class RenderPipeline {
   private readonly tmp = new THREE.Vector3();
   private readonly tmp4 = new THREE.Vector4();
   readonly stats = { passes: 0 };
+  /** Graphics-card time for each stage of the frame. */
+  readonly gpu: GpuTimer;
 
   constructor(
     readonly renderer: THREE.WebGLRenderer,
@@ -127,6 +130,7 @@ export class RenderPipeline {
     readonly camera: THREE.PerspectiveCamera,
     public quality: QualitySettings,
   ) {
+    this.gpu = new GpuTimer(renderer.getContext() as WebGL2RenderingContext);
     const dummyWeather = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     dummyWeather.needsUpdate = true;
     this.cloudUniforms.uCloudWeather.value = dummyWeather;
@@ -289,7 +293,10 @@ export class RenderPipeline {
     const camera = this.camera;
     this.time += dt;
     this.resize();
+    const gpu = this.gpu;
+    gpu.poll();
 
+    gpu.begin('sky');
     this.atmosphere.update(renderer, camera, atmosphereState);
     const sunDir = this.atmosphere.uniforms.uSunDir.value;
     this.lightDir.value.copy(sunDir.y > -0.06 ? sunDir : this.atmosphere.uniforms.uMoonDir.value);
@@ -305,6 +312,7 @@ export class RenderPipeline {
     if (env) this.scene.environment = env;
 
     // Pass 1: opaque world + sky into the MSAA HDR target.
+    gpu.begin('scene');
     renderer.shadowMap.needsUpdate = true;
     camera.layers.set(LAYER_MAIN);
     renderer.setRenderTarget(this.sceneTarget);
@@ -318,6 +326,7 @@ export class RenderPipeline {
     // Screen-space AO from the opaque depth.
     const restoreUniforms = (this.restoreMesh.material as THREE.ShaderMaterial).uniforms;
     if (this.quality.ssao && this.post.aoStrength > 0) {
+      gpu.begin('ssao');
       this.ssao.render(renderer, depthA, camera, this.width, this.height);
       restoreUniforms.uAO.value = this.ssao.texture;
     } else {
@@ -328,6 +337,7 @@ export class RenderPipeline {
     restoreUniforms.uAOStrength.value = this.post.aoStrength;
 
     // Pass 2: restore opaque color/depth, then water and transparent effects.
+    gpu.begin('water');
     camera.layers.set(LAYER_TRANSPARENT);
     renderer.setRenderTarget(this.finalTarget);
     renderer.clear(true, true, false);
@@ -336,6 +346,7 @@ export class RenderPipeline {
 
     const color = this.finalTarget.texture;
     const cu = this.composite.material.uniforms;
+    gpu.begin('post');
 
     if (this.quality.bloom) {
       this.bloom.render(renderer, color, this.width, this.height);
@@ -394,6 +405,7 @@ export class RenderPipeline {
     cu.uFar.value = camera.far;
     (cu.uResolution.value as THREE.Vector2).set(this.width, this.height);
     this.composite.render(renderer, null);
+    gpu.end();
   }
 
   /** Snap eye adaptation to the next frame's target (camera cuts, loads). */

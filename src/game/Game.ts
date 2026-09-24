@@ -2045,7 +2045,10 @@ export class Game {
     }
     this.renderer.info.reset();
     const time = this.reducedMotion ? 0 : this.elapsed;
+    // The sea's wave cascades are rendered here, before the frame proper.
+    this.pipeline.gpu.begin('waves');
     this.water.update(this.renderer, this.camera, time, { color: this.pipeline.opaqueColor, depth: this.pipeline.opaqueDepth }, this.light);
+    this.pipeline.gpu.end();
     this.updateUnderwater();
     this.updatePostFeedback(dt);
     this.updateAudio(dt);
@@ -2281,7 +2284,8 @@ export class Game {
       this.fps = this.fpsFrames / this.fpsTime;
       this.fpsFrames = 0;
       this.fpsTime = 0;
-      if (this.fpsEl && this.settings.get('showFps')) this.fpsEl.textContent = `${this.fps.toFixed(0)} fps · ${this.quality.name}`;
+      const gpu = this.pipeline.gpu;
+      if (this.fpsEl && this.settings.get('showFps')) this.fpsEl.textContent = `${this.fps.toFixed(0)} fps · ${gpu.available ? `${gpu.total.toFixed(1)} ms gpu · ` : ''}${this.quality.name}`;
     }
     if (this.mode !== 'play') return;
     const p = this.player.position;
@@ -2329,6 +2333,7 @@ export class Game {
       this.debugEl.textContent = [
         `${this.fps.toFixed(0)} fps  ${this.timings.frameMs?.toFixed(1)} ms cpu  ${this.quality.name}`,
         `draws ${info.calls}  tris ${(info.triangles / 1e6).toFixed(2)}M`,
+        `gpu ${Object.entries(this.pipeline.gpu.ms).map(([k, v]) => `${k} ${v.toFixed(1)}`).join('  ') || 'n/a'}`,
         `pos ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}  ${this.player.state}  ${this.player.speed.toFixed(1)} m/s`,
         `biome ${BIOMES[this.world.dominantBiome(p.x, p.z)].name}  surface ${this.surfaceAt(p.x, p.z)}`,
         `felt ${s.feltTemp.toFixed(1)}°C  body ${s.bodyTemp.toFixed(2)}°C  wet ${(s.wetness * 100).toFixed(0)}%`,
@@ -2861,7 +2866,8 @@ export class Game {
         gpu: this.gpuName,
         discovered: this.discovered.size,
       },
-      timings: { ...this.timings },
+      timings: { ...this.timings, gpuMs: this.pipeline.gpu.total },
+      gpu: { ...this.pipeline.gpu.ms },
       errors: this.errors.slice(-10),
     };
   }
