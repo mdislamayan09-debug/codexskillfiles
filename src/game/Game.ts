@@ -18,6 +18,8 @@ import { createVegetationShared, type VegetationShared } from '../render/vegetat
 import { WaterSystem, type WaterSample } from '../render/water/WaterSystem';
 import { PropSystem, type PropOptions } from '../world/props/PropSystem';
 import { Viewmodel } from '../player/Viewmodel';
+import { AudioEngine, type AudioState } from '../audio/AudioEngine';
+import { SPECIES, Wildlife } from '../creatures/Wildlife';
 import { Gathering, type GatherContext } from './Gathering';
 import { Structures, type StructureData, type StructureType } from './Structures';
 import { InventoryScreen } from '../ui/InventoryScreen';
@@ -80,8 +82,30 @@ export class Game {
   props!: PropSystem;
   gathering!: Gathering;
   structures!: Structures;
+  wildlife!: Wildlife;
   inventoryScreen!: InventoryScreen;
   readonly viewmodel = new Viewmodel();
+  readonly audio = new AudioEngine();
+  private readonly audioState: AudioState = {
+    listener: { x: 0, y: 0, z: 0, fx: 0, fy: 0, fz: -1 },
+    hours: 12,
+    wind: 0,
+    forest: 0,
+    meadow: 0,
+    sea: 0,
+    river: 0,
+    marsh: 0,
+    snow: 0,
+    fire: 0,
+    surfPeriod: 0,
+    underwater: false,
+    lowHealth: 0,
+    rain: 0,
+    musicMode: 'lydian',
+    musicRoot: 62,
+    inDanger: false,
+  };
+  private audioProbeTimer = 0;
   player!: PlayerController;
   hud!: Hud;
   menu!: Menu;
@@ -226,8 +250,44 @@ export class Game {
     this.scene.add(this.props.group);
     this.gathering = new Gathering(this.events, this.world, this.props, this.vegetation, this.inventory, this.survival);
     this.structures = new Structures(this.world, this.events, 4);
+    this.wildlife = new Wildlife(
+      this.world,
+      this.events,
+      {
+        player: () => {
+          const p = this.player.position;
+          const noise = this.player.sprinting ? 1 : this.player.crouching ? 0.2 : this.player.speed > 0.5 ? 0.6 : 0.15;
+          return { x: p.x, y: p.y, z: p.z, crouching: this.player.crouching, sprinting: this.player.sprinting, noise };
+        },
+        damagePlayer: (amount, source) => {
+          if (this.mode !== 'play' || !this.survival.alive) return;
+          this.survival.damage(amount, source);
+        },
+        isNight: () => this.clock.isNight,
+        cameraFacing: (x, z) => {
+          const dir = this.camera.getWorldDirection(this.tmpDir);
+          const dx = x - this.camera.position.x;
+          const dz = z - this.camera.position.z;
+          const d = Math.hypot(dx, dz) || 1;
+          return (dx * dir.x + dz * dir.z) / d > 0.35;
+        },
+      },
+      (x, z, r) => this.vegetation.collidersNear(x, z, r, this.treeScratch),
+    );
+    this.wildlife.cap = this.quality.name === 'low' ? 8 : this.quality.name === 'medium' ? 12 : this.quality.name === 'high' ? 16 : 22;
+    for (const material of this.wildlife.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.wildlife.group);
     for (const material of this.structures.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.structures.group);
+    this.gathering.creatureHit = (origin, dir, reach, damage) => {
+      const hit = this.wildlife.pick(origin, dir, reach);
+      if (!hit || hit.creature.state === 'dead') return false;
+      const p = this.player.position;
+      this.wildlife.damage(hit.creature, damage, hit.weak, p.x, p.z, this.elapsed);
+      this.view.addTrauma(hit.weak ? 0.25 : 0.12);
+      if (hit.weak) this.events.emit('notify', { text: 'Weak point!', icon: 'quest', tone: 'good' });
+      return true;
+    };
     this.scene.add(this.camera);
     this.camera.add(this.viewmodel.root);
     this.viewmodel.root.traverse((o) => {
@@ -266,6 +326,9 @@ export class Game {
     this.canvas.addEventListener('click', () => {
       if (this.mode === 'play' && !this.menu.isOpen && this.survival.alive) this.input.requestPointerLock();
     });
+    const unlockAudio = () => this.audio.unlock();
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
     document.addEventListener('pointerlockchange', () => {
       // Losing the pointer while playing (Esc) opens the pause menu.
       if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && !this.inventoryScreen.isOpen && this.survival.alive && this.running) this.openMenu();
@@ -396,6 +459,19 @@ export class Game {
       this.pipeline.post.damage = Math.min(1, this.pipeline.post.damage + amount / 22);
       this.view.addTrauma(Math.min(0.6, amount / 40));
     });
+    this.events.on('footstep', ({ surface, speed, left }) => this.audio.footstep(surface, speed, left));
+    this.events.on('landed', ({ speed }) => {
+      if (speed > 3) this.audio.land(speed);
+    });
+    this.events.on('jumped', () => this.audio.jump());
+    this.events.on('splash', ({ strength }) => this.audio.splash(strength));
+    this.events.on('swing', () => this.audio.swing());
+    this.events.on('hit', ({ material }) => this.audio.hit(material));
+    this.events.on('gathered', () => this.audio.pickup());
+    this.events.on('crafted', () => this.audio.craft());
+    this.events.on('consumed', ({ kind }) => (kind === 'eat' ? this.audio.eat() : this.audio.drink()));
+    this.events.on('damage', ({ amount }) => this.audio.hurt(amount));
+    this.events.on('discovered', ({ kind }) => this.audio.stinger(kind !== 'biome'));
     this.events.on('died', ({ cause }) => {
       this.deathCause = cause;
       this.input.exitPointerLock();
@@ -484,6 +560,7 @@ export class Game {
     this.hud?.setOpacity(s.hudOpacity);
     document.documentElement.dataset.subtitles = s.subtitles ? s.subtitleSize : 'off';
     this.fpsEl?.classList.toggle('show', s.showFps);
+    this.audio.setVolumes(s.masterVolume, s.musicVolume, s.sfxVolume, s.ambienceVolume);
   }
 
   // -------------------------------------------------------------------------
@@ -580,6 +657,12 @@ export class Game {
       lod0: pick([30, 40, 50, 62, 78]),
       lod1: pick([110, 140, 180, 220, 280]),
     };
+  }
+
+  private skinCorpse(corpse: import('../creatures/Wildlife').Creature): void {
+    const knife = this.inventory.held ? itemDef(this.inventory.held.id).tool?.kind === 'knife' : false;
+    for (const [item, n] of this.wildlife.loot(corpse, knife)) this.inventory.add(item, n);
+    this.events.emit('gathered', { resource: `corpse:${corpse.species.id}`, x: corpse.pos.x, y: corpse.pos.y, z: corpse.pos.z });
   }
 
   private readonly tmpOrigin = new THREE.Vector3();
@@ -796,7 +879,13 @@ export class Game {
       const dir = this.camera.getWorldDirection(this.tmpDir);
       const structure = this.structures.pick(origin, dir, 3.2);
       const gatherDist = this.gathering.target ? this.targetDistance() : Infinity;
-      if (structure && Math.hypot(structure.x - origin.x, structure.z - origin.z) < gatherDist) {
+      const corpse = this.wildlife.corpseNear(origin, dir, 2.8);
+      if (corpse) {
+        const knife = this.inventory.held ? itemDef(this.inventory.held.id).tool?.kind === 'knife' : false;
+        prompt = { key: 'E', text: `${knife ? 'Skin' : 'Butcher'} ${corpse.species.name}` };
+        if (canAct && input.wasPressed('interact')) this.skinCorpse(corpse);
+        if (canAct && input.wasPressed('attack')) this.gathering.use(ctx);
+      } else if (structure && Math.hypot(structure.x - origin.x, structure.z - origin.z) < gatherDist) {
         prompt = this.structurePrompt(structure);
         if (canAct && input.wasPressed('interact')) this.useStructure(structure);
       } else {
@@ -807,6 +896,7 @@ export class Game {
     this.gathering.update(dt, ctx);
     this.hud.setPrompt(prompt ? (prompt.key === 'LMB' ? this.input.bindingLabel('attack') : prompt.key === 'E' ? this.input.bindingLabel('interact') : null) : null, prompt ? prompt.text : null);
     this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, 0);
+    this.wildlife.update(dt, this.elapsed, this.camera);
     this.vegetation.tick(dt, this.clock.totalHours);
     this.props.tick(this.clock.totalHours);
 
@@ -942,6 +1032,7 @@ export class Game {
     this.water.update(this.renderer, this.camera, time, { color: this.pipeline.opaqueColor, depth: this.pipeline.opaqueDepth }, this.light);
     this.updateUnderwater();
     this.updatePostFeedback(dt);
+    this.updateAudio(dt);
     this.pipeline.render(
       dt,
       {
@@ -964,6 +1055,52 @@ export class Game {
     this.timings.frameMs = performance.now() - t;
     this.updateUi(dt);
     this.publishDiagnostics();
+  }
+
+  private updateAudio(dt: number): void {
+    if (!this.audio.running) return;
+    const a = this.audioState;
+    const cam = this.camera.position;
+    const fwd = this.camera.getWorldDirection(this.tmpDir);
+    a.listener.x = cam.x;
+    a.listener.y = cam.y;
+    a.listener.z = cam.z;
+    a.listener.fx = fwd.x;
+    a.listener.fy = fwd.y;
+    a.listener.fz = fwd.z;
+    a.hours = this.clock.hours;
+    a.underwater = this.pipeline.post.underwater > 0;
+    a.lowHealth = this.mode === 'play' ? this.pipeline.post.lowHealth : 0;
+    // Surroundings change slowly: probe a few times a second.
+    this.audioProbeTimer -= dt;
+    if (this.audioProbeTimer <= 0) {
+      this.audioProbeTimer = 0.4;
+      const w = this.world.biomeWeights(cam.x, cam.z, this.biomeScratch);
+      const B = BIOMES;
+      a.forest = Math.min(1, w[1] * 1 + w[2] * 0.7 + w[0] * 0.3 + w[6] * 0.4 + w[7] * 0.2);
+      a.meadow = Math.min(1, w[0] * 1 + w[7] * 0.7 + w[3] * 0.2);
+      a.marsh = w[6];
+      a.snow = w[5];
+      const altitude = Math.max(0, cam.y - 40) / 160;
+      a.wind = Math.min(1, 0.25 + altitude * 0.6 + w[5] * 0.4 + w[3] * 0.3 + w[7] * 0.2);
+      const shore = this.water.shoreDistance(cam.x, cam.z);
+      a.sea = shore > 0 ? 1 : 1 - smoothstep(8, 220, -shore);
+      a.surfPeriod = a.sea > 0.05 ? 9.5 : 0;
+      let river = Infinity;
+      for (const r of this.world.rivers) {
+        const pts = r.points;
+        for (let i = 0; i < r.count; i += 4) {
+          const d = Math.hypot(pts[i * 6] - cam.x, pts[i * 6 + 1] - cam.z) - pts[i * 6 + 3];
+          if (d < river) river = d;
+        }
+      }
+      a.river = 1 - smoothstep(4, 90, river);
+      a.fire = Math.min(1, this.structures.heatAt(cam.x, cam.y - 1, cam.z) / 10);
+      const biome = this.world.dominantBiome(cam.x, cam.z);
+      a.musicMode = B[biome].musicMode;
+      a.musicRoot = [62, 57, 64, 55, 61, 53, 58, 60][biome];
+    }
+    this.audio.update(dt, a);
   }
 
   private updatePostFeedback(dt: number): void {
@@ -1223,7 +1360,11 @@ export class Game {
         this.gathering.updateTarget(ctx);
         const structure = this.structures.pick(origin, dir, 3.2);
         let result = false;
-        if (action === 'interact') {
+        const corpse = action === 'interact' ? this.wildlife.corpseNear(origin, dir, 2.8) : null;
+        if (corpse) {
+          this.skinCorpse(corpse);
+          result = true;
+        } else if (action === 'interact') {
           if (structure) {
             this.useStructure(structure);
             result = true;
@@ -1272,6 +1413,28 @@ export class Game {
         return true;
       },
       closeInventory: () => this.closeInventory(),
+      spawnCreature: (id: string, dx = 0, dz = -8) => {
+        const species = SPECIES.find((sp) => sp.id === id);
+        if (!species) throw new Error(`Unknown species ${id}`);
+        const p = this.player.position;
+        const c = this.wildlife.spawn(species, p.x + dx, p.z + dz, 999);
+        c.yaw = Math.atan2(dx, dz);
+        this.render(0);
+        return { id: c.id, x: c.pos.x, y: c.pos.y, z: c.pos.z };
+      },
+      creatures: () => this.wildlife.creatures.map((c) => ({ id: c.id, species: c.species.id, state: c.state, hp: Math.round(c.hp), x: c.pos.x, z: c.pos.z, dist: Math.hypot(c.pos.x - this.player.position.x, c.pos.z - this.player.position.z) })),
+      tickWorld: (seconds: number, dt = 1 / 30) => {
+        const steps = Math.round(seconds / dt);
+        for (let i = 0; i < steps; i += 1) {
+          this.elapsed += dt;
+          this.clock.update(dt);
+          this.player.update(dt, { moveX: 0, moveY: 0, jumpPressed: false, jumpHeld: false, sprint: false, crouch: false });
+          this.survival.update(dt, this.climate());
+          this.wildlife.update(dt, this.elapsed, this.camera);
+        }
+        this.render(dt);
+        return this.survival.health;
+      },
       setTime: (hours: number) => {
         this.clock.set(this.clock.day, hours);
       },

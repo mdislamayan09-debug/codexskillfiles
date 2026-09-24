@@ -517,6 +517,11 @@ export class WaterSystem {
     return { distance: this.info.distance[k], ocean: this.info.ocean[k] };
   }
 
+  /** Signed distance to the coastline (m): positive over open water, negative inland. */
+  shoreDistance(x: number, z: number): number {
+    return this.infoAt(x, z).distance;
+  }
+
   /** Water at a world point (for swimming, buoyancy, camera and audio). */
   sample(x: number, z: number, out: WaterSample): WaterSample {
     const ground = this.world.heightAt(x, z);

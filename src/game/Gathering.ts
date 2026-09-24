@@ -194,6 +194,7 @@ export class Gathering {
         this.events.emit('inventoryChanged', {});
       } else {
         this.survival.drink(14);
+        this.events.emit('consumed', { kind: 'drink' });
         this.events.emit('notify', { text: 'You drink the cold water', icon: 'water', tone: 'info' });
       }
       this.events.emit('splash', { strength: 0.25, x: t.x, y: this.world.waterLevelAt(t.x, t.z), z: t.z });
@@ -238,6 +239,7 @@ export class Gathering {
         this.events.emit('notify', { text: 'Your stomach turns. Cook it next time.', icon: 'meat', tone: 'bad' });
       }
       this.inventory.consumeSlot(this.inventory.selected, 1);
+      this.events.emit('consumed', { kind: f.food > 0 ? 'eat' : 'drink' });
       this.events.emit('notify', { text: `${def.category === 'medicine' ? 'Used' : 'Ate'} ${def.name}`, icon: def.icon, tone: 'good' });
       return true;
     }
@@ -248,6 +250,7 @@ export class Gathering {
       }
       held.durability = (held.durability ?? 1) - 1;
       this.survival.drink(20);
+      this.events.emit('consumed', { kind: 'drink' });
       this.events.emit('inventoryChanged', {});
       return true;
     }
@@ -263,6 +266,8 @@ export class Gathering {
   }
 
   private swingDuration = 0.7;
+  /** Hook: try to hit a creature first (returns true if something was hit). */
+  creatureHit: ((origin: THREE.Vector3, dir: THREE.Vector3, reach: number, damage: number) => boolean) | null = null;
 
   /** Advance swings; resolves hits at impact time. */
   update(dt: number, ctx: GatherContext): void {
@@ -276,6 +281,15 @@ export class Gathering {
 
   private resolveHit(ctx: GatherContext): void {
     const tool = this.heldTool();
+    if (tool && this.creatureHit) {
+      ctx.camera.getWorldPosition(this.origin);
+      ctx.camera.getWorldDirection(this.dir);
+      const reach = tool.kind === 'spear' ? 3.4 : tool.kind === 'bow' ? 3 : 2.8;
+      if (this.creatureHit(this.origin, this.dir, reach, tool.damage)) {
+        this.inventory.wearHeld(1);
+        return;
+      }
+    }
     const t = this.target;
     if (!tool || !t || t.kind === 'water') return;
     if (t.kind === 'tree') {

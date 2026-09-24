@@ -128,13 +128,15 @@ export class Viewmodel {
 
   private buildArm(): void {
     // Sleeve disappearing off the bottom-right of the screen.
-    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.45, 12, 1, true), this.materials.sleeve);
-    sleeve.rotation.x = Math.PI / 2 - 0.25;
-    sleeve.position.set(0.02, -0.06, 0.24);
+    // The forearm runs down and back toward the camera from the wrist
+    // (expressed in the arm's tilted local frame).
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.07, 0.45, 12, 1, true), this.materials.sleeve);
+    sleeve.rotation.x = -0.49;
+    sleeve.position.set(0.02, -0.25, 0.135);
     this.arm.add(sleeve);
-    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.054, 0.012, 6, 14), this.materials.leather);
-    cuff.rotation.x = -0.25;
-    cuff.position.set(0.02, -0.005, 0.03);
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 6, 14), this.materials.leather);
+    cuff.rotation.x = Math.PI / 2 - 0.49;
+    cuff.position.set(0.02, -0.05, 0.03);
     this.arm.add(cuff);
     // Gloved fist around a vertical grip at the origin.
     const palm = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), this.materials.glove);
