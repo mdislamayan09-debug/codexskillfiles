@@ -56,6 +56,8 @@ export class InventoryScreen {
   private lifted: { container: 'pack' | 'chest'; slot: number } | null = null;
   private chest: (ItemStack | null)[] | null = null;
   private chestName = '';
+  private chestSlots = 0;
+  private readonly chestLabel: HTMLElement;
 
   constructor(
     parent: HTMLElement,
@@ -80,7 +82,10 @@ export class InventoryScreen {
     el('div', 'inv-label', left, 'Backpack');
     this.grid = el('div', 'inv-grid', left);
     this.chestPanel = el('div', 'inv-chest', left);
-    el('div', 'inv-label', this.chestPanel, 'Storage');
+    const chestHead = el('div', 'inv-chest-head', this.chestPanel);
+    this.chestLabel = el('div', 'inv-label', chestHead, 'Storage');
+    const takeAll = el('button', 'inv-take', chestHead, 'Take all');
+    takeAll.addEventListener('click', () => this.takeAll());
     this.chestGrid = el('div', 'inv-grid', this.chestPanel);
     this.detail = el('div', 'inv-detail', left);
 
@@ -94,7 +99,6 @@ export class InventoryScreen {
 
     for (let i = 0; i < HOTBAR_SIZE; i += 1) this.slotEl(this.hotbar, 'pack', i);
     for (let i = 0; i < BACKPACK_SIZE; i += 1) this.slotEl(this.grid, 'pack', HOTBAR_SIZE + i);
-    for (let i = 0; i < 24; i += 1) this.slotEl(this.chestGrid, 'chest', i);
 
     this.root.addEventListener('mousemove', (e) => {
       this.cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
@@ -113,6 +117,12 @@ export class InventoryScreen {
     this.open = true;
     this.chest = chest;
     this.chestName = chestName;
+    if (chest && chest.length !== this.chestSlots) {
+      // Containers differ in size (chests, a dropped pack): rebuild the grid.
+      this.chestGrid.innerHTML = '';
+      for (let i = 0; i < chest.length; i += 1) this.slotEl(this.chestGrid, 'chest', i);
+      this.chestSlots = chest.length;
+    }
     this.root.classList.add('open');
     this.render();
   }
@@ -171,6 +181,34 @@ export class InventoryScreen {
       }
     }
     this.render();
+  }
+
+  /** Move everything that fits from the open container into the pack. */
+  private takeAll(): void {
+    const chest = this.chest;
+    if (!chest) return;
+    this.dropLifted();
+    for (let i = 0; i < chest.length; i += 1) {
+      const s = chest[i];
+      if (!s) continue;
+      if (s.durability !== undefined) {
+        // Tools keep their wear: move whole stacks into empty slots only.
+        const free = this.inventory.slots.indexOf(null);
+        if (free < 0) continue;
+        this.inventory.slots[free] = s;
+        chest[i] = null;
+        continue;
+      }
+      const left = this.inventory.add(s.id, s.count);
+      if (left <= 0) chest[i] = null;
+      else s.count = left;
+    }
+    this.events.emit('inventoryChanged', {});
+    this.render();
+  }
+
+  get containerEmpty(): boolean {
+    return !this.chest || this.chest.every((s) => !s);
   }
 
   private dropLifted(): void {
@@ -233,7 +271,7 @@ export class InventoryScreen {
   private render(): void {
     this.renderSlots();
     this.chestPanel.style.display = this.chest ? '' : 'none';
-    if (this.chest) (this.chestPanel.querySelector('.inv-label') as HTMLElement).textContent = this.chestName || 'Storage';
+    if (this.chest) this.chestLabel.textContent = this.chestName || 'Storage';
     const stations = this.hooks.stations();
     this.stationsEl.innerHTML = '';
     for (const s of stations) el('span', 'inv-station', this.stationsEl, STATION_NAMES[s]);

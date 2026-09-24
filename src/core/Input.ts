@@ -120,7 +120,9 @@ export class Input {
       for (const fn of this.typedListeners) fn(e);
       if (e.repeat) return;
       const token = `Key:${e.code}`;
-      if (this.isBoundToken(token) && e.code !== 'F5' && e.code !== 'F12') e.preventDefault();
+      // Menus keep the browser's own keyboard navigation (Tab, Space, Enter, arrows).
+      const menuKey = !this.gameplayEnabled && (e.code === 'Tab' || e.code === 'Space' || e.code === 'Enter' || e.code.startsWith('Arrow'));
+      if (this.isBoundToken(token) && e.code !== 'F5' && e.code !== 'F12' && !menuKey) e.preventDefault();
       this.press(token);
       this.lastDevice = 'keyboard';
     });

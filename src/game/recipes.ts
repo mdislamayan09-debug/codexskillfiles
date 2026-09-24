@@ -70,6 +70,7 @@ export const RECIPES: readonly Recipe[] = [
   R('iron_pickaxe', 'iron_pickaxe', 1, 'workbench', 'tools', [['iron_ingot', 3], ['wood', 2], ['leather', 1]], 1.6),
   R('iron_sword', 'iron_sword', 1, 'workbench', 'gear', [['iron_ingot', 4], ['leather', 1]], 1.8),
   R('iron_spear', 'iron_spear', 1, 'workbench', 'gear', [['iron_ingot', 2], ['wood', 3], ['rope', 1]], 1.6),
+  R('antler_pike', 'antler_pike', 1, 'workbench', 'gear', [['warden_antler', 1], ['iron_ingot', 2], ['rope', 2]], 2),
   R('iron_arrow', 'iron_arrow', 5, 'workbench', 'gear', [['iron_ingot', 1], ['stick', 5], ['feather', 5]]),
   R('longbow', 'longbow', 1, 'workbench', 'gear', [['hardwood', 3], ['rope', 3], ['leather', 1]], 1.8),
   R('obsidian_hammer', 'obsidian_hammer', 1, 'workbench', 'gear', [['obsidian', 4], ['hardwood', 2], ['leather', 2]], 2),

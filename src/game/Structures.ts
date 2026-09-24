@@ -23,7 +23,8 @@ export type StructureType =
   | 'smelter'
   | 'farm_plot'
   | 'rain_collector'
-  | 'lantern_post';
+  | 'lantern_post'
+  | 'satchel';
 
 export interface StructureData {
   id: string;
@@ -58,6 +59,7 @@ const FOOTPRINT: Record<StructureType, number> = {
   farm_plot: 1.4,
   rain_collector: 0.6,
   lantern_post: 0.3,
+  satchel: 0.45,
 };
 
 const STATION_OF: Partial<Record<StructureType, Station>> = {
@@ -79,6 +81,7 @@ const NAMES: Record<StructureType, string> = {
   farm_plot: 'Farm Plot',
   rain_collector: 'Rain Collector',
   lantern_post: 'Lantern Post',
+  satchel: 'Your Pack',
 };
 
 const FLAME_VERT = /* glsl */ `
@@ -149,6 +152,10 @@ export class Structures {
   ghostReason = '';
   private readonly ghostPos = new THREE.Vector3();
   private ghostYaw = 0;
+  /** Aim test including built decks (defaults to the terrain). */
+  raycast: ((origin: THREE.Vector3, dir: THREE.Vector3, max: number, out: THREE.Vector3) => number) | null = null;
+  /** Built walkable surfaces (floors) under a point, near height y. */
+  surfaceAt: ((x: number, z: number, y: number) => number) | null = null;
 
   constructor(
     private readonly world: WorldData,
@@ -323,6 +330,18 @@ export class Structures {
         g.add(lamp);
         break;
       }
+      case 'satchel': {
+        // A slumped leather pack with its flap thrown open.
+        const bag = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), m.hide);
+        bag.scale.set(1, 0.62, 0.72);
+        bag.position.y = 0.17;
+        g.add(bag);
+        const flap = box(0.46, 0.03, 0.34, m.cloth, 0.05, 0.33, -0.08, 0.2);
+        flap.rotation.x = -0.35;
+        cyl(0.018, 0.018, 0.9, m.rope, 0, 0.05, 0.32, 0, Math.PI / 2 - 0.25);
+        box(0.07, 0.06, 0.03, m.brass, 0, 0.26, 0.22);
+        break;
+      }
     }
     g.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -363,12 +382,12 @@ export class Structures {
     camera.getWorldPosition(origin);
     camera.getWorldDirection(dir);
     const hit = new THREE.Vector3();
-    const t = this.world.raycast(origin, dir, 5.5, hit);
+    const t = this.raycast ? this.raycast(origin, dir, 5.5, hit) : this.world.raycast(origin, dir, 5.5, hit);
     this.ghost.visible = true;
     if (t < 0) {
       // Nothing in reach: hover at arm's length.
       hit.copy(origin).addScaledVector(dir, 3);
-      hit.y = this.world.heightAt(hit.x, hit.z);
+      hit.y = this.groundAt(hit.x, hit.z, origin.y - 1);
     }
     this.ghostPos.copy(hit);
     this.ghost.position.copy(hit);
@@ -380,13 +399,21 @@ export class Structures {
     return this.ghostValid ? `Place ${NAMES[type]}` : `${NAMES[type]} · ${valid}`;
   }
 
+  /** Terrain or a built floor, whichever is the ground near height y. */
+  private groundAt(x: number, z: number, y: number): number {
+    return Math.max(this.world.heightAt(x, z), this.surfaceAt ? this.surfaceAt(x, z, y) : -Infinity);
+  }
+
   private validate(type: StructureType, x: number, z: number, from: THREE.Vector3): string {
     const r = FOOTPRINT[type];
     if (Math.hypot(x - from.x, z - from.z) > 5) return 'too far';
-    if (this.world.waterDepthAt(x, z) > -0.05) return 'in water';
-    // Slope across the footprint.
-    const h = [this.world.heightAt(x - r, z), this.world.heightAt(x + r, z), this.world.heightAt(x, z - r), this.world.heightAt(x, z + r)];
-    if (Math.max(...h) - Math.min(...h) > r * 0.9) return 'too steep';
+    const onDeck = this.ghostPos.y > this.world.heightAt(x, z) + 0.1;
+    if (!onDeck) {
+      if (this.world.waterDepthAt(x, z) > -0.05) return 'in water';
+      // Slope across the footprint.
+      const h = [this.world.heightAt(x - r, z), this.world.heightAt(x + r, z), this.world.heightAt(x, z - r), this.world.heightAt(x, z + r)];
+      if (Math.max(...h) - Math.min(...h) > r * 0.9) return 'too steep';
+    }
     for (const p of this.placed) {
       const min = r + FOOTPRINT[p.data.type] * 0.85;
       if ((p.data.x - x) ** 2 + (p.data.z - z) ** 2 < min * min) return 'blocked';
@@ -401,7 +428,7 @@ export class Structures {
       id: `s${this.nextId++}`,
       type: this.ghostType,
       x: this.ghostPos.x,
-      y: this.world.heightAt(this.ghostPos.x, this.ghostPos.z),
+      y: this.groundAt(this.ghostPos.x, this.ghostPos.z, this.ghostPos.y + 0.3),
       z: this.ghostPos.z,
       yaw: this.ghost.rotation.y,
     };
@@ -420,6 +447,13 @@ export class Structures {
     group.rotation.y = data.yaw;
     this.group.add(group);
     this.placed.push({ data, object: group, flame });
+  }
+
+  /** Put a structure into the world directly (dropped packs, story set pieces). */
+  drop(type: StructureType, x: number, z: number, yaw: number, extra: Partial<StructureData> = {}): StructureData {
+    const data: StructureData = { id: `s${this.nextId++}`, type, x, y: this.world.heightAt(x, z), z, yaw, ...extra };
+    this.add(data);
+    return data;
   }
 
   remove(id: string): StructureData | null {

@@ -145,6 +145,22 @@ export const QUESTS: readonly QuestDef[] = [
     auto: true,
   },
   {
+    id: 'grove_warden',
+    title: 'The Warden of Hollowpine',
+    main: true,
+    giver: 'ilyr',
+    summary: 'Each Bellstone is guarded by something the Held Note will not let die. The nearest lies west, where Hollowpine has grown over the first bell.',
+    steps: [
+      { id: 'reach', text: 'Find the Bellstone in Hollowpine', kind: 'discover', target: 'bell_hollowpine', hint: 'Far west, beyond the Hollow Elder.' },
+      { id: 'calm', text: 'Calm Mossback, Warden of Hollowpine', kind: 'flag', target: 'warden_hollowpine', hint: 'Shatter the glowing knots on its forelegs. When it reels, strike the knot at its chest. Jump its shockwaves; let its charge find a tree.' },
+      { id: 'ring', text: 'Ring the Bellstone', kind: 'flag', target: 'rung_bell_hollowpine' },
+      { id: 'report', text: 'Tell Ilyr the first bell has rung', kind: 'talk', target: 'ilyr' },
+    ],
+    rewards: [['heartsong', 2]],
+    after: ['needle'],
+    auto: true,
+  },
+  {
     id: 'bells',
     title: 'The Five Bells',
     main: true,
@@ -261,6 +277,11 @@ export const DIALOGUE: Record<string, Line[]> = {
     { speaker: 'Varga', text: 'We didn’t drift into the shimmer. I steered us in. The instruments said there was an island inside. I wanted to see.' },
     { speaker: 'Varga', text: 'That makes this my fault. So I’ll be the one who gets everyone home.' },
   ],
+  'ilyr:grove_warden:report': [
+    { speaker: 'Ilyr', text: 'I heard it. The whole ring heard it. For a moment the stones remembered a second note.' },
+    { speaker: 'Ilyr', text: 'Mossback was gentle once. It carried the Choirmaster’s daughter through the grove on its back.' },
+    { speaker: 'Ilyr', text: 'Four bells remain, and four Wardens. The coast. The caldera. The ice. The fen. Each will be harder than the last.' },
+  ],
   'varga:idle': [
     { speaker: 'Varga', text: 'Keep the fire fed. Eat when you can, drink when you can. And don’t sleep in the open.' },
   ],
@@ -272,6 +293,25 @@ export const DIALOGUE: Record<string, Line[]> = {
   ],
   'ilyr:idle': [
     { speaker: 'Ilyr', text: 'Five bells. Five anchors. Each one guarded by something the note would not let go.' },
+  ],
+};
+
+/** Which flag frees each Bellstone (its Warden calmed). */
+export const BELL_WARDENS: Record<string, string> = {
+  bell_hollowpine: 'warden_hollowpine',
+  bell_coast: 'warden_coast',
+  bell_cinder: 'warden_cinder',
+  bell_frost: 'warden_frost',
+  bell_fen: 'warden_fen',
+};
+
+/** What the Bellstone shows you when it rings (Ilyr's voice through the stone). */
+export const BELL_MEMORIES: Record<string, Line[]> = {
+  bell_hollowpine: [
+    { speaker: 'Memory', text: 'A girl in a grey choir-robe runs through young birches, laughing. A calf with velvet antlers follows her everywhere.' },
+    { speaker: 'Memory', text: 'The note begins. The birds stop mid-song. The calf lies down beside the bell and will not leave it.' },
+    { speaker: 'Memory', text: 'Years that are not years. It cannot die, so it grows. Moss. Ferns. Trees. A forest keeping watch over a bell.' },
+    { speaker: 'Ilyr', text: 'One bell rings free. Can you feel the Veil loosen, just a little?' },
   ],
 };
 

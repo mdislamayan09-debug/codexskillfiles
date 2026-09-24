@@ -59,6 +59,14 @@ export class Hud {
   private readonly notifications: HTMLElement;
   private readonly banner: HTMLElement;
   private readonly subtitle: HTMLElement;
+  private readonly boss: HTMLElement;
+  private readonly bossName: HTMLElement;
+  private readonly bossTitle: HTMLElement;
+  private readonly bossFill: HTMLElement;
+  private readonly bossLoss: HTMLElement;
+  private bossShown = false;
+  private bossFraction = 1;
+  private bossLossFraction = 1;
   private readonly tapeWidth = 560;
   private lastHealth = 100;
   private healthLossTimer = 0;
@@ -135,6 +143,16 @@ export class Hud {
     this.banner = el('div', 'hud-banner', this.root);
     this.subtitle = el('div', 'hud-subtitle', this.root);
 
+    // Warden health: a long bar under the compass during a fight.
+    this.boss = el('div', 'hud-boss', this.root);
+    const bossHead = el('div', 'hud-boss-head', this.boss);
+    this.bossName = el('span', 'hud-boss-name', bossHead);
+    this.bossTitle = el('span', 'hud-boss-title', bossHead);
+    const bossBar = el('div', 'hud-boss-bar', this.boss);
+    this.bossLoss = el('div', 'hud-boss-loss', bossBar);
+    this.bossFill = el('div', 'hud-boss-fill', bossBar);
+    el('div', 'hud-boss-notch', bossBar);
+
     events.on('inventoryChanged', () => {
       this.hotbarDirty = true;
     });
@@ -143,8 +161,31 @@ export class Hud {
       this.notify(`+${count} ${def.name}`, def.icon, 'good', `${total}`);
     });
     events.on('notify', ({ text, icon: ic, tone }) => this.notify(text, ic ?? 'compass', tone ?? 'info'));
-    events.on('discovered', ({ name, kind }) => this.showBanner(name, kind === 'biome' ? 'Entering' : 'Discovered'));
+    const kickers: Record<string, string> = { biome: 'Entering', quest: 'Completed', lore: 'Journal · Lore', landmark: 'Discovered' };
+    events.on('discovered', ({ name, kind }) => this.showBanner(name, kickers[kind] ?? 'Discovered'));
     events.on('subtitle', ({ speaker, text, duration }) => this.showSubtitle(speaker, text, duration));
+  }
+
+  /** Show (or hide with null) a Warden's health. */
+  setBoss(status: { name: string; title: string; fraction: number; phaseAt: number } | null, dt: number): void {
+    const show = Boolean(status);
+    if (show !== this.bossShown) {
+      this.bossShown = show;
+      this.boss.classList.toggle('show', show);
+      if (status) {
+        this.bossName.textContent = status.name;
+        this.bossTitle.textContent = status.title;
+        this.bossFraction = status.fraction;
+        this.bossLossFraction = status.fraction;
+        this.boss.style.setProperty('--notch', `${status.phaseAt * 100}%`);
+      }
+    }
+    if (!status) return;
+    this.bossFraction = status.fraction;
+    // The pale "damage taken" segment drains after a beat.
+    this.bossLossFraction = Math.max(this.bossFraction, this.bossLossFraction - dt * 0.25);
+    this.bossFill.style.transform = `scaleX(${this.bossFraction})`;
+    this.bossLoss.style.transform = `scaleX(${this.bossLossFraction})`;
   }
 
   setVisible(visible: boolean): void {

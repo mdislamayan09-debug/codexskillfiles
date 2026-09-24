@@ -30,6 +30,8 @@ export interface GameEvents {
   stateChanged: { state: string };
   subtitle: { speaker: string; text: string; duration: number };
   settingsChanged: { key: string };
+  wardenAwake: { id: string; name: string };
+  wardenCalmed: { id: string; flag: string; name: string };
 }
 
 type Handler<T> = (payload: T) => void;

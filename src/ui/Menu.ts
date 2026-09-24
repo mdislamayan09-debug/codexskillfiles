@@ -10,6 +10,7 @@ export interface MenuHooks {
   onResume(): void;
   onApplyQuality(quality: QualityName | 'auto'): void;
   onRespawn?(): void;
+  onQuitToTitle?(): void;
   detectedQuality: QualityName;
   activeQuality: QualityName;
   gpu: string;
@@ -40,6 +41,10 @@ export class Menu {
   private tab: Tab = 'graphics';
   private open = false;
   private pendingQuality: QualityName | 'auto';
+  private readonly titleEl: HTMLElement;
+  private readonly subEl: HTMLElement;
+  private readonly resumeEl: HTMLElement;
+  private readonly playOnly: HTMLElement[] = [];
 
   constructor(
     parent: HTMLElement,
@@ -52,10 +57,11 @@ export class Menu {
     this.root.setAttribute('aria-label', 'Paused');
     const frame = el('div', 'menu-frame', this.root);
     const side = el('div', 'menu-side', frame);
-    el('div', 'menu-title', side, 'Paused');
-    el('div', 'menu-sub', side, 'The island waits.');
+    this.titleEl = el('div', 'menu-title', side, 'Paused');
+    this.subEl = el('div', 'menu-sub', side, 'The island waits.');
     const resume = el('button', 'menu-button primary', side, 'Resume');
     resume.addEventListener('click', () => this.hooks.onResume());
+    this.resumeEl = resume;
     this.nav = el('nav', 'menu-nav', side);
     const tabs: [Tab, string][] = [
       ['graphics', 'Graphics'],
@@ -75,6 +81,12 @@ export class Menu {
     if (hooks.onRespawn) {
       const unstuck = el('button', 'menu-button subtle', side, 'Return to camp');
       unstuck.addEventListener('click', () => hooks.onRespawn?.());
+      this.playOnly.push(unstuck);
+    }
+    if (hooks.onQuitToTitle) {
+      const quit = el('button', 'menu-button subtle', side, 'Save and quit to title');
+      quit.addEventListener('click', () => hooks.onQuitToTitle?.());
+      this.playOnly.push(quit);
     }
     const hint = el('div', 'menu-hint', side);
     hint.innerHTML = '<kbd>Esc</kbd> resume';
@@ -86,9 +98,16 @@ export class Menu {
     return this.open;
   }
 
-  show(): void {
+  /** Paused mid-game, or settings opened from the title. */
+  show(context: 'pause' | 'title' = 'pause'): void {
     this.open = true;
     this.pendingQuality = this.settings.get('quality');
+    const title = context === 'title';
+    this.titleEl.textContent = title ? 'Settings' : 'Paused';
+    this.subEl.textContent = title ? 'Tune the island to your machine.' : 'The island waits.';
+    this.resumeEl.textContent = title ? 'Back' : 'Resume';
+    this.root.setAttribute('aria-label', title ? 'Settings' : 'Paused');
+    for (const b of this.playOnly) b.style.display = title ? 'none' : '';
     this.render();
     this.root.classList.add('open');
   }

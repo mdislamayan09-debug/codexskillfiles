@@ -4,7 +4,7 @@ import type { WorldData } from '../world/WorldData';
 import { LANDMARKS } from '../world/WorldLayout';
 import { generateRock } from '../world/props/RockGenerator';
 import type { QuestTracker } from './Quests';
-import { GLYPHS, NPCS, TUNING_ORDER, type NpcDef } from './StoryData';
+import { BELL_WARDENS, GLYPHS, NPCS, TUNING_ORDER, type NpcDef } from './StoryData';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
 
 // The physical side of the story: the survivors standing in the world,
@@ -57,6 +57,8 @@ export interface StoryHooks {
   say(speaker: string, text: string, seconds?: number): void;
   talk(npc: string): void;
   playerPosition(): THREE.Vector3;
+  /** A freed Bellstone is struck: toll, memory, reward. */
+  ringBell(id: string): void;
 }
 
 export class StoryWorld {
@@ -69,6 +71,8 @@ export class StoryWorld {
   private lanternOnPedestal: THREE.Object3D | null = null;
   private vaultDoor: THREE.Object3D | null = null;
   private ilyrMaterial: THREE.MeshStandardMaterial | null = null;
+  private readonly bellGlows = new Map<string, THREE.MeshStandardMaterial>();
+  private bellPulse = 0;
   private time = 0;
   private readonly m = {
     stone: mat(0x7c786f, 0.92),
@@ -411,8 +415,13 @@ export class StoryWorld {
       yoke.rotation.z = Math.PI;
       yoke.position.y = 1.6;
       spire.add(yoke);
+      // Each bell's bands glow on their own: dim while bound, bright once rung.
+      const glow = this.m.songstone.clone();
+      glow.emissiveIntensity = 0.9;
+      this.materials.push(glow);
+      this.bellGlows.set(id, glow);
       for (let k = 0; k < 3; k += 1) {
-        const band = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.08, 6, 24), this.m.songstone);
+        const band = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.08, 6, 24), glow);
         band.rotation.x = Math.PI / 2;
         band.position.y = 3 + k * 3;
         band.userData.noShadow = true;
@@ -420,6 +429,23 @@ export class StoryWorld {
       }
       spire.rotation.y = b.x * 0.01;
       this.add(spire, b.x, b.z, -0.3);
+      const flag = `rung_${id}`;
+      this.interactables.push({
+        id: `bell:${id}`,
+        position: new THREE.Vector3(b.x, b.y + 1.6, b.z),
+        radius: 2.8,
+        prompt: () => {
+          if (this.quests.flags.has(flag)) return null;
+          if (this.quests.flags.has(BELL_WARDENS[id])) return { key: 'E', text: 'Ring the Bellstone' };
+          return { key: null, text: 'The Bellstone is silent. Something here will not let it ring.' };
+        },
+        use: () => {
+          if (this.quests.flags.has(flag) || !this.quests.flags.has(BELL_WARDENS[id])) return;
+          this.quests.setFlag(flag);
+          this.bellPulse = 1;
+          this.hooks.ringBell(id);
+        },
+      });
     }
   }
 
@@ -584,6 +610,11 @@ export class StoryWorld {
       }
       f.body.scale.y = 1 + Math.sin(this.time * 1.6 + f.def.id.length) * 0.006;
       f.head.rotation.x = Math.sin(this.time * 0.7 + f.def.id.length) * 0.05 - (d < 4 ? 0.05 : 0);
+    }
+    this.bellPulse = Math.max(0, this.bellPulse - dt * 0.12);
+    for (const [id, glow] of this.bellGlows) {
+      const rung = this.quests.flags.has(`rung_${id}`);
+      glow.emissiveIntensity = rung ? 2.4 + Math.sin(this.time * 1.4) * 0.4 + this.bellPulse * 6 : 0.7 + Math.sin(this.time * 0.6) * 0.15;
     }
     if (this.ilyrMaterial) this.ilyrMaterial.opacity = 0.4 + 0.18 * Math.sin(this.time * 3.1) * Math.sin(this.time * 1.7);
     if (this.lanternOnPedestal?.visible) {

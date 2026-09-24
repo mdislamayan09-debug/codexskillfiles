@@ -3,7 +3,7 @@ import { clamp, damp, smoothstep } from '../core/math';
 import { EventBus } from '../core/Events';
 import { GameClock } from '../core/GameClock';
 import { Input, type ButtonAction } from '../core/Input';
-import { SettingsStore } from '../core/Settings';
+import { SettingsStore, type Difficulty } from '../core/Settings';
 import { FlyCamera } from '../debug/FlyCamera';
 import { PlayerController, type ControlIntent, type PlayerEnvironment, type WaterAt } from '../player/PlayerController';
 import { PlayerView } from '../player/PlayerView';
@@ -20,19 +20,23 @@ import { PropSystem, type PropOptions } from '../world/props/PropSystem';
 import { Viewmodel } from '../player/Viewmodel';
 import { AudioEngine, type AudioState } from '../audio/AudioEngine';
 import { SPECIES, Wildlife } from '../creatures/Wildlife';
+import { WardenSystem } from '../creatures/Warden';
 import { Precipitation, WEATHER_LABELS, WeatherSystem, type WeatherKind } from '../world/Weather';
 import { Gathering, type GatherContext } from './Gathering';
 import { Structures, type StructureData, type StructureType } from './Structures';
+import { Building, isPieceType, type Piece } from './Building';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { MapScreen, type MapPin } from '../ui/MapScreen';
 import { QuestTracker } from '../story/Quests';
 import { StoryWorld } from '../story/StoryWorld';
-import { DIALOGUE, TUNING_ORDER } from '../story/StoryData';
+import { BELL_MEMORIES, DIALOGUE, TUNING_ORDER } from '../story/StoryData';
 import { DialogueBox, Journal, QuestTrackerHud } from '../ui/StoryUi';
 import { itemDef } from './items';
 import { RECIPES } from './recipes';
 import { craft } from '../ui/InventoryScreen';
 import { DeathScreen, Menu } from '../ui/Menu';
+import { TitleScreen } from '../ui/TitleScreen';
+import { TitleCamera, type ShotStart } from './TitleCamera';
 import { Hud, type CompassMarker } from '../ui/Hud';
 import { bearingOf, MASK } from '../world/gen/generateWorld';
 import { moonDirection, moonIllumination, moonPhase, starRotation, sunDirection } from '../world/Celestial';
@@ -44,12 +48,12 @@ import { WorldData } from '../world/WorldData';
 import { loadWorld } from '../world/WorldLoader';
 import { LANDMARKS } from '../world/WorldLayout';
 import { Inventory, type ItemStack } from './Inventory';
-import { SaveSystem } from './SaveSystem';
+import { SaveSystem, type SaveMeta } from './SaveSystem';
 import { Survival, type Climate } from './Survival';
 import { viewpointByName, VIEWPOINTS } from './Viewpoints';
 
 export type ProgressReporter = (stage: string, fraction: number) => void;
-export type GameMode = 'play' | 'fly';
+export type GameMode = 'play' | 'fly' | 'title';
 
 /** Where a new survivor wakes: beside the Meridian's crash camp. */
 const CAMP_SPAWN = { x: 26, z: 614, yaw: 0.05 };
@@ -88,7 +92,9 @@ export class Game {
   props!: PropSystem;
   gathering!: Gathering;
   structures!: Structures;
+  building!: Building;
   wildlife!: Wildlife;
+  wardens!: WardenSystem;
   readonly weather = new WeatherSystem();
   precipitation!: Precipitation;
   inventoryScreen!: InventoryScreen;
@@ -118,12 +124,15 @@ export class Game {
     musicMode: 'lydian',
     musicRoot: 62,
     inDanger: false,
+    combat: 0,
   };
   private audioProbeTimer = 0;
   player!: PlayerController;
   hud!: Hud;
   menu!: Menu;
   death!: DeathScreen;
+  title!: TitleScreen;
+  titleCam!: TitleCamera;
   mode: GameMode = 'play';
 
   private running = false;
@@ -172,6 +181,12 @@ export class Game {
   private fpsEl: HTMLElement | null = null;
   private veilEl: HTMLElement | null = null;
   private deathCause: string | null = null;
+  /** Seconds into the wake-up after the opening narration (-1 when not waking). */
+  private wake = -1;
+  /** The world holds still while the opening narration plays. */
+  private introHold = false;
+  /** Container (chest, dropped pack) open in the inventory screen. */
+  private openContainer: StructureData | null = null;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const params = new URLSearchParams(location.search);
@@ -305,15 +320,58 @@ export class Game {
       say: (speaker, text, seconds = 6) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
       talk: (npc) => this.talkTo(npc),
       playerPosition: () => this.player.position,
+      ringBell: (id) => this.ringBell(id),
     });
     for (const material of this.story.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.story.group);
+    const obstacleScratch: TreeCollider[] = [];
+    this.wardens = new WardenSystem(this.world, this.events, {
+      player: () => {
+        const p = this.player.position;
+        return { x: p.x, y: p.y, z: p.z, grounded: this.player.grounded, alive: this.mode === 'play' && this.survival.alive };
+      },
+      damagePlayer: (amount, source) => {
+        if (this.mode !== 'play' || !this.survival.alive) return;
+        this.survival.damage(amount, source);
+      },
+      knockPlayer: (x, y, z) => this.player.knock(x, y, z),
+      shake: (amount) => this.view.addTrauma(amount),
+      sound: (kind, x, y, z, strength) => this.audio.warden(kind, x, y, z, strength),
+      say: (speaker, text, seconds = 6) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
+      obstacles: (x, z, r) => this.vegetation.collidersNear(x, z, r, obstacleScratch),
+    });
+    for (const material of this.wardens.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.wardens.group);
+    this.events.on('wardenCalmed', ({ flag }) => {
+      this.quests.setFlag(flag);
+      this.saveSession('auto');
+    });
     this.events.on('killed', ({ species }) => this.quests.progress('kill', species));
     this.precipitation = new Precipitation({ low: 2500, medium: 4500, high: 7000, extra: 10000, max: 14000 }[this.quality.name]);
     this.scene.add(this.precipitation.mesh);
     for (const material of this.structures.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.structures.group);
+    this.building = new Building(this.world, this.events);
+    for (const material of this.building.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.building.group);
+    // Campfires, chests and benches can stand on built floors.
+    this.structures.surfaceAt = (x, z, y) => this.building.surfaceAt(x, z, y);
+    this.structures.raycast = (o, d, max, out) => {
+      const t = this.world.raycast(o, d, max, out);
+      const b = this.building.raycast(o, d, max);
+      if (b && (t < 0 || b.t < t)) {
+        if (b.normal.y < 0.5) return -1;
+        out.copy(b.point);
+        return b.t;
+      }
+      return t;
+    };
     this.gathering.creatureHit = (origin, dir, reach, damage) => {
+      const w = this.wardens.hit(origin, dir, reach, damage);
+      if (w.hit) {
+        this.view.addTrauma(w.weak ? 0.22 : 0.08);
+        return true;
+      }
       const hit = this.wildlife.pick(origin, dir, reach);
       if (!hit || hit.creature.state === 'dead') return false;
       const p = this.player.position;
@@ -339,11 +397,17 @@ export class Game {
     this.applySettings();
     this.settings.onChange(() => this.applySettings());
 
+    this.titleCam = new TitleCamera(this.world);
     const view = params.get('view');
     if (view && viewpointByName(view)) {
       this.applyViewpoint(view);
+    } else if (SaveSystem.consumeResume()) {
+      this.startPlay('session');
+    } else if (params.has('capture') && !params.has('title')) {
+      // Automated tests and captures go straight into play.
+      this.startPlay(null);
     } else {
-      this.startPlay(SaveSystem.consumeResume() ? 'session' : null);
+      this.enterTitle();
     }
     this.vegetation.prewarm(this.camera.position.x, this.camera.position.z, 260);
     this.props.prewarm(this.camera.position.x, this.camera.position.z);
@@ -363,6 +427,10 @@ export class Game {
     const unlockAudio = () => this.audio.unlock();
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('pagehide', () => {
+      // Closing the tab keeps the journey.
+      if (this.mode === 'play' && this.survival.alive && !this.introHold && this.playtime > 5) this.saveSession('auto');
+    });
     document.addEventListener('pointerlockchange', () => {
       // Losing the pointer while playing (Esc) opens the pause menu.
       if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && !this.journal.isOpen && this.survival.alive && this.running) this.openMenu();
@@ -377,8 +445,16 @@ export class Game {
     const world = this.world;
     const waterOut: WaterAt = { surface: 0, depth: 0, frozen: false, flowX: 0, flowZ: 0 };
     return {
-      groundHeight: (x, z) => Math.max(world.heightAt(x, z), this.props.heightAt(x, z)),
-      groundNormal: (x, z, out) => {
+      groundHeight: (x, z, y) => {
+        const natural = Math.max(world.heightAt(x, z), this.props.heightAt(x, z));
+        return y === undefined ? natural : Math.max(natural, this.building.surfaceAt(x, z, y));
+      },
+      groundNormal: (x, z, out, y) => {
+        // Standing on a built floor or stair: level footing.
+        if (y !== undefined && this.building.count > 0) {
+          const deck = this.building.surfaceAt(x, z, y);
+          if (deck > world.heightAt(x, z) && deck >= this.props.heightAt(x, z)) return out.set(0, 1, 0);
+        }
         const rock = this.props.heightAt(x, z);
         if (rock <= world.heightAt(x, z)) return world.smoothNormalAt(x, z, out);
         // On a boulder: numeric normal of the combined ground.
@@ -400,6 +476,9 @@ export class Game {
         this.vegetation.collidersNear(x, z, r, this.treeScratch);
         out.length = 0;
         for (const c of this.treeScratch) out.push(c);
+        // The Warden is solid, and so are walls.
+        for (const c of this.wardens.colliders()) if (Math.hypot(c.x - x, c.z - z) < r + c.radius) out.push(c);
+        this.building.collidersNear(x, z, r, out);
         return out;
       },
       surface: (x, z) => this.surfaceAt(x, z),
@@ -460,11 +539,30 @@ export class Game {
         this.closeMenu();
         this.respawn();
       },
+      onQuitToTitle: () => this.quitToTitle(),
       detectedQuality: this.detectedQuality,
       activeQuality: this.quality.name,
       gpu: this.gpuName,
     });
     this.death = new DeathScreen(root, () => this.respawn());
+    this.title = new TitleScreen(root, {
+      continueMeta: () => this.latestSave(),
+      onContinue: () => {
+        const save = this.latestSave();
+        this.title.hide();
+        this.startPlay(save?.slot ?? null);
+        this.pipeline.post.fade = 1;
+        this.input.requestPointerLock();
+      },
+      onNewGame: (difficulty) => this.newGame(difficulty),
+      onBegin: () => {
+        this.introHold = false;
+        this.wake = 0;
+        this.pipeline.post.fade = 1;
+        this.input.requestPointerLock();
+      },
+      onSettings: () => this.openMenu(),
+    });
     this.mapScreen = new MapScreen(root, this.world, () => this.closeMap());
     this.dialogue = new DialogueBox(root);
     this.journal = new Journal(root, () => this.closeJournal());
@@ -509,9 +607,14 @@ export class Game {
     this.events.on('crafted', () => this.audio.craft());
     this.events.on('consumed', ({ kind }) => (kind === 'eat' ? this.audio.eat() : this.audio.drink()));
     this.events.on('damage', ({ amount }) => this.audio.hurt(amount));
-    this.events.on('discovered', ({ kind }) => this.audio.stinger(kind !== 'biome'));
+    this.events.on('discovered', ({ id, kind }) => {
+      this.audio.stinger(kind !== 'biome');
+      // Lore pages fill the journal.
+      if (kind === 'lore') this.discovered.add(id);
+    });
     this.events.on('died', ({ cause }) => {
       this.deathCause = cause;
+      this.dropPack();
       this.input.exitPointerLock();
       this.death.show(cause);
       this.hud.setVisible(false);
@@ -525,8 +628,8 @@ export class Game {
         return { x: p.x, y: p.y, z: p.z, yaw: this.player.yaw, pitch: this.player.pitch };
       },
       load: (data) => {
-        const d = data as { x: number; z: number; yaw: number; pitch: number };
-        this.player.spawn(d.x, d.z, d.yaw);
+        const d = data as { x: number; y?: number; z: number; yaw: number; pitch: number };
+        this.player.spawn(d.x, d.z, d.yaw, d.y);
         this.player.pitch = d.pitch ?? 0;
       },
     });
@@ -540,7 +643,7 @@ export class Game {
     this.saves.register('survival', {
       save: () => {
         const s = this.survival;
-        return { health: s.health, stamina: s.stamina, food: s.food, water: s.water, bodyTemp: s.bodyTemp, wetness: s.wetness };
+        return { health: s.health, maxHealth: s.maxHealth, baseMaxStamina: s.baseMaxStamina, stamina: s.stamina, food: s.food, water: s.water, bodyTemp: s.bodyTemp, wetness: s.wetness };
       },
       load: (data) => Object.assign(this.survival, data as object),
     });
@@ -587,6 +690,14 @@ export class Game {
         this.props.load(d.props ?? []);
       },
     });
+    this.saves.register('building', {
+      save: () => this.building.serialize(),
+      load: (data) => this.building.load(data as ReturnType<Building['serialize']>),
+    });
+    this.saves.register('wardens', {
+      save: () => ({ mossback: this.wardens.serialize() }),
+      load: (data) => this.wardens.load((data as { mossback?: { calmed?: boolean } }).mossback ?? null),
+    });
     this.saves.register('meta', {
       save: () => ({ playtime: this.playtime }),
       load: (data) => {
@@ -616,14 +727,25 @@ export class Game {
   // -------------------------------------------------------------------------
   // Modes
 
-  private startPlay(resumeSlot: string | null): void {
+  private startPlay(resumeSlot: string | null, intro = false): void {
     this.mode = 'play';
     this.stateName = 'play';
+    this.title?.hide();
+    this.menu?.hide();
+    this.menuPaused = false;
+    this.input.gameplayEnabled = true;
+    this.wake = -1;
     this.player.spawn(CAMP_SPAWN.x, CAMP_SPAWN.z, CAMP_SPAWN.yaw);
     this.clock.set(1, 7.6);
+    this.weather.set('clear', true);
+    this.weather.groundWetness = 0;
+    this.spawnPoint = { ...CAMP_SPAWN };
+    this.playtime = 0;
     // A fresh game starts with a clean pack and rested body.
     for (let i = 0; i < this.inventory.slots.length; i += 1) this.inventory.slots[i] = null;
     this.inventory.select(0);
+    this.survival.maxHealth = 100;
+    this.survival.baseMaxStamina = 100;
     this.survival.revive();
     this.survival.health = this.survival.maxHealth;
     this.survival.food = 82;
@@ -631,15 +753,104 @@ export class Game {
     this.discovered.clear();
     this.seen.clear();
     this.quests?.reset();
-    if (resumeSlot && this.saves.load(resumeSlot)) {
-      this.events.emit('notify', { text: `Graphics set to ${this.quality.name === 'extra' ? 'Extra High' : this.quality.name[0].toUpperCase() + this.quality.name.slice(1)}`, icon: 'gear', tone: 'info' });
+    this.wardens?.load(null);
+    this.building?.load(null);
+    const loaded = resumeSlot ? this.saves.load(resumeSlot) : null;
+    if (loaded) {
+      if (resumeSlot === 'session') this.events.emit('notify', { text: `Graphics set to ${this.quality.name === 'extra' ? 'Extra High' : this.quality.name[0].toUpperCase() + this.quality.name.slice(1)}`, icon: 'gear', tone: 'info' });
+      else this.events.emit('notify', { text: `Day ${loaded.day} · ${loaded.location}`, icon: 'moon', tone: 'info' });
+      // Never wake a dead survivor.
+      if (this.survival.health <= 0) this.survival.revive();
     } else {
       this.inventory.add('berries', 4);
     }
-    this.hud.setVisible(true);
+    this.hud.setVisible(!intro);
     this.pipeline.resetExposure();
     this.view.update(0, this.player, this.camera, this.viewOptions());
-    this.quests?.refresh();
+    this.vegetation.prewarm(this.player.position.x, this.player.position.z, 260);
+    this.props.prewarm(this.player.position.x, this.player.position.z);
+    if (!intro) this.quests?.refresh();
+  }
+
+  /** The title: a slow drift through the island behind the menu. */
+  private enterTitle(): void {
+    this.mode = 'title';
+    this.stateName = 'title';
+    this.hud.setVisible(false);
+    this.input.gameplayEnabled = false;
+    this.input.exitPointerLock();
+    this.cutTo(this.titleCam.reset());
+    this.titleCam.update(0, this.camera);
+    this.title.show();
+  }
+
+  private cutTo(shot: ShotStart): void {
+    this.clock.set(1, shot.hour);
+    this.weather.set(shot.weather, true);
+    this.vegetation.prewarm(shot.x, shot.z, 260);
+    this.props.prewarm(shot.x, shot.z);
+    this.pipeline.resetExposure();
+  }
+
+  private updateTitle(dt: number): void {
+    this.hoursElapsed = 0;
+    const cut = this.titleCam.update(dt, this.camera);
+    if (cut) this.cutTo(cut);
+    this.clock.set(1, this.titleCam.hour);
+  }
+
+  /** A new journey: set the difficulty and wake at the crash site. */
+  private newGame(difficulty: Difficulty): void {
+    this.settings.set('difficulty', difficulty);
+    this.startPlay(null, true);
+    this.introHold = true;
+    this.pipeline.post.fade = 1;
+  }
+
+  /** Newest of the autosave and the quality-reload session save. */
+  private latestSave(): SaveMeta | null {
+    const auto = this.saves.meta('auto');
+    const session = this.saves.meta('session');
+    if (!auto) return session;
+    if (!session) return auto;
+    return auto.savedAt >= session.savedAt ? auto : session;
+  }
+
+  private quitToTitle(): void {
+    if (this.survival.alive) this.saveSession('auto');
+    // A fresh boot guarantees a clean world behind the title (the world data is cached).
+    this.stop();
+    location.reload();
+  }
+
+  /** On death: explorer keeps everything, survivor drops the pack, harsh loses it. */
+  private dropPack(): void {
+    const difficulty = this.settings.get('difficulty');
+    if (difficulty === 'explorer') return;
+    const items = this.inventory.slots.map((s) => (s ? { ...s } : null));
+    if (!items.some(Boolean)) return;
+    for (let i = 0; i < this.inventory.slots.length; i += 1) this.inventory.slots[i] = null;
+    this.events.emit('inventoryChanged', {});
+    if (difficulty === 'harsh') return;
+    // The pack comes to rest on dry ground: in deep water, the nearest shore.
+    const p = this.player.position;
+    let x = p.x;
+    let z = p.z;
+    if (this.world.waterDepthAt(x, z) > 0.6) {
+      search: for (let r = 4; r <= 160; r += 4) {
+        for (let k = 0; k < 24; k += 1) {
+          const a = (k / 24) * Math.PI * 2;
+          const qx = p.x + Math.cos(a) * r;
+          const qz = p.z + Math.sin(a) * r;
+          if (this.world.waterDepthAt(qx, qz) < -0.05) {
+            x = qx;
+            z = qz;
+            break search;
+          }
+        }
+      }
+    }
+    this.structures.drop('satchel', x, z, this.player.yaw, { contents: items });
   }
 
   private respawn(): void {
@@ -650,13 +861,15 @@ export class Game {
     this.deathCause = null;
     this.pipeline.post.damage = 0;
     this.hud.setVisible(true);
-    this.events.emit('respawned', { x: CAMP_SPAWN.x, z: CAMP_SPAWN.z });
+    this.events.emit('respawned', { x: sp.x, z: sp.z });
+    if (this.structures.all.some((d) => d.type === 'satchel')) this.events.emit('notify', { text: 'Your pack lies where you fell', icon: 'bag', tone: 'warn' });
     this.pipeline.resetExposure();
     this.input.requestPointerLock();
   }
 
   private openInventory(chest: StructureData | null = null): void {
-    this.inventoryScreen.show(chest?.contents ?? null, chest ? 'Storage Chest' : '');
+    this.openContainer = chest;
+    this.inventoryScreen.show(chest?.contents ?? null, chest ? Structures.label(chest.type) : '');
     this.input.gameplayEnabled = false;
     this.input.exitPointerLock();
   }
@@ -701,28 +914,44 @@ export class Game {
   }
 
   private closeInventory(): void {
+    const container = this.openContainer;
+    this.openContainer = null;
+    if (container?.type === 'satchel' && (container.contents ?? []).every((s) => !s)) {
+      this.structures.remove(container.id);
+      this.events.emit('notify', { text: 'Pack recovered', icon: 'bag', tone: 'good' });
+    }
     this.inventoryScreen.hide();
     this.input.gameplayEnabled = true;
     this.input.requestPointerLock();
   }
 
   private openMenu(): void {
-    this.menu.show();
-    this.menuPaused = true;
+    const onTitle = this.mode === 'title';
+    this.menu.show(onTitle ? 'title' : 'pause');
+    // The title keeps drifting behind its settings; play pauses.
+    this.menuPaused = !onTitle;
     this.input.gameplayEnabled = false;
     this.input.exitPointerLock();
+    if (onTitle) this.title.hide();
   }
 
   private closeMenu(): void {
     this.menu.hide();
     this.menuPaused = false;
+    if (this.mode === 'title') {
+      this.title.show();
+      return;
+    }
     this.input.gameplayEnabled = true;
     this.input.requestPointerLock();
   }
 
   private reloadWithQuality(): void {
-    this.saveSession();
-    SaveSystem.markResume();
+    // From the title, simply come back to the title.
+    if (this.mode === 'play') {
+      this.saveSession();
+      SaveSystem.markResume();
+    }
     const url = new URL(location.href);
     url.searchParams.delete('quality');
     location.replace(url.toString());
@@ -780,6 +1009,8 @@ export class Game {
       saw_stillheart: 'rim_lookout',
       echo_lantern: 'singing_stones',
       duskhound: 'hollow_elder',
+      warden_hollowpine: 'bell_hollowpine',
+      rung_bell_hollowpine: 'bell_hollowpine',
     };
     const lid = byFlag[step.target];
     return lid ? lmPos(lid) : null;
@@ -787,6 +1018,8 @@ export class Game {
 
   private readonly tmpOrigin = new THREE.Vector3();
   private readonly tmpDir = new THREE.Vector3();
+  private dismantleTimer = 0;
+  private dismantleTarget: Piece | null = null;
 
   private targetDistance(): number {
     const t = this.gathering.target;
@@ -819,6 +1052,8 @@ export class Game {
       }
       case 'lantern_post':
         return { key: null, text: name };
+      case 'satchel':
+        return { key: 'E', text: 'Recover your pack' };
       default:
         return { key: 'E', text: `Use ${name}` };
     }
@@ -840,6 +1075,7 @@ export class Game {
         break;
       }
       case 'chest':
+      case 'satchel':
         this.openInventory(d);
         break;
       case 'rain_collector':
@@ -862,6 +1098,53 @@ export class Game {
       default:
         this.openInventory();
     }
+  }
+
+  /** A freed Bellstone tolls: a memory plays through it and the grove gives thanks. */
+  private ringBell(id: string): void {
+    this.audio.bellToll();
+    this.view.addTrauma(0.3);
+    this.pipeline.post.flash = 0.7;
+    const lines = BELL_MEMORIES[id] ?? [];
+    lines.forEach((line, i) => {
+      window.setTimeout(() => this.events.emit('subtitle', { speaker: line.speaker, text: line.text, duration: 6.5 }), 1800 + i * 7000);
+    });
+    if (id === 'bell_hollowpine') {
+      this.events.emit('discovered', { id: 'lore:mossback', name: 'Mossback', kind: 'lore' });
+      this.inventory.add('warden_antler', 1);
+      this.inventory.add('songstone', 3);
+    }
+    this.saveSession('auto');
+  }
+
+  /**
+   * Built pieces under the aim can be taken down by holding interact; half
+   * the wood comes back. Returns the prompt (null when not aiming at one).
+   */
+  private dismantlePrompt(origin: THREE.Vector3, dir: THREE.Vector3, gatherDist: number, act: boolean, dt: number): { key: string | null; text: string } | null {
+    const piece = this.building.pick(origin, dir, 3.4);
+    if (!piece) {
+      if (act) this.dismantleTimer = 0;
+      return null;
+    }
+    const hit = this.building.raycast(origin, dir, 3.4);
+    if (!hit || hit.t > gatherDist) return null;
+    const name = Building.label(piece.type);
+    if (!this.building.canRemove(piece)) return { key: null, text: `${name} · holding up other pieces` };
+    if (act) {
+      if (this.input.isDown('interact') && this.dismantleTarget === piece) this.dismantleTimer += dt;
+      else this.dismantleTimer = 0;
+      this.dismantleTarget = piece;
+      if (this.dismantleTimer > 0.9) {
+        this.dismantleTimer = 0;
+        const wood = this.building.remove(piece);
+        this.inventory.add('wood', wood);
+        this.audio.hit('timber');
+        this.events.emit('notify', { text: `${name} taken down`, icon: 'build', tone: 'info' });
+      }
+    }
+    const progress = this.dismantleTimer > 0 ? ` ${Math.round((this.dismantleTimer / 0.9) * 100)}%` : '';
+    return { key: 'E', text: `Hold to dismantle ${name}${progress}` };
   }
 
   /** Sleep through the night: time jumps to dawn, body recovers, needs drop. */
@@ -931,7 +1214,13 @@ export class Game {
       this.debugVisible = !this.debugVisible;
       this.debugEl?.classList.toggle('show', this.debugVisible);
     }
-    if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && (this.input.wasPressed('journal', true) || (this.journal.isOpen && this.input.wasPressed('pause', true)))) {
+    if (this.title.isIntroPlaying) {
+      // Narration: Esc skips it, E / Space / click move to the next line.
+      if (this.input.wasPressed('pause', true)) this.title.skipIntro();
+      else if (this.input.wasPressed('interact', true) || this.input.wasPressed('jump', true)) this.title.skipIntroLine();
+    } else if (this.mode === 'title') {
+      if (this.menu.isOpen && this.input.wasPressed('pause', true)) this.closeMenu();
+    } else if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && (this.input.wasPressed('journal', true) || (this.journal.isOpen && this.input.wasPressed('pause', true)))) {
       if (this.journal.isOpen) this.closeJournal();
       else this.openJournal();
     } else if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.journal.isOpen && (this.input.wasPressed('map', true) || (this.mapScreen.isOpen && this.input.wasPressed('pause', true)))) {
@@ -944,12 +1233,15 @@ export class Game {
       if (this.menu.isOpen) this.closeMenu();
       else this.openMenu();
     }
-    const frozen = this.paused || this.menuPaused;
+    const frozen = this.paused || this.menuPaused || this.introHold;
     if (!frozen) {
       this.elapsed += dt;
-      this.hoursElapsed = this.clock.update(dt);
-      if (this.mode === 'fly') this.flyCam.update(dt);
-      else this.updatePlay(dt);
+      if (this.mode === 'title') this.updateTitle(dt);
+      else {
+        this.hoursElapsed = this.clock.update(dt);
+        if (this.mode === 'fly') this.flyCam.update(dt);
+        else this.updatePlay(dt);
+      }
     }
     this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && !this.journal.isOpen && this.survival.alive && this.frame > 30);
     this.input.endFrame();
@@ -959,6 +1251,10 @@ export class Game {
     this.playtime += dt;
     const input = this.input;
     const alive = this.survival.alive;
+    if (this.wake >= 0) {
+      this.updateWake(dt);
+      return;
+    }
     this.dialogue.update(dt);
     if (this.dialogue.isOpen) {
       if (input.wasPressed('interact') || input.wasPressed('attack') || input.wasPressed('jump')) this.dialogue.advance();
@@ -1000,10 +1296,20 @@ export class Game {
     const ctx = this.gatherContext();
     const canAct = alive && (input.pointerLocked || this.testInput);
     const held = this.inventory.held;
-    const placeType = held ? (itemDef(held.id).places as StructureType | undefined) : undefined;
+    const places = held ? itemDef(held.id).places : undefined;
+    const pieceType = isPieceType(places) ? places : null;
+    const placeType = places && !pieceType ? (places as StructureType) : undefined;
     let prompt: { key: string | null; text: string } | null = null;
-    const ghostText = this.structures.updateGhost(alive && placeType ? placeType : null, this.camera, canAct && input.wasPressed('rotate'));
-    if (ghostText) {
+    const rotate = canAct && input.wasPressed('rotate');
+    const ghostText = this.structures.updateGhost(alive && placeType ? placeType : null, this.camera, rotate);
+    const pieceText = this.building.updateGhost(alive && pieceType ? pieceType : null, this.camera, rotate, (o, d, max, out) => this.world.raycast(o, d, max, out));
+    if (pieceText) {
+      prompt = { key: this.building.ghostValid ? 'LMB' : null, text: pieceText };
+      if (canAct && input.wasPressed('attack') && this.building.placeGhost()) {
+        this.inventory.consumeSlot(this.inventory.selected, 1);
+        this.audio.hit('wood');
+      }
+    } else if (ghostText) {
       prompt = { key: this.structures.ghostValid ? 'LMB' : null, text: ghostText };
       if (canAct && input.wasPressed('attack') && this.structures.placeGhost()) this.inventory.consumeSlot(this.inventory.selected, 1);
     } else if (alive) {
@@ -1026,6 +1332,8 @@ export class Game {
       } else if (structure && Math.hypot(structure.x - origin.x, structure.z - origin.z) < gatherDist) {
         prompt = this.structurePrompt(structure);
         if (canAct && input.wasPressed('interact')) this.useStructure(structure);
+      } else if (this.dismantlePrompt(origin, dir, gatherDist, canAct, dt)) {
+        prompt = this.dismantlePrompt(origin, dir, gatherDist, false, 0);
       } else {
         if (canAct && input.wasPressed('interact')) this.gathering.interact(ctx);
         if (canAct && input.wasPressed('attack')) this.gathering.use(ctx);
@@ -1035,6 +1343,7 @@ export class Game {
     this.hud.setPrompt(prompt ? (prompt.key === 'LMB' ? this.input.bindingLabel('attack') : prompt.key === 'E' ? this.input.bindingLabel('interact') : null) : null, prompt ? prompt.text : null);
     this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, 0);
     this.wildlife.update(dt, this.elapsed, this.camera);
+    this.wardens.update(dt);
     this.story.update(dt);
     this.quests.refresh();
     this.vegetation.tick(dt, this.clock.totalHours);
@@ -1045,6 +1354,33 @@ export class Game {
     if (this.autosaveTimer > 60 && alive) {
       this.autosaveTimer = 0;
       this.saveSession('auto');
+    }
+  }
+
+  /**
+   * Coming to after the crash: eyes open on the sky through the birches, a
+   * slow blink, then the head comes down to the camp and control returns.
+   */
+  private updateWake(dt: number): void {
+    const before = this.wake;
+    this.wake += dt;
+    const w = this.wake;
+    const lower = smoothstep(2.6, 5.4, w);
+    this.player.pitch = 1.05 * (1 - lower) - 0.06 * lower;
+    this.player.yaw = CAMP_SPAWN.yaw + 0.35 * (1 - lower);
+    this.intent.moveX = 0;
+    this.intent.moveY = 0;
+    this.intent.jumpPressed = false;
+    this.intent.jumpHeld = false;
+    this.intent.sprint = false;
+    this.intent.crouch = w < 4.2;
+    this.player.update(dt, this.intent);
+    this.story.update(dt);
+    if (before < 3.2 && w >= 3.2) this.events.emit('subtitle', { speaker: '', text: 'Woodsmoke on the wind. Voices, not far off.', duration: 5 });
+    if (w >= 5.6) {
+      this.wake = -1;
+      this.hud.setVisible(true);
+      this.quests.refresh();
     }
   }
 
@@ -1072,13 +1408,14 @@ export class Game {
     heat += this.structures.heatAt(p.x, p.y + 1, p.z);
     const inWater = this.player.state === 'swim';
     const ws = this.weather.state;
+    const sheltered = this.building.sheltered(p.x, p.y, p.z);
     return {
-      airTemperature: base + diurnal - altitude + ws.chill - ws.wind * 2,
-      precipitation: Math.min(1, ws.rain + ws.snow * 0.6),
+      airTemperature: base + diurnal - altitude + ws.chill - ws.wind * (sheltered ? 0.5 : 2),
+      precipitation: sheltered ? 0 : Math.min(1, ws.rain + ws.snow * 0.6),
       heat,
       inWater,
       waterTemperature: water.hot ? 38 : 9 + base * 0.35,
-      sheltered: false,
+      sheltered,
       resting: false,
     };
   }
@@ -1144,7 +1481,8 @@ export class Game {
     this.vegetationShared.uTime.value = this.reducedMotion ? 0 : this.elapsed;
     this.vegetation.update(this.camera);
     this.props.update(this.camera);
-    this.viewmodel.root.visible = this.mode === 'play' && this.survival.alive;
+    // Hands come up once the survivor is on their feet.
+    this.viewmodel.root.visible = this.mode === 'play' && this.survival.alive && this.wake < 0 && !this.introHold;
     if (this.mode === 'play') {
       const held = this.inventory.held;
       this.viewmodel.update(dt, {
@@ -1245,6 +1583,7 @@ export class Game {
     a.underwater = this.pipeline.post.underwater > 0;
     a.lowHealth = this.mode === 'play' ? this.pipeline.post.lowHealth : 0;
     a.rain = Math.min(1, this.weather.state.rain + this.weather.state.snow * 0.15);
+    a.combat = damp(a.combat, this.mode === 'play' && this.wardens.active ? 1 : 0, this.wardens.active ? 2 : 0.35, dt);
     // Surroundings change slowly: probe a few times a second.
     this.audioProbeTimer -= dt;
     if (this.audioProbeTimer <= 0) {
@@ -1282,7 +1621,15 @@ export class Game {
     post.damage = damp(post.damage, 0, 3, dt);
     const hp = this.survival.health / this.survival.maxHealth;
     post.lowHealth = this.mode === 'play' ? smoothstep(0.35, 0.08, hp) : 0;
-    post.fade = damp(post.fade, this.deathCause ? 0.85 : 0, 1.5, dt);
+    if (this.mode === 'title') post.fade = this.titleCam.fade;
+    else if (this.introHold) post.fade = 1;
+    else if (this.wake >= 0) {
+      // Eyes opening, then one slow blink.
+      const w = this.wake;
+      const open = 1 - smoothstep(0.3, 1.6, w);
+      const blink = Math.max(0, 1 - Math.abs(w - 2.2) / 0.28) * 0.8;
+      post.fade = Math.max(open, blink);
+    } else post.fade = damp(post.fade, this.deathCause ? 0.85 : 0, 1.5, dt);
   }
 
   private updateUi(dt: number): void {
@@ -1305,6 +1652,12 @@ export class Game {
       if (distance < 12 || distance > 900) continue;
       this.markers.push({ id: lm.id, bearing: bearingOf(dx, dz), distance, kind: 'landmark', label: this.discovered.has(lm.id) ? lm.name : undefined });
     }
+    for (const d of this.structures.all) {
+      if (d.type !== 'satchel') continue;
+      const dx = d.x - p.x;
+      const dz = d.z - p.z;
+      this.markers.push({ id: d.id, bearing: bearingOf(dx, dz), distance: Math.hypot(dx, dz), kind: 'satchel', label: 'Your pack' });
+    }
     const target = this.questTargetPosition();
     if (target) {
       const dx = target.x - p.x;
@@ -1326,6 +1679,7 @@ export class Game {
       dt,
     );
     this.questHud.update(this.quests);
+    this.hud.setBoss(this.wardens.status(), dt);
     if (this.debugVisible && this.debugEl) {
       const s = this.survival.snapshot();
       const info = this.renderer.info.render;
@@ -1450,6 +1804,11 @@ export class Game {
           this.render(0);
           return { state: name };
         }
+        if (name === 'title') {
+          this.enterTitle();
+          this.render(0);
+          return { state: name };
+        }
         const view = name.startsWith('view-') ? name.slice(5) : name;
         if (!this.applyViewpoint(view)) throw new Error(`Unknown test state: ${name}`);
         this.render(0);
@@ -1532,7 +1891,15 @@ export class Game {
         const dir = this.camera.getWorldDirection(new THREE.Vector3());
         if (action === 'place') {
           const held = this.inventory.held;
-          const type = held ? (itemDef(held.id).places as StructureType | undefined) : undefined;
+          const places = held ? itemDef(held.id).places : undefined;
+          if (isPieceType(places)) {
+            const text = this.building.updateGhost(places, this.camera, false, (o, d, max, out) => this.world.raycast(o, d, max, out));
+            const piece = this.building.placeGhost();
+            if (piece) this.inventory.consumeSlot(this.inventory.selected, 1);
+            this.building.updateGhost(null, this.camera, false, () => -1);
+            return { placed: piece ? piece.type : null, reason: piece ? '' : (text ?? this.building.ghostReason) };
+          }
+          const type = places as StructureType | undefined;
           this.structures.updateGhost(type ?? null, this.camera, false);
           const placed = this.structures.placeGhost();
           if (placed) this.inventory.consumeSlot(this.inventory.selected, 1);
@@ -1642,9 +2009,32 @@ export class Game {
           this.player.update(dt, { moveX: 0, moveY: 0, jumpPressed: false, jumpHeld: false, sprint: false, crouch: false });
           this.survival.update(dt, this.climate());
           this.wildlife.update(dt, this.elapsed, this.camera);
+          this.wardens.update(dt);
+          this.gathering.update(dt, this.gatherContext());
         }
         this.render(dt);
         return this.survival.health;
+      },
+      /** Built pieces, and whether the player stands sheltered. */
+      building: () => {
+        const p = this.player.position;
+        return { pieces: this.building.debugPieces(), sheltered: this.building.sheltered(p.x, p.y, p.z), surface: this.building.surfaceAt(p.x, p.z, p.y), player: { x: p.x, y: p.y, z: p.z } };
+      },
+      /** Take down the piece under the aim (as holding E would). */
+      dismantle: () => {
+        const origin = this.camera.getWorldPosition(new THREE.Vector3());
+        const dir = this.camera.getWorldDirection(new THREE.Vector3());
+        const piece = this.building.pick(origin, dir, 3.4);
+        if (!piece) return { removed: null, reason: 'nothing aimed at' };
+        if (!this.building.canRemove(piece)) return { removed: null, reason: 'supports other pieces' };
+        const wood = this.building.remove(piece);
+        this.inventory.add('wood', wood);
+        return { removed: piece.type, wood };
+      },
+      /** Mossback: state, or a debug action (wake | calm | reset | stagger | hurt). */
+      warden: (action?: 'wake' | 'calm' | 'reset' | 'stagger' | 'hurt' | 'hold' | 'release', amount = 0) => {
+        if (action) this.wardens.debug(action, amount);
+        return { ...this.wardens.debugState, knotPositions: this.wardens.knotPositions(), boss: this.wardens.status() };
       },
       setTime: (hours: number) => {
         this.clock.set(this.clock.day, hours);

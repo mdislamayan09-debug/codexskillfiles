@@ -28,6 +28,8 @@ export interface AudioState {
   musicMode: string;
   musicRoot: number;
   inDanger: boolean;
+  /** 0..1 boss-fight intensity: drums and a low ostinato take over the score. */
+  combat: number;
 }
 
 const MODES: Record<string, number[]> = {
@@ -75,6 +77,8 @@ export class AudioEngine {
   private chordIndex = 0;
   private seed = 1;
   private state: AudioState | null = null;
+  private nextBeat = 0;
+  private beatIndex = 0;
 
   /** Must be called from a user gesture (click / key). */
   unlock(): void {
@@ -407,6 +411,13 @@ export class AudioEngine {
         this.burst({ buffer: this.pink, type: 'lowpass', freq: 1500, decay: 0.07, gain: 0.3 });
         if (material === 'flesh-weak') this.tone({ freq: 1560, decay: 0.35, gain: 0.08, reverb: 0.5, fm: { ratio: 2.7, index: 0.8 } });
         break;
+      case 'songstone':
+        // A songstone knot struck: a bright, ringing crack.
+        this.tone({ freq: 1320 + this.rand() * 80, decay: 1.4, gain: 0.1, reverb: 0.8, fm: { ratio: 2.41, index: 1.4 } });
+        this.tone({ freq: 2790, decay: 0.7, gain: 0.05, reverb: 0.6 });
+        this.burst({ type: 'highpass', freq: 3200, decay: 0.05, gain: 0.2 });
+        this.tone({ freq: 160, freqEnd: 70, decay: 0.12, gain: 0.25 });
+        break;
       case 'growl': {
         const ctx = this.ctx;
         const t = ctx.currentTime;
@@ -493,6 +504,91 @@ export class AudioEngine {
       this.tone({ freq: f * 0.5, freqEnd: f * 0.45, decay: 0.4, gain: 0.12, fm: { ratio: 1.07, index: 3 } });
       this.burst({ buffer: this.brown, type: 'lowpass', freq: 500, decay: 0.3, gain: 0.2 });
     }
+  }
+
+  /** Gain and pan for a sound at a world position, from the last listener. */
+  private spatial(x: number, y: number, z: number, range = 14): { g: number; pan: number } {
+    const l = this.state?.listener;
+    if (!l) return { g: 1, pan: 0 };
+    const dx = x - l.x;
+    const dy = y - l.y;
+    const dz = z - l.z;
+    const d = Math.hypot(dx, dy, dz) || 1;
+    const fl = Math.hypot(l.fx, l.fz) || 1;
+    const pan = Math.max(-0.85, Math.min(0.85, (dx * (-l.fz / fl) + dz * (l.fx / fl)) / d));
+    return { g: 1 / (1 + d / range), pan };
+  }
+
+  /** The Wardens: roars, stomps, crashes and the tolling of a freed Bellstone. */
+  warden(kind: 'roar' | 'stomp' | 'step' | 'charge' | 'crash' | 'roots' | 'rootsWarn' | 'crack' | 'calm', x: number, y: number, z: number, strength = 1): void {
+    if (!this.ctx) return;
+    const { g: near, pan } = this.spatial(x, y, z, kind === 'step' ? 10 : 22);
+    const g = near * strength;
+    const t = this.ctx.currentTime;
+    switch (kind) {
+      case 'roar':
+      case 'charge': {
+        const long = kind === 'roar' ? 1 : 0.7;
+        // Two growling voices, a breath of noise and a chest rumble.
+        this.tone({ type: 'sawtooth', freq: 82, freqEnd: 50, attack: 0.25, decay: 2.1 * long, gain: 0.2 * g, pan, reverb: 0.8, fm: { ratio: 0.5, index: 2.6 } });
+        this.tone({ type: 'sawtooth', freq: 123, freqEnd: 74, attack: 0.3, decay: 1.7 * long, gain: 0.08 * g, pan, reverb: 0.8, detune: 14 });
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: 560, freqEnd: 240, q: 1.3, attack: 0.3, decay: 1.9 * long, gain: 0.5 * g, pan, reverb: 0.7 });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 240, attack: 0.2, decay: 2.2 * long, gain: 0.7 * g, pan });
+        if (kind === 'charge') this.burst({ buffer: this.brown, type: 'lowpass', freq: 130, attack: 0.4, decay: 2.8, gain: 0.8 * g, pan, when: t + 0.3 });
+        break;
+      }
+      case 'stomp':
+        this.tone({ freq: 58, freqEnd: 26, attack: 0.004, decay: 1.0, gain: 0.7 * g, pan, reverb: 0.6 });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 380, freqEnd: 50, attack: 0.005, decay: 1.6, gain: 1.0 * g, pan, reverb: 0.5 });
+        this.burst({ type: 'highpass', freq: 1400, decay: 0.2, gain: 0.18 * g, pan, when: t + 0.02 });
+        for (let i = 0; i < 6; i += 1) this.burst({ buffer: this.pink, type: 'bandpass', freq: 900 + this.rand() * 1600, decay: 0.05, gain: 0.08 * g, pan: pan + (this.rand() - 0.5) * 0.4, when: t + 0.15 + this.rand() * 0.6 });
+        break;
+      case 'step':
+        this.tone({ freq: 50, freqEnd: 30, attack: 0.004, decay: 0.35, gain: 0.3 * g, pan });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 200, decay: 0.45, gain: 0.45 * g, pan });
+        break;
+      case 'crash':
+        for (let i = 0; i < 7; i += 1) this.burst({ type: 'highpass', freq: 1600 + this.rand() * 2400, decay: 0.04 + this.rand() * 0.12, gain: 0.3 * g, pan, when: t + i * 0.035 + this.rand() * 0.03 });
+        this.tone({ freq: 64, freqEnd: 30, attack: 0.004, decay: 0.8, gain: 0.6 * g, pan, reverb: 0.5 });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 520, freqEnd: 70, attack: 0.01, decay: 1.8, gain: 0.9 * g, pan, reverb: 0.5 });
+        break;
+      case 'rootsWarn':
+        // Creaking wood working its way up through the ground.
+        this.tone({ type: 'sawtooth', freq: 120, freqEnd: 260, attack: 0.5, decay: 0.6, gain: 0.05 * g, pan, fm: { ratio: 1.5, index: 3 } });
+        this.burst({ buffer: this.brown, type: 'lowpass', freq: 90, freqEnd: 260, attack: 0.9, decay: 0.3, gain: 0.5 * g, pan });
+        break;
+      case 'roots':
+        for (let i = 0; i < 9; i += 1) this.burst({ type: 'highpass', freq: 1300 + this.rand() * 2600, decay: 0.03 + this.rand() * 0.08, gain: 0.22 * g, pan, when: t + this.rand() * 0.25 });
+        this.tone({ freq: 90, freqEnd: 40, decay: 0.4, gain: 0.45 * g, pan });
+        this.burst({ buffer: this.pink, type: 'bandpass', freq: 800, decay: 0.6, gain: 0.35 * g, pan, reverb: 0.3 });
+        break;
+      case 'crack':
+        for (let i = 0; i < 5; i += 1) this.tone({ freq: 1800 + this.rand() * 3200, decay: 0.3 + this.rand() * 0.9, gain: 0.06 * g, pan, when: t + i * 0.03, reverb: 0.9, fm: { ratio: 1.41 + this.rand(), index: 1.2 } });
+        this.burst({ type: 'highpass', freq: 3000, decay: 0.25, gain: 0.4 * g, pan });
+        this.tone({ freq: 140, freqEnd: 60, decay: 0.3, gain: 0.4 * g, pan });
+        break;
+      case 'calm':
+        this.bellToll(t + 0.4, 1);
+        break;
+    }
+  }
+
+  /** A Bellstone tolls: inharmonic bell partials and a choir chord under them. */
+  bellToll(when = this.ctx?.currentTime ?? 0, strength = 1): void {
+    if (!this.ctx) return;
+    const f = midiToHz(43);
+    const partials: [number, number, number][] = [
+      [0.5, 0.2, 9],
+      [1, 0.28, 8],
+      [1.19, 0.1, 6],
+      [2, 0.14, 6],
+      [2.76, 0.1, 5],
+      [5.4, 0.06, 3.5],
+      [8.93, 0.035, 2.2],
+    ];
+    for (const [ratio, gain, decay] of partials) this.tone({ freq: f * ratio, decay, attack: 0.004, gain: gain * strength, when, bus: this.music, reverb: 1 });
+    this.burst({ type: 'bandpass', freq: 2400, q: 2, decay: 0.2, gain: 0.08 * strength, when, bus: this.music });
+    for (const n of [55, 62, 67, 71]) this.pad(midiToHz(n), when + 0.6, 9);
   }
 
   /** Rolling thunder `delay` seconds from now (closer = sharper crack). */
@@ -628,6 +724,14 @@ export class AudioEngine {
 
   // Generative score: sparse pieces separated by long silences.
   private updateMusic(t: number, s: AudioState): void {
+    if (s.combat > 0.02) {
+      // A fight takes over: end the current piece and drum.
+      this.pieceEnd = Math.min(this.pieceEnd, t);
+      this.nextPiece = Math.max(this.nextPiece, t + 25);
+      this.updateCombatMusic(t, s);
+      return;
+    }
+    this.nextBeat = 0;
     if (t > this.pieceEnd && t > this.nextPiece) {
       this.pieceEnd = t + 55 + this.rand() * 45;
       this.nextPiece = this.pieceEnd + 90 + this.rand() * 150;
@@ -656,6 +760,36 @@ export class AudioEngine {
       this.tone({ freq: midiToHz(note), decay: 2.2, attack: 0.004, gain: 0.05, when: t + 0.6 + i * (1.2 + this.rand() * 0.8), bus: this.music, reverb: 0.9, fm: { ratio: 2, index: 0.9 }, pan: this.rand() * 0.6 - 0.3 });
     }
     this.nextNote = t + len;
+  }
+
+  /** Taiko, frame drum and a low phrygian ostinato, scheduled just ahead. */
+  private updateCombatMusic(t: number, s: AudioState): void {
+    const bpm = 96 + s.combat * 10;
+    const eighth = 60 / bpm / 2;
+    if (this.nextBeat < t) {
+      this.nextBeat = t + 0.05;
+      this.beatIndex = 0;
+    }
+    const root = 38;
+    const pattern = [0, 0, 1, 0, 3, 0, 1, 0, 0, 0, 1, 0, 5, 3, 1, 0];
+    const kicks = [1, 0, 0, 0.6, 0, 0, 0.7, 0, 1, 0, 0, 0.6, 0, 0, 0.8, 0.5];
+    const g = Math.min(1, s.combat);
+    while (this.nextBeat < t + 0.2) {
+      const i = this.beatIndex % 16;
+      const when = this.nextBeat;
+      if (kicks[i] > 0) this.taiko(when, kicks[i] * g);
+      if (i === 4 || i === 12) this.burst({ type: 'bandpass', freq: 1700, q: 2.2, decay: 0.09, gain: 0.07 * g, when, bus: this.music, reverb: 0.3 });
+      this.tone({ type: 'triangle', freq: midiToHz(root + pattern[i]), decay: eighth * 0.95, attack: 0.006, gain: 0.1 * g, when, bus: this.music, fm: { ratio: 2, index: 0.6 } });
+      if (i === 0 && this.beatIndex % 32 === 0) for (const n of [root + 12, root + 19, root + 24]) this.pad(midiToHz(n), when, eighth * 16);
+      this.nextBeat += eighth;
+      this.beatIndex += 1;
+    }
+  }
+
+  private taiko(when: number, accent: number): void {
+    this.tone({ freq: 72, freqEnd: 42, attack: 0.004, decay: 0.55, gain: 0.34 * accent, when, bus: this.music, reverb: 0.45 });
+    this.burst({ buffer: this.brown, type: 'lowpass', freq: 420, freqEnd: 90, decay: 0.32, gain: 0.5 * accent, when, bus: this.music });
+    this.burst({ type: 'bandpass', freq: 950, q: 0.8, decay: 0.05, gain: 0.06 * accent, when, bus: this.music });
   }
 
   private pad(freq: number, t: number, len: number): void {

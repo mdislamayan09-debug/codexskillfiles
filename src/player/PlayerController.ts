@@ -64,8 +64,12 @@ export interface CircleCollider {
 }
 
 export interface PlayerEnvironment {
-  groundHeight(x: number, z: number): number;
-  groundNormal(x: number, z: number, out: THREE.Vector3): THREE.Vector3;
+  /**
+   * Ground under (x, z). With `y` (the feet), built floors no higher than a
+   * step above it count too, so storeys stack; without it, terrain only.
+   */
+  groundHeight(x: number, z: number, y?: number): number;
+  groundNormal(x: number, z: number, out: THREE.Vector3, y?: number): THREE.Vector3;
   water(x: number, z: number): WaterAt;
   colliders(x: number, z: number, radius: number, out: CircleCollider[]): CircleCollider[];
   surface(x: number, z: number): string;
@@ -137,8 +141,8 @@ export class PlayerController {
   ) {}
 
   /** Teleport, standing on the ground (or floating on water). */
-  spawn(x: number, z: number, yaw = this.yaw): void {
-    const ground = this.env.groundHeight(x, z);
+  spawn(x: number, z: number, yaw = this.yaw, yHint?: number): void {
+    const ground = this.env.groundHeight(x, z, yHint);
     this.position.set(x, ground, z);
     this.velocity.set(0, 0, 0);
     this.yaw = yaw;
@@ -150,6 +154,22 @@ export class PlayerController {
       this.setState('swim');
     }
     this.peakY = this.position.y;
+  }
+
+  /** External shove (a Warden's charge, a shockwave): adds velocity and lifts off. */
+  knock(x: number, y: number, z: number): void {
+    if (this.state === 'swim') {
+      this.velocity.x += x * 0.4;
+      this.velocity.z += z * 0.4;
+      return;
+    }
+    this.velocity.x += x;
+    this.velocity.z += z;
+    if (y > 0) {
+      this.velocity.y = Math.max(this.velocity.y, y);
+      this.position.y += 0.05;
+      this.setState('air');
+    }
   }
 
   get eyeHeight(): number {
@@ -248,7 +268,7 @@ export class PlayerController {
     const T = PLAYER_TUNING;
     const p = this.position;
     const v = this.velocity;
-    const n = this.env.groundNormal(p.x, p.z, this.normal);
+    const n = this.env.groundNormal(p.x, p.z, this.normal, p.y);
     const moving = Math.hypot(wishX, wishZ) > 0.1;
 
     // Sprint needs forward intent and stamina.
@@ -291,7 +311,7 @@ export class PlayerController {
 
     const nx = p.x + v.x * dt;
     const nz = p.z + v.z * dt;
-    const nextGround = this.env.groundHeight(nx, nz);
+    const nextGround = this.env.groundHeight(nx, nz, p.y);
     // A sudden wall higher than a step blocks horizontal motion.
     if (nextGround - p.y > T.stepHeight + Math.hypot(v.x, v.z) * dt * 1.2) {
       v.x *= 0.2;
@@ -301,7 +321,7 @@ export class PlayerController {
       p.z = nz;
     }
 
-    const ground = this.env.groundHeight(p.x, p.z);
+    const ground = this.env.groundHeight(p.x, p.z, p.y);
     if (p.y - ground > T.groundSnap) {
       // Walked off a ledge.
       v.y = 0;
@@ -359,6 +379,8 @@ export class PlayerController {
       v.z += (az / al) * step;
     }
     v.y = Math.max(v.y - T.gravity * dt, -T.terminalSpeed);
+    // Floors are found from where the feet were, so a fast fall can't skip one.
+    const fromY = p.y;
     p.x += v.x * dt;
     p.y += v.y * dt;
     p.z += v.z * dt;
@@ -367,7 +389,7 @@ export class PlayerController {
     // Grab a wall mid-air when falling past it.
     if (v.y < 2 && Math.hypot(wishX, wishZ) > 0.3 && this.tryStartClimb(wishX, wishZ)) return;
 
-    const ground = this.env.groundHeight(p.x, p.z);
+    const ground = this.env.groundHeight(p.x, p.z, Math.max(fromY, p.y));
     if (p.y <= ground) {
       p.y = ground;
       this.landing(false);
@@ -524,7 +546,7 @@ export class PlayerController {
     this.peakY = p.y;
 
     // Climb out onto a bank or rock with jump.
-    if (this.jumpBuffer > 0 && water.surface - this.env.groundHeight(p.x + wishX, p.z + wishZ) < 1.2) {
+    if (this.jumpBuffer > 0 && water.surface - this.env.groundHeight(p.x + wishX, p.z + wishZ, p.y + 1.2) < 1.2) {
       this.jumpBuffer = 0;
       v.y = 4.2;
       this.setState('air');

@@ -227,4 +227,9 @@ export const LORE: { id: string; title: string; text: string }[] = [
     title: 'The Held Note',
     text: 'In the crater lies Hallowmere, the Veyr city, held beneath a wall of light. The whole island is sustaining one note that will not end. Five Bellstones anchor it.',
   },
+  {
+    id: 'lore:mossback',
+    title: 'Mossback',
+    text: 'The Warden of Hollowpine was a calf that followed the Choirmaster’s daughter through the young birches. When the note began it lay down beside the first bell. Unable to die, it grew a forest instead.',
+  },
 ];
