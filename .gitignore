@@ -5,6 +5,7 @@ playwright-report/
 artifacts/captures/
 artifacts/world-preview/
 artifacts/tmp/
+artifacts/playtest/
 *.log
 .DS_Store
 .unlazy/
