@@ -600,6 +600,26 @@ export class AudioEngine {
     }
   }
 
+  /** A Sunwell prism turning on its bronze bearing: a click and a glassy ring. */
+  prismTurn(index: number, x: number, y: number, z: number): void {
+    if (!this.ctx) return;
+    const { g, pan } = this.spatial(x, y, z, 12);
+    const notes = [74, 76, 79, 81, 83, 86, 88];
+    const f = midiToHz(notes[index % notes.length]);
+    this.burst({ buffer: this.pink, type: 'bandpass', freq: 2600, q: 3, decay: 0.05, gain: 0.12 * g, pan });
+    this.burst({ buffer: this.brown, type: 'lowpass', freq: 300, attack: 0.02, decay: 0.28, gain: 0.1 * g, pan });
+    this.tone({ freq: f, decay: 1.8, attack: 0.004, gain: 0.05 * g, pan, reverb: 0.7, fm: { ratio: 2.76, index: 0.5 } });
+  }
+
+  /** Light reaches a Sunwell door: a rising chord, then stone grinding down. */
+  sunwellOpen(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + 0.05;
+    [62, 69, 74, 78, 81, 86].forEach((n, i) => this.tone({ freq: midiToHz(n), decay: 4.5, attack: 0.03, gain: 0.055, when: t + i * 0.16, bus: this.music, reverb: 1, fm: { ratio: 2, index: 0.7 } }));
+    this.burst({ buffer: this.brown, type: 'lowpass', freq: 260, freqEnd: 80, attack: 0.8, decay: 3.6, gain: 0.55, when: t + 1.2, reverb: 0.4 });
+    this.burst({ buffer: this.pink, type: 'bandpass', freq: 900, q: 0.8, attack: 0.5, decay: 3, gain: 0.08, when: t + 1.3 });
+  }
+
   /** Gain and pan for a sound at a world position, from the last listener. */
   private spatial(x: number, y: number, z: number, range = 14): { g: number; pan: number } {
     const l = this.state?.listener;

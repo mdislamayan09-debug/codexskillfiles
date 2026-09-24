@@ -798,3 +798,42 @@
 .hud-lock.show {
   opacity: 1;
 }
+
+/* The spyglass: a round field of view in a dark tube, and a ring that fills
+   while a far place is held in the sights. */
+.hud-spyglass {
+  position: absolute;
+  inset: 0;
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 0, transparent 35vmin, rgba(0, 0, 0, 0.7) 37.5vmin, #000 40vmin);
+}
+
+.hud-spyglass.show {
+  display: block;
+}
+
+.hud-spyglass .spy-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76vmin;
+  height: 76vmin;
+  margin: -38vmin 0 0 -38vmin;
+  border-radius: 50%;
+  box-shadow: inset 0 0 7vmin rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(214, 186, 128, 0.35);
+}
+
+.hud-spyglass .spy-focus {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  background: conic-gradient(rgba(255, 214, 150, 0.95) calc(var(--focus, 0) * 360deg), rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 11px, #000 12px);
+  mask: radial-gradient(circle, transparent 11px, #000 12px);
+}

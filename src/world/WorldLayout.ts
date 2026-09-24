@@ -135,8 +135,11 @@ export interface LandmarkDef {
   kind: LandmarkKind;
   x: number;
   z: number;
-  /** Flatten a pad for structures: radius of the flat area and blend distance. */
-  pad?: { radius: number; falloff: number; height?: number; offset?: number };
+  /**
+   * Flatten a pad for structures: radius of the flat area and blend
+   * distance. `paved` is the half-size of a square court with no grass.
+   */
+  pad?: { radius: number; falloff: number; height?: number; offset?: number; paved?: number };
   /** Raise terrain into a hill/mound: peak height added at the center. */
   mound?: { height: number; radius: number };
   /** Short description for the journal. */
@@ -524,6 +527,40 @@ export const LANDMARKS: readonly LandmarkDef[] = [
     z: 630,
     blurb: 'At dusk the air here fills with slow gold lights.',
   },
+  // --- The Sunwells ----------------------------------------------------------
+  {
+    id: 'dawnwell',
+    name: 'The Dawnwell',
+    biome: BIOME.Greensward,
+    kind: 'ruin',
+    x: 338,
+    z: 728,
+    pad: { radius: 17, falloff: 16, paved: 13 },
+    blurb: 'A paved Veyr court where a bronze dish still gathers the morning into a lens.',
+    discoverRadius: 70,
+  },
+  {
+    id: 'noonwell',
+    name: 'The Noonwell',
+    biome: BIOME.Glasswood,
+    kind: 'ruin',
+    x: 394,
+    z: 14,
+    pad: { radius: 17, falloff: 16, paved: 13 },
+    blurb: 'Crystal prisms on bronze turntables, waiting for someone to turn the light.',
+    discoverRadius: 70,
+  },
+  {
+    id: 'duskwell',
+    name: 'The Duskwell',
+    biome: BIOME.Hollowpine,
+    kind: 'ruin',
+    x: -338,
+    z: 186,
+    pad: { radius: 17, falloff: 16, paved: 13 },
+    blurb: 'The last of the three sun-courts. Its door has waited a long time for the evening.',
+    discoverRadius: 70,
+  },
   // --- The Rim / Stillheart -------------------------------------------------
   {
     id: 'stillheart',
@@ -676,4 +713,7 @@ export const TRAILS: readonly [string, string][] = [
   ['old_persistence', 'sunken_face'],
   ['meridian_tail', 'galleon'],
   ['galleon', 'lighthouse'],
+  ['tocks_vault', 'dawnwell'],
+  ['floating_isle', 'noonwell'],
+  ['whispering_cave', 'duskwell'],
 ];

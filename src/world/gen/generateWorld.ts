@@ -931,6 +931,8 @@ function computeFields(
   const masks = new Uint8Array(res * res * 8);
   const biomeBytes = new Uint8Array(res * res * BIOME_COUNT);
 
+  // Paved courts: bare stone, no grass.
+  const paved = LANDMARKS.filter((l) => l.pad?.paved);
   // Trail distance field.
   const trailDist = new Float32Array(res * res).fill(1e9);
   for (const seg of trails) {
@@ -987,7 +989,12 @@ function computeFields(
       const ny = normals[hkc * 4 + 1] / 255 * 2 - 1;
       const slope = 1 - ny; // 0 flat .. ~1 vertical
 
-      const path = 1 - smoothstep(0.9, 2.6 + 0.6 * n.detail.noise(x / 14, z / 14), trailDist[k]);
+      let path = 1 - smoothstep(0.9, 2.6 + 0.6 * n.detail.noise(x / 14, z / 14), trailDist[k]);
+      for (const lm of paved) {
+        const half = lm.pad?.paved ?? 0;
+        const d = Math.max(Math.abs(x - lm.x), Math.abs(z - lm.z));
+        if (d < half + 2) path = Math.max(path, 1 - smoothstep(half - 1, half + 2, d));
+      }
       const underwater = h < level - 0.05;
       const sand = underwater ? 0 : smoothstep(2.9, 0.7, h) * (1 - wDrown) * (1 - smoothstep(0.25, 0.5, slope));
       let wet = wDrown * smoothstep(2.6, 0.2, h);

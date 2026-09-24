@@ -29,11 +29,13 @@ saves screenshots under `artifacts/playtest/`. Start the dev server
 | `scripts/playtest-sidestories.mjs` | Wren's field notes, Ilyr's four caves (in any order) and Tock's workshop, played through and paid out |
 | `scripts/playtest-sky.mjs` | A meteor shower, a fallen star found and gathered, a Starglass Lantern made from it, an eclipse |
 | `scripts/playtest-curiosities.mjs` | Curiosities spread over the island, one of each kind found once and rewarded |
+| `scripts/playtest-sunwells.mjs` | The three Sunwells solved, doors sunk, sealed caches opened, Tock's Burning Glass, the spyglass |
 | `scripts/capture.mjs` | Scenic views for visual review (`--views`, `--quality`) |
 
 `npm test` runs the unit tests (`tests/unit/`). They check story data,
 quest logic, the inventory, save round trips, the seeded RNG, noise,
-landmark caches, farming growth and the combat rules.
+landmark caches, farming growth, the combat rules and the Sunwell beams
+(every well solvable, each harder than the last, one true path each).
 
 ## Milestones
 
@@ -128,8 +130,12 @@ landmark caches, farming growth and the combat rules.
   chamber with the cache. It is dark underground: sun and sky light are cut
   off in every material, so a torch matters. Crystals and lava glow, ice
   hangs from the roof, water drips and echoes.
-- 🟡 Puzzles: the Singing Stones (strike in order). Prisms and echo bridges
-  are not built yet.
+- 🟡 Puzzles: the Singing Stones (strike in order) and the three
+  **Sunwells**: the Dawnwell, Noonwell and Duskwell. In each, a lens
+  throws sunlight across a paved court; turning crystal prisms carries the
+  beam to the sun disc on a vault door, which sinks to reveal a sealed
+  cache. They need 4, 9 and 12 turns, and the beam only runs by day. Echo
+  bridges, wisp chases and glyph doors are not built yet.
 - ✅ Curiosities: about seventy small finds between the named places, laid
   out from the world seed. Veyr cairns have a line carved into the
   capstone, lost expedition packs hold supplies, songstone shrines give a
@@ -145,7 +151,9 @@ landmark caches, farming growth and the combat rules.
 - ✅ Side stories: Tock's workshop (a smelter and iron; he reforges a pick),
   Wren's field notes (a rook brought down with a bow, the Crystal Grotto's
   glow), Ilyr's *What the Rock Remembers* (listen in all four cave chambers,
-  in any order; each chamber still says something), and Varga's log.
+  in any order; each chamber still says something), Varga's log, and
+  Tock's *Burning Glass* (light the three Sunwells; he makes a spyglass
+  that marks far places on the compass and map).
 
 ### M6 Wardens and endgame: ✅
 
@@ -190,7 +198,14 @@ landmark caches, farming growth and the combat rules.
 
 ## Next up
 
-1. A second puzzle type (prisms and light).
-2. Visual polish: bark and forest edges, denser grass near the camera on
+The full, ordered list is in `README.md` ("What we do next") and in
+detail in `HANDOFF.md`. The first few:
+
+1. Finish the Sunwells: get their playtest passing end to end, look at
+   them in daylight on a real GPU, tune the beam and stonework, and re-run
+   every playtest.
+2. Solid landmarks: colliders for walls, hulls and statues, and walkable
+   steps, decks and floors.
+3. Frame-time measurements on Apple silicon, and presets tuned to them.
+4. Visual polish: bark and forest edges, denser grass near the camera on
    High and above, and creature detail.
-3. Frame-time measurements on Apple silicon.

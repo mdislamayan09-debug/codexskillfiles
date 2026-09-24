@@ -321,6 +321,25 @@ export const QUESTS: readonly QuestDef[] = [
     auto: true,
   },
   {
+    id: 'burning_glass',
+    title: 'Burning Glass',
+    main: false,
+    giver: 'tock',
+    summary: 'The Veyr caught sunlight in paved courts and turned it with crystal. Tock wants to know how. Light the three Sunwells and tell him what you saw.',
+    steps: [
+      { id: 'dawn', text: 'Light the Dawnwell', kind: 'flag', target: 'lit:dawnwell', hint: 'A paved court on the eastern Greensward, past Tock’s vault.' },
+      { id: 'noon', text: 'Light the Noonwell', kind: 'flag', target: 'lit:noonwell', hint: 'Among the glass trees east of the crater.' },
+      { id: 'dusk', text: 'Light the Duskwell', kind: 'flag', target: 'lit:duskwell', hint: 'On the edge of Hollowpine, west of the crater.' },
+      { id: 'talk', text: 'Tell Tock how the light was turned', kind: 'talk', target: 'tock' },
+    ],
+    rewards: [
+      ['spyglass', 1],
+      ['gears', 1],
+    ],
+    after: ['tocks_workshop'],
+    auto: true,
+  },
+  {
     id: 'field_notes',
     title: 'Field Notes',
     main: false,
@@ -421,6 +440,12 @@ export const DIALOGUE: Record<string, Line[]> = {
     { speaker: 'Tock', text: 'Four ingots! Clean pours, too. You’ve got hands for this, you know.' },
     { speaker: 'Tock', text: 'Here. I reforged the old ship’s pick while you were out. Iron bites where stone just bounces.' },
     { speaker: 'Tock', text: 'The Meridian’s frame is sound. It’s the rest of the island that’s broken. Clocks, compasses, time. I can fix brass. I can’t fix that.' },
+    { speaker: 'Tock', text: 'Ilyr says the Veyr kept the sun in stone courts and turned it with crystal. Sunwells, Ilyr calls them. Find one, work it out, and tell me how.' },
+  ],
+  'tock:burning_glass:talk': [
+    { speaker: 'Tock', text: 'Prisms on bearings, a lens that drinks the sun, and a door that only opens for light that has been turned the right way. They built locks out of noon.' },
+    { speaker: 'Tock', text: 'I’ve been grinding glass the way you described. Two lenses, a brass tube and a great deal of swearing. Here.' },
+    { speaker: 'Tock', text: 'Hold it to your eye and look at something far away. If it’s worth the walk, you’ll know.' },
   ],
   'wren:field_notes:talk': [
     { speaker: 'Wren', text: 'Look at this primary feather. Notched, here. Every rook in that flock has the same notch, in the same place.' },

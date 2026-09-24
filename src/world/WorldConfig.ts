@@ -1,7 +1,7 @@
 // World-wide constants. Dependency-free: imported by the generator worker.
 
 /** Bump whenever generation output changes so cached worlds are rebuilt. */
-export const GEN_VERSION = 9;
+export const GEN_VERSION = 10;
 
 export const WORLD_SEED = 0x57111d;
 

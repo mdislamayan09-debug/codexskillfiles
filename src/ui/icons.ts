@@ -32,6 +32,7 @@ export const ICONS = {
   bedroll: svg('<rect x="3" y="11" width="18" height="7" rx="3.5"/><path d="M6.5 11V9.5A2.5 2.5 0 0 1 9 7h6"/>'),
   waterskin: svg('<path d="M9 4.5h6M10 4.5v3c-3 1-5 3.5-5 7a7 7 0 0 0 14 0c0-3.5-2-6-5-7v-3"/>'),
   lantern: svg('<path d="M9 4.5h6M12 2.5v2M8 7h8l-1 11H9z"/><path d="M12 10.5c1 1 1.5 2 1.5 3a1.5 1.5 0 0 1-3 0c0-1 .5-2 1.5-3z"/>'),
+  spyglass: svg('<path d="M3.5 15.5 15 9l2 3.6-11.5 6.4z"/><path d="M15 9l3.2-1.8 1.6 3-3 1.8"/><path d="M9.5 16.8 8 21M11 16l2.5 5"/>'),
   compass: svg('<circle cx="12" cy="12" r="8.5"/><path d="m15 9-2 4.5L9 15l2-4.5z"/>'),
   map: svg('<path d="M3.5 6.5 9 4.5l6 2 5.5-2v13l-5.5 2-6-2-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>'),
   landmark: svg('<path d="M12 3.5c3 0 5.5 2.4 5.5 5.5 0 4-5.5 11.5-5.5 11.5S6.5 13 6.5 9c0-3.1 2.5-5.5 5.5-5.5z"/><circle cx="12" cy="9" r="2"/>'),

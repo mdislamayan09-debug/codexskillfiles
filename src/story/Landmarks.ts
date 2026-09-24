@@ -267,9 +267,9 @@ export class Landmarks {
       id: `cache:${p.lm.id}`,
       position: new THREE.Vector3(x, y + 0.4, z),
       radius: 0.9,
-      prompt: () => (this.hooks.hasFlag(flag) ? null : { key: 'E', text: `Search the ${cache.container}` }),
+      prompt: () => (this.hooks.hasFlag(flag) || (cache.sealedBy && !this.hooks.hasFlag(cache.sealedBy)) ? null : { key: 'E', text: `Search the ${cache.container}` }),
       use: () => {
-        if (this.hooks.hasFlag(flag)) return;
+        if (this.hooks.hasFlag(flag) || (cache.sealedBy && !this.hooks.hasFlag(cache.sealedBy))) return;
         this.hooks.setFlag(flag);
         for (const [item, n] of cache.items) this.hooks.give(item, n);
         this.hooks.lore(cache.lore.id, cache.lore.title);
@@ -904,6 +904,10 @@ export class Landmarks {
     lanternfly_hollow(this: Landmarks, p) {
       for (let i = 0; i < 12; i += 1) this.rock(p, 'moss', 3600 + i, 'boulder', 0.8 + this.rng(), (this.rng() - 0.5) * 30, (this.rng() - 0.5) * 30, -0.3, 0.6);
     },
+    // The Sunwells build their own courts (Sunwells.ts); only the cache is set here.
+    dawnwell() {},
+    noonwell() {},
+    duskwell() {},
   };
 
   /** Night factor 0..1; `camera` for distance culling of the dynamic bits. */

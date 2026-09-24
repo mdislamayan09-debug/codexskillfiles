@@ -57,6 +57,8 @@ export class Hud {
   private readonly prompt: HTMLElement;
   private readonly crosshair: HTMLElement;
   private readonly lockMark: HTMLElement;
+  private readonly scope: HTMLElement;
+  private readonly scopeFocus: HTMLElement;
   private readonly notifications: HTMLElement;
   private readonly banner: HTMLElement;
   private readonly subtitle: HTMLElement;
@@ -130,6 +132,9 @@ export class Hud {
 
     this.crosshair = el('div', 'hud-crosshair', this.root);
     this.lockMark = el('div', 'hud-lock', this.root);
+    this.scope = el('div', 'hud-spyglass', this.root);
+    el('div', 'spy-ring', this.scope);
+    this.scopeFocus = el('div', 'spy-focus', this.scope);
     this.prompt = el('div', 'hud-prompt', this.root);
 
     // Hotbar.
@@ -194,6 +199,15 @@ export class Hud {
   setLock(at: { x: number; y: number } | null): void {
     this.lockMark.classList.toggle('show', at !== null);
     if (at) this.lockMark.style.transform = `translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px) rotate(45deg)`;
+  }
+
+  /** The spyglass: how far it is raised (0..1) and how long a place has been held in its sights. */
+  setSpyglass(raised: number, focus: number): void {
+    const show = raised > 0.002;
+    if (!show && !this.scope.classList.contains('show')) return;
+    this.scope.classList.toggle('show', show);
+    this.scope.style.opacity = raised.toFixed(3);
+    this.scopeFocus.style.setProperty('--focus', focus.toFixed(3));
   }
 
   setVisible(visible: boolean): void {

@@ -6,7 +6,7 @@ import type { IconName } from '../ui/icons';
 
 export type ItemCategory = 'resource' | 'tool' | 'weapon' | 'ammo' | 'food' | 'medicine' | 'placeable' | 'armor' | 'relic';
 
-export type ToolKind = 'axe' | 'pickaxe' | 'knife' | 'torch' | 'lantern' | 'spear' | 'bow' | 'club' | 'sword' | 'hammer' | 'waterskin' | 'sickle';
+export type ToolKind = 'axe' | 'pickaxe' | 'knife' | 'torch' | 'lantern' | 'spear' | 'bow' | 'club' | 'sword' | 'hammer' | 'waterskin' | 'sickle' | 'spyglass';
 
 export interface ToolStats {
   kind: ToolKind;
@@ -184,6 +184,7 @@ export const ITEMS: readonly ItemDef[] = [
   tool('waterskin', 'Waterskin', 'waterskin', 'Fill at any river or lake. Drink when thirsty.', { kind: 'waterskin', tier: 0, damage: 0, speed: 1, durability: 0, reach: 2 }),
   tool('echo_lantern', 'Echo Lantern', 'lantern', 'Captain Varga’s gift. It hums near things that remember.', { kind: 'lantern', tier: 0, damage: 0, speed: 1, durability: 0, reach: 2 }),
   tool('star_lantern', 'Starglass Lantern', 'lantern', 'Starmetal in a glass cage: a cold, clear light that reaches far into caves.', { kind: 'lantern', tier: 0, damage: 0, speed: 1, durability: 0, reach: 2 }),
+  tool('spyglass', 'Veyr Spyglass', 'spyglass', 'Tock’s brass tube and two ground lenses. Hold aim to look through it; a place held in its sights is marked on your map.', { kind: 'spyglass', tier: 0, damage: 0, speed: 1, durability: 0, reach: 2 }),
   tool('iron_axe', 'Iron Axe', 'axe', 'A proper axe. Hardwood is no longer a problem.', { kind: 'axe', tier: 2, damage: 20, speed: 1.6, durability: 400, reach: 2.5 }),
   tool('iron_pickaxe', 'Iron Pickaxe', 'pickaxe', 'Bites into iron, silver and obsidian.', { kind: 'pickaxe', tier: 2, damage: 17, speed: 1.4, durability: 400, reach: 2.5 }),
   tool('bone_sickle', 'Bone Sickle', 'knife', 'Harvests fiber, herbs and crops by the armful.', { kind: 'sickle', tier: 1, damage: 7, speed: 2.2, durability: 160, reach: 2 }),

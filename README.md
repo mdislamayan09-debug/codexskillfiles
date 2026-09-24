@@ -4,11 +4,128 @@
 
 An open-world survival adventure that runs in the browser. Your airship, the
 Meridian, came down inside a wall of light on the sea. The island within has
-been holding one note for a thousand years: nothing ages, nothing ends, and
+been holding one note for nine hundred years: nothing ages, nothing ends, and
 five vast Wardens guard the bells that keep it that way.
 
-Everything is made at runtime: terrain, forests, water, creatures, textures,
-music and sound. There are no downloaded assets.
+Everything is made at runtime: terrain, forests, water, sky, creatures,
+textures, music and sound. There are no downloaded assets.
+
+> **Picking the project up?** Read [`HANDOFF.md`](HANDOFF.md). It has
+> everything in one file: what is built, how it fits together, every file,
+> how it is tested, the rules, and the next steps in detail.
+
+---
+
+## The game plan
+
+**The goal:** the most beautiful, most curious open world we can make in a
+browser, at the highest realistic visual quality an M4 MacBook can run,
+with graphics presets from Low to Max.
+
+**The pillars** (from [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md)):
+
+1. **Curiosity is the engine.** Every minute or two of walking shows,
+   sounds or turns up something that asks a question.
+2. **A wilderness with memory.** Every place tells a story.
+3. **Survival is texture, not tax.** Needs create choices, never chores.
+4. **Earned mobility.** Progress means new ways to move and new places to
+   survive.
+5. **Small, dense, deliberate.** Two kilometres square, and nearly every
+   hill hides something.
+
+**How we build it:** milestone by milestone, so the game is playable and
+polished at the end of each one (plan: [`docs/ROADMAP.md`](docs/ROADMAP.md)).
+Every system is procedural, every random choice is seeded, and every feature
+lands with a test that drives the real game in a browser.
+
+| Milestone | What it means | Status |
+| --- | --- | --- |
+| M0 Pre-production | Design, roadmap, project scaffold | ✅ Done |
+| M1 Playable core | The island, rendering, movement, sound, HUD | ✅ Done |
+| M2 Survival and building | Needs, gathering, crafting, building, farming, saves | ✅ Done |
+| M3 Creatures and combat | Wildlife, birds, melee, archery, dodge, guard, parry | ✅ Done |
+| M4 World content | Landmarks, caves, curiosities, puzzles | 🟡 Almost: Sunwell puzzles being finished |
+| M5 Story and survivors | Survivors, main quest, side stories | ✅ Done (four of the seven survivors designed) |
+| M6 Wardens and endgame | Five Wardens, the Stillheart, the ending | ✅ Done (one of three endings) |
+| M7 Weather and world events | Weather, hazards, meteor showers, eclipses | ✅ Done |
+| M8 Polish and release | Settings, accessibility, performance, release | 🟡 Key rebinding and M4 frame timing left |
+
+---
+
+## Where we are now
+
+The whole game is playable from the crash to the ending, and the island is
+full of things to find.
+
+- **The island:** a 2 km island with seven biomes around a crater, built
+  from a seed with erosion, rivers, lakes, coast and a volcano. Day and
+  night, moon phases, volumetric clouds, regional weather (rain, storms,
+  fog, snow, ash) and northern lights.
+- **The look:** physically based sky and atmosphere, cascaded shadows,
+  ambient occlusion, god rays, bloom, filmic tone mapping, a real ocean,
+  procedural forests and dense grass. Five presets: **Low, Medium, High,
+  Extra High and Max**.
+- **Survival:** hunger, thirst, body temperature, wetness and stamina.
+  Gather, hunt, cook, craft (94 items, 61 recipes) and build timber houses
+  on a grid. Six crops to farm.
+- **Creatures and combat:** herds, hares, boars, crabs and night-hunting
+  duskhounds; flocks of birds. Melee with weak points, a bow whose arrows
+  fly, stick and can be recovered, a dodge, a guard, a parry and lock-on.
+- **The story:** find the crew (Captain Varga, Tock, Wren and Ilyr), tune
+  the Singing Stones, climb to the Rim, calm the five Wardens (Mossback,
+  Tidemother, Emberjaw, Rimebrow, Old Croak), ring the bells and walk down
+  into Hallowmere to release the note. Seven side quests.
+- **Places:** 28 landmarks with caches and journal pages, four caves you
+  walk into (dark without a torch), and about seventy curiosities between
+  them: carved cairns, lost packs, shrines and echo stones.
+- **Sky events:** meteor showers with a fallen star to find (its metal makes
+  a Starglass Lantern), and eclipses.
+- **Just added, being finished:** the three **Sunwells**, light puzzles
+  where you turn crystal prisms to carry a sunbeam to a vault door, and
+  Tock's side story *Burning Glass*, which rewards a **spyglass** that marks
+  far places on your map.
+- **Interface:** compass, map with fog of war, journal, inventory and
+  crafting, title screen, full settings, subtitles, colour-blind filters,
+  reduced motion, and full controller support.
+
+**Tests:** 66 unit tests, 14 browser playtests and 6 capture scripts. Typecheck is clean.
+
+**Known gaps:** landmark buildings are not yet solid (you can walk through
+their walls), frame rates have not been measured on a real M4, key
+rebinding is missing, and some of the design (three more survivors, the
+glider, two more endings) is not built yet.
+
+---
+
+## What we do next
+
+In order:
+
+1. **Finish the Sunwells.** Get their playtest passing end to end (it was
+   stopped part-way at hand-off), check them in the browser in daylight,
+   tune the beam and stonework, try the spyglass from a hilltop, and re-run every
+   playtest (several have not run since the last big feature commit).
+2. **Solid landmarks.** Give every building, wall, hull and statue
+   colliders, and let the player walk on steps, decks and floors.
+3. **Performance on the M4.** Measure each preset, make Extra High and Max
+   hold 60 fps where possible, add GPU timing to the diagnostics.
+4. **Visual polish.** Bark and forest edges, denser grass close up on High
+   and above, creature detail, wet surfaces in rain, better cave lighting.
+5. **Key rebinding** in Settings → Controls.
+6. **More puzzles:** echo bridges seen only through the Echo Lantern, wisp
+   chases, sealed glyph doors.
+7. **Three more survivors:** Pell, Sister Maudra and Corwin, with their
+   quests and what they do at camp.
+8. **Traversal gear:** the Wingsail glider, climbing picks, the Resonance
+   Hook.
+9. **The full ending:** Seren Vey at the Crown, and the Sustain and Retune
+   endings.
+10. **More world events:** the Wanderer colossus, time-slips, resonance
+    storms.
+11. **Tiers:** stone and reinforced building, fur and ashweave clothing.
+12. **Release:** host the production build as a website.
+
+---
 
 ## Running it
 
@@ -20,25 +137,24 @@ npm install
 npm run dev        # http://127.0.0.1:5188
 ```
 
-For the best experience build once and serve the production bundle:
+For the best experience, build once and serve the production bundle:
 
 ```sh
 npm run build
 npm run preview    # http://127.0.0.1:4188
 ```
 
-The first launch generates the island (a few seconds) and caches it; later
-launches start faster.
+The first launch generates the island and caches it; later launches start
+faster.
 
 ### Graphics on a Mac
 
-Quality is chosen automatically from your GPU and can be changed any time in
+Quality is chosen from your GPU and can be changed any time in
 **Settings → Graphics**: Low, Medium, High, Extra High and Max. On Apple
-silicon, **High** is the default. An M4 Pro or Max handles **Extra High**
-comfortably, and **Max** turns everything up: full-resolution volumetric
-clouds, the longest view distance and the densest forests. Use Safari or
-Chrome in full screen for the steadiest frame rate. Turn on
-**Show frame rate** in the same tab to compare presets.
+silicon, **High** is the default; an M4 Pro gets **Extra High** and an M4
+Max gets **Max**, which turns everything up: finer volumetric clouds, the
+longest view distance and the densest forests. Use Chrome or Safari in full
+screen, and turn on **Show frame rate** in the same tab to compare presets.
 
 ## Controls
 
@@ -48,10 +164,11 @@ Chrome in full screen for the steadiest frame rate. Turn on
 | Jump, climb hop | Space | A |
 | Sprint | Shift | Left stick press |
 | Crouch, let go of a wall | C | Right stick press |
-| Interact, gather, talk | E (hold E to dismantle a built piece) | X |
+| Interact, gather, talk, turn a prism | E (hold E to dismantle a built piece) | X |
 | Use, attack, place | Left mouse | Right trigger |
 | Draw a bow, loose | Hold left mouse, release (right mouse to take aim) | Hold right trigger, release (left trigger to aim) |
 | Guard (raise it just in time to parry) | Hold right mouse with a weapon or tool | Hold left trigger |
+| Look through the spyglass | Hold right mouse | Hold left trigger |
 | Dodge | Q or Left Alt | B |
 | Lock on to a target | T or middle mouse | D-pad right |
 | Hotbar | 1–8, mouse wheel | Bumpers |
@@ -65,59 +182,22 @@ Menus, the title screen and the inventory can be driven entirely with a
 controller: the d-pad or left stick moves between buttons, A selects, B goes
 back, and left/right adjusts sliders.
 
-## What's in the island
-
-- **Seven biomes and a crater** on a 2 km island: meadows, pine forest, glass
-  forest, coast, volcanic ash, frozen peaks and marsh, around the Stillheart.
-  Day and night, moon phases, volumetric clouds, regional weather (rain,
-  storms, fog, snow, ashfall) and northern lights over the Frostveil.
-- **Survival**: hunger, thirst, body temperature, wetness and stamina.
-  Gather, hunt, cook, craft tools and weapons, and build.
-- **Building**: campfires, beds, chests, stations, rain collectors, and timber
-  foundations, walls, doorways, floors, roofs and stairs that snap to a grid.
-  Floors and stairs are walkable; a roof keeps the rain off.
-- **Farming**: plant flax seeds, lanternberries, mushrooms, yarrow, moonmoss
-  or frostmint in a farm plot. Rain or a waterskin keeps them growing, and
-  berries and herbs fruit again after picking.
-- **Wildlife**: grazing herds, skittish hares, territorial boars, crabs on the
-  beaches and duskhounds that hunt at night. Aim for weak points. Rooks,
-  gulls, herons and snowfinches flock overhead and flush when you come near.
-- **Combat**: swing tools and weapons, dodge through blows, block with a
-  raised guard or parry with a well-timed one, and lock on to a target.
-- **Archery**: draw a bow and let fly. Arrows drop with distance, stick where
-  they land and can be pulled out again. Birds give the feathers to fletch
-  more.
-- **Caves**: walk into the Whispering Cave, the Crystal Grotto, the Lava Tubes
-  and the Ice Caves. It is dark underground, so bring a torch, and something
-  waits in each deep chamber.
-- **The story**: find the crew, tune the Singing Stones, climb to the Rim, then
-  seek the five Bellstones. Each is guarded by a Warden: Mossback in
-  Hollowpine, Tidemother on the coast, Emberjaw in the caldera forge,
-  Rimebrow on the frozen lake and Old Croak in the Choir Mire. Calm them,
-  ring the bells, and walk down into Hallowmere.
-- **Side stories**: help Tock set up a workshop, fill Wren's field notes and
-  listen in the caves for Ilyr.
-- **Sky events**: some nights bring meteor showers, and a fallen star to
-  find before dawn. Some afternoons, an eclipse.
-- **Discovery**: a parchment map with fog of war, a compass that learns
-  landmarks as you see them, a journal of quests, places and lore, and
-  caches to search at the island's named places. Between them, about
-  seventy curiosities: carved cairns, lost packs, shrines and echo stones.
-- **Difficulty**: Explorer keeps your pack when you fall, Survivor drops it
-  where you fell, Harsh loses it.
-- **Accessibility**: remappable sensitivity, invert look, toggle sprint and
-  crouch, reduced motion, colour-blind filters, interface scale, HUD opacity,
-  subtitles and full controller support.
-
 ## For developers
 
 ```sh
-npm run typecheck           # TypeScript
-npm test                    # unit tests (vitest)
-node scripts/playtest.mjs   # browser playtests (see scripts/), dev server running
+npm run typecheck                      # TypeScript
+npm test                               # unit tests (vitest)
+node scripts/playtest-sunwells.mjs     # a browser playtest; needs npm run dev
 ```
 
-The browser playtests drive the real game through
-`window.__THREE_GAME_TEST_HOOKS__` in a headless Chromium and write
-screenshots to `artifacts/`. `docs/GAME_DESIGN.md` is the design,
-`docs/ROADMAP.md` the plan, and `docs/PROGRESS.md` where things stand.
+The browser playtests in `scripts/` drive the real game through
+`window.__THREE_GAME_TEST_HOOKS__` in headless Chromium and write
+screenshots to `artifacts/playtest/`.
+
+| Document | What it is |
+| --- | --- |
+| [`HANDOFF.md`](HANDOFF.md) | Everything about the project in one file |
+| [`CLAUDE.md`](CLAUDE.md) | Working notes for Claude Code sessions |
+| [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) | The full design |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | The milestone plan |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | Status of every roadmap item and how it is tested |

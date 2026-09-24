@@ -45,6 +45,8 @@ export class MapScreen {
   private player = { x: 0, z: 0, yaw: 0 };
   private discovered = new Set<string>();
   private seen = new Set<string>();
+  /** Places spotted through the spyglass: named before they are reached. */
+  private named = new Set<string>();
   private readonly legend: HTMLElement;
 
   constructor(parent: HTMLElement, private readonly world: WorldData, private readonly onClose: () => void) {
@@ -127,11 +129,12 @@ export class MapScreen {
     }
   }
 
-  show(player: { x: number; z: number; yaw: number }, discovered: Set<string>, seen: Set<string>): void {
+  show(player: { x: number; z: number; yaw: number }, discovered: Set<string>, seen: Set<string>, named: Set<string> = new Set()): void {
     this.open = true;
     this.player = player;
     this.discovered = discovered;
     this.seen = seen;
+    this.named = named;
     this.centerX = player.x;
     this.centerZ = player.z;
     if (!this.base) this.base = this.paintBase();
@@ -317,7 +320,7 @@ export class MapScreen {
     // Landmarks.
     for (const lm of LANDMARKS) {
       const known = this.discovered.has(lm.id);
-      const spotted = this.seen.has(lm.id);
+      const spotted = this.seen.has(lm.id) || this.named.has(lm.id);
       if (!known && !spotted) continue;
       const [sx, sy] = toScreen(lm.x, lm.z);
       g.fillStyle = known ? 'rgba(90, 40, 24, 0.95)' : 'rgba(90, 60, 40, 0.6)';
@@ -326,7 +329,7 @@ export class MapScreen {
       g.fill();
       g.font = `${known ? 600 : 400} ${Math.round(12 * dpr)}px 'Cormorant Garamond', Georgia, serif`;
       g.fillStyle = 'rgba(50, 30, 16, 0.9)';
-      g.fillText(known ? lm.name : '?', sx, sy - 11 * dpr);
+      g.fillText(known || this.named.has(lm.id) ? lm.name : '?', sx, sy - 11 * dpr);
     }
     // Pins.
     for (const p of this.pins) {

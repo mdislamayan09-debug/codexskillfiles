@@ -263,8 +263,8 @@ export class Gathering {
       return true;
     }
     const tool = this.heldTool();
-    // Bows are drawn and loosed (see Archery), never swung.
-    if (!tool || tool.kind === 'bow' || this.swingTimer > 0) return false;
+    // Bows are drawn and loosed (see Archery), never swung; a spyglass is looked through.
+    if (!tool || tool.kind === 'bow' || tool.kind === 'spyglass' || this.swingTimer > 0) return false;
     // Start a swing; the hit lands partway through.
     this.swingTimer = 1;
     this.pendingHit = 0.55;

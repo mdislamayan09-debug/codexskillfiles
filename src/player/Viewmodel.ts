@@ -268,6 +268,21 @@ export class Viewmodel {
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.05, 8), m.leather);
       neck.position.y = 0.16;
       g.add(bag, neck);
+    } else if (kind === 'spyglass') {
+      // A leather-bound brass draw-tube, eyepiece toward you.
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.22, 14), m.leather);
+      const draw = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.027, 0.15, 14), m.brass);
+      draw.position.y = 0.17;
+      const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.021, 0.05, 12), m.brass);
+      eye.position.y = 0.265;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 6, 18), m.brass);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = -0.11;
+      const tube = new THREE.Group();
+      tube.add(body, draw, eye, rim);
+      tube.rotation.x = Math.PI / 2 - 0.12;
+      tube.position.set(0, 0.03, -0.04);
+      g.add(tube);
     } else if (kind === 'bow') {
       // Drawn by the bow rig (see poseBow); the fist holds nothing.
     } else if (def.category === 'food' || def.category === 'medicine') {

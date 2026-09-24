@@ -38,6 +38,7 @@ import { StoryWorld } from '../story/StoryWorld';
 import { Stillheart } from '../story/Stillheart';
 import { Landmarks } from '../story/Landmarks';
 import { Curiosities } from '../story/Curiosities';
+import { Sunwells } from '../story/Sunwells';
 import { Caves } from '../world/Caves';
 import { eclipseAt, SkyEvents } from '../world/SkyEvents';
 import { BELL_MEMORIES, CAVE_ECHOES, DIALOGUE, EPILOGUE, TUNING_ORDER } from '../story/StoryData';
@@ -122,6 +123,15 @@ export class Game {
   landmarks!: Landmarks;
   caves!: Caves;
   curiosities!: Curiosities;
+  sunwells!: Sunwells;
+  /** The spyglass: how far it is raised, the place in its sights and for how long. */
+  private spyZoom = 0;
+  private spyTarget: string | null = null;
+  private spyHold = 0;
+  private testSpyglass = false;
+  private readonly spyEye = new THREE.Vector3();
+  private readonly spyDir = new THREE.Vector3();
+  private readonly spyTo = new THREE.Vector3();
   sky!: SkyEvents;
   /** The player is underground in a cave (floor and walls come from it). */
   private inCave = false;
@@ -407,6 +417,19 @@ export class Game {
     });
     for (const material of this.curiosities.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.curiosities.group);
+    this.sunwells = new Sunwells(this.world, this.story.interactables, {
+      hasFlag: (flag) => this.quests.flags.has(flag),
+      setFlag: (flag) => this.quests.setFlag(flag),
+      say: (speaker, text, seconds = 5) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
+      turned: (index, x, y, z) => this.audio.prismTurn(index, x, y, z),
+      opened: (_id, name) => {
+        this.audio.sunwellOpen();
+        this.events.emit('notify', { text: `The light reaches the door of ${name}`, icon: 'sun', tone: 'good' });
+      },
+      sunlight: () => this.sunlight(),
+    });
+    for (const material of this.sunwells.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.sunwells.group);
     // The Hollow Elder: an ancient oak grown by the forest itself.
     const elder = LANDMARKS.find((l) => l.id === 'hollow_elder');
     if (elder) {
@@ -605,6 +628,7 @@ export class Game {
         for (const c of this.wardens.colliders()) if (Math.hypot(c.x - x, c.z - z) < r + c.radius) out.push(c);
         this.building.collidersNear(x, z, r, out);
         this.stillheart.collidersNear(x, z, r, out);
+        this.sunwells?.collidersNear(x, z, r, out);
         return out;
       },
       surface: (x, z) => this.surfaceAt(x, z),
@@ -906,6 +930,8 @@ export class Game {
     } else {
       this.inventory.add('berries', 4);
     }
+    // Solved Sunwells come back solved; a fresh game finds them shut.
+    this.sunwells?.sync();
     this.hud.setVisible(!intro);
     this.pipeline.resetExposure();
     this.view.update(0, this.player, this.camera, this.viewOptions());
@@ -1042,7 +1068,8 @@ export class Game {
 
   private openMap(): void {
     const p = this.player.position;
-    this.mapScreen.show({ x: p.x, z: p.z, yaw: this.player.yaw }, this.discovered, this.seen);
+    const named = new Set(LANDMARKS.filter((l) => this.quests.flags.has(`spotted:${l.id}`)).map((l) => l.id));
+    this.mapScreen.show({ x: p.x, z: p.z, yaw: this.player.yaw }, this.discovered, this.seen, named);
     this.input.gameplayEnabled = false;
     this.input.exitPointerLock();
     this.audio.ui('open');
@@ -1209,7 +1236,7 @@ export class Game {
     const alive = this.survival.alive;
     const held = this.inventory.held;
     const tool = held ? itemDef(held.id).tool : undefined;
-    const guardable = !!tool && !['bow', 'torch', 'lantern', 'waterskin'].includes(tool.kind);
+    const guardable = !!tool && !['bow', 'torch', 'lantern', 'waterskin', 'spyglass'].includes(tool.kind);
     this.combat.update(dt, alive && canAct && guardable && input.isDown('aim') && this.player.state === 'ground' && this.gathering.swingProgress <= 0);
     if (alive && canAct && input.wasPressed('dodge') && this.player.state === 'ground') {
       // Along the stick or keys; straight back when standing still.
@@ -1591,7 +1618,9 @@ export class Game {
   private viewOptions() {
     const s = this.settings.all;
     const zoom = this.archery && this.mode === 'play' ? 1 - this.archery.draw * (this.input.isDown('aim') ? 0.28 : 0.08) : 1;
-    return { fov: s.fov * zoom, headBob: s.headBob, shake: s.cameraShake, reducedMotion: s.reducedMotion || this.reducedMotion };
+    // A spyglass narrows the view to about a quarter.
+    const spy = this.mode === 'play' ? 1 - this.spyZoom * 0.76 : 1;
+    return { fov: s.fov * zoom * spy, headBob: s.headBob && this.spyZoom < 0.5, shake: s.cameraShake, reducedMotion: s.reducedMotion || this.reducedMotion };
   }
 
   // -------------------------------------------------------------------------
@@ -1686,8 +1715,10 @@ export class Game {
     }
     if (alive) {
       input.look(dt, this.look);
-      this.player.yaw -= this.look.x;
-      this.player.pitch = clamp(this.player.pitch - this.look.y, -1.52, 1.52);
+      // Looking through the spyglass steadies the hand.
+      const steady = 1 - this.spyZoom * 0.72;
+      this.player.yaw -= this.look.x * steady;
+      this.player.pitch = clamp(this.player.pitch - this.look.y * steady, -1.52, 1.52);
       input.movement(this.move);
       this.intent.moveX = this.move.x;
       this.intent.moveY = this.move.y;
@@ -1704,6 +1735,7 @@ export class Game {
       this.intent.crouch = false;
     }
     this.updateDefence(dt, alive && (this.input.pointerLocked || this.testInput));
+    this.updateSpyglass(dt, alive && (this.input.pointerLocked || this.testInput));
     this.player.update(dt, this.intent);
     this.updateCaveState();
     this.updateHush();
@@ -1943,7 +1975,7 @@ export class Game {
     this.vegetation.update(this.camera);
     this.props.update(this.camera);
     // Hands come up once the survivor is on their feet.
-    this.viewmodel.root.visible = this.mode === 'play' && this.survival.alive && this.wake < 0 && !this.introHold;
+    this.viewmodel.root.visible = this.mode === 'play' && this.survival.alive && this.wake < 0 && !this.introHold && this.spyZoom < 0.6;
     if (this.mode === 'play') {
       const held = this.inventory.held;
       this.viewmodel.update(dt, {
@@ -2018,6 +2050,7 @@ export class Game {
     this.landmarks.update(dt, night, this.camera.position);
     this.caves.update(dt, this.camera.position);
     this.curiosities.update(dt);
+    this.sunwells.update(dt, this.camera);
     this.sky.update(dt, this.clock.day, this.clock.hours, this.camera.position, this.player?.position.x ?? 0, this.player?.position.z ?? 0);
     if (this.mode === 'play') {
       // Tell the player to look up, once each time.
@@ -2029,6 +2062,60 @@ export class Game {
       if (this.sky.showering(this.clock.day, this.clock.hours)) announce(`shower:${this.clock.hours < 12 ? this.clock.day - 1 : this.clock.day}`, 'Stars are falling tonight');
       if (eclipseAt(this.clock.day, this.clock.hours, this.sky.forceEclipse) > 0.3) announce(`eclipse:${this.clock.day}`, 'The sun is going dark');
     }
+  }
+
+  /** How strongly the sun shines: 0 at night and under an eclipse. */
+  private sunlight(): number {
+    const eclipse = eclipseAt(this.clock.day, this.clock.hours, this.sky?.forceEclipse ?? false);
+    return THREE.MathUtils.smoothstep(this.sunDir.y, -0.02, 0.1) * (1 - 0.97 * eclipse);
+  }
+
+  /**
+   * The spyglass: hold aim (or the attack button) to raise it. A named place
+   * held in its sights for a moment is marked, with its name, on the compass
+   * and the map. Reaching it still discovers it.
+   */
+  private updateSpyglass(dt: number, canAct: boolean): void {
+    const held = this.inventory.held;
+    const has = !!held && itemDef(held.id).tool?.kind === 'spyglass';
+    const raise = has && canAct && this.survival.alive && this.player.state !== 'swim' && (this.testSpyglass || this.input.isDown('aim') || this.input.isDown('attack'));
+    this.spyZoom = THREE.MathUtils.damp(this.spyZoom, raise ? 1 : 0, 9, dt);
+    if (!raise && this.spyZoom < 0.01) this.spyZoom = 0;
+    let target: (typeof LANDMARKS)[number] | null = null;
+    if (this.spyZoom > 0.85) {
+      const eye = this.camera.getWorldPosition(this.spyEye);
+      const fwd = this.camera.getWorldDirection(this.spyDir);
+      let best = Infinity;
+      for (const lm of LANDMARKS) {
+        if (lm.kind === 'crater' || this.discovered.has(lm.id) || this.quests.flags.has(`spotted:${lm.id}`)) continue;
+        const to = this.spyTo.set(lm.x - eye.x, this.world.groundAt(lm.x, lm.z) + 4 - eye.y, lm.z - eye.z);
+        const d = to.length();
+        if (d < 60 || d > 2400) continue;
+        to.divideScalar(d);
+        // Big places are easier to hold in the sights.
+        const size = (lm.pad?.radius ?? lm.mound?.radius ?? 14) + 6;
+        const off = Math.acos(THREE.MathUtils.clamp(to.dot(fwd), -1, 1));
+        if (off > Math.max(Math.atan(size / d), 0.012) || off >= best) continue;
+        // Nothing but air between: hills hide what lies behind them.
+        if (this.world.raycast(eye, to, d - size) >= 0) continue;
+        best = off;
+        target = lm;
+      }
+    }
+    if ((target?.id ?? null) !== this.spyTarget) this.spyHold = 0;
+    this.spyTarget = target?.id ?? null;
+    if (target) {
+      this.spyHold += dt;
+      if (this.spyHold >= 0.8) {
+        this.quests.setFlag(`spotted:${target.id}`);
+        this.seen.add(target.id);
+        this.events.emit('notify', { text: `Spotted · ${target.name}`, icon: 'spyglass', tone: 'info' });
+        this.audio.ui('click');
+        this.spyTarget = null;
+        this.spyHold = 0;
+      }
+    }
+    this.hud.setSpyglass(this.spyZoom, this.spyTarget ? Math.min(1, this.spyHold / 0.8) : 0);
   }
 
   /** Northern lights over the Frostveil, strongest at the Aurora Overlook. */
@@ -2168,12 +2255,13 @@ export class Game {
     const p = this.player.position;
     this.markers.length = 0;
     for (const lm of LANDMARKS) {
-      if (!this.seen.has(lm.id)) continue;
+      const spotted = this.quests.flags.has(`spotted:${lm.id}`);
+      if (!this.seen.has(lm.id) && !spotted) continue;
       const dx = lm.x - p.x;
       const dz = lm.z - p.z;
       const distance = Math.hypot(dx, dz);
-      if (distance < 12 || distance > 900) continue;
-      this.markers.push({ id: lm.id, bearing: bearingOf(dx, dz), distance, kind: 'landmark', label: this.discovered.has(lm.id) ? lm.name : undefined });
+      if (distance < 12 || distance > (spotted ? 2600 : 900)) continue;
+      this.markers.push({ id: lm.id, bearing: bearingOf(dx, dz), distance, kind: 'landmark', label: this.discovered.has(lm.id) || spotted ? lm.name : undefined });
     }
     for (const d of this.structures.all) {
       if (d.type !== 'satchel') continue;
@@ -2620,6 +2708,21 @@ export class Game {
       },
       caves: () => this.caves.debugCaves(),
       curiosities: () => this.curiosities.list.map((c) => ({ ...c, found: this.quests.flags.has(`found:${c.id}`) })),
+      sunwells: () => this.sunwells.debug(),
+      /** Turn a Sunwell prism a quarter clockwise, `times` over. */
+      turnPrism: (id: string, index: number, times = 1) => {
+        const s = this.sunwells.sites.findIndex((w) => w.layout.id === id);
+        if (s < 0) throw new Error(`Unknown sunwell ${id}`);
+        for (let k = 0; k < times; k += 1) this.sunwells.turnPrism(s, index);
+        return this.sunwells.debug()[s];
+      },
+      /** Raise or lower the spyglass as if aim were held. */
+      raiseSpyglass: (on: boolean) => {
+        this.testSpyglass = on;
+        this.testInput = true;
+        return { zoom: this.spyZoom, target: this.spyTarget, hold: this.spyHold };
+      },
+      spyglass: () => ({ zoom: this.spyZoom, target: this.spyTarget, hold: this.spyHold }),
       /** Force a meteor shower tonight, or a star to fall now. */
       skyEvent: (kind: 'shower' | 'fall' | 'eclipse' | 'clear') => {
         if (kind === 'shower') this.sky.forceShower = true;

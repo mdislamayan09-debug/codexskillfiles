@@ -2,6 +2,8 @@
 // gives, and the journal page it adds. Pure data (no rendering), so tests
 // can check every item and landmark it names.
 
+import { SUNWELL_LAYOUTS, vaultSpot } from './sunwellLogic';
+
 export interface LandmarkLore {
   id: string;
   title: string;
@@ -12,10 +14,30 @@ export interface LandmarkCache {
   items: [string, number][];
   container: string;
   lore: LandmarkLore;
+  /** A story flag that must be set before the cache can be reached. */
+  sealedBy?: string;
 }
 
 /** Caches: what each place gives, and the journal page it holds. */
 export const CACHES: Record<string, LandmarkCache> = {
+  dawnwell: {
+    container: 'Veyr sun-casket',
+    sealedBy: 'lit:dawnwell',
+    items: [['heartsong', 1], ['songstone', 3], ['glass_petal', 2]],
+    lore: { id: 'lore:dawnwell', title: 'The First Light', text: 'The Veyr tuned the Choir by the sun. At the Dawnwell the first light of the day was caught and sent across the court, and the choirmasters took their note from the colour it made on the door.' },
+  },
+  noonwell: {
+    container: 'Veyr sun-casket',
+    sealedBy: 'lit:noonwell',
+    items: [['heartsong', 1], ['iron_ingot', 3], ['gears', 1]],
+    lore: { id: 'lore:noonwell', title: 'Noon, Held', text: 'At the Noonwell the light was turned again and again before it was let near the door. The Veyr believed light remembers every turn it takes, and that a well-turned beam carries a clearer note.' },
+  },
+  duskwell: {
+    container: 'Veyr sun-casket',
+    sealedBy: 'lit:duskwell',
+    items: [['heartsong', 1], ['star_shard', 2], ['songstone', 4]],
+    lore: { id: 'lore:duskwell', title: 'The Last Light', text: 'The Duskwell caught the end of the day. On the day the note began, its keepers turned the prisms for the evening chord, and the evening never came. The light has been waiting at the door ever since.' },
+  },
   whispering_cave: {
     container: 'Veyr breath-urn',
     items: [['flint', 4], ['rope', 2], ['songstone', 1]],
@@ -147,6 +169,8 @@ export const LANDMARK_LORE: readonly LandmarkLore[] = Object.values(CACHES).map(
 
 /** Where each cache sits relative to its landmark (dx, dz, lift). */
 export const CACHE_SPOTS: Record<string, [number, number, number?]> = {
+  // Inside each Sunwell's vault, behind the door.
+  ...Object.fromEntries(SUNWELL_LAYOUTS.map((l) => [l.id, vaultSpot(l)])),
   whispering_cave: [1.2, -2.2],
   old_aqueduct: [2.5, 1.5],
   poppy_hill: [1.4, -0.8],
