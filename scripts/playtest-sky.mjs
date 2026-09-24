@@ -4,8 +4,8 @@
 // it, its metal is gathered, and a Starglass Lantern made from it lights a
 // cave. Saves the sky and the find as pictures.
 // Usage: node scripts/playtest-sky.mjs [--quality low]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -16,11 +16,7 @@ const url = arg('url', 'http://127.0.0.1:5188');
 const quality = arg('quality', 'low');
 const out = arg('out', 'artifacts/playtest/sky');
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = [];
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));

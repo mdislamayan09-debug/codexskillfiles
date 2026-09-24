@@ -2,8 +2,8 @@
 // All five Wardens: for each, a portrait asleep and awake, a leg knot broken,
 // a heart strike while it reels, calmed, its Bellstone rung and its trophy.
 // Usage: node scripts/playtest-wardens.mjs [--quality low] [--only tidemother]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -15,11 +15,7 @@ const quality = arg('quality', 'low');
 const only = arg('only', '');
 const out = arg('out', 'artifacts/playtest');
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = [];
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));

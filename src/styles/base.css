@@ -20,6 +20,14 @@
   box-sizing: border-box;
 }
 
+/* Captures and playtests step time frame by frame; a fade would still be
+   half-way when the screenshot is taken. */
+[data-capture] *,
+[data-capture] *::before,
+[data-capture] *::after {
+  transition: none !important;
+}
+
 html,
 body {
   margin: 0;

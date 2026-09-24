@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 // Renders baked texture-array layers to PNGs for inspection.
 // Usage: node scripts/show-textures.mjs foliage:2,bark:0 [--url http://127.0.0.1:5188]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 const list = (process.argv[2] ?? 'foliage:2').split(',');
 const url = process.argv.includes('--url') ? process.argv[process.argv.indexOf('--url') + 1] : 'http://127.0.0.1:5188';
 mkdirSync('artifacts/captures/textures', { recursive: true });
-const pre = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch(existsSync(pre) ? { executablePath: pre } : { channel: 'chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
 await page.goto(`${url}/?quality=low&capture=1`);
 await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 240000, polling: 500 });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createRng } from '../core/rng';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
 import { getRockTexture } from '../render/props/rockTexture';
@@ -21,6 +22,25 @@ import { doorSpot, DX, DZ, isSolved, solveSunwell, SUNWELL_CELL, SUNWELL_LAYOUTS
 const BEAM_Y = 1.35;
 const TURN_TIME = 0.32;
 const DOOR_TIME = 3.2;
+/** Specks of dust drifting through each court's light. */
+const MOTES = 48;
+
+/** A soft round glow, white at the middle, for flares and dust. */
+function glowTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.18, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.12)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
 
 export interface SunwellHooks {
   hasFlag(flag: string): boolean;
@@ -68,6 +88,13 @@ interface Site {
   /** Beam path in world space, for tests and the HUD. */
   path: THREE.Vector3[];
   end: string;
+  /** Prisms the light reaches, in order. */
+  lit: number[];
+  /** Dust in the light: along the beam (0..1), angle and distance off its axis, twinkle phase. */
+  motes: THREE.Points;
+  moteSeeds: Float32Array;
+  /** Glows where the light gathers: the lens, each lit prism, the sun on the door. */
+  flares: THREE.Sprite[];
 }
 
 function mat(color: number, roughness = 0.85, metalness = 0, emissive = 0, emissiveIntensity = 1): THREE.MeshStandardMaterial {
@@ -94,6 +121,9 @@ export class Sunwells {
   };
   private readonly beamMaterial: THREE.ShaderMaterial;
   private readonly beamGeometry: THREE.CylinderGeometry;
+  private readonly glow = glowTexture();
+  private readonly flareMaterial: THREE.SpriteMaterial;
+  private readonly moteMaterial: THREE.PointsMaterial;
   private time = 0;
 
   constructor(
@@ -111,29 +141,35 @@ export class Sunwells {
       lit: mat(0xfff0c8, 0.05, 0, 0xffc860, 3.2),
       lens: mat(0x2a2010, 0.08, 0.2, 0xffd890, 0.2),
       disc: mat(0xa8844a, 0.3, 1, 0xffb040, 0),
-      moss: mat(0x3e5230, 0.97),
+      moss: mat(0x6b7a3e, 0.97),
     };
     for (const m of Object.values(this.m)) this.materials.push(m);
     const stone = getStoneTextures();
     applyTriplanar(this.m.stone, stone.masonry, 2.4, 1);
     applyTriplanar(this.m.dark, stone.masonry, 1.8, 1.2);
-    applyTriplanar(this.m.paving, stone.masonry, 3.2, 0.9);
+    // Each flagstone is one great slab: a jointless worn face, tiled at a
+    // size that is not the cell's, so no two slabs look alike.
+    applyTriplanar(this.m.paving, stone.slab, 4.3, 0.9);
     applyTriplanar(this.m.rock, getRockTexture(), 2.6, 1.2);
 
-    // The beam: a bright core that fades at its edges, with a slow shimmer
-    // running along it like heat.
+    // The beam: a hot, narrow core inside a soft sheath of lit air, with a
+    // slow shimmer running along it like heat. The cylinder is wide; how far
+    // across it a pixel looks decides how bright it is.
     this.beamMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntensity: { value: 1 } },
       vertexShader: /* glsl */ `
         varying vec3 vN;
         varying vec3 vView;
-        varying vec3 vWorld;
+        varying vec3 vAxis;
+        varying float vAlong;
         void main() {
           vec4 world = modelMatrix * vec4(position, 1.0);
-          vWorld = world.xyz;
+          vec3 axis = normalize(modelMatrix[2].xyz);
+          vAlong = dot(world.xyz, axis);
           vec4 mv = viewMatrix * world;
           vN = normalize(normalMatrix * normal);
           vView = normalize(-mv.xyz);
+          vAxis = normalize(mat3(viewMatrix) * axis);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
@@ -141,13 +177,25 @@ export class Sunwells {
         uniform float uIntensity;
         varying vec3 vN;
         varying vec3 vView;
-        varying vec3 vWorld;
+        varying vec3 vAxis;
+        varying float vAlong;
         void main() {
-          float facing = abs(dot(normalize(vN), normalize(vView)));
-          float core = pow(facing, 5.0);
-          float halo = pow(facing, 1.6) * 0.35;
-          float shimmer = 0.82 + 0.18 * sin(dot(vWorld, vec3(3.1, 1.7, 2.9)) - uTime * 5.0);
-          vec3 col = vec3(1.0, 0.86, 0.58) * (core * 2.4 + halo) * shimmer * uIntensity;
+          // Seen at a slant, the eye's line runs partly along the beam; only
+          // the part across it says how near this pixel is to the axis.
+          vec3 axis = normalize(vAxis);
+          vec3 view = normalize(vView);
+          vec3 perp = view - axis * dot(view, axis);
+          float slant = length(perp);
+          float facing = abs(dot(normalize(vN), perp / max(slant, 1e-4)));
+          // 0 looking through the axis, 1 at the rim.
+          float across = sqrt(max(0.0, 1.0 - facing * facing));
+          float core = exp(-across * across / 0.016);
+          float sheath = exp(-across * across / 0.2);
+          float shimmer = 0.8 + 0.2 * sin(vAlong * 2.3 - uTime * 3.1) * sin(vAlong * 0.7 + uTime * 1.3);
+          // Straight down the axis there is no across; the flares at the
+          // ends carry the light there.
+          float endOn = smoothstep(0.03, 0.2, slant);
+          vec3 col = vec3(1.0, 0.83, 0.55) * (core * 16.0 + sheath * 0.9) * shimmer * endOn * uIntensity;
           gl_FragColor = vec4(col, 1.0);
         }`,
       transparent: true,
@@ -156,9 +204,11 @@ export class Sunwells {
       toneMapped: false,
       fog: false,
     });
-    this.beamGeometry = new THREE.CylinderGeometry(0.16, 0.16, 1, 10, 1, true);
+    this.beamGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 16, 1, true);
     this.beamGeometry.translate(0, 0.5, 0);
     this.beamGeometry.rotateX(Math.PI / 2);
+    this.flareMaterial = new THREE.SpriteMaterial({ map: this.glow, color: 0xffd79a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false, fog: false });
+    this.moteMaterial = new THREE.PointsMaterial({ map: this.glow, size: 0.06, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false, fog: false });
 
     for (const layout of SUNWELL_LAYOUTS) {
       const lm = LANDMARKS.find((l) => l.id === layout.id);
@@ -242,6 +292,10 @@ export class Sunwells {
       colliders,
       path: [],
       end: 'held',
+      lit: [],
+      motes: new THREE.Points(new THREE.BufferGeometry(), this.moteMaterial),
+      moteSeeds: new Float32Array(MOTES * 4),
+      flares: [],
     };
     const L = SUNWELL_CELL;
     const extent = PARAPET * L;
@@ -253,9 +307,27 @@ export class Sunwells {
       g.translate(x, yy, z);
       add(m, g);
     };
+    // Moss grows in low cushions where feet never go: against the foot of
+    // the walls and round the pillars.
+    const cushion = (x: number, z: number, s: number) => {
+      const g = mergeVertices(new THREE.IcosahedronGeometry(1, 1).deleteAttribute('normal').deleteAttribute('uv'));
+      const pos = g.getAttribute('position') as THREE.BufferAttribute;
+      const a = rng() * 10;
+      for (let i = 0; i < pos.count; i += 1) {
+        const vx = pos.getX(i);
+        const vy = pos.getY(i);
+        const vz = pos.getZ(i);
+        const lump = 0.8 + 0.2 * Math.sin(vx * 3.1 + a) * Math.cos(vz * 2.7 + a * 1.3);
+        pos.setXYZ(i, vx * s * lump, Math.max(-0.2, vy) * s * 0.2 * lump, vz * s * 0.8 * lump);
+      }
+      g.computeVertexNormals();
+      g.rotateY(rng() * Math.PI);
+      g.translate(x, y + 0.02, z);
+      add(this.m.moss, g);
+    };
 
     // Flagstones: one great slab per cell, a border of smaller ones, each
-    // settled a little differently. Moss creeps in at the edges.
+    // settled a little differently.
     for (let r = -1; r <= layout.size; r += 1) {
       for (let c = -1; c <= layout.size; c += 1) {
         const border = r < 0 || c < 0 || r >= layout.size || c >= layout.size;
@@ -264,9 +336,9 @@ export class Sunwells {
         const sink = border ? rng() * 0.08 : rng() * 0.03;
         if (border) {
           for (let k = 0; k < 4; k += 1) {
-            if (rng() < 0.12) continue;
             const ox = (k % 2 === 0 ? -0.5 : 0.5) * L * 0.5;
             const oz = (k < 2 ? -0.5 : 0.5) * L * 0.5;
+            if (rng() < 0.12) continue;
             box(this.m.paving, L * 0.48, 0.3, L * 0.48, w.x + ox, y - 0.12 - sink, w.z + oz, rng() * 0.06 - 0.03, (rng() - 0.5) * tilt, (rng() - 0.5) * tilt);
           }
         } else {
@@ -275,7 +347,6 @@ export class Sunwells {
           box(this.m.brass, L * 0.96, 0.02, 0.05, w.x, y + 0.065 - sink, w.z);
           box(this.m.brass, 0.05, 0.02, L * 0.96, w.x, y + 0.065 - sink, w.z);
         }
-        if (border && rng() < 0.35) box(this.m.moss, L * 0.4 * (0.5 + rng()), 0.04, L * 0.3 * (0.5 + rng()), w.x + (rng() - 0.5) * 1.5, y + 0.05, w.z + (rng() - 0.5) * 1.5, rng() * 3);
       }
     }
 
@@ -304,6 +375,7 @@ export class Sunwells {
         box(this.m.stone, side % 2 === 0 ? L : 0.7, h + (y - base), side % 2 === 0 ? 0.7 : L, x, base + (h + (y - base)) / 2, z);
         if (!broken) box(this.m.dark, side % 2 === 0 ? L + 0.04 : 0.86, 0.14, side % 2 === 0 ? 0.86 : L + 0.04, x, y + h + 0.07, z);
         else box(this.m.stone, 0.5 + rng() * 0.4, 0.35, 0.4 + rng() * 0.3, x + tx * (rng() - 0.5) * 2 + nx * 1.1, y + 0.1, z + tz * (rng() - 0.5) * 2 + nz * 1.1, rng() * 3, rng() * 0.4);
+        if (!broken && rng() < 0.3) cushion(x - nx * 0.45 + tx * (rng() - 0.5) * 2.4, z - nz * 0.45 + tz * (rng() - 0.5) * 2.4, 0.35 + rng() * 0.3);
         for (let s = -1; s <= 1; s += 1) colliders.push({ x: x + tx * s * L * 0.34, z: z + tz * s * L * 0.34, radius: 0.55, height: h + 0.3, baseY: y - 0.5 });
       }
     }
@@ -340,6 +412,7 @@ export class Sunwells {
       box(this.m.stone, 0.8, h, 0.8, w.x, y + 0.3 + h / 2, w.z, rng() * 0.08);
       box(this.m.stone, 0.95, 0.18, 0.95, w.x, y + 0.3 + h * 0.62, w.z);
       colliders.push({ x: w.x, z: w.z, radius: 0.62, height: h + 0.3, baseY: y - 0.3 });
+      if (rng() < 0.5) cushion(w.x + (rng() - 0.5) * 0.9, w.z + (rng() < 0.5 ? -0.6 : 0.6), 0.28 + rng() * 0.2);
     }
 
     // The lens: a stone plinth one cell back from where the beam enters,
@@ -491,6 +564,32 @@ export class Sunwells {
       void i;
     }
 
+    // Glows where the light gathers: the lens, every prism, the sun on the
+    // door. Each is shown only while light reaches it.
+    const flare = (x: number, z: number) => {
+      const s = new THREE.Sprite(this.flareMaterial);
+      s.position.set(x, y + BEAM_Y, z);
+      s.layers.set(LAYER_TRANSPARENT);
+      s.visible = false;
+      this.group.add(s);
+      site.flares.push(s);
+    };
+    const lensAt = this.cellWorld(site, layout.emitter.cell[0] - DX[layout.emitter.dir], layout.emitter.cell[1] - DZ[layout.emitter.dir]);
+    flare(lensAt.x, lensAt.z);
+    for (const p of site.prisms) flare(p.x, p.z);
+    const doorAt = this.doorWorld(site);
+    flare(doorAt.x - DX[layout.receptor.dir] * 0.45, doorAt.z - DZ[layout.receptor.dir] * 0.45);
+    // Dust in the light: each speck keeps its place along the beam, its angle
+    // and distance off the axis, and a phase for its twinkle.
+    for (let k = 0; k < MOTES; k += 1) site.moteSeeds.set([rng(), rng() * Math.PI * 2, Math.sqrt(rng()) * 0.3, rng() * Math.PI * 2], k * 4);
+    const moteGeo = site.motes.geometry;
+    moteGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3));
+    moteGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3));
+    site.motes.layers.set(LAYER_TRANSPARENT);
+    site.motes.frustumCulled = false;
+    site.motes.visible = false;
+    this.group.add(site.motes);
+
     // Merge the stonework: one mesh per material for the whole court.
     for (const [m, list] of parts) {
       const mesh = new THREE.Mesh(merge(list), m);
@@ -554,6 +653,7 @@ export class Sunwells {
       b.copy(a).addScaledVector(dir, Math.max(0.2, along));
     }
     site.path = pts;
+    site.lit = trace.lit;
     for (const p of site.prisms) p.crystal.material = this.m.crystal;
     for (const i of trace.lit) site.prisms[i].crystal.material = this.m.lit;
     if (trace.end === 'receptor' && !site.solved) {
@@ -564,7 +664,8 @@ export class Sunwells {
     }
   }
 
-  private layBeams(site: Site, strength: number): void {
+  /** Lay the beam meshes along the light as it is this frame; returns the points it passes. */
+  private layBeams(site: Site, strength: number): THREE.Vector3[] {
     // Hide the beam past a prism that is still turning.
     let pts = site.path;
     const busy = site.prisms.findIndex((p) => p.turning > 0);
@@ -587,6 +688,13 @@ export class Sunwells {
         }
       }
     }
+    // Once the door sinks, the light runs on into the vault to its back wall.
+    if (site.end === 'receptor' && busy < 0 && site.open > 0) {
+      const e = site.open * site.open * (3 - 2 * site.open);
+      const a = pts[pts.length - 2];
+      const b = pts[pts.length - 1];
+      pts = [...pts.slice(0, -1), b.clone().addScaledVector(b.clone().sub(a).normalize(), e * 4.05)];
+    }
     const segs = strength > 0.02 ? pts.length - 1 : 0;
     while (site.beams.length < segs) {
       const b = new THREE.Mesh(this.beamGeometry, this.beamMaterial);
@@ -606,6 +714,70 @@ export class Sunwells {
       b.lookAt(c);
       b.scale.set(1, 1, Math.max(0.01, len));
     }
+    return pts;
+  }
+
+  /**
+   * Flares where the light gathers and dust drifting in it. `pts` is the
+   * beam as laid this frame; `close` is 1 beside the court, 0 far off.
+   */
+  private layGlows(site: Site, pts: THREE.Vector3[], strength: number, close: number): void {
+    const on = strength > 0.02;
+    const pulse = 0.94 + 0.06 * Math.sin(this.time * 2.1 + site.cx);
+    const [lens, ...rest] = site.flares;
+    const end = rest[rest.length - 1];
+    lens.visible = on;
+    lens.scale.setScalar(1.7 * pulse * (0.5 + 0.5 * strength));
+    // Prisms glow while the light reaches them (up to one that is turning).
+    const busy = site.prisms.findIndex((p) => p.turning > 0);
+    const cut = busy >= 0 ? site.lit.indexOf(busy) : -1;
+    const lit = cut >= 0 ? site.lit.slice(0, cut + 1) : site.lit;
+    site.prisms.forEach((_, i) => {
+      rest[i].visible = on && lit.includes(i);
+      rest[i].scale.setScalar(1.05 * pulse);
+    });
+    // The sun on the door flares as the light arrives, then the light rests
+    // on the vault's back wall.
+    end.visible = on && site.solved;
+    if (end.visible) {
+      const last = pts[pts.length - 1];
+      end.position.copy(last);
+      const arriving = Math.min(1, site.since / 1.2);
+      end.scale.setScalar((site.open > 0 ? 1.4 : 0.6 + 1.6 * arriving) * pulse);
+    }
+    // Dust: every speck drifts slowly along the light and turns about its
+    // axis, twinkling as it crosses the brightest part.
+    site.motes.visible = on && close > 0.01 && pts.length > 1;
+    if (!site.motes.visible) return;
+    const pos = site.motes.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const col = site.motes.geometry.getAttribute('color') as THREE.BufferAttribute;
+    let total = 0;
+    for (let j = 1; j < pts.length; j += 1) total += pts[j - 1].distanceTo(pts[j]);
+    const seeds = site.moteSeeds;
+    for (let k = 0; k < MOTES; k += 1) {
+      const u = seeds[k * 4];
+      const angle = seeds[k * 4 + 1] + this.time * 0.15;
+      const off = seeds[k * 4 + 2];
+      const phase = seeds[k * 4 + 3];
+      let s = ((u + this.time * 0.01 * (0.6 + 0.4 * Math.sin(phase))) % 1) * total;
+      let j = 1;
+      while (j < pts.length - 1 && s > pts[j - 1].distanceTo(pts[j])) {
+        s -= pts[j - 1].distanceTo(pts[j]);
+        j += 1;
+      }
+      const a = pts[j - 1];
+      const b = pts[j];
+      const len = Math.max(1e-4, a.distanceTo(b));
+      const dx = (b.x - a.x) / len;
+      const dz = (b.z - a.z) / len;
+      const across = Math.cos(angle) * off;
+      pos.setXYZ(k, a.x + dx * s - dz * across, a.y + Math.sin(angle) * off + Math.sin(this.time * 0.4 + phase) * 0.04, a.z + dz * s + dx * across);
+      const twinkle = 0.3 + 0.7 * Math.max(0, Math.sin(this.time * 1.7 + phase * 3)) ** 2;
+      const bright = strength * close * twinkle * (1 - off / 0.34) * 2.4;
+      col.setXYZ(k, bright, bright * 0.86, bright * 0.62);
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
   }
 
   update(dt: number, camera: THREE.Camera): void {
@@ -616,8 +788,10 @@ export class Sunwells {
     this.m.lens.emissiveIntensity = 0.15 + 2.6 * sun;
     this.m.lit.emissiveIntensity = 0.6 + 2.8 * sun;
     const pos = camera.position;
+    this.flareMaterial.color.setRGB(1, 0.84, 0.6).multiplyScalar(0.8 + 7 * sun);
     for (const site of this.sites) {
-      const near = (pos.x - site.cx) ** 2 + (pos.z - site.cz) ** 2 < 420 * 420;
+      const d2 = (pos.x - site.cx) ** 2 + (pos.z - site.cz) ** 2;
+      const near = d2 < 420 * 420;
       for (const p of site.prisms) {
         const target = -p.facing * (Math.PI / 2);
         if (p.turning > 0) {
@@ -630,7 +804,9 @@ export class Sunwells {
         } else p.head.rotation.y = target;
       }
       // A beam only runs while the sun is up to feed the lens.
-      this.layBeams(site, near ? sun : 0);
+      const strength = near ? sun : 0;
+      const pts = this.layBeams(site, strength);
+      this.layGlows(site, pts, strength, 1 - THREE.MathUtils.smoothstep(Math.sqrt(d2), 45, 90));
       if (!site.solved) site.discMat.emissiveIntensity = 0;
       else if (site.open >= 1) site.discMat.emissiveIntensity = 1.2;
       if (site.solved && site.open < 1) {

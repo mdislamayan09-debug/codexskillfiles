@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 // Prints the WebGL2 capabilities of the Chromium that Playwright will use.
 // STILLWILD's terrain needs vertex texture fetch and float textures; run this
-// first when a new machine renders a blank or broken world.
-import { existsSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+// first when a new machine renders a blank or broken world. Takes the same
+// --gpu / --swiftshader flags as the playtests.
+import { launchChromium } from './lib/browser.mjs';
 
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch(existsSync(preinstalled) ? { executablePath: preinstalled } : {});
+const browser = await launchChromium();
 const page = await browser.newPage();
 const info = await page.evaluate(() => {
   const canvas = document.createElement('canvas');
@@ -22,6 +21,7 @@ const info = await page.evaluate(() => {
     colorBufferFloat: Boolean(gl.getExtension('EXT_color_buffer_float')),
     maxSamples: gl.getParameter(gl.MAX_SAMPLES),
     anisotropic: Boolean(gl.getExtension('EXT_texture_filter_anisotropic')),
+    gpuTimer: Boolean(gl.getExtension('EXT_disjoint_timer_query_webgl2')),
     webgpu: 'gpu' in navigator,
   };
 });

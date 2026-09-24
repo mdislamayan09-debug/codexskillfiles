@@ -8,6 +8,10 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5188,
     strictPort: true,
+    // Playtests write screenshots and browser profiles under artifacts/;
+    // watching them only costs time, and Chromium's locked profile files
+    // crash the watcher on Windows (EBUSY).
+    watch: { ignored: ['**/artifacts/**', '**/dist/**', '**/client-finder-run/**'] },
   },
   preview: {
     host: '127.0.0.1',

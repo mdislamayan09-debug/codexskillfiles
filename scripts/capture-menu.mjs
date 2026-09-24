@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 // Captures the pause menu (graphics tab) and an in-game HUD shot.
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const out = 'artifacts/captures';
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.goto('http://127.0.0.1:5188/?quality=medium&capture=1', { waitUntil: 'load' });
 await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 240_000, polling: 500 });

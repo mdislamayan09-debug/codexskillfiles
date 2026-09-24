@@ -1,24 +1,27 @@
 #!/usr/bin/env node
 // Story playtest: plays Act I end to end through test hooks and captures
 // the key beats (camp, Singing Stones with Ilyr, journal).
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
-const quality = process.argv[2] ?? 'low';
+const args = process.argv.slice(2);
+const arg = (name, fallback) => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 ? args[i + 1] : fallback;
+};
+// Quality as --quality or, as before, the first argument.
+const quality = arg('quality', args[0] && !args[0].startsWith('--') ? args[0] : 'low');
+const url = arg('url', 'http://127.0.0.1:5188');
 const out = 'artifacts/playtest';
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = [];
 page.on('console', (m) => {
   if ((m.type() === 'error' || m.type() === 'warning') && !m.text().includes('ERR_CERT')) logs.push(`[${m.type()}] ${m.text()}`);
 });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
-await page.goto(`http://127.0.0.1:5188/?quality=${quality}&capture=1`, { waitUntil: 'load' });
+await page.goto(`${url}/?quality=${quality}&capture=1`, { waitUntil: 'load' });
 await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 240_000, polling: 500 });
 await page.evaluate(() => window.__THREE_GAME_TEST_HOOKS__.freeze(true));
 const H = (fn, ...a) => page.evaluate(({ fn, a }) => window.__THREE_GAME_TEST_HOOKS__[fn](...a), { fn, a });

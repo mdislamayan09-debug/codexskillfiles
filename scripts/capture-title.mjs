@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 // Title flow: title over the drifting world, difficulty choice, opening
 // narration, the wake-up, then Continue after a save.
-// Usage: node scripts/capture-title.mjs [quality]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+// Usage: node scripts/capture-title.mjs [quality | --quality medium] [--url http://127.0.0.1:5188]
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
-const quality = process.argv[2] ?? 'medium';
+const args = process.argv.slice(2);
+const arg = (name, fallback) => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 ? args[i + 1] : fallback;
+};
+const quality = arg('quality', args[0] && !args[0].startsWith('--') ? args[0] : 'medium');
+const url = arg('url', 'http://127.0.0.1:5188');
 const out = 'artifacts/captures';
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`http://127.0.0.1:5188/?quality=${quality}&capture=1&title=1`, { waitUntil: 'load' });
+await page.goto(`${url}/?quality=${quality}&capture=1&title=1`, { waitUntil: 'load' });
 await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 240_000, polling: 500 });
 const hooks = (fn, arg) => page.evaluate(fn, arg);
 await hooks(() => window.__THREE_GAME_TEST_HOOKS__.freeze(true));

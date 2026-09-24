@@ -6,8 +6,8 @@
 // only then, that Tock's "Burning Glass" pays out a spyglass, and that the
 // spyglass narrows the view.
 // Usage: node scripts/playtest-sunwells.mjs [--quality low]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -18,11 +18,7 @@ const url = arg('url', 'http://127.0.0.1:5188');
 const quality = arg('quality', 'low');
 const out = arg('out', 'artifacts/playtest/sunwells');
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = [];
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));

@@ -241,6 +241,9 @@ export class Game {
       powerPreference: 'high-performance',
       preserveDrawingBuffer: params.has('capture'),
     });
+    // Captures step time frame by frame, so real-time CSS fades would catch a
+    // screenshot half-way through (see base.css).
+    if (params.has('capture')) document.documentElement.dataset.capture = '';
     this.gpuName = detectGpu(this.renderer);
     this.detectedQuality = suggestQuality(this.gpuName);
     const chosen = params.get('quality') ?? this.settings.get('quality');

@@ -2,8 +2,8 @@
 // Captures screenshots of named viewpoints from a running dev/preview server.
 // Usage: node scripts/capture.mjs [--url http://127.0.0.1:5188] [--views a,b] [--quality high]
 //        [--size 1280x720] [--out artifacts/captures] [--wait 2500] [--params extra=1]
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -20,11 +20,7 @@ const viewsArg = arg('views', 'crash-site');
 const frames = Number(arg('frames', '3'));
 
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width, height } });
 const logs = [];
 page.on('console', (m) => {

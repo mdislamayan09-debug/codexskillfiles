@@ -2,8 +2,8 @@
 // Survival-loop playtest: gather by hand, craft tools, chop a tree, mine a
 // rock, build and light a campfire. Asserts on inventory counts and saves
 // screenshots. Usage: node scripts/playtest-survival.mjs [--quality low]
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -17,11 +17,7 @@ const out = arg('out', 'artifacts/playtest');
 const shots = arg('shots', '1') === '1';
 mkdirSync(out, { recursive: true });
 
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width, height } });
 const logs = [];
 page.on('console', (m) => {

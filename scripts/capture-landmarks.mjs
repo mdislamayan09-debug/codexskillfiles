@@ -3,8 +3,8 @@
 // vantage, then a cache searched (items and a journal page) and one of Jonah
 // Reed's traps stepped in.
 // Usage: node scripts/capture-landmarks.mjs [--quality low] [--only galleon,lighthouse]
-import { existsSync, mkdirSync } from 'node:fs';
-import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { launchChromium } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -16,11 +16,7 @@ const quality = arg('quality', 'low');
 const only = arg('only', '');
 const out = arg('out', 'artifacts/playtest/landmarks');
 mkdirSync(out, { recursive: true });
-const preinstalled = '/opt/pw-browsers/chromium';
-const browser = await chromium.launch({
-  ...(existsSync(preinstalled) ? { executablePath: preinstalled } : { channel: 'chromium' }),
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const logs = [];
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));

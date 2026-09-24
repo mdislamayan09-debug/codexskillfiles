@@ -10,6 +10,8 @@ import { addPatch, replaceOnce } from '../materials/MaterialPatches';
 
 export interface StoneTextures {
   masonry: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
+  /** The worn face of a great paving slab: no joints of its own. */
+  slab: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
 }
 
 /** Tileable value noise with a period of `period` cells. */
@@ -180,11 +182,73 @@ function masonry(size: number, seed: number): StoneTextures['masonry'] {
   return { map: canvasTexture(size, albedo, true), normalMap: canvasTexture(size, normalsFrom(size, height, 4.5), false) };
 }
 
+/**
+ * The top of a great flagstone. Each slab is its own stone, so the joints
+ * between them are real gaps and this has none: only a tooled face gone soft
+ * underfoot, a few hairline cracks, pitting, grime in the hollows and lichen
+ * where feet never reached. Tiles in both directions.
+ */
+function flagstone(size: number, seed: number): StoneTextures['slab'] {
+  const rng = createRng(seed);
+  const fine = tileNoise(rng, size / 4);
+  const mottle = tileNoise(rng, size / 16);
+  const broad = tileNoise(rng, size / 64);
+  const vast = tileNoise(rng, 4);
+  // Hairline cracks: short wandering walks, wrapped at the edges.
+  const crack = new Float32Array(size * size);
+  for (let k = 0; k < 6; k += 1) {
+    let x = rng() * size;
+    let y = rng() * size;
+    let a = rng() * Math.PI * 2;
+    const steps = 50 + Math.floor(rng() * 110);
+    for (let s = 0; s < steps; s += 1) {
+      a += (rng() - 0.5) * 0.7;
+      x += Math.cos(a);
+      y += Math.sin(a);
+      // Cracks fade out toward their ends.
+      const depth = Math.min(1, Math.min(s, steps - s) / 12);
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          const px = (((Math.round(x) + ox) % size) + size) % size;
+          const py = (((Math.round(y) + oy) % size) + size) % size;
+          const w = ox === 0 && oy === 0 ? 1 : 0.35;
+          crack[py * size + px] = Math.max(crack[py * size + px], depth * w);
+        }
+      }
+    }
+  }
+  const albedo = new Uint8ClampedArray(size * size * 4);
+  const height = new Float32Array(size * size);
+  for (let py = 0; py < size; py += 1) {
+    for (let px = 0; px < size; px += 1) {
+      const f = fine(px, py) * 0.6 + fine(px * 0.5 + 41, py * 0.5 + 13) * 0.4;
+      const m = mottle(px / 4, py / 4);
+      const b = broad(px / 16, py / 16);
+      const v = vast(px / 128, py / 128);
+      // Worn into shallow hollows; pits where the grain let go.
+      const pit = Math.max(0, fine(px * 2 + 7, py * 2 + 3) - 0.8) * 2.2;
+      const c = crack[py * size + px];
+      const h = 0.5 + (b - 0.5) * 0.34 + (m - 0.5) * 0.2 + (f - 0.5) * 0.1 - pit * 0.3 - c * 0.3;
+      height[py * size + px] = h;
+      // Tone: slow drifts across the slab, mottling, darker in the hollows.
+      let tone = 0.8 + (v - 0.5) * 0.16 + (m - 0.5) * 0.14 + (f - 0.5) * 0.08;
+      tone *= 1 - Math.max(0, 0.46 - h) * 0.7 - pit * 0.25 - c * 0.35;
+      const lichen = Math.max(0, (b - 0.64) * 3) * Math.max(0, m - 0.42) * 1.6;
+      const i = (py * size + px) * 4;
+      albedo[i] = 188 * tone * (1 - lichen) + 150 * lichen;
+      albedo[i + 1] = 180 * tone * (1 - lichen) + 156 * lichen;
+      albedo[i + 2] = 164 * tone * (1 - lichen) + 118 * lichen;
+      albedo[i + 3] = 255;
+    }
+  }
+  return { map: canvasTexture(size, albedo, true), normalMap: canvasTexture(size, normalsFrom(size, height, 3.2), false) };
+}
+
 let shared: StoneTextures | null = null;
 
 /** The shared stone textures (made once, on first use). */
 export function getStoneTextures(): StoneTextures {
-  shared ??= { masonry: masonry(512, 0x57011e) };
+  shared ??= { masonry: masonry(512, 0x57011e), slab: flagstone(512, 0xf1a65) };
   return shared;
 }
 
