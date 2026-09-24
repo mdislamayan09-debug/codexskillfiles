@@ -48,14 +48,16 @@ const spawn = await hooks('drive', {}, 0.2);
 check('spawn on ground', spawn.state === 'ground', spawn);
 if (want('spawn')) await shot('01-spawn');
 
-// Walk forward 3 s.
-const walk = await hooks('drive', { moveY: 1 }, 3);
+// Walk forward 3 s, east across the meadow (north of the spawn, the camp's
+// crates stand in the way, and they are solid).
+const EAST = -Math.PI / 2;
+const walk = await hooks('drive', { moveY: 1, yaw: EAST }, 3);
 const walked = Math.hypot(walk.x - spawn.x, walk.z - spawn.z);
 check('walk ~4.6 m/s', walked > 10 && walked < 15.5, { walked: walked.toFixed(2), state: walk.state });
 
 // Sprint 2 s.
 const before = walk;
-const sprint = await hooks('drive', { moveY: 1, sprint: true }, 2);
+const sprint = await hooks('drive', { moveY: 1, sprint: true, yaw: EAST }, 2);
 const sprinted = Math.hypot(sprint.x - before.x, sprint.z - before.z);
 check('sprint faster than walk', sprinted > 11, { sprinted: sprinted.toFixed(2), stamina: sprint.stamina.toFixed(1) });
 check('sprint drains stamina', sprint.stamina < 90, { stamina: sprint.stamina });

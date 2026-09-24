@@ -27,6 +27,7 @@ if (args.includes('--swiftshader')) pass.push('--swiftshader');
 // Longest first, so the slow ones are not left running alone at the end.
 const SCRIPTS = [
   'playtest-wardens',
+  'playtest-landmarks',
   'playtest-archery',
   'playtest-story',
   'playtest-warden',
@@ -44,8 +45,7 @@ const SCRIPTS = [
   'playtest-curiosities',
   'capture-title',
 ];
-const wanted = SCRIPTS.filter((s) => !only || only.split(',').some((o) => s === o || s === `playtest-${o}` || s === `capture-${o}`));
-mkdirSync('artifacts/playtest/logs', { recursive: true });
+const wanted = SCRIPTS.filter((s) => !only || only.split(',').some((o) => s === o || s === `playtest-${o}` || s === `capture-${o}`));mkdirSync('artifacts/playtest/logs', { recursive: true });
 
 const results = [];
 const run = (name) =>

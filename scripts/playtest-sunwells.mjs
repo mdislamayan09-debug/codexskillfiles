@@ -41,6 +41,23 @@ const shot = async (name) => {
 };
 const count = (id) => page.evaluate((id) => window.game.inventory.count(id), id);
 const step = (id) => page.evaluate((id) => window.game.quests.currentStep(id)?.step.id ?? (window.game.quests.isDone(id) ? 'done' : null), id);
+/** Walk on toward (tx, tz), re-aiming every tenth of a second; stop on arrival. */
+const follow = (tx, tz, seconds) =>
+  page.evaluate(
+    ([tx, tz, seconds]) => {
+      const p = window.game.player.position;
+      for (let t = 0; t < seconds && Math.hypot(tx - p.x, tz - p.z) > 0.25; ) {
+        // Shorter steps near the mark, so the walk does not run past it.
+        const step = Math.max(1 / 30, Math.min(0.1, (Math.hypot(tx - p.x, tz - p.z) - 0.2) / 5));
+        window.__THREE_GAME_TEST_HOOKS__.drive({ moveY: 1, yaw: Math.atan2(-(tx - p.x), -(tz - p.z)) }, step);
+        t += step;
+      }
+      // Stop on the spot, as a walker would before turning.
+      window.__THREE_GAME_TEST_HOOKS__.drive({}, 0.3);
+      return { x: p.x, y: p.y, z: p.z };
+    },
+    [tx, tz, seconds],
+  );
 
 await H('setState', 'play');
 await H('setWeather', 'clear');
@@ -85,6 +102,31 @@ check('each court sets its flag', ['dawnwell', 'noonwell', 'duskwell'].every((id
 const opened = await H('useStory', 'cache:dawnwell');
 check('the vault cache opens once lit', opened.flags.includes('looted:dawnwell') && (await count('heartsong')) > heart0, { heartsong: await count('heartsong') });
 check('turning stops once a court is solved', (await H('useStory', 'sunwell:dawnwell:0')).prompt === null);
+
+// Walking the courts: in through both open sides to the paving just inside
+// the wall, and (now the doors are down) from in front of each door into
+// its vault.
+const snags = [];
+for (const w of await H('sunwells')) {
+  const lens = w.path[0];
+  const toLens = Math.round(Math.atan2(lens[2] - w.z, lens[0] - w.x) / (Math.PI / 2)) * (Math.PI / 2);
+  // Which wall the door is in (the door itself may sit off the middle).
+  const toDoor = Math.round(Math.atan2(w.door.z - w.z, w.door.x - w.x) / (Math.PI / 2)) * (Math.PI / 2);
+  for (let side = 0; side < 4; side += 1) {
+    const a = (side * Math.PI) / 2;
+    const off = (b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    if (off(toLens) < 0.5 || off(toDoor) < 0.5) continue;
+    await H('teleport', w.x + Math.cos(a) * 17, w.z + Math.sin(a) * 17, 0);
+    const p = await follow(w.x + Math.cos(a) * 8.8, w.z + Math.sin(a) * 8.8, 6);
+    if (Math.hypot(p.x - w.x - Math.cos(a) * 8.8, p.z - w.z - Math.sin(a) * 8.8) > 1) snags.push({ id: w.id, side, at: [Math.round(p.x - w.x), Math.round(p.z - w.z)] });
+  }
+  const nx = Math.cos(toDoor);
+  const nz = Math.sin(toDoor);
+  await H('teleport', w.door.x - nx * 1.8, w.door.z - nz * 1.8, 0);
+  const v = await follow(w.door.x + nx * 2.2, w.door.z + nz * 2.2, 4);
+  if (Math.hypot(v.x - w.door.x - nx * 2.2, v.z - w.door.z - nz * 2.2) > 0.9) snags.push({ id: w.id, vault: [Math.round((v.x - w.door.x) * 10) / 10, Math.round((v.z - w.door.z) * 10) / 10] });
+}
+check('the courts can be walked: entrances, middle and vault', snags.length === 0, snags);
 
 // Tock pays out.
 check('the quest waits on Tock', (await step('burning_glass')) === 'talk', { step: await step('burning_glass') });

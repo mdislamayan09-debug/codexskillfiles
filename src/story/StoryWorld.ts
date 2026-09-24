@@ -70,6 +70,7 @@ export class StoryWorld {
   private readonly stoneGlows: THREE.MeshStandardMaterial[] = [];
   private lanternOnPedestal: THREE.Object3D | null = null;
   private vaultDoor: THREE.Object3D | null = null;
+  private readonly doorColliders: { x: number; z: number; radius: number; height: number; baseY: number }[] = [];
   private ilyrMaterial: THREE.MeshStandardMaterial | null = null;
   private readonly bellGlows = new Map<string, THREE.MeshStandardMaterial>();
   private bellPulse = 0;
@@ -270,6 +271,8 @@ export class StoryWorld {
     const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), this.m.songstone);
     lantern.add(cage, core);
     this.add(lantern, c.x, c.z, 1.25);
+    // Taken away later, so never solid.
+    lantern.userData.moving = true;
     this.lanternOnPedestal = lantern;
     this.interactables.push({
       id: 'lantern_pedestal',
@@ -327,7 +330,11 @@ export class StoryWorld {
     arch.add(left, right, lintel, door);
     arch.rotation.y = 0.9;
     this.add(arch, v.x, v.z);
+    // The door sinks when the vault opens; the arch round it stays solid.
+    // Until then the door is a wall of its own (see collidersNear).
+    door.userData.moving = true;
     this.vaultDoor = door;
+    for (const k of [-1, 0, 1]) this.doorColliders.push({ x: v.x + Math.cos(0.9) * k, z: v.z - Math.sin(0.9) * k, radius: 0.6, height: 3.8, baseY: v.y - 0.3 });
     this.interactables.push({
       id: 'vault_door',
       position: new THREE.Vector3(v.x, v.y + 1.8, v.z),
@@ -449,6 +456,12 @@ export class StoryWorld {
     }
   }
 
+  /** The vault door, while it is still shut. */
+  collidersNear(x: number, z: number, r: number, out: { x: number; z: number; radius: number; height: number; baseY?: number }[]): void {
+    if (this.quests.flags.has('vault_open')) return;
+    for (const c of this.doorColliders) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (r + c.radius) ** 2) out.push(c);
+  }
+
   // ---------------------------------------------------------------------------
   // Survivors
 
@@ -546,6 +559,8 @@ export class StoryWorld {
       }
     });
     g.visible = false;
+    // Survivors walk about: not part of the solid ground.
+    g.userData.moving = true;
     this.group.add(g);
     const materials = [coat, trim, skin, dark].filter((m, i, a) => a.indexOf(m) === i) as THREE.MeshStandardMaterial[];
     for (const m of materials) if (!this.materials.includes(m)) this.materials.push(m);

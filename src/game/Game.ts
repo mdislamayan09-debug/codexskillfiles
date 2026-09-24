@@ -5,7 +5,7 @@ import { GameClock } from '../core/GameClock';
 import { Input, type ButtonAction } from '../core/Input';
 import { SettingsStore, type Difficulty } from '../core/Settings';
 import { FlyCamera } from '../debug/FlyCamera';
-import { PlayerController, type ControlIntent, type PlayerEnvironment, type WaterAt } from '../player/PlayerController';
+import { PLAYER_TUNING, PlayerController, type ControlIntent, type PlayerEnvironment, type WaterAt } from '../player/PlayerController';
 import { PlayerView } from '../player/PlayerView';
 import { MOON_ILLUMINANCE, SUN_ILLUMINANCE } from '../render/atmosphere/Atmosphere';
 import { createFullscreenMaterial, FullscreenPass } from '../render/FullscreenPass';
@@ -396,6 +396,7 @@ export class Game {
     this.caves = new Caves(this.world);
     for (const material of this.caves.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.caves.group);
+    const tLandmarks = performance.now();
     this.landmarks = new Landmarks(this.world, this.story.interactables, {
       give: (item, count) => this.inventory.add(item, count),
       hasFlag: (flag) => this.quests.flags.has(flag),
@@ -407,6 +408,12 @@ export class Game {
       },
       playerPosition: () => this.player.position,
     }, this.caves);
+    // The crash site, the stones, the vault arch and the bells are solid as
+    // well as the landmarks; then the columns are packed for walking against.
+    this.landmarks.solids.addObject(this.story.group);
+    this.landmarks.solids.finish();
+    this.wildlife.solid = (x, z, y) => this.landmarks.solids.blocked(x, z, y + 0.3, y + 1.3);
+    this.timings.landmarksMs = performance.now() - tLandmarks;
     for (const material of this.landmarks.materials) this.lighting.setupMaterial(material);
     this.curiosities = new Curiosities(this.world, this.story.interactables, {
       isFound: (id) => this.quests.flags.has(`found:${id}`),
@@ -595,10 +602,17 @@ export class Game {
         const cave = this.caveFloor(x, z, y);
         if (cave !== null) return cave;
         const natural = Math.max(world.groundAt(x, z), this.props.heightAt(x, z));
-        return y === undefined ? natural : Math.max(natural, this.building.surfaceAt(x, z, y));
+        // Built floors and the set pieces' steps, decks and terraces.
+        return y === undefined ? natural : Math.max(natural, this.building.surfaceAt(x, z, y), this.landmarks.solids.surfaceAt(x, z, y));
       },
       groundNormal: (x, z, out, y) => {
         if (this.caveFloor(x, z, y) !== null) return out.set(0, 1, 0);
+        // On a set piece: the way its stone faces (steps are level, a
+        // boulder's flank is not).
+        if (y !== undefined) {
+          const top = this.landmarks.solids.surfaceAt(x, z, y);
+          if (top > world.heightAt(x, z) + 0.02 && top >= this.props.heightAt(x, z)) return this.landmarks.solids.normalAt(x, z, y, out);
+        }
         // Standing on a built floor or stair: level footing.
         if (y !== undefined && this.building.count > 0) {
           const deck = this.building.surfaceAt(x, z, y);
@@ -632,11 +646,16 @@ export class Game {
         this.building.collidersNear(x, z, r, out);
         this.stillheart.collidersNear(x, z, r, out);
         this.sunwells?.collidersNear(x, z, r, out);
+        this.story.collidersNear(x, z, r, out);
         return out;
       },
       surface: (x, z) => this.surfaceAt(x, z),
       boundary: VEIL_RADIUS - 8,
-      confine: (p, v, radius) => this.caves.confine(p, v, radius),
+      confine: (p, v, radius) => {
+        this.caves.confine(p, v, radius);
+        // Walls, hulls and statues; a crouch gets under a lower lintel.
+        this.landmarks.solids.confine(p, v, radius, PLAYER_TUNING.stepHeight, this.player?.crouching ? 1.2 : 1.75);
+      },
     };
   }
 
@@ -1024,11 +1043,19 @@ export class Game {
     this.structures.drop('satchel', x, z, this.player.yaw, { contents: items });
   }
 
+  /** Put the survivor at (x, z): on top of a set piece rather than inside one. */
+  private spawnPlayer(x: number, z: number, yaw: number): void {
+    this.player.spawn(x, z, yaw);
+    const solids = this.landmarks.solids;
+    const y = this.player.position.y;
+    if (solids.blocked(x, z, y + PLAYER_TUNING.stepHeight, y + 1.75)) this.player.spawn(x, z, yaw, solids.topAt(x, z));
+  }
+
   private respawn(): void {
     this.death.hide();
     this.survival.revive();
     const sp = this.spawnPoint;
-    this.player.spawn(sp.x, sp.z, sp.yaw);
+    this.spawnPlayer(sp.x, sp.z, sp.yaw);
     this.deathCause = null;
     this.pipeline.post.damage = 0;
     this.hud.setVisible(true);
@@ -1399,6 +1426,8 @@ export class Game {
     if (prop && (prop.kind === 'boulder' || prop.kind === 'rock_node')) consider(prop.distance, 'stone');
     const piece = this.building.raycast(from, dir, length);
     if (piece) consider(piece.t, 'wood');
+    const solid = this.landmarks.solids.raycast(from, dir, length);
+    if (solid) consider(solid.t, 'stone');
     return best;
   }
 
@@ -2478,7 +2507,7 @@ export class Game {
       },
       teleport: (x: number, z: number, yaw = 0) => {
         if (this.mode !== 'play') this.startPlay(null);
-        this.player.spawn(x, z, yaw);
+        this.spawnPlayer(x, z, yaw);
         this.vegetation.prewarm(x, z, 200);
         this.render(0);
         return { x, z };

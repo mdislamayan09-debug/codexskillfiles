@@ -191,9 +191,11 @@ export const CACHE_SPOTS: Record<string, [number, number, number?]> = {
   monastery: [2, 7],
   sled_camp: [2, 6, 0.85],
   ice_caves: [0.6, -1.6],
-  frozen_titan: [4, 11],
+  // Outside the glacier's foot, where the ice gave it up.
+  frozen_titan: [5, 16.5],
   aurora_overlook: [1.5, 1],
   stilt_village: [0, 0.2],
-  ziggurat: [0, 12.5],
+  // In the shrine at the top of the stair.
+  ziggurat: [0.9, 0.9],
   lanternfly_hollow: [0, 0],
 };

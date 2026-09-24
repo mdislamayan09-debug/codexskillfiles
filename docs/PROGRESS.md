@@ -29,12 +29,15 @@ saves screenshots under `artifacts/playtest/`. Start the dev server
 | `scripts/playtest-sidestories.mjs` | Wren's field notes, Ilyr's four caves (in any order) and Tock's workshop, played through and paid out |
 | `scripts/playtest-sky.mjs` | A meteor shower, a fallen star found and gathered, a Starglass Lantern made from it, an eclipse |
 | `scripts/playtest-curiosities.mjs` | Curiosities spread over the island, one of each kind found once and rewarded |
-| `scripts/playtest-sunwells.mjs` | The three Sunwells solved, doors sunk, sealed caches opened, Tock's Burning Glass, the spyglass |
+| `scripts/playtest-sunwells.mjs` | The three Sunwells solved, doors sunk, sealed caches opened, each court walked, Tock's Burning Glass, the spyglass |
+| `scripts/playtest-landmarks.mjs` | Solid set pieces: walls stop you, doors and arches let you through, the ziggurat stair, the stilt village steps and boardwalk, every cache reachable |
+| `scripts/playtest-all.mjs` | Runs every script above, two at a time (`--gpu`, `--only`) |
 | `scripts/capture.mjs` | Scenic views for visual review (`--views`, `--quality`) |
 
 `npm test` runs the unit tests (`tests/unit/`). They check story data,
 quest logic, the inventory, save round trips, the seeded RNG, noise,
-landmark caches, farming growth, the combat rules and the Sunwell beams
+landmark caches, farming growth, the combat rules, the Sunwell beams and
+the solid-geometry columns (walls, stairs, doorways, plank walls, slopes)
 (every well solvable, each harder than the last, one true path each).
 
 ## Milestones
@@ -112,30 +115,37 @@ landmark caches, farming growth, the combat rules and the Sunwell beams
   out; a guard raised just in time parries and staggers the attacker;
   lock-on keeps a target under the crosshair.
 
-### M4 World content: 🟡
+### M4 World content: ✅
 
 - ✅ Parchment map drawn from the heightmap, with fog of war and pins.
 - ✅ Journal of quests, places and lore.
 - ✅ Discovery: named places are learned when seen and stamped on the
   compass and map.
-- 🟡 Landmarks: 25 set pieces, each with a cache that holds items and a
+- ✅ Landmarks: 25 set pieces, each with a cache that holds items and a
   journal page. Among them are the galleon, the lighthouse, the floating
   isle, the frozen titan, the monastery, the stilt village and the ziggurat.
   Built in `src/story/Landmarks.ts` from an architecture kit
   (`landmarkKit.ts`): voussoir arches, walls with real window openings,
   shingled roofs, a lofted ship hull and a sculpted colossal face. Stone
   and timber are textured in world space.
+- ✅ Solid set pieces: every landmark and the story's set pieces (the
+  wreck, the stones, the vault arch, the Bellstones) are built into
+  columns of solid (`src/world/SolidField.ts`) from their own triangles.
+  Walls, hulls and statues stop you; doorways and arches let you through;
+  stairs, decks, terraces and boulder tops can be walked. The ziggurat has
+  a grand stair to its shrine, the stilt village steps up out of the fen,
+  arrows stop at walls and animals turn from them.
 - ✅ Caves: the Whispering Cave, Crystal Grotto, Lava Tubes and Ice Caves
   open on their mounds' flanks, slope down under the rock and end in a
   chamber with the cache. It is dark underground: sun and sky light are cut
   off in every material, so a torch matters. Crystals and lava glow, ice
   hangs from the roof, water drips and echoes.
-- 🟡 Puzzles: the Singing Stones (strike in order) and the three
+- ✅ Puzzles: the Singing Stones (strike in order) and the three
   **Sunwells**: the Dawnwell, Noonwell and Duskwell. In each, a lens
   throws sunlight across a paved court; turning crystal prisms carries the
-  beam to the sun disc on a vault door, which sinks to reveal a sealed
-  cache. They need 4, 9 and 12 turns, and the beam only runs by day. Echo
-  bridges, wisp chases and glyph doors are not built yet.
+  beam to the sun disc on a vault door, which sinks, and the light runs on
+  into the vault. They need 4, 9 and 12 turns, and the beam only runs by
+  day. (Planned next: echo bridges, wisp chases and glyph doors.)
 - ✅ Curiosities: about seventy small finds between the named places, laid
   out from the world seed. Veyr cairns have a line carved into the
   capstone, lost expedition packs hold supplies, songstone shrines give a
@@ -192,8 +202,8 @@ landmark caches, farming growth, the combat rules and the Sunwell beams
   toggle sprint and crouch, reduced motion, colour-blind filters,
   interface scale, HUD opacity and subtitles.
 - ✅ Full controller support, menus included.
-- 🟡 Performance: presets are tuned by eye on SwiftShader and by budget.
-  Frame times still need measuring on real Apple silicon.
+- 🟡 Performance: presets are tuned by eye and by budget. Frame times
+  still need measuring on real Apple silicon.
 - ⬜ Key rebinding.
 
 ## Next up
@@ -201,11 +211,9 @@ landmark caches, farming growth, the combat rules and the Sunwell beams
 The full, ordered list is in `README.md` ("What we do next") and in
 detail in `HANDOFF.md`. The first few:
 
-1. Finish the Sunwells: get their playtest passing end to end, look at
-   them in daylight on a real GPU, tune the beam and stonework, and re-run
-   every playtest.
-2. Solid landmarks: colliders for walls, hulls and statues, and walkable
-   steps, decks and floors.
-3. Frame-time measurements on Apple silicon, and presets tuned to them.
-4. Visual polish: bark and forest edges, denser grass near the camera on
+1. Frame-time measurements on Apple silicon, presets tuned to them, and
+   GPU timing in the diagnostics.
+2. Visual polish: bark and forest edges, denser grass near the camera on
    High and above, and creature detail.
+3. Key rebinding in Settings → Controls.
+4. More puzzle types: echo bridges, wisp chases, sealed glyph doors.

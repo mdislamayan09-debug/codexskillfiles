@@ -243,6 +243,8 @@ export class Wildlife {
   private readonly biomeScratch = new Float32Array(BIOME_COUNT);
   private readonly tmp = new THREE.Vector3();
   cap = 16;
+  /** Solid set pieces at (x, z) for a body standing at y: walls to turn from. */
+  solid: ((x: number, z: number, y: number) => boolean) | null = null;
 
   constructor(
     private readonly world: WorldData,
@@ -644,10 +646,10 @@ export class Wildlife {
     const fz = -Math.cos(c.yaw);
     let nx = c.pos.x + fx * c.speed * dt;
     let nz = c.pos.z + fz * c.speed * dt;
-    // Keep out of deep water and off cliffs: turn away instead.
+    // Keep out of deep water, off cliffs and out of walls: turn away instead.
     const ground = this.world.groundAt(nx, nz);
     const water = this.world.waterLevelAt(nx, nz);
-    if (water > ground + 0.35 || this.world.slopeAt(nx, nz) > 0.62) {
+    if (water > ground + 0.35 || this.world.slopeAt(nx, nz) > 0.62 || this.solid?.(nx, nz, ground)) {
       c.yaw += Math.PI * (0.5 + this.rng() * 0.5);
       c.speed *= 0.3;
       return;

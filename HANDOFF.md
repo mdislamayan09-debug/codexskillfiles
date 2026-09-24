@@ -8,8 +8,9 @@ unfinished, and what comes next. If you are picking the project up (a person,
 or Claude Code in a terminal), read this first. `README.md` is the short
 version: the game plan, where we are and what is next.
 
-Last updated at the hand-off from the cloud session to terminal Claude Code
-(September 2026). Branch: `claude/clever-hawking-4d1prc`.
+Last updated September 2026, after the terminal session that finished the
+Sunwells and made the set pieces solid. Branch:
+`claude/clever-hawking-4d1prc`.
 
 ---
 
@@ -59,15 +60,16 @@ machine) and caches it in IndexedDB. Later launches are quicker.
 
 ```sh
 npm run typecheck      # tsc, must be clean
-npm test               # vitest unit tests (tests/unit), 66 at hand-off
+npm test               # vitest unit tests (tests/unit), 73
 node scripts/playtest.mjs            # a browser playtest; needs npm run dev running
+node scripts/playtest-all.mjs        # every playtest, two at a time
 ```
 
 Browser playtests drive the real game in headless Chromium (see
-[Testing](#7-testing)). On a Mac with Playwright installed normally they
-use the bundled Chromium. The cloud session used a pre-installed one at
-`/opt/pw-browsers/chromium`; the scripts fall back to Playwright's own
-Chromium when that path does not exist.
+[Testing](#7-testing)). On a machine with a graphics card they render on
+it; run `npx playwright install chromium` once if Playwright asks for its
+browser. The cloud session used a pre-installed Chromium at
+`/opt/pw-browsers/chromium` with software rendering (SwiftShader).
 
 ### The repository
 
@@ -154,7 +156,7 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
 | M1 Playable core: world, rendering, movement, audio, HUD | ✅ |
 | M2 Survival, gathering, crafting, building, farming, saves | ✅ |
 | M3 Creatures and combat, archery, birds, defence | ✅ |
-| M4 World content: landmarks, caves, curiosities, puzzles | 🟡 Sunwell prism puzzles in progress |
+| M4 World content: landmarks, caves, curiosities, puzzles | ✅ (solid set pieces, three Sunwells; more puzzle types planned) |
 | M5 Story and survivors | ✅ (four survivors, the main quest, seven side quests) |
 | M6 Wardens and the Stillheart ending | ✅ |
 | M7 Weather and sky events | ✅ |
@@ -293,7 +295,9 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
 ### Places
 
 - **Landmarks:** 25 set pieces (28 with the Sunwells), each with a cache and
-  a journal page (`Landmarks.ts`, `LandmarkData.ts`, built from the
+  a journal page, all solid: walls stop you, stairs, decks and terraces
+  can be walked (climb the ziggurat's grand stair to its shrine, or the
+  stilt village's steps out of the fen) (`Landmarks.ts`, `LandmarkData.ts`, built from the
   architecture kit in `landmarkKit.ts`: voussoir arches, walls with window
   openings, gable roofs, stairs, a lofted ship hull, a sculpted colossal
   face). Among them: the Meridian wreck, the Singing Stones, the Old
@@ -431,7 +435,10 @@ cloud shadows, cave darkness (`uCaveSpheres`, `atmoCaveDark`,
 `isPath`, `raycast`. The player collides with the heightfield plus **circle
 colliders** (vertical cylinders with base and height) gathered each frame
 from vegetation, props, Wardens, building pieces, the Stillheart and the
-Sunwells, and a `confine` hook for caves.
+Sunwells, and a `confine` hook for caves and for the **solid set pieces**
+(`SolidField`: columns of solid spans built from the landmarks' and story
+set pieces' own triangles; see §10). Built floors and set pieces' steps
+and decks come in through `groundHeight` when the feet's height is given.
 
 ### Streaming and instancing
 
@@ -495,6 +502,7 @@ Line counts at hand-off. 97 TypeScript files, about 37,000 lines in `src`.
 | `SkyEvents.ts` | 336 | Meteor showers, fallen stars, eclipses |
 | `Weather.ts` | 296 | Regional weather fronts |
 | `Celestial.ts` | 58 | Sun, moon and star positions and phases |
+| `SolidField.ts` | ~420 | Solid set pieces: triangles laid into columns of spans; walls, floors, arrows |
 
 ### `src/render`
 
@@ -583,7 +591,9 @@ Line counts at hand-off. 97 TypeScript files, about 37,000 lines in `src`.
 ### Other
 
 `src/main.ts` (boot), `src/debug/FlyCamera.ts` (free camera for captures),
-`src/audio/AudioEngine.ts` (all sound).
+`src/audio/AudioEngine.ts` (all sound). In `scripts/`: `lib/browser.mjs`
+(how every test starts Chromium: GPU, SwiftShader, profiles) and
+`playtest-all.mjs` (the whole suite).
 
 ---
 
@@ -641,38 +651,59 @@ moonmoss, frostmint.
 (every quest, item, dialogue key, kill target and cave echo is real),
 `landmarks` (caches and lore), `farming`, `combat`, `birds`, `sky`,
 `curiosities`, `sunwells` (beam rules; every well unsolved at start,
-solvable, harder than the last, with exactly one true path). 66 tests, all
-passing at hand-off.
+solvable, harder than the last, with exactly one true path) and `solids`
+(blocks, stairs, doorways, thin plank walls, slopes, pushing a body out of
+a wall, arrows). 73 tests.
 
 ### Browser playtests (`scripts/`)
 
-Start `npm run dev` first. Each prints PASS/FAIL per check and saves
-screenshots under `artifacts/playtest/<name>/`. Use `--quality low` on slow
-machines (it is the default).
+Start `npm run dev` first (or see "Testing while editing" below). Each
+script prints PASS/FAIL per check and saves screenshots under
+`artifacts/playtest/<name>/`. `--quality low` is the default.
 
-| Script | Covers | Last result |
+**GPU or software.** The scripts start Chromium through
+`scripts/lib/browser.mjs`: on a machine with a graphics card the game
+renders on it (a full Sunwells run: 80–100 s); in the cloud, where
+`/opt/pw-browsers/chromium` exists and there is no GPU, SwiftShader is
+used (the same run: about 7 minutes). `--gpu` or `--swiftshader` forces
+either. `--profile <dir>` keeps a browser profile, so the island stays
+cached between runs (handy for captures).
+
+**The whole suite:** `node scripts/playtest-all.mjs [--gpu]` runs every
+script two at a time and prints one line each; logs go to
+`artifacts/playtest/logs/`. `--only caves,sky` picks some.
+
+**Testing while editing.** Vite reloads the page when a source file is
+saved, which breaks a running test. To keep working, build once and point
+the suite at the build: `npm run build`, `npm run preview`, then
+`--url http://127.0.0.1:4188`.
+
+| Script | Covers | Last result (GPU, September 2026) |
 | --- | --- | --- |
-| `playtest.mjs` | Walk, sprint, jump, climb, mantle, swim, fall damage, stamina | passed before `f4365c0`; re-run due |
-| `playtest-survival.mjs` | Gathering, crafting, felling, mining, a camp | passed before `f4365c0`; re-run due |
-| `playtest-creatures.mjs` | Wildlife, hunting, weak points | passed earlier; re-run due |
-| `playtest-story.mjs` | Act I end to end | passed before `f4365c0`; re-run due |
-| `playtest-building.mjs` | A two-room cabin, roofs as shelter, dismantling, saves | passed before `f4365c0`; re-run due |
-| `playtest-warden.mjs` | Mossback end to end | passed before `f4365c0`; re-run due |
-| `playtest-wardens.mjs` | All five Wardens | passed before `f4365c0`; re-run due |
-| `playtest-archery.mjs` | Bow, arrows, rooks, gulls, a hunt, farm plots | passing |
+| `playtest.mjs` | Walk, sprint, jump, climb, mantle, swim, fall damage, stamina | 9/9 |
+| `playtest-survival.mjs` | Gathering, crafting, felling, mining, a camp | 13/13 |
+| `playtest-creatures.mjs` | Wildlife, hunting, weak points | 4/4 |
+| `playtest-story.mjs` | Act I end to end | 14/14 |
+| `playtest-building.mjs` | A two-room cabin, roofs as shelter, dismantling, saves | 12/12 |
+| `playtest-warden.mjs` | Mossback end to end | 14/14 |
+| `playtest-wardens.mjs` | All five Wardens | 32/32 |
+| `playtest-archery.mjs` | Bow, arrows, rooks, gulls, a hunt, farm plots | 18/18 |
 | `playtest-caves.mjs` | All four caves, walls, floors, darkness and a torch | 18/18 |
 | `playtest-combat.mjs` | Dodge, block, parry, lock-on | 8/8 |
 | `playtest-sidestories.mjs` | Wren, Ilyr and Tock's workshop | 12/12 |
 | `playtest-sky.mjs` | Meteor shower, fallen star, Starglass Lantern, eclipse | 8/8 |
 | `playtest-curiosities.mjs` | Curiosities spread and rewarded | 6/6 |
-| `playtest-sunwells.mjs` | Sunwells solved, vaults opened, Burning Glass, spyglass | not passed end to end yet; see §10 |
+| `playtest-sunwells.mjs` | Sunwells solved, vaults opened, the courts walked, Burning Glass, spyglass | 15/15 |
+| `playtest-landmarks.mjs` | Solid set pieces: walls, doors, arches, the ziggurat stair, the stilt village, every cache reachable | 13/13 |
 | `capture-landmarks.mjs` | A picture of every landmark, a cache, a trap | 4/4 |
-| `capture-stillheart.mjs` | The Hush, Hallowmere, the ending | passed before `f4365c0`; re-run due |
-| `capture-title.mjs` | Title flow, new game, continue | passed before `f4365c0`; re-run due |
-| `capture.mjs` | Scenic views (`--views`, `--quality`) | n/a |
+| `capture-stillheart.mjs` | The Hush, Hallowmere, the ending | 6/6 |
+| `capture-title.mjs` | Title flow, new game, continue | 9/9 |
+| `capture-sunwells.mjs` | Each Sunwell found, lit, close up and open (`--quality high`) | pictures |
+| `capture.mjs` | Scenic views (`--views`, `--quality`) | pictures |
 
-The scripts were last run on SwiftShader (software rendering) in the cloud,
-where a full run takes several minutes. On a real GPU they are much faster.
+Capture mode (`?capture=1`) turns CSS transitions off: time is stepped
+frame by frame, and a fade would still be half-way when the screenshot is
+taken.
 
 ### Test hooks
 
@@ -739,7 +770,9 @@ with hooks, advance time with `renderFrames`, check state, screenshot with
 | `e1b83b7` | 2026-09-24 | Five Wardens, the Stillheart ending, controller menus, unit tests |
 | `f4365c0` | 2026-09-24 | Caves, archery, birds, farming, defence, sky events, side stories, landmark rebuild, curiosities |
 | `cb58682` | 2026-09-24 | Steadier side-story and sky playtests |
-| (hand-off) | 2026-09-24 | Sunwells, Burning Glass, spyglass; this file, README plan, CLAUDE.md |
+| `88dc627` | 2026-09-24 | Sunwells, Burning Glass, spyglass; this file, README plan, CLAUDE.md |
+| `b365e77` | 2026-09-24 | Sunwells finished (the beam, flagstones), GPU playtests, the suite runner |
+| (this session) | 2026-09-24 | Solid set pieces: `SolidField`, the ziggurat stair, the stilt village steps, every cache reachable |
 
 Earlier commits in the repository (`3a0df7e`, `5ec6464`, `8fd3fed`) belong to
 `client-finder-run/` and have nothing to do with the game.
@@ -748,72 +781,81 @@ Earlier commits in the repository (`3a0df7e`, `5ec6464`, `8fd3fed`) belong to
 
 ## 10. Unfinished work and known issues
 
-### The Sunwells (in progress at hand-off)
+### The Sunwells (finished)
 
 Three Veyr sun-courts: **the Dawnwell** (Greensward, 338, 728), **the
 Noonwell** (Glasswood, 394, 14) and **the Duskwell** (Hollowpine edge,
 −338, 186). In each, a lens throws a beam of sunlight across a 5 × 5 grid
 of flagstones; crystal prisms on bronze turntables send the beam out of
 the side they face (turn one a quarter with E); pillars stop it. When the
-beam reaches the bronze sun on the vault door, the door sinks and the
-sealed cache (a Heartsong and more) can be searched. The beam only runs
-while the sun is up. The wells need 4, 9 and 12 turns and each has a
-single true path (`tests/unit/sunwells.test.ts`).
+beam reaches the bronze sun on the vault door, the door sinks, the light
+runs on into the vault and rests on its back wall, and the sealed cache
+(a Heartsong and more) can be searched. The beam only runs while the sun
+is up. The wells need 4, 9 and 12 turns and each has a single true path
+(`tests/unit/sunwells.test.ts`). Lighting all three completes Tock's
+**Burning Glass**, which pays out the **Veyr Spyglass** (about 4× zoom, a
+steadier hand; a named place held in its sights is marked on the compass
+and map with flag `spotted:<id>`).
 
-Lighting all three completes Tock's **Burning Glass**, which pays out the
-**Veyr Spyglass**: hold aim to look through it (about 4× zoom, a steadier
-hand, a round scope); a named place held in its sights for a moment is
-marked with its name on the compass and map (flag `spotted:<id>`), though
-walking up is still what discovers it.
+The look: the beam is a hot core inside a sheath of lit air (one shader
+on a wide cylinder; brightness comes from how far across the beam a pixel
+looks, measured square to the beam's axis so it holds up seen at a slant),
+flares at the lens, each lit prism and where the light lands, and dust
+drifting in the light. The paving uses a jointless flagstone texture
+(`stoneTextures.ts`, `slab`) tiled at 4.3 m so no two slabs match; moss
+grows in low cushions against the walls and pillars.
 
-Code: `src/story/sunwellLogic.ts` (rules), `src/story/Sunwells.ts` (the
-courts), wiring in `Game.ts`, `WorldLayout.ts` (pads with a `paved`
-square that suppresses grass), `generateWorld.ts`, `LandmarkData.ts`
-(`sealedBy` caches), `Landmarks.ts`, `StoryData.ts`, `items.ts`,
-`icons.ts`, `Viewmodel.ts`, `Hud.ts`, `hud.css`, `MapScreen.ts`,
-`AudioEngine.ts`. Playtest: `scripts/playtest-sunwells.mjs`. Starting a
-game or loading a save calls `Sunwells.sync()`, which puts each court back
-in step with its `lit:<id>` flag.
+`scripts/playtest-sunwells.mjs` (15 checks) solves all three, opens the
+vaults, pays out the spyglass, and walks each court: in through both open
+sides and from in front of each door into its vault.
+`scripts/capture-sunwells.mjs` pictures each court found, lit, close up
+and open.
 
-What still needs doing:
+### Solid set pieces (finished)
 
-1. **Get `scripts/playtest-sunwells.mjs` passing end to end.** Its first
-   full run passed 9 of 14 checks. The failures came from the test itself:
-   it called `setState('play')` part-way through, which starts a fresh game
-   and wipes quests and inventory (the script is now reordered so this only
-   happens before the quest state is loaded). That run also exposed a real
-   bug, a court staying solved after a new game, now fixed with
-   `Sunwells.sync()`. The re-run after both fixes passed its first 4 checks
-   (the courts stand, Burning Glass starts, the cache is sealed, the
-   Dawnwell opens) and was stopped there at hand-off.
-2. Look at the courts in daylight on a real GPU and tune the beam (width,
-   brightness, shimmer) and the stonework. Screenshots from the playtest
-   are in `artifacts/playtest/sunwells/`. From the first captures: the
-   moss patches on the border read as flat green mats (replace them with
-   something softer or drop them), and the Dawnwell sits on a sandy shore
-   by the sea, which works but was not planned.
-3. Check the spyglass spotting by hand: stand on a hill, look at a far
-   undiscovered place, hold right mouse.
-4. Walk each court: the parapet, pillars, pedestals and vault walls are
-   circle colliders; make sure nothing snags at the entrances.
+Landmarks and the story's set pieces (the Meridian wreck and camp, the
+Singing Stones, Tock's vault arch, the tail, the lookout, the Bellstones)
+are solid. `src/world/SolidField.ts` lays the same triangles the scene
+draws into 10 cm columns; each column keeps the heights where solid
+begins and ends and which way each top faces. A span rising more than a
+step above the feet is a wall (the player is pushed back along it);
+a top within a step is floor. So walls, hulls and statues stop you,
+doorways and arches let you through, stairs, decks and terraces can be
+walked, boulders stood on, and steep faces slide you off as terrain does.
+Arrows stop at walls, and animals turn away from them.
+
+- `Landmarks` feeds each part to the field before merging (flowers, lamps
+  and anything smaller than 30 cm are left out, and so is the floating
+  isle, which drifts). `Game` then adds the story's set pieces
+  (`SolidField.addObject`, which skips subtrees marked
+  `userData.moving`: the survivors, the Echo Lantern, Tock's vault door)
+  and packs the field. Tock's door is a wall of its own until the vault
+  opens (`StoryWorld.collidersNear`), like the Sunwell doors.
+- Built at boot in about 1.5 s on this machine (`timings.landmarksMs`
+  in the diagnostics), ~510,000 spans.
+- Changes made so every place stays reachable: the ziggurat has one grand
+  stair from the fen to the shrine (the old per-terrace stairs overlapped
+  into 1.5 m walls) and its cache now waits in the shrine; the stilt
+  village's huts have a metre of deck outside their walls and steep plank
+  steps from the fen floor to the first hut (the old ladder could not be
+  climbed), and its cache sits on that hut's floor instead of the fen bed;
+  Jonah Reed's doorway is tall enough to walk through; the Aurora
+  Overlook's platform is one step high with its cache on top; the Frozen
+  Titan's cache is outside the glacier; the Floating Isle's fallen rubble
+  no longer drifts with the isle.
+- `scripts/playtest-landmarks.mjs` (13 checks) walks into walls, through
+  the cabin door and the aqueduct, up the ziggurat and the stilt village,
+  along a boardwalk, and up to every landmark cache.
 
 ### Known issues and gaps
 
-- **Landmark set pieces have no colliders** (task "Solid landmarks"). You
-  can walk through the monastery walls, the galleon hull, the ziggurat and
-  so on. The fix: register circle colliders from the kit's boxes and
-  cylinders in `Landmarks.ts` (chains of circles along walls, as
-  `Building.ts` does), and walkable tops (steps, decks, floors) through
-  the player's `groundHeight` the way built floors work.
 - **Frame times on Apple silicon are unmeasured.** Presets were tuned by
-  eye and budget on software rendering. Measure on the M4 (Settings → Show
-  frame rate) and adjust `Quality.ts`.
+  eye and budget. Measure on the M4 (Settings → Show frame rate) and
+  adjust `Quality.ts`.
 - **Key rebinding** is not built (bindings are data in `Input.ts`).
-- One capture near the Dawnwell showed a white, branch-like shape floating
-  in the sky to the north-west (`artifacts/playtest/sunwells/spyglass.png`
-  from the first run). Possibly a flock of gulls up close or a tree
-  impostor drawn in the wrong place; worth a look.
-- The playtests take minutes on SwiftShader; on a real GPU they are fast.
+- The player cannot climb landmark walls (climbing reads the terrain
+  only), and wildlife only turns away from walls rather than steering
+  round them.
 - `docs/GAME_DESIGN.md` still describes a third-person game and seven
   survivors; see §2 for how the build differs.
 
@@ -822,32 +864,31 @@ What still needs doing:
 ## 11. What comes next
 
 In priority order. Each item should end playable, tested and documented.
+(The Sunwells and solid set pieces, items 1 and 2 at the last hand-off,
+are done; see §10.)
 
-1. **Finish the Sunwells** (above): get their playtest passing, look at
-   them in the browser, tune the beam and stonework, and **re-run every
-   playtest**. Several (movement,
-   survival, story, building, the Wardens, the Stillheart, the title) have
-   not run since the big `f4365c0` commit.
-2. **Solid landmarks:** colliders and walkable tops for every set piece.
-3. **Performance on the M4:** measure each preset, set Max and Extra High
-   to hold 60 fps where possible, and add GPU timing to the diagnostics.
-4. **Visual polish for "AAA":** bark and forest edges, denser grass near
+1. **Performance on the M4:** measure each preset, set Max and Extra High
+   to hold 60 fps where possible, and add GPU timing to the diagnostics
+   (`EXT_disjoint_timer_query_webgl2` is available in Chrome).
+2. **Visual polish for "AAA":** bark and forest edges, denser grass near
    the camera on High and above, creature detail (fur shells, better
    silhouettes), wet surfaces in rain, better cave light.
-5. **Key rebinding** in Settings → Controls, with controller prompts.
-6. **More puzzle types:** echo bridges (visible only through the Echo
+3. **Key rebinding** in Settings → Controls, with controller prompts.
+4. **More puzzle types:** echo bridges (visible only through the Echo
    Lantern), wisp chases, sealed glyph doors.
-7. **The remaining survivors** from the design: Pell (stilt village),
+5. **The remaining survivors** from the design: Pell (stilt village),
    Sister Maudra (monastery), Corwin (galleon), with quests and camp
-   services; affinity.
-8. **Traversal gear:** the Wingsail glider (updrafts from vents and cliffs),
-   climbing picks, the Resonance Hook.
-9. **Endings:** Seren Vey at the Crown, and the Sustain and Retune endings.
-10. **More world events:** the Wanderer colossus, time-slips, resonance
-    storms, messages in bottles.
-11. **Building tiers** (stone, reinforced) and clothing and armour tiers
-    (fur for cold, ashweave for heat).
-12. **Release:** a production build hosted as a static site.
+   services; affinity. The stilt village and ziggurat can now be walked,
+   so Pell's home is ready for him.
+6. **Traversal gear:** the Wingsail glider (updrafts from vents and cliffs),
+   climbing picks (and climbing set-piece walls, which today only reads
+   the terrain), the Resonance Hook.
+7. **Endings:** Seren Vey at the Crown, and the Sustain and Retune endings.
+8. **More world events:** the Wanderer colossus, time-slips, resonance
+   storms, messages in bottles.
+9. **Building tiers** (stone, reinforced) and clothing and armour tiers
+   (fur for cold, ashweave for heat).
+10. **Release:** a production build hosted as a static site.
 
 ---
 
@@ -869,6 +910,20 @@ In priority order. Each item should end playable, tested and documented.
   darkness must reach well past the cave radius or sunlight leaks onto
   walls.
 - **Never `pkill -f` a pattern that matches your own shell command.**
+- **Keep browser profiles and other test output under `artifacts/`.** The
+  dev server's file watcher ignores that folder; a Chromium profile
+  anywhere else in the project crashes the watcher on Windows (`EBUSY`).
+- **A waypoint walker must brake.** The player keeps about 0.4 m of
+  momentum at walking speed, so a test that runs up to a mark and turns
+  goes over ledges a careful player would not. Step in short moves near
+  the mark and stop before turning (see `follow` in
+  `playtest-landmarks.mjs`).
+- **Solid geometry changes what is reachable.** When a set piece becomes
+  solid, walk to its cache (the landmarks playtest does, for all of
+  them): several caches were inside walls, stairs or ice and nobody had
+  noticed while everything was walk-through.
+- The pale lattice seen on the north-west skyline from the Dawnwell is the
+  Crown over the Stillheart, not a stray impostor.
 - **The ocean and sky are the most expensive passes;** Max doubles cloud
   resolution and view distance, which is where an M4 base model may need
   Extra High instead.

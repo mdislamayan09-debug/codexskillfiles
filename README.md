@@ -44,7 +44,7 @@ lands with a test that drives the real game in a browser.
 | M1 Playable core | The island, rendering, movement, sound, HUD | ✅ Done |
 | M2 Survival and building | Needs, gathering, crafting, building, farming, saves | ✅ Done |
 | M3 Creatures and combat | Wildlife, birds, melee, archery, dodge, guard, parry | ✅ Done |
-| M4 World content | Landmarks, caves, curiosities, puzzles | 🟡 Almost: Sunwell puzzles being finished |
+| M4 World content | Landmarks, caves, curiosities, puzzles | ✅ Done (more puzzle types planned) |
 | M5 Story and survivors | Survivors, main quest, side stories | ✅ Done (four of the seven survivors designed) |
 | M6 Wardens and endgame | Five Wardens, the Stillheart, the ending | ✅ Done (one of three endings) |
 | M7 Weather and world events | Weather, hazards, meteor showers, eclipses | ✅ Done |
@@ -77,21 +77,23 @@ full of things to find.
   into Hallowmere to release the note. Seven side quests.
 - **Places:** 28 landmarks with caches and journal pages, four caves you
   walk into (dark without a torch), and about seventy curiosities between
-  them: carved cairns, lost packs, shrines and echo stones.
+  them: carved cairns, lost packs, shrines and echo stones. The set pieces
+  are solid: walls stop you, and you can climb the ziggurat's grand stair
+  to its shrine, walk the stilt village's boardwalks above the fen, step
+  under the aqueduct's arches and into Jonah Reed's cabin.
 - **Sky events:** meteor showers with a fallen star to find (its metal makes
   a Starglass Lantern), and eclipses.
-- **Just added, being finished:** the three **Sunwells**, light puzzles
-  where you turn crystal prisms to carry a sunbeam to a vault door, and
-  Tock's side story *Burning Glass*, which rewards a **spyglass** that marks
-  far places on your map.
+- **Light puzzles:** the three **Sunwells**, where you turn crystal prisms
+  to carry a beam of sunlight across a paved court to a vault door, and
+  Tock's side story *Burning Glass*, which rewards a **spyglass** that
+  marks far places on your map.
 - **Interface:** compass, map with fog of war, journal, inventory and
   crafting, title screen, full settings, subtitles, colour-blind filters,
   reduced motion, and full controller support.
 
-**Tests:** 66 unit tests, 14 browser playtests and 6 capture scripts. Typecheck is clean.
+**Tests:** 73 unit tests and 18 browser playtests and captures, all passing on a real GPU (`node scripts/playtest-all.mjs --gpu`). Typecheck is clean.
 
-**Known gaps:** landmark buildings are not yet solid (you can walk through
-their walls), frame rates have not been measured on a real M4, key
+**Known gaps:** frame rates have not been measured on a real M4, key
 rebinding is missing, and some of the design (three more survivors, the
 glider, two more endings) is not built yet.
 
@@ -101,29 +103,23 @@ glider, two more endings) is not built yet.
 
 In order:
 
-1. **Finish the Sunwells.** Get their playtest passing end to end (it was
-   stopped part-way at hand-off), check them in the browser in daylight,
-   tune the beam and stonework, try the spyglass from a hilltop, and re-run every
-   playtest (several have not run since the last big feature commit).
-2. **Solid landmarks.** Give every building, wall, hull and statue
-   colliders, and let the player walk on steps, decks and floors.
-3. **Performance on the M4.** Measure each preset, make Extra High and Max
+1. **Performance on the M4.** Measure each preset, make Extra High and Max
    hold 60 fps where possible, add GPU timing to the diagnostics.
-4. **Visual polish.** Bark and forest edges, denser grass close up on High
+2. **Visual polish.** Bark and forest edges, denser grass close up on High
    and above, creature detail, wet surfaces in rain, better cave lighting.
-5. **Key rebinding** in Settings → Controls.
-6. **More puzzles:** echo bridges seen only through the Echo Lantern, wisp
+3. **Key rebinding** in Settings → Controls.
+4. **More puzzles:** echo bridges seen only through the Echo Lantern, wisp
    chases, sealed glyph doors.
-7. **Three more survivors:** Pell, Sister Maudra and Corwin, with their
+5. **Three more survivors:** Pell, Sister Maudra and Corwin, with their
    quests and what they do at camp.
-8. **Traversal gear:** the Wingsail glider, climbing picks, the Resonance
+6. **Traversal gear:** the Wingsail glider, climbing picks, the Resonance
    Hook.
-9. **The full ending:** Seren Vey at the Crown, and the Sustain and Retune
+7. **The full ending:** Seren Vey at the Crown, and the Sustain and Retune
    endings.
-10. **More world events:** the Wanderer colossus, time-slips, resonance
-    storms.
-11. **Tiers:** stone and reinforced building, fur and ashweave clothing.
-12. **Release:** host the production build as a website.
+8. **More world events:** the Wanderer colossus, time-slips, resonance
+   storms.
+9. **Tiers:** stone and reinforced building, fur and ashweave clothing.
+10. **Release:** host the production build as a website.
 
 ---
 
@@ -188,11 +184,13 @@ back, and left/right adjusts sliders.
 npm run typecheck                      # TypeScript
 npm test                               # unit tests (vitest)
 node scripts/playtest-sunwells.mjs     # a browser playtest; needs npm run dev
+node scripts/playtest-all.mjs          # every playtest, two at a time
 ```
 
 The browser playtests in `scripts/` drive the real game through
 `window.__THREE_GAME_TEST_HOOKS__` in headless Chromium and write
-screenshots to `artifacts/playtest/`.
+screenshots to `artifacts/playtest/`. They render on your graphics card
+when there is one (`--swiftshader` forces software rendering).
 
 | Document | What it is |
 | --- | --- |

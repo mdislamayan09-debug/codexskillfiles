@@ -7,6 +7,7 @@ import { applyTriplanar, getStoneTextures } from '../render/props/stoneTextures'
 import { getWoodTextures } from '../render/props/woodTextures';
 import { generateRock, type RockKind } from '../world/props/RockGenerator';
 import type { Caves } from '../world/Caves';
+import { SolidField } from '../world/SolidField';
 import type { WorldData } from '../world/WorldData';
 import { LANDMARKS, type LandmarkDef } from '../world/WorldLayout';
 import type { Interactable } from './StoryWorld';
@@ -36,6 +37,8 @@ interface Piece {
   cx: number;
   cy: number;
   cz: number;
+  /** Where the cache stands, when not on the ground (a floor, a terrace). */
+  cacheY?: number;
 }
 
 
@@ -46,6 +49,8 @@ function mat(color: number, roughness = 0.85, metalness = 0, emissive = 0, emiss
 export class Landmarks {
   readonly group = new THREE.Group();
   readonly materials: THREE.MeshStandardMaterial[] = [];
+  /** Walls to walk into and floors, steps and decks to walk on. */
+  readonly solids = new SolidField();
   private readonly m: Record<Mat, THREE.MeshStandardMaterial>;
   private readonly rng = createRng(0x1a4d);
   private readonly beam: THREE.Mesh;
@@ -220,8 +225,24 @@ export class Landmarks {
     this.put(p, natural, geo, dx, this.g(p.cx + dx, p.cz + dz) + lift, dz, 0, seed);
   }
 
-  /** Merge a place's parts, one mesh per material. */
+  /**
+   * Merge a place's parts, one mesh per material. Everything that stands on
+   * the ground is solid too, except flowers, lamps and anything too small
+   * to trip over (and the floating isle, which drifts out of reach).
+   */
   private flush(p: Piece, parent: THREE.Object3D): void {
+    if (parent !== this.isle) {
+      for (const [m, list] of p.parts) {
+        if (m === 'red' || m === 'lamp') continue;
+        for (const g of list) {
+          if (g.userData.ghost) continue;
+          g.computeBoundingBox();
+          const b = g.boundingBox as THREE.Box3;
+          if (Math.max(b.max.x - b.min.x, b.max.z - b.min.z) < 0.3 && b.max.y - b.min.y < 0.6) continue;
+          this.solids.add(g);
+        }
+      }
+    }
     for (const [m, list] of p.parts) {
       const geo = mergeGeometries(
         list.map((g) => {
@@ -246,7 +267,7 @@ export class Landmarks {
     const deep = this.caves?.cacheSpots().find((c) => c.id === p.lm.id);
     const x = deep ? deep.x : p.cx + at[0];
     const z = deep ? deep.z : p.cz + at[1];
-    const y = deep ? deep.y : this.g(x, z) + (at[2] ?? 0);
+    const y = deep ? deep.y : (p.cacheY ?? this.g(x, z) + (at[2] ?? 0));
     // A small iron-banded crate (or urn) to search.
     const crate = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.55), this.m.plank);
@@ -407,7 +428,8 @@ export class Landmarks {
         this.put(p, 'wood', new THREE.CylinderGeometry(0.17, 0.17, 5.4, 8), 0, y, -2, 0, 0, Math.PI / 2);
         if (r < 6 || r === 7) this.put(p, 'wood', new THREE.CylinderGeometry(0.17, 0.17, 5.4, 8), 0, y, 2, 0, 0, Math.PI / 2);
         this.put(p, 'wood', new THREE.CylinderGeometry(0.17, 0.17, 4.4, 8), -2.6, y, 0, Math.PI / 2, 0, 0);
-        if (r > 4) this.put(p, 'wood', new THREE.CylinderGeometry(0.17, 0.17, 4.4, 8), 2.6, y, 0, Math.PI / 2, 0, 0);
+        // The east side is the doorway, tall enough to walk in upright.
+        if (r > 5) this.put(p, 'wood', new THREE.CylinderGeometry(0.17, 0.17, 4.4, 8), 2.6, y, 0, Math.PI / 2, 0, 0);
       }
       for (const side of [-1, 1]) this.put(p, 'plank', new THREE.BoxGeometry(6, 0.12, 2.8), 0, p.cy + 3.2, side * 1.2, side * 0.55, 0, 0);
       this.put(p, 'stone', new THREE.BoxGeometry(0.8, 4.2, 0.8), -2.3, p.cy + 2.1, -1.3);
@@ -484,8 +506,11 @@ export class Landmarks {
       for (const side of [-1, 1]) this.put(p, 'stone', new THREE.BoxGeometry(0.8, 2.8, 0.9), side * 1.8, top + 2, -3.6);
       this.put(p, 'stone', new THREE.CylinderGeometry(3.5, 3.5, 0.6, 20), 0, top + 0.9, 0);
       this.put(p, 'song', new THREE.OctahedronGeometry(1.1, 0), 0, top + 3.2, 0);
-      // Fallen rubble below where the reliquary landed.
-      for (let i = 0; i < 8; i += 1) this.rock(p, 'dark', 2800 + i, 'boulder', 1 + this.rng() * 1.4, (this.rng() - 0.5) * 18, (this.rng() - 0.5) * 18, -0.3);
+      // Fallen rubble below where the reliquary landed: on the ground, so it
+      // stays put while the isle drifts overhead.
+      const fallen: Piece = { lm: p.lm, parts: new Map(), cx: p.cx, cy: p.cy, cz: p.cz };
+      for (let i = 0; i < 8; i += 1) this.rock(fallen, 'dark', 2800 + i, 'boulder', 1 + this.rng() * 1.4, (this.rng() - 0.5) * 18, (this.rng() - 0.5) * 18, -0.3);
+      this.flush(fallen, this.group);
     },
     echo_garden(this: Landmarks, p) {
       for (let i = 0; i < 8; i += 1) {
@@ -787,10 +812,12 @@ export class Landmarks {
       }
     },
     aurora_overlook(this: Landmarks, p) {
-      this.cyl(p, 'stone', 5, 5.4, 0.8, 0, 0, -0.2, 20);
+      // A round platform one step up, ringed with cairns.
+      this.cyl(p, 'stone', 5, 5.4, 0.8, 0, 0, -0.4, 20);
+      p.cacheY = p.cy + 0.4;
       for (let i = 0; i < 7; i += 1) {
         const a = (i / 7) * Math.PI * 2;
-        for (let k = 0; k < 4; k += 1) this.rock(p, 'stone', 3500 + i * 4 + k, 'pebble', 0.6 - k * 0.1, Math.cos(a) * 4.5, Math.sin(a) * 4.5, 0.6 + k * 0.45);
+        for (let k = 0; k < 4; k += 1) this.rock(p, 'stone', 3500 + i * 4 + k, 'pebble', 0.6 - k * 0.1, Math.cos(a) * 4.5, Math.sin(a) * 4.5, 0.4 + k * 0.45);
       }
       this.put(p, 'brass', new THREE.TorusGeometry(1.2, 0.08, 6, 24), 0, p.cy + 1.8, 0, Math.PI / 2 - 0.5, 0, 0);
       this.cyl(p, 'dark', 0.12, 0.15, 1.3, 0, 0, 0.5, 8);
@@ -807,7 +834,8 @@ export class Landmarks {
       ];
       const deck = this.world.waterLevelAt(p.cx, p.cz) + 1.6;
       const W = 3.6;
-      const Hh = 2.4;
+      // Tall enough that the eaves clear a head on the ledge below them.
+      const Hh = 2.7;
       for (const [x, z, yaw] of houses) {
         const rot = (dx: number, dz: number): [number, number] => [x + dx * Math.cos(yaw) - dz * Math.sin(yaw), z + dx * Math.sin(yaw) + dz * Math.cos(yaw)];
         for (const [a, b] of [
@@ -821,7 +849,9 @@ export class Landmarks {
           const h = deck + 0.3 - base;
           if (h > 0) this.put(p, 'wood', new THREE.CylinderGeometry(0.14, 0.17, h + 0.6, 6), px, base - 0.3 + (h + 0.6) / 2, pz);
         }
-        this.put(p, 'plank', new THREE.BoxGeometry(4.6, 0.2, 4.6), x, deck + 0.3, z, 0, yaw, 0);
+        // The deck runs a metre out past the walls: a ledge to walk round
+        // from the door to the boardwalks.
+        this.put(p, 'plank', new THREE.BoxGeometry(5.6, 0.2, 5.6), x, deck + 0.3, z, 0, yaw, 0);
         // Walls: a door at the front, a window each side.
         const walls: [number, number, number, { x: number; y: number; w: number; h: number }[]][] = [
           [0, W / 2, 0, [{ x: 0.5, y: 0.15, w: 0.9, h: 1.8 }]],
@@ -860,13 +890,22 @@ export class Landmarks {
           if (h > 0) this.put(p, 'wood', new THREE.CylinderGeometry(0.1, 0.12, h + 0.5, 5), px, base - 0.5 + (h + 0.5) / 2, pz);
         }
       }
-      // A ladder down to a moored punt.
-      for (let r = 0; r < 6; r += 1) this.put(p, 'wood', new THREE.CylinderGeometry(0.03, 0.03, 0.8, 4), 2.3, deck + 0.2 - r * 0.32, 2.4, 0, 0, Math.PI / 2);
-      this.put(p, 'plank', new THREE.BoxGeometry(1.2, 0.3, 3.6), 3.4, this.world.waterLevelAt(p.cx + 3.4, p.cz + 3) + 0.1, 3);
+      // Steep plank steps from the fen floor up to the first hut, the way up
+      // out of the water, with a punt moored alongside.
+      const water = this.world.waterLevelAt(p.cx + 2, p.cz + 4);
+      const foot = this.g(p.cx + 2, p.cz + 5);
+      const flight = deck + 0.4 - foot;
+      const treads = Math.ceil(flight / 0.3);
+      const steps = stairs(0.8, treads, flight / treads, 0.3);
+      steps.rotateY(Math.PI);
+      this.put(p, 'plank', steps, 2, foot, 2.8 + treads * 0.3);
+      this.put(p, 'plank', new THREE.BoxGeometry(1.2, 0.3, 3.6), 3, water + 0.1, 4.2);
+      p.cacheY = deck + 0.4;
     },
     ziggurat(this: Landmarks, p) {
-      // Five dressed terraces climbing to a shrine, a stair up the face of
-      // each, song-lines in the risers, and a corner or two fallen away.
+      // Five dressed terraces climbing to a shrine, one grand stair up the
+      // front from the mud to the top, song-lines in the risers, and a
+      // corner or two fallen away.
       const base = this.g(p.cx, p.cz) - 1.5;
       const H = 3;
       for (let k = 0; k < 5; k += 1) {
@@ -875,19 +914,28 @@ export class Landmarks {
         this.put(p, k % 2 ? 'stone' : 'dark', new THREE.BoxGeometry(s, H, s), 0, y + H / 2, 0);
         // A cornice lip round each terrace.
         this.put(p, 'dark', new THREE.BoxGeometry(s + 0.4, 0.3, s + 0.4), 0, y + H - 0.15, 0);
-        // The glowing line in the front riser.
-        this.put(p, 'song', new THREE.BoxGeometry(s * 0.3, 0.16, 0.12), 0, y + H * 0.55, s / 2 + 0.05);
-        // The stair up this terrace, centred on the front.
-        const st = stairs(3.2, 8, H / 8, 0.42);
-        st.rotateY(Math.PI);
-        this.put(p, 'stone', st, 0, y, s / 2 + 8 * 0.42);
-        // Balustrade posts either side of the stair.
-        for (const side of [-1, 1]) this.put(p, 'dark', new THREE.BoxGeometry(0.4, 1, 0.4), side * 2, y + H + 0.5, s / 2 - 0.4);
+        // The glowing lines in the front riser, either side of the stair.
+        for (const side of [-1, 1]) this.put(p, 'song', new THREE.BoxGeometry(s * 0.2, 0.16, 0.12), side * (2.2 + s * 0.12), y + H * 0.55, s / 2 + 0.05);
         // A fallen corner block on the lower terraces.
         if (k < 3) this.rock(p, 'stone', 3600 + k, 'slab', 1.1 + k * 0.2, (k % 2 ? 1 : -1) * (s / 2 + 1.5), (k % 2 ? -1 : 1) * (s / 2 - 1), -0.3, 0.7);
       }
+      // The stair: 45 steps of a third of a metre, from well out in front up
+      // to the top terrace's edge, with a low wall down each side.
+      const treads = 45;
+      const run = 0.4;
+      const flight = stairs(3.2, treads, (5 * H) / treads, run);
+      flight.rotateY(Math.PI);
+      this.put(p, 'stone', flight, 0, base, 3 + treads * run);
+      for (const side of [-1, 1]) {
+        for (let k = 0; k < treads; k += 3) {
+          const z = 3 + (treads - k) * run - run * 1.5;
+          const top = base + ((k + 3) * 5 * H) / treads;
+          this.put(p, 'dark', new THREE.BoxGeometry(0.5, 1.9, run * 3), side * 1.85, top - 0.25, z);
+        }
+      }
       // The shrine: four columns, a slab roof and the song within.
       const top = base + 5 * H;
+      p.cacheY = top;
       for (const [x, z] of [
         [-1.6, -1.6],
         [1.6, -1.6],
