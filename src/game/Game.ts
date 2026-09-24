@@ -17,6 +17,7 @@ import { WorldData } from '../world/WorldData';
 import { loadWorld } from '../world/WorldLoader';
 import { viewpointByName, VIEWPOINTS } from './Viewpoints';
 import { createFullscreenMaterial, FullscreenPass } from '../render/FullscreenPass';
+import { WaterSystem, type WaterSample } from '../render/water/WaterSystem';
 
 export type ProgressReporter = (stage: string, fraction: number) => void;
 
@@ -41,6 +42,7 @@ export class Game {
   vegetation!: VegetationSystem;
   vegetationShared!: VegetationShared;
   foliageTextures!: FoliageTextures;
+  water!: WaterSystem;
 
   private running = false;
   private rafId = 0;
@@ -57,6 +59,8 @@ export class Game {
   private readonly errors: string[] = [];
   private debugTexturePass: FullscreenPass | null = null;
   private readonly timings: Record<string, number> = {};
+  private readonly light = { direction: new THREE.Vector3(0, 1, 0), color: new THREE.Color(), intensity: 0 };
+  private readonly waterSample: WaterSample = { surface: 0, depth: 0, kind: 0, flowX: 0, flowZ: 0, frozen: false, hot: false, turbidity: 0 };
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const params = new URLSearchParams(location.search);
@@ -127,6 +131,15 @@ export class Game {
     this.scene.add(this.vegetation.group);
     this.timings.vegetationMs = performance.now() - t3;
 
+    progress('Filling the seas', 0.2);
+    await nextFrame();
+    const t4 = performance.now();
+    this.water = new WaterSystem(this.renderer, this.world, this.quality);
+    this.lighting.setupMaterial(this.water.material);
+    this.lighting.setupMaterial(this.water.iceMaterial);
+    this.scene.add(this.water.group);
+    this.timings.waterMs = performance.now() - t4;
+
     this.flyCam = new FlyCamera(this.camera, this.input, this.world);
     const start = viewpointByName(params.get('view') ?? 'crash-site') ?? VIEWPOINTS[0];
     this.applyViewpoint(start.name);
@@ -196,8 +209,11 @@ export class Game {
     // Dominant light for shadows: whichever of sun/moon is brighter here.
     const sunI = SUN_ILLUMINANCE * THREE.MathUtils.smoothstep(this.sunDir.y, -0.04, 0.06);
     const moonI = MOON_ILLUMINANCE * (0.25 + 0.75 * moonLight) * THREE.MathUtils.smoothstep(this.moonDir.y, -0.02, 0.1);
-    if (sunI >= moonI) this.lighting.update(this.sunDir, a.uSunColor.value, sunI);
-    else this.lighting.update(this.moonDir, a.uMoonColor.value, moonI);
+    const useSun = sunI >= moonI;
+    this.light.direction.copy(useSun ? this.sunDir : this.moonDir);
+    this.light.color.copy(useSun ? a.uSunColor.value : a.uMoonColor.value);
+    this.light.intensity = useSun ? sunI : moonI;
+    this.lighting.update(this.light.direction, this.light.color, this.light.intensity);
     void dt;
   }
 
@@ -209,6 +225,9 @@ export class Game {
     this.vegetationShared.uTime.value = this.reducedMotion ? 0 : this.elapsed;
     this.vegetation.update(this.camera);
     this.renderer.info.reset();
+    const time = this.reducedMotion ? 0 : this.elapsed;
+    this.water.update(this.renderer, this.camera, time, { color: this.pipeline.opaqueColor, depth: this.pipeline.opaqueDepth }, this.light);
+    this.updateUnderwater();
     this.pipeline.render(
       dt,
       {
@@ -232,6 +251,19 @@ export class Game {
     this.publishDiagnostics();
   }
 
+  /** Underwater post effects when the camera dips below a water surface. */
+  private updateUnderwater(): void {
+    const cam = this.camera.position;
+    const w = this.water.sample(cam.x, cam.z, this.waterSample);
+    const below = Number.isFinite(w.surface) && !w.frozen && cam.y < w.surface - 0.05;
+    const post = this.pipeline.post;
+    post.underwater = below ? 1 : 0;
+    if (below) {
+      const murk = w.turbidity;
+      post.underwaterColor.setRGB(0.01 + 0.02 * murk, 0.05 + 0.01 * murk, 0.06 - 0.03 * murk);
+    }
+  }
+
   /** Debug: draw a baked texture-array layer over the frame (null to clear). */
   showTexture(name: string | null, layer = 0): void {
     this.debugTexturePass?.dispose();
@@ -246,28 +278,43 @@ export class Game {
       groundNormal: this.baker.normalRough.texture,
       impostor: this.vegetation.impostors.albedo.texture,
       impostorNormal: this.vegetation.impostors.normal.texture,
+      foam: this.water.foamTarget.texture,
+      waveDisp: this.water.waves.displacement(0),
+      waveDeriv: this.water.waves.derivatives(1),
     };
     const tex = sources[name];
     if (!tex) throw new Error(`Unknown texture ${name}`);
     const srgb = tex.colorSpace === THREE.SRGBColorSpace;
+    const isArray = (tex as THREE.DataArrayTexture).isDataArrayTexture === true;
+    const sampler = isArray ? 'sampler2DArray' : 'sampler2D';
+    const fetch = isArray ? 'texture(uTex, vec3(f, uLayer))' : 'texture(uTex, f) * uScale + uBias';
     this.debugTexturePass = new FullscreenPass(
       createFullscreenMaterial({
         fragmentShader: /* glsl */ `
           precision highp sampler2DArray;
-          uniform sampler2DArray uTex;
+          uniform ${sampler} uTex;
           uniform float uLayer;
           uniform float uSrgb;
+          uniform float uScale;
+          uniform float uBias;
           varying vec2 vUv;
           void main() {
             vec2 uv = vUv * vec2(1.7778, 1.0);
             vec2 cell = floor(uv);
             vec2 f = fract(uv);
-            vec4 t = texture(uTex, vec3(f, uLayer));
+            vec4 t = ${fetch};
             vec3 c = mix(vec3(0.5) + 0.1 * mod(floor(f.x * 16.0) + floor(f.y * 16.0), 2.0), t.rgb, t.a > 0.0 ? t.a : 1.0);
             if (uSrgb > 0.5) c = pow(c, vec3(1.0 / 2.2));
             gl_FragColor = vec4(cell.x > 0.5 ? vec3(t.a) : c, 1.0);
           }`,
-        uniforms: { uTex: { value: tex }, uLayer: { value: layer }, uSrgb: { value: srgb ? 1 : 0 } },
+        uniforms: {
+          uTex: { value: tex },
+          uLayer: { value: layer },
+          uSrgb: { value: srgb ? 1 : 0 },
+          // Signed float data (waves) is remapped around mid-grey.
+          uScale: { value: tex.type === THREE.HalfFloatType ? 0.5 : 1 },
+          uBias: { value: tex.type === THREE.HalfFloatType ? 0.5 : 0 },
+        },
       }),
     );
   }
@@ -381,6 +428,7 @@ export class Game {
         hours: this.clock.hours,
         terrainNodes: this.terrain?.selectedNodes ?? 0,
         trees: this.vegetation ? { ...this.vegetation.stats } : null,
+        water: this.water ? this.water.stats : null,
         quality: this.quality.name,
       },
       timings: { ...this.timings },

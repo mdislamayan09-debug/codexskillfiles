@@ -29,7 +29,7 @@ export const LAYER_NORMAL_STRENGTH = [1.2, 1.3, 1.6, 1.5, 1.8, 1.0, 2.4, 2.2, 1.
 /** Height-blend sharpness contribution (how strongly height wins transitions). */
 export const LAYER_HEIGHT_BIAS = [0.3, 0.3, 0.35, 0.45, 0.25, 0.1, 0.8, 0.8, 0.15, 0.6, 0.4, 0.25, 0.7, 0.4];
 
-const NOISE_LIB = /* glsl */ `
+export const NOISE_LIB = /* glsl */ `
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 hash22(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
 vec3 hash32(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yzz) * p3.zyx); }

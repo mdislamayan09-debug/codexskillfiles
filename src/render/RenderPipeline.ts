@@ -132,6 +132,9 @@ export class RenderPipeline {
     this.cloudUniforms.uCloudWeather.value = dummyWeather;
     installAtmosphereChunks({ ...this.atmosphere.uniforms, ...this.cloudUniforms, uLightDir: this.lightDir });
     installShadowProxyLayer(renderer, LAYER_SHADOW_PROXY);
+    // Any Fog instance turns on USE_FOG; the chunks it enables are replaced by
+    // aerial perspective, height fog and cloud-shadow visibility.
+    scene.fog = new THREE.Fog(0xffffff, 1, 2);
     renderer.shadowMap.autoUpdate = false;
     renderer.autoClear = false;
     this.sky = new SkyRenderer(renderer, this.atmosphere);

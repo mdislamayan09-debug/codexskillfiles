@@ -184,6 +184,28 @@ export function adoptCsmHook(material: THREE.Material): void {
   rebuildHook(material, state);
 }
 
+// Three's own lights_fragment_begin, captured before CSM swaps in its copy.
+const CORE_LIGHTS_FRAGMENT_BEGIN = THREE.ShaderChunk.lights_fragment_begin;
+const INCIDENT_LIGHT_DECL = 'IncidentLight directLight;';
+
+/**
+ * CSM ships an older lights_fragment_begin that never initialises the
+ * split-sum DFG term or the multi-scattering compensation. Without them every
+ * CSM material loses its image-based specular and its direct specular goes to
+ * zero. Graft the missing block from the core chunk back in.
+ */
+function repairCsmLightsChunk(): void {
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  if (chunk.includes('material.dfg')) return;
+  const start = CORE_LIGHTS_FRAGMENT_BEGIN.indexOf('#ifdef STANDARD');
+  const end = CORE_LIGHTS_FRAGMENT_BEGIN.indexOf(INCIDENT_LIGHT_DECL);
+  if (start < 0 || end < 0 || end < start || !chunk.includes(INCIDENT_LIGHT_DECL)) {
+    throw new Error('Could not repair CSM lights chunk (Three.js chunk changed?)');
+  }
+  const block = CORE_LIGHTS_FRAGMENT_BEGIN.slice(start, end);
+  THREE.ShaderChunk.lights_fragment_begin = chunk.replace(INCIDENT_LIGHT_DECL, `${block}\n${INCIDENT_LIGHT_DECL}`);
+}
+
 const DIR_LIGHT_INFO = /getDirectionalLightInfo\(\s*directionalLights?(?:\[\s*\w+\s*\])?\s*,\s*directLight\s*\);/g;
 
 /**
@@ -192,6 +214,7 @@ const DIR_LIGHT_INFO = /getDirectionalLightInfo\(\s*directionalLights?(?:\[\s*\w
  * new CSM instance re-injects it).
  */
 export function patchDirectionalLightVisibility(): void {
+  repairCsmLightsChunk();
   const chunk = THREE.ShaderChunk.lights_fragment_begin;
   if (chunk.includes('atmoSunVisibility')) return;
   let count = 0;

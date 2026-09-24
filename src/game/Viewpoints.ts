@@ -16,6 +16,7 @@ export const VIEWPOINTS: readonly Viewpoint[] = [
   { name: 'meadow-golden', x: -60, z: 760, height: 2.4, target: [-260, 520, 10], hour: 18.9 },
   { name: 'hollowpine', x: -546, z: 2, height: 1.8, target: [-470, -120, 6], hour: 10.5 },
   { name: 'mirror-lake', x: -380, z: 300, height: 4, target: [-520, 260, 0], hour: 16.8 },
+  { name: 'beach', x: 6, z: 872, height: 1.7, target: [70, 1000, 0], hour: 15.5 },
   { name: 'coast-cliffs', x: 806, z: -60, height: 3, target: [860, 260, 0], hour: 17.3 },
   { name: 'peaks', x: -250, z: -420, height: 2.2, target: [-420, -760, 120], hour: 13 },
   { name: 'volcano', x: 380, z: -420, height: 3, target: [560, -640, 120], hour: 11.5 },

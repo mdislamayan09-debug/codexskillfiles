@@ -36,6 +36,13 @@ export interface QualitySettings {
   impostorDistance: number;
   farPlane: number;
   anisotropy: number;
+  /** Sea surface grid vertices per side. */
+  waterGrid: number;
+  /** Screen-space reflection march steps on water (0 = sky/env only). */
+  waterReflectionSteps: number;
+  /** Wave cascade texture size and spectrum samples per cascade. */
+  waveResolution: number;
+  wavesPerCascade: number;
 }
 
 export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
@@ -60,6 +67,10 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     impostorDistance: 90,
     farPlane: 4200,
     anisotropy: 2,
+    waterGrid: 128,
+    waterReflectionSteps: 0,
+    waveResolution: 128,
+    wavesPerCascade: 32,
   },
   medium: {
     name: 'medium',
@@ -82,6 +93,10 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     impostorDistance: 130,
     farPlane: 5500,
     anisotropy: 4,
+    waterGrid: 160,
+    waterReflectionSteps: 16,
+    waveResolution: 256,
+    wavesPerCascade: 40,
   },
   high: {
     name: 'high',
@@ -104,6 +119,10 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     impostorDistance: 170,
     farPlane: 7000,
     anisotropy: 8,
+    waterGrid: 200,
+    waterReflectionSteps: 24,
+    waveResolution: 256,
+    wavesPerCascade: 48,
   },
   extra: {
     name: 'extra',
@@ -126,6 +145,10 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     impostorDistance: 230,
     farPlane: 9000,
     anisotropy: 16,
+    waterGrid: 256,
+    waterReflectionSteps: 32,
+    waveResolution: 256,
+    wavesPerCascade: 56,
   },
   max: {
     name: 'max',
@@ -148,6 +171,10 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     impostorDistance: 300,
     farPlane: 11000,
     anisotropy: 16,
+    waterGrid: 320,
+    waterReflectionSteps: 40,
+    waveResolution: 256,
+    wavesPerCascade: 64,
   },
 };
 
