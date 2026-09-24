@@ -410,6 +410,7 @@ export class Structures {
     if (data.type === 'rain_collector') data.water = 0;
     this.add(data);
     this.events.emit('notify', { text: `${NAMES[data.type]} placed`, icon: data.type === 'campfire' ? 'campfire' : 'build', tone: 'good' });
+    this.events.emit('crafted', { recipe: 'place', item: data.type, count: 1 });
     return data;
   }
 

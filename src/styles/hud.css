@@ -630,7 +630,7 @@
 .hud-subtitle {
   position: absolute;
   left: 50%;
-  bottom: 104px;
+  bottom: 128px;
   transform: translateX(-50%);
   max-width: min(780px, 90vw);
   padding: 7px 14px;

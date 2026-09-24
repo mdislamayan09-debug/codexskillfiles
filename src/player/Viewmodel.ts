@@ -104,7 +104,8 @@ export class Viewmodel {
     this.root.name = 'viewmodel';
     this.light = new THREE.PointLight(0xffa35a, 0, 14, 2);
     this.light.castShadow = false;
-    this.light.position.set(0.25, 0.1, -0.5);
+    // Held lights sit ahead of the hand so the glove isn't blown out.
+    this.light.position.set(0.05, 0.4, -1.1);
     this.root.add(this.light);
     this.root.add(this.arm);
     this.buildArm();
@@ -224,7 +225,7 @@ export class Viewmodel {
       flame.position.y = 0.52;
       g.add(flame);
       visual.flame = flame;
-      visual.light = { color: new THREE.Color(1, 0.62, 0.32), intensity: 26, flicker: 0.25 };
+      visual.light = { color: new THREE.Color(1, 0.62, 0.32), intensity: 16, flicker: 0.25 };
     } else if (kind === 'lantern') {
       g.add(this.handle(0.1, 0.008, m.brass, 0.02));
       const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.12, 8, 1, true), m.brass);
@@ -232,7 +233,7 @@ export class Viewmodel {
       const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), m.glass);
       core.position.y = 0.16;
       g.add(cage, core);
-      visual.light = { color: new THREE.Color(0.4, 1, 0.9), intensity: 14, flicker: 0.05 };
+      visual.light = { color: new THREE.Color(0.4, 1, 0.9), intensity: 4.5, flicker: 0.05 };
     } else if (kind === 'spear') {
       const shaft = this.handle(1.5, 0.014, m.wood, 0.55);
       const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.12, 5), id.startsWith('iron') ? m.iron : m.flint);

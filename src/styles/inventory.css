@@ -392,3 +392,280 @@
     max-height: 200px;
   }
 }
+
+/* ---------------------------------------------------------------- Map */
+
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  background: rgba(8, 7, 6, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.map.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 56px 24px 44px;
+  width: calc(100% - 48px);
+  height: calc(100% - 100px);
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(201, 168, 106, 0.4), 0 20px 60px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+}
+
+.map-canvas:active {
+  cursor: grabbing;
+}
+
+.map-head {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.map-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #f1e7d0;
+}
+
+.map-help {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.map-legend {
+  position: absolute;
+  left: 24px;
+  bottom: 14px;
+  font-size: 13px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------- Dialogue */
+
+.dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  transform: translate(-50%, 12px);
+  width: min(760px, calc(100vw - 32px));
+  padding: 16px 20px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(20, 18, 15, 0.92), rgba(10, 11, 12, 0.94));
+  box-shadow: 0 0 0 1px var(--panel-edge), 0 18px 50px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 16;
+}
+
+.dialogue.open {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.dialogue-speaker {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--brass);
+  margin-bottom: 4px;
+}
+
+.dialogue-text {
+  min-height: 48px;
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: #efe7d5;
+}
+
+.dialogue-hint {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------ Quest tracker */
+
+.hud-quest {
+  position: absolute;
+  right: 28px;
+  top: 62px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.hud-quest.show {
+  opacity: 1;
+}
+
+.hud-quest .t {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--teal);
+  letter-spacing: 0.03em;
+}
+
+.hud-quest .o {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.hud-quest .h {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------ Journal */
+
+.journal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 5, 6, 0.72);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 18;
+}
+
+.journal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.journal-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(760px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 24px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(34, 29, 22, 0.97), rgba(16, 15, 13, 0.97));
+  box-shadow: 0 0 0 1px var(--panel-edge), 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.journal-body {
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.journal-quest {
+  position: relative;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: rgba(232, 226, 212, 0.04);
+}
+
+.journal-quest.tracked {
+  box-shadow: inset 2px 0 0 var(--teal);
+}
+
+.journal-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.journal-title {
+  margin: 2px 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: #f1e7d0;
+}
+
+.journal-summary {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.journal-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.journal-steps .done {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.journal-steps .current {
+  color: var(--ink);
+}
+
+.journal-steps .later {
+  color: var(--ink-faint);
+}
+
+.journal-track {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.journal-done {
+  font-size: 13px;
+  color: var(--ink-dim);
+  padding: 3px 0;
+}
+
+.journal-place {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(232, 226, 212, 0.06);
+}
+
+.journal-place b {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: #f1e7d0;
+}
+
+.journal-place p {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.journal-empty {
+  font-size: 14px;
+  color: var(--ink-dim);
+}

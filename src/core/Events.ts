@@ -25,6 +25,7 @@ export interface GameEvents {
   biomeChanged: { biome: number; name: string };
   swing: { tool: string };
   consumed: { kind: 'eat' | 'drink' };
+  killed: { species: string };
   hit: { target: string; material: string; x: number; y: number; z: number };
   stateChanged: { state: string };
   subtitle: { speaker: string; text: string; duration: number };

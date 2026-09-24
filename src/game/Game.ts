@@ -20,9 +20,15 @@ import { PropSystem, type PropOptions } from '../world/props/PropSystem';
 import { Viewmodel } from '../player/Viewmodel';
 import { AudioEngine, type AudioState } from '../audio/AudioEngine';
 import { SPECIES, Wildlife } from '../creatures/Wildlife';
+import { Precipitation, WEATHER_LABELS, WeatherSystem, type WeatherKind } from '../world/Weather';
 import { Gathering, type GatherContext } from './Gathering';
 import { Structures, type StructureData, type StructureType } from './Structures';
 import { InventoryScreen } from '../ui/InventoryScreen';
+import { MapScreen, type MapPin } from '../ui/MapScreen';
+import { QuestTracker } from '../story/Quests';
+import { StoryWorld } from '../story/StoryWorld';
+import { DIALOGUE, TUNING_ORDER } from '../story/StoryData';
+import { DialogueBox, Journal, QuestTrackerHud } from '../ui/StoryUi';
 import { itemDef } from './items';
 import { RECIPES } from './recipes';
 import { craft } from '../ui/InventoryScreen';
@@ -83,7 +89,15 @@ export class Game {
   gathering!: Gathering;
   structures!: Structures;
   wildlife!: Wildlife;
+  readonly weather = new WeatherSystem();
+  precipitation!: Precipitation;
   inventoryScreen!: InventoryScreen;
+  mapScreen!: MapScreen;
+  quests!: QuestTracker;
+  story!: StoryWorld;
+  dialogue!: DialogueBox;
+  journal!: Journal;
+  questHud!: QuestTrackerHud;
   readonly viewmodel = new Viewmodel();
   readonly audio = new AudioEngine();
   private readonly audioState: AudioState = {
@@ -277,6 +291,26 @@ export class Game {
     this.wildlife.cap = this.quality.name === 'low' ? 8 : this.quality.name === 'medium' ? 12 : this.quality.name === 'high' ? 16 : 22;
     for (const material of this.wildlife.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.wildlife.group);
+    this.quests = new QuestTracker(this.events, this.inventory);
+    this.quests.isSatisfied = (step) => {
+      if (step.kind === 'place') return this.structures.nearestOfType(step.target as StructureType, this.player.position.x, this.player.position.z) !== null;
+      if (step.kind === 'discover') return this.discovered.has(step.target);
+      if (step.kind === 'flag') return this.quests.flags.has(step.target);
+      return false;
+    };
+    this.story = new StoryWorld(this.world, this.events, this.quests, {
+      heldItem: () => this.inventory.held?.id ?? null,
+      give: (item, count) => this.inventory.add(item, count),
+      playTone: (index, correct) => this.audio.stoneTone(index, correct),
+      say: (speaker, text, seconds = 6) => this.events.emit('subtitle', { speaker, text, duration: seconds }),
+      talk: (npc) => this.talkTo(npc),
+      playerPosition: () => this.player.position,
+    });
+    for (const material of this.story.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.story.group);
+    this.events.on('killed', ({ species }) => this.quests.progress('kill', species));
+    this.precipitation = new Precipitation({ low: 2500, medium: 4500, high: 7000, extra: 10000, max: 14000 }[this.quality.name]);
+    this.scene.add(this.precipitation.mesh);
     for (const material of this.structures.materials) this.lighting.setupMaterial(material);
     this.scene.add(this.structures.group);
     this.gathering.creatureHit = (origin, dir, reach, damage) => {
@@ -331,7 +365,7 @@ export class Game {
     window.addEventListener('keydown', unlockAudio);
     document.addEventListener('pointerlockchange', () => {
       // Losing the pointer while playing (Esc) opens the pause menu.
-      if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && !this.inventoryScreen.isOpen && this.survival.alive && this.running) this.openMenu();
+      if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && !this.journal.isOpen && this.survival.alive && this.running) this.openMenu();
     });
     progress('Ready', 1);
   }
@@ -431,6 +465,10 @@ export class Game {
       gpu: this.gpuName,
     });
     this.death = new DeathScreen(root, () => this.respawn());
+    this.mapScreen = new MapScreen(root, this.world, () => this.closeMap());
+    this.dialogue = new DialogueBox(root);
+    this.journal = new Journal(root, () => this.closeJournal());
+    this.questHud = new QuestTrackerHud(this.hud.root);
     this.inventoryScreen = new InventoryScreen(root, this.inventory, this.events, {
       stations: () => this.structures.stationsNear(this.player.position.x, this.player.position.z),
       onUse: (slot) => {
@@ -529,6 +567,18 @@ export class Game {
         if (d.spawn) this.spawnPoint = d.spawn;
       },
     });
+    this.saves.register('quests', {
+      save: () => this.quests.serialize(),
+      load: (data) => this.quests.load(data),
+    });
+    this.saves.register('map', {
+      save: () => this.mapScreen.serialize(),
+      load: (data) => this.mapScreen.load(data as { fog: string; pins: MapPin[] }),
+    });
+    this.saves.register('weather', {
+      save: () => this.weather.serialize(),
+      load: (data) => this.weather.load(data),
+    });
     this.saves.register('harvest', {
       save: () => ({ trees: this.vegetation.serializeHarvest(), props: this.props.serialize() }),
       load: (data) => {
@@ -580,6 +630,7 @@ export class Game {
     this.survival.water = 76;
     this.discovered.clear();
     this.seen.clear();
+    this.quests?.reset();
     if (resumeSlot && this.saves.load(resumeSlot)) {
       this.events.emit('notify', { text: `Graphics set to ${this.quality.name === 'extra' ? 'Extra High' : this.quality.name[0].toUpperCase() + this.quality.name.slice(1)}`, icon: 'gear', tone: 'info' });
     } else {
@@ -588,6 +639,7 @@ export class Game {
     this.hud.setVisible(true);
     this.pipeline.resetExposure();
     this.view.update(0, this.player, this.camera, this.viewOptions());
+    this.quests?.refresh();
   }
 
   private respawn(): void {
@@ -607,6 +659,45 @@ export class Game {
     this.inventoryScreen.show(chest?.contents ?? null, chest ? 'Storage Chest' : '');
     this.input.gameplayEnabled = false;
     this.input.exitPointerLock();
+  }
+
+  /** Conversation with a survivor: quest lines first, small talk otherwise. */
+  private talkTo(npc: string): void {
+    const step = this.quests.talkStepFor(npc);
+    const key = step ? `${npc}:${step.quest.id}:${step.step.id}` : `${npc}:idle`;
+    const lines = DIALOGUE[key] ?? DIALOGUE[`${npc}:idle`] ?? [];
+    this.dialogue.show(lines, () => {
+      if (step) this.quests.progress('talk', npc);
+    });
+  }
+
+  private openJournal(): void {
+    this.journal.show(this.quests, this.discovered);
+    this.input.gameplayEnabled = false;
+    this.input.exitPointerLock();
+    this.audio.ui('open');
+  }
+
+  private closeJournal(): void {
+    this.journal.hide();
+    this.input.gameplayEnabled = true;
+    this.input.requestPointerLock();
+    this.audio.ui('close');
+  }
+
+  private openMap(): void {
+    const p = this.player.position;
+    this.mapScreen.show({ x: p.x, z: p.z, yaw: this.player.yaw }, this.discovered, this.seen);
+    this.input.gameplayEnabled = false;
+    this.input.exitPointerLock();
+    this.audio.ui('open');
+  }
+
+  private closeMap(): void {
+    this.mapScreen.hide();
+    this.input.gameplayEnabled = true;
+    this.input.requestPointerLock();
+    this.audio.ui('close');
   }
 
   private closeInventory(): void {
@@ -663,6 +754,35 @@ export class Game {
     const knife = this.inventory.held ? itemDef(this.inventory.held.id).tool?.kind === 'knife' : false;
     for (const [item, n] of this.wildlife.loot(corpse, knife)) this.inventory.add(item, n);
     this.events.emit('gathered', { resource: `corpse:${corpse.species.id}`, x: corpse.pos.x, y: corpse.pos.y, z: corpse.pos.z });
+  }
+
+  /** Where the tracked objective points on the compass. */
+  private questTargetPosition(): { x: number; z: number } | null {
+    const id = this.quests.tracked;
+    if (!id) return null;
+    const cur = this.quests.currentStep(id);
+    if (!cur) return null;
+    const step = cur.step;
+    const lmPos = (lid: string) => {
+      const l = LANDMARKS.find((d) => d.id === lid);
+      return l ? { x: l.x, z: l.z } : null;
+    };
+    if (step.kind === 'discover') return lmPos(step.target);
+    if (step.kind === 'talk') {
+      const p = this.story.npcPosition(step.target);
+      return p ? { x: p.x, z: p.z } : lmPos('crash_camp');
+    }
+    const byFlag: Record<string, string> = {
+      read_mural: 'singing_stones',
+      stones_tuned: 'singing_stones',
+      vault_open: 'tocks_vault',
+      found_log: 'meridian_tail',
+      saw_stillheart: 'rim_lookout',
+      echo_lantern: 'singing_stones',
+      duskhound: 'hollow_elder',
+    };
+    const lid = byFlag[step.target];
+    return lid ? lmPos(lid) : null;
   }
 
   private readonly tmpOrigin = new THREE.Vector3();
@@ -811,7 +931,13 @@ export class Game {
       this.debugVisible = !this.debugVisible;
       this.debugEl?.classList.toggle('show', this.debugVisible);
     }
-    if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && (this.input.wasPressed('inventory', true) || (this.inventoryScreen.isOpen && this.input.wasPressed('pause', true)))) {
+    if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && (this.input.wasPressed('journal', true) || (this.journal.isOpen && this.input.wasPressed('pause', true)))) {
+      if (this.journal.isOpen) this.closeJournal();
+      else this.openJournal();
+    } else if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.journal.isOpen && (this.input.wasPressed('map', true) || (this.mapScreen.isOpen && this.input.wasPressed('pause', true)))) {
+      if (this.mapScreen.isOpen) this.closeMap();
+      else this.openMap();
+    } else if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && !this.mapScreen.isOpen && (this.input.wasPressed('inventory', true) || (this.inventoryScreen.isOpen && this.input.wasPressed('pause', true)))) {
       if (this.inventoryScreen.isOpen) this.closeInventory();
       else this.openInventory();
     } else if (this.input.wasPressed('pause', true) && this.mode === 'play' && this.survival.alive) {
@@ -825,7 +951,7 @@ export class Game {
       if (this.mode === 'fly') this.flyCam.update(dt);
       else this.updatePlay(dt);
     }
-    this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && !this.inventoryScreen.isOpen && this.survival.alive && this.frame > 30);
+    this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && !this.inventoryScreen.isOpen && !this.mapScreen.isOpen && !this.journal.isOpen && this.survival.alive && this.frame > 30);
     this.input.endFrame();
   }
 
@@ -833,6 +959,16 @@ export class Game {
     this.playtime += dt;
     const input = this.input;
     const alive = this.survival.alive;
+    this.dialogue.update(dt);
+    if (this.dialogue.isOpen) {
+      if (input.wasPressed('interact') || input.wasPressed('attack') || input.wasPressed('jump')) this.dialogue.advance();
+      input.look(dt, this.look);
+      this.player.yaw -= this.look.x * 0.3;
+      this.player.update(dt, { moveX: 0, moveY: 0, jumpPressed: false, jumpHeld: false, sprint: false, crouch: false });
+      this.survival.update(dt, this.climate());
+      this.story.update(dt);
+      return;
+    }
     if (alive) {
       input.look(dt, this.look);
       this.player.yaw -= this.look.x;
@@ -869,10 +1005,7 @@ export class Game {
     const ghostText = this.structures.updateGhost(alive && placeType ? placeType : null, this.camera, canAct && input.wasPressed('rotate'));
     if (ghostText) {
       prompt = { key: this.structures.ghostValid ? 'LMB' : null, text: ghostText };
-      if (canAct && input.wasPressed('attack') && this.structures.placeGhost()) {
-        this.inventory.consumeSlot(this.inventory.selected, 1);
-        this.events.emit('crafted', { recipe: 'place', item: placeType as string, count: 1 });
-      }
+      if (canAct && input.wasPressed('attack') && this.structures.placeGhost()) this.inventory.consumeSlot(this.inventory.selected, 1);
     } else if (alive) {
       prompt = this.gathering.updateTarget(ctx);
       const origin = this.camera.getWorldPosition(this.tmpOrigin);
@@ -880,7 +1013,12 @@ export class Game {
       const structure = this.structures.pick(origin, dir, 3.2);
       const gatherDist = this.gathering.target ? this.targetDistance() : Infinity;
       const corpse = this.wildlife.corpseNear(origin, dir, 2.8);
-      if (corpse) {
+      const storyTarget = this.story.pick(origin, dir, 3.2);
+      if (storyTarget) {
+        prompt = storyTarget.prompt();
+        if (canAct && input.wasPressed('interact') && prompt?.key) storyTarget.use();
+        if (canAct && input.wasPressed('attack')) this.gathering.use(ctx);
+      } else if (corpse) {
         const knife = this.inventory.held ? itemDef(this.inventory.held.id).tool?.kind === 'knife' : false;
         prompt = { key: 'E', text: `${knife ? 'Skin' : 'Butcher'} ${corpse.species.name}` };
         if (canAct && input.wasPressed('interact')) this.skinCorpse(corpse);
@@ -897,6 +1035,8 @@ export class Game {
     this.hud.setPrompt(prompt ? (prompt.key === 'LMB' ? this.input.bindingLabel('attack') : prompt.key === 'E' ? this.input.bindingLabel('interact') : null) : null, prompt ? prompt.text : null);
     this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, 0);
     this.wildlife.update(dt, this.elapsed, this.camera);
+    this.story.update(dt);
+    this.quests.refresh();
     this.vegetation.tick(dt, this.clock.totalHours);
     this.props.tick(this.clock.totalHours);
 
@@ -931,9 +1071,10 @@ export class Game {
     }
     heat += this.structures.heatAt(p.x, p.y + 1, p.z);
     const inWater = this.player.state === 'swim';
+    const ws = this.weather.state;
     return {
-      airTemperature: base + diurnal - altitude,
-      precipitation: 0,
+      airTemperature: base + diurnal - altitude + ws.chill - ws.wind * 2,
+      precipitation: Math.min(1, ws.rain + ws.snow * 0.6),
       heat,
       inWater,
       waterTemperature: water.hot ? 38 : 9 + base * 0.35,
@@ -948,6 +1089,7 @@ export class Game {
     this.biomeTimer -= dt;
     if (this.biomeTimer <= 0) {
       this.biomeTimer = 0.5;
+      this.mapScreen.reveal(p.x, p.z);
       const biome = this.world.dominantBiome(p.x, p.z);
       if (biome !== this.currentBiome) {
         const first = this.currentBiome === -1;
@@ -994,6 +1136,7 @@ export class Game {
   private render(dt: number): void {
     const t = performance.now();
     if (this.mode === 'play') this.view.update(dt, this.player, this.camera, this.viewOptions());
+    this.updateWeather(dt);
     this.updateEnvironment(dt);
     this.terrain.update(this.camera, this.elapsed);
     if (this.mode === 'play') this.grass.setPusher(0, this.player.position, 0.6);
@@ -1039,7 +1182,7 @@ export class Game {
         sunDir: this.sunDir,
         moonDir: this.moonDir,
         moonPhaseLight: moonIllumination(moonPhase(this.clock.day, this.clock.hours)),
-        mieScale: 2.2,
+        mieScale: this.weather.state.haze,
         cameraAltitude: this.camera.position.y,
       },
       {
@@ -1057,6 +1200,36 @@ export class Game {
     this.publishDiagnostics();
   }
 
+  private updateWeather(dt: number): void {
+    const cam = this.camera.position;
+    const weights = this.world.biomeWeights(cam.x, cam.z, this.weatherWeights);
+    const w = this.weather.update(dt, this.paused || this.menuPaused ? 0 : this.hoursElapsed, weights);
+    const wind = this.weather.windDir;
+    const cp = this.pipeline.cloudParams;
+    cp.coverage = w.coverage;
+    cp.type = w.cloudType;
+    cp.windX = wind.x;
+    cp.windZ = wind.y;
+    cp.windSpeed = 10 + w.wind * 26;
+    const atmo = this.pipeline.atmosphere.uniforms;
+    atmo.uFogDensity.value = w.fog;
+    atmo.uFogHeight.value = Math.max(0, this.world.heightAt(cam.x, cam.z)) + (w.fog > 0.006 ? 6 : 25);
+    atmo.uFogFalloff.value = w.fog > 0.006 ? 0.05 : 0.02;
+    this.terrain.uniforms.uWetness.value = this.weather.groundWetness;
+    this.vegetationShared.uWindStrength.value = 0.25 + w.wind * 0.95;
+    this.vegetationShared.uWindDir.value.set(wind.x, 0, wind.y);
+    this.grass.setWind(wind.x, wind.y, 0.35 + w.wind * 1.1);
+    this.water.seaState = damp(this.water.seaState, 0.6 + w.wind * 1.9, 0.2, dt);
+    this.pipeline.post.flash = Math.max(this.pipeline.post.flash * 0.9, this.weather.flash * 0.35);
+    if (this.weather.thunderIn > 0) this.audio.thunder(this.weather.thunderIn, 0.8);
+    // Drops catch the light of the sky around them: roughly scene brightness.
+    const ambient = this.tmpColor.copy(this.light.color).multiplyScalar(this.light.intensity * 0.3).addScalar(0.04);
+    this.precipitation.update(this.elapsed, cam, w, wind.x, wind.y, ambient);
+  }
+
+  private readonly weatherWeights = new Float32Array(BIOME_COUNT);
+  private readonly tmpColor = new THREE.Color();
+
   private updateAudio(dt: number): void {
     if (!this.audio.running) return;
     const a = this.audioState;
@@ -1071,6 +1244,7 @@ export class Game {
     a.hours = this.clock.hours;
     a.underwater = this.pipeline.post.underwater > 0;
     a.lowHealth = this.mode === 'play' ? this.pipeline.post.lowHealth : 0;
+    a.rain = Math.min(1, this.weather.state.rain + this.weather.state.snow * 0.15);
     // Surroundings change slowly: probe a few times a second.
     this.audioProbeTimer -= dt;
     if (this.audioProbeTimer <= 0) {
@@ -1082,7 +1256,7 @@ export class Game {
       a.marsh = w[6];
       a.snow = w[5];
       const altitude = Math.max(0, cam.y - 40) / 160;
-      a.wind = Math.min(1, 0.25 + altitude * 0.6 + w[5] * 0.4 + w[3] * 0.3 + w[7] * 0.2);
+      a.wind = Math.min(1, 0.2 + altitude * 0.6 + w[5] * 0.35 + w[3] * 0.25 + w[7] * 0.2 + this.weather.state.wind * 0.5);
       const shore = this.water.shoreDistance(cam.x, cam.z);
       a.sea = shore > 0 ? 1 : 1 - smoothstep(8, 220, -shore);
       a.surfPeriod = a.sea > 0.05 ? 9.5 : 0;
@@ -1131,6 +1305,12 @@ export class Game {
       if (distance < 12 || distance > 900) continue;
       this.markers.push({ id: lm.id, bearing: bearingOf(dx, dz), distance, kind: 'landmark', label: this.discovered.has(lm.id) ? lm.name : undefined });
     }
+    const target = this.questTargetPosition();
+    if (target) {
+      const dx = target.x - p.x;
+      const dz = target.z - p.z;
+      this.markers.push({ id: 'quest', bearing: bearingOf(dx, dz), distance: Math.hypot(dx, dz), kind: 'quest', label: this.quests.trackedObjective()?.title });
+    }
     const heading = (-this.player.yaw * 180) / Math.PI;
     this.hud.update(
       {
@@ -1141,9 +1321,11 @@ export class Game {
         hours: this.clock.hours,
         day: this.clock.day,
         underwater: this.pipeline.post.underwater > 0,
+        weather: WEATHER_LABELS[this.weather.transition > 0.5 ? this.weather.next : this.weather.current],
       },
       dt,
     );
+    this.questHud.update(this.quests);
     if (this.debugVisible && this.debugEl) {
       const s = this.survival.snapshot();
       const info = this.renderer.info.render;
@@ -1413,6 +1595,35 @@ export class Game {
         return true;
       },
       closeInventory: () => this.closeInventory(),
+      quest: () => ({ tracked: this.quests.tracked, objective: this.quests.trackedObjective(), active: this.quests.activeQuests().map((q) => q.id), done: this.quests.doneQuests().map((q) => q.id), flags: [...this.quests.flags] }),
+      talk: (npc: string) => {
+        this.talkTo(npc);
+        let guard = 0;
+        while (this.dialogue.isOpen && guard < 50) {
+          this.dialogue.advance();
+          guard += 1;
+        }
+        return this.quests.trackedObjective();
+      },
+      useStory: (id: string) => {
+        const ia = this.story.interactables.find((i) => i.id === id);
+        if (!ia) throw new Error(`Unknown interactable ${id}`);
+        const prompt = ia.prompt();
+        if (prompt?.key) ia.use();
+        return { prompt, flags: [...this.quests.flags] };
+      },
+      tuningOrder: () => TUNING_ORDER.slice(),
+      npcPosition: (id: string) => this.story.npcPosition(id)?.toArray() ?? null,
+      openMap: () => {
+        this.openMap();
+        return this.mapScreen.revealedFraction();
+      },
+      closeMap: () => this.closeMap(),
+      setWeather: (kind: string) => {
+        this.weather.set(kind as WeatherKind, true);
+        this.render(0);
+        return kind;
+      },
       spawnCreature: (id: string, dx = 0, dz = -8) => {
         const species = SPECIES.find((sp) => sp.id === id);
         if (!species) throw new Error(`Unknown species ${id}`);

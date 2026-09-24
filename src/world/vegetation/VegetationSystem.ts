@@ -12,6 +12,7 @@ import {
 import { MASK } from '../gen/generateWorld';
 import { BIOME_COUNT, WORLD_HALF, WORLD_SEED } from '../WorldConfig';
 import { LANDMARKS } from '../WorldLayout';
+import { VIEWPOINTS } from '../../game/Viewpoints';
 import type { WorldData } from '../WorldData';
 import { BIOME_FLORA } from './ecology';
 import { generateTree, SPECIES, type SpeciesConfig, type TreeMeshes } from './TreeGenerator';
@@ -138,6 +139,8 @@ export class VegetationSystem {
       const r = lm.pad ? lm.pad.radius + 8 : lm.mound ? lm.mound.radius * 0.25 : lm.kind === 'crater' ? 0 : 12;
       if (r > 0) this.clearings.push({ x: lm.x, z: lm.z, r });
     }
+    // Photo viewpoints stay clear of trunks.
+    for (const vp of VIEWPOINTS) this.clearings.push({ x: vp.x, z: vp.z, r: 5 });
     const leafMaterial = createLeafMaterial(shared, textures, options.alphaToCoverage);
     const leafDepth = createVegetationDepthMaterial(shared, textures);
     const barkDepth = createVegetationDepthMaterial(shared, null);

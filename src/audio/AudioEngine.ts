@@ -481,6 +481,30 @@ export class AudioEngine {
     } else this.tone({ type: 'square', freq: 180, decay: 0.12, gain: 0.03 });
   }
 
+  /** A struck tuning stone: pentatonic bell tones; wrong ones sound dull. */
+  stoneTone(index: number, correct: boolean): void {
+    if (!this.ctx) return;
+    const notes = [62, 64, 66, 69, 71];
+    const f = midiToHz(notes[index % notes.length]);
+    if (correct) {
+      this.tone({ freq: f, decay: 3.5, attack: 0.004, gain: 0.12, reverb: 0.9, fm: { ratio: 1.41, index: 1.8 } });
+      this.tone({ freq: f * 2, decay: 2, attack: 0.004, gain: 0.04, reverb: 0.8 });
+    } else {
+      this.tone({ freq: f * 0.5, freqEnd: f * 0.45, decay: 0.4, gain: 0.12, fm: { ratio: 1.07, index: 3 } });
+      this.burst({ buffer: this.brown, type: 'lowpass', freq: 500, decay: 0.3, gain: 0.2 });
+    }
+  }
+
+  /** Rolling thunder `delay` seconds from now (closer = sharper crack). */
+  thunder(delay: number, intensity: number): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const near = delay < 2.5;
+    if (near) this.burst({ type: 'highpass', freq: 1800, decay: 0.25, gain: 0.35 * intensity, when: t, bus: this.amb, reverb: 0.6 });
+    this.burst({ buffer: this.brown, type: 'lowpass', freq: near ? 420 : 220, freqEnd: 60, attack: near ? 0.05 : 0.6, decay: 4.5 + delay * 0.3, gain: (near ? 0.9 : 0.55) * intensity, when: t, bus: this.amb, reverb: 0.7 });
+    this.burst({ buffer: this.brown, type: 'lowpass', freq: 160, attack: 1.2, decay: 3, gain: 0.35 * intensity, when: t + 1.4, bus: this.amb });
+  }
+
   /** Bell-like arpeggio when a place is discovered. */
   stinger(major = true): void {
     if (!this.ctx) return;

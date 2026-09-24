@@ -22,6 +22,7 @@ export interface HudState {
   hours: number;
   day: number;
   underwater: boolean;
+  weather?: string;
 }
 
 const COMPASS_RANGE = 170;
@@ -213,7 +214,7 @@ export class Hud {
     }
     const hour = Math.floor(state.hours);
     const minute = Math.floor((state.hours - hour) * 60 / 10) * 10;
-    const text = `Day ${state.day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    const text = `Day ${state.day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}${state.weather ? ` · ${state.weather}` : ''}`;
     if (this.clockText.textContent !== text) this.clockText.textContent = text;
     const night = state.hours < 5.5 || state.hours > 19.5;
     const glyph = night ? 'moon' : 'sun';

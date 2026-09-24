@@ -393,6 +393,7 @@ export class Wildlife {
       c.deadTime = now;
       c.speed = 0;
       this.events.emit('notify', { text: `${c.species.name} down`, icon: 'meat', tone: 'info' });
+      this.events.emit('killed', { species: c.species.id });
       this.alarmHerd(c, fromX, fromZ);
       return true;
     }

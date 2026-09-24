@@ -227,6 +227,14 @@ export class Gathering {
     const held = this.inventory.held;
     if (!held) return false;
     const def = itemDef(held.id);
+    if (held.id === 'heartsong') {
+      this.survival.maxHealth += 10;
+      this.survival.baseMaxStamina += 8;
+      this.survival.heal(10);
+      this.inventory.consumeSlot(this.inventory.selected, 1);
+      this.events.emit('notify', { text: 'A Heartsong settles in your chest · +10 health, +8 stamina', icon: 'heart', tone: 'good' });
+      return true;
+    }
     if (def.food) {
       const f = def.food;
       this.survival.eat(f.food, f.water);
