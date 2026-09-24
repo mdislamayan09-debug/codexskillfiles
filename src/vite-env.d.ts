@@ -12,6 +12,7 @@ interface ThreeGameDiagnostics {
     speed: number;
     mode?: string;
     health?: number;
+    [extra: string]: unknown;
   };
   renderer: {
     calls: number;

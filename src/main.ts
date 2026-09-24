@@ -1,4 +1,6 @@
 import './styles/base.css';
+import './styles/hud.css';
+import './styles/menu.css';
 import { Game } from './game/Game';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');

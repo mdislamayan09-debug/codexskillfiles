@@ -188,8 +188,8 @@ export function qualityFromName(name: string | null | undefined): QualitySetting
 export function suggestQuality(renderer: string): QualityName {
   const r = renderer.toLowerCase();
   if (r.includes('swiftshader') || r.includes('llvmpipe') || r.includes('software')) return 'low';
-  if (/apple m\d (max|ultra)/.test(r)) return 'extra';
-  if (/apple m\d pro/.test(r)) return 'extra';
+  if (/apple m\d+ (max|ultra)/.test(r)) return 'max';
+  if (/apple m\d+ pro/.test(r)) return 'extra';
   if (r.includes('apple m') || r.includes('apple gpu')) return 'high';
   if (/rtx [34]0[789]0|rtx 50|rx 7[89]00|rx 9070/.test(r)) return 'max';
   if (/rtx|radeon rx [67]/.test(r)) return 'extra';
