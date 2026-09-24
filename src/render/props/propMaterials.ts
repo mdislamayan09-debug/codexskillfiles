@@ -86,7 +86,9 @@ vec3 rockN = normalize(vRockN);
 float rockLayer = vRockParams.x;
 float rockMoss = vRockParams.y;
 float rockSnow = vRockParams.z;
-float rockTint = vRockParams.w;
+float rockOre = floor(vRockParams.w);
+float rockTint = fract(vRockParams.w);
+vec3 rockGlow = vec3(0.0);
 vec4 rAlb; vec3 rN; vec2 rRA;
 rockTriplanar(rockLayer, vRockPos, rockN, uRockTile, rAlb, rN, rRA);
 vec3 rockAlbedo = rAlb.rgb;
@@ -113,6 +115,21 @@ if (snowMask > 0.01) {
   rN = normalize(mix(rN, rockN, snowMask * 0.7));
   rockRough = mix(rockRough, 0.55, snowMask);
 }
+// Resource veins: iron rust, silver, coal seams, sulfur crust, obsidian glass, songstone.
+if (rockOre > 0.5) {
+  float warp = rockNoise(vRockPos * 0.8) * 2.0;
+  float vein = 1.0 - smoothstep(0.03, 0.1, abs(rockNoise(vRockPos * 1.9 + vec3(0.0, warp, 0.0)) - 0.5));
+  vein = max(vein, smoothstep(0.78, 0.9, rockNoise(vRockPos * 4.3 + 5.0)));
+  vec3 oreCol = vec3(0.42, 0.19, 0.07);
+  float oreRough = 0.65;
+  if (rockOre > 1.5 && rockOre < 2.5) { oreCol = vec3(0.78, 0.8, 0.85); oreRough = 0.22; }
+  else if (rockOre > 2.5 && rockOre < 3.5) { oreCol = vec3(0.025); oreRough = 0.35; }
+  else if (rockOre > 3.5 && rockOre < 4.5) { oreCol = vec3(0.86, 0.72, 0.16); oreRough = 0.75; }
+  else if (rockOre > 4.5 && rockOre < 5.5) { oreCol = vec3(0.03, 0.03, 0.045); oreRough = 0.06; vein = max(vein, 0.75); }
+  else if (rockOre > 5.5) { oreCol = vec3(0.16, 0.85, 0.76); oreRough = 0.12; rockGlow = oreCol * vein * 0.45; }
+  rockAlbedo = mix(rockAlbedo, oreCol, vein * 0.92);
+  rockRough = mix(rockRough, oreRough, vein);
+}
 float rockOcc = vRockAo * mix(1.0, rockCav, 0.7);
 diffuseColor.rgb = rockAlbedo;
 `;
@@ -126,7 +143,7 @@ export function createRockMaterial(baker: TerrainMaterialBaker): THREE.MeshStand
     uRockTile: { value: 2.6 },
   };
   addPatch(material, {
-    key: 'rock-v1',
+    key: 'rock-v2',
     apply(shader) {
       Object.assign(shader.uniforms, uniforms);
       let vs = shader.vertexShader;
@@ -136,7 +153,8 @@ export function createRockMaterial(baker: TerrainMaterialBaker): THREE.MeshStand
       let fs = shader.fragmentShader;
       fs = replaceOnce(fs, '#include <common>', `#include <common>\n${ROCK_FRAGMENT_PARS}`, 'rock-fpars');
       fs = replaceOnce(fs, '#include <color_fragment>', `#include <color_fragment>\n${ROCK_FRAGMENT}`, 'rock-main');
-      fs = replaceOnce(fs, '#include <roughnessmap_fragment>', 'float roughnessFactor = clamp(rockRough, 0.3, 1.0);', 'rock-rough');
+      fs = replaceOnce(fs, '#include <roughnessmap_fragment>', 'float roughnessFactor = clamp(rockRough, 0.05, 1.0);', 'rock-rough');
+      fs = replaceOnce(fs, '#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += rockGlow;', 'rock-glow');
       fs = replaceOnce(fs, '#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(rN, 0.0)).xyz);', 'rock-normal');
       fs = replaceOnce(
         fs,
@@ -149,6 +167,9 @@ export function createRockMaterial(baker: TerrainMaterialBaker): THREE.MeshStand
   });
   return material;
 }
+
+/** Ore codes for the integer part of aRock.w (fraction = tint). */
+export const ORE = { none: 0, iron: 1, silver: 2, coal: 3, sulfur: 4, obsidian: 5, songstone: 6 } as const;
 
 /** Rock layer ids for the aRock attribute. */
 export const ROCK_LAYERS = {

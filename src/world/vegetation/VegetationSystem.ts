@@ -53,6 +53,35 @@ export interface TreeCollider {
   z: number;
   radius: number;
   height: number;
+  /** Instance index inside its cell. */
+  index?: number;
+}
+
+export interface TreeHit {
+  /** Stable id: `${cellKey}:${index}`. */
+  id: string;
+  cellKey: number;
+  index: number;
+  species: string;
+  bush: boolean;
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  height: number;
+  distance: number;
+}
+
+interface FallingTree {
+  group: THREE.Group;
+  pivot: THREE.Group;
+  axis: THREE.Vector3;
+  angle: number;
+  speed: number;
+  height: number;
+  landed: boolean;
+  timer: number;
+  onLand?: () => void;
 }
 
 interface Cell {
@@ -67,6 +96,8 @@ interface Cell {
   colliders: TreeCollider[];
   center: THREE.Vector3;
   radius: number;
+  /** Instances felled or harvested (hidden until they regrow). */
+  removed: Set<number>;
 }
 
 const LOD0_CAP = 700;
@@ -87,6 +118,11 @@ export class VegetationSystem {
   private readonly clearings: { x: number; z: number; r: number }[] = [];
   private readonly biomeScratch = new Float32Array(BIOME_COUNT);
   readonly materials: THREE.Material[] = [];
+  readonly leafMaterial: THREE.MeshStandardMaterial;
+  readonly leafDepth: THREE.MeshDepthMaterial;
+  readonly barkDepth: THREE.MeshDepthMaterial;
+  private readonly barkMaterials = new Map<number, THREE.MeshStandardMaterial>();
+  private readonly barkFactory: (layer: number) => THREE.MeshStandardMaterial;
   readonly impostors: Impostors;
   stats = { cells: 0, lod0: 0, lod1: 0, impostors: 0, shadows: 0 };
   private impostorKey = '';
@@ -105,8 +141,20 @@ export class VegetationSystem {
     const leafMaterial = createLeafMaterial(shared, textures, options.alphaToCoverage);
     const leafDepth = createVegetationDepthMaterial(shared, textures);
     const barkDepth = createVegetationDepthMaterial(shared, null);
+    this.leafMaterial = leafMaterial;
+    this.leafDepth = leafDepth;
+    this.barkDepth = barkDepth;
     this.materials.push(leafMaterial);
-    const barkMaterials = new Map<number, THREE.MeshStandardMaterial>();
+    const barkMaterials = this.barkMaterials;
+    this.barkFactory = (layer: number) => {
+      let m = barkMaterials.get(layer);
+      if (!m) {
+        m = createBarkMaterial(shared, textures, layer);
+        barkMaterials.set(layer, m);
+        this.materials.push(m);
+      }
+      return m;
+    };
 
     let index = 0;
     for (const species of Object.values(SPECIES)) {
@@ -116,12 +164,7 @@ export class VegetationSystem {
         const seed = hash2i(index, v, 1337);
         const lod0 = generateTree(species, { seed, lod: 0 });
         const lod1 = generateTree(species, { seed, lod: 1 });
-        let barkMaterial = barkMaterials.get(species.bark);
-        if (!barkMaterial) {
-          barkMaterial = createBarkMaterial(shared, textures, species.bark);
-          barkMaterials.set(species.bark, barkMaterial);
-          this.materials.push(barkMaterial);
-        }
+        const barkMaterial = this.barkFactory(species.bark);
         const make = (geometry: THREE.BufferGeometry, material: THREE.Material, cap: number, depth: THREE.Material, shadowProxy: boolean) => {
           const mesh = new THREE.InstancedMesh(geometry, material, cap);
           mesh.count = 0;
@@ -294,7 +337,7 @@ export class VegetationSystem {
           minY = Math.min(minY, ground);
           maxY = Math.max(maxY, ground + kind.lod0.height * scale);
           if (kind.lod0.trunkRadius > 0) {
-            colliders.push({ x, z, radius: kind.lod0.trunkRadius * scale * 1.15, height: kind.lod0.height * scale });
+            colliders.push({ x, z, radius: kind.lod0.trunkRadius * scale * 1.15, height: kind.lod0.height * scale, index: kinds.length - 1 });
           }
         }
       }
@@ -317,6 +360,7 @@ export class VegetationSystem {
       colliders,
       center: new THREE.Vector3(x0 + CELL / 2, cy, z0 + CELL / 2),
       radius: Math.hypot(CELL / 2, CELL / 2, halfY) + 12,
+      removed: this.removedFor(this.cellKey(cx, cz)),
     };
   }
 
@@ -400,6 +444,7 @@ export class VegetationSystem {
         // Entirely in impostor range.
         if (!rebuildImpostors) continue;
         for (let i = 0; i < cell.count; i += 1) {
+          if (cell.removed.has(i)) continue;
           const ix = pos[i * 3] - camX;
           const iz = pos[i * 3 + 2] - camZ;
           if (ix * ix + iz * iz > maxSq) continue;
@@ -415,6 +460,7 @@ export class VegetationSystem {
       }
       visibleCells += 1;
       for (let i = 0; i < cell.count; i += 1) {
+        if (cell.removed.size > 0 && cell.removed.has(i)) continue;
         const ix = pos[i * 3] - camX;
         const iz = pos[i * 3 + 2] - camZ;
         const d2 = ix * ix + iz * iz;
@@ -518,6 +564,7 @@ export class VegetationSystem {
         const cell = this.cells.get(this.cellKey(cx, cz));
         if (!cell) continue;
         for (const c of cell.colliders) {
+          if (c.index !== undefined && cell.removed.has(c.index)) continue;
           const dx = c.x - x;
           const dz = c.z - z;
           if (dx * dx + dz * dz < (radius + c.radius) * (radius + c.radius)) out.push(c);
@@ -527,7 +574,178 @@ export class VegetationSystem {
     return out;
   }
 
+  /** Shared bark material for a bark layer (created on demand). */
+  barkMaterial(layer: number): THREE.MeshStandardMaterial {
+    return this.barkFactory(layer);
+  }
+
   setOptions(options: VegetationOptions): void {
     this.options = options;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Felling & harvesting
+
+  private readonly removedByCell = new Map<number, Set<number>>();
+  /** id → in-game hour when the tree regrows. */
+  private readonly regrowAt = new Map<string, number>();
+  private readonly falling: FallingTree[] = [];
+
+  private removedFor(key: number): Set<number> {
+    let set = this.removedByCell.get(key);
+    if (!set) {
+      set = new Set();
+      this.removedByCell.set(key, set);
+    }
+    return set;
+  }
+
+  /** Nearest trunk hit by a ray (xz circle test, clipped to trunk height). */
+  pickTree(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number): TreeHit | null {
+    const reach = maxDistance + 1.5;
+    const c0x = Math.floor((origin.x - reach) / CELL);
+    const c1x = Math.floor((origin.x + reach) / CELL);
+    const c0z = Math.floor((origin.z - reach) / CELL);
+    const c1z = Math.floor((origin.z + reach) / CELL);
+    let best: TreeHit | null = null;
+    const hl = Math.hypot(dir.x, dir.z);
+    for (let cz = c0z; cz <= c1z; cz += 1) {
+      for (let cx = c0x; cx <= c1x; cx += 1) {
+        const key = this.cellKey(cx, cz);
+        const cell = this.cells.get(key);
+        if (!cell) continue;
+        for (const c of cell.colliders) {
+          if (c.index === undefined || cell.removed.has(c.index)) continue;
+          const ox = origin.x - c.x;
+          const oz = origin.z - c.z;
+          if (ox * ox + oz * oz > reach * reach) continue;
+          // Aim assist: trunks feel a little thicker than they are.
+          const r = c.radius + 0.18;
+          let t = -1;
+          if (hl > 1e-4) {
+            const a = dir.x * dir.x + dir.z * dir.z;
+            const b = 2 * (ox * dir.x + oz * dir.z);
+            const cc = ox * ox + oz * oz - r * r;
+            const disc = b * b - 4 * a * cc;
+            if (disc >= 0) {
+              const sq = Math.sqrt(disc);
+              t = (-b - sq) / (2 * a);
+              if (t < 0) t = (-b + sq) / (2 * a);
+            }
+          }
+          if (t < 0 || t > maxDistance) continue;
+          const y = origin.y + dir.y * t;
+          const ground = cell.positions[c.index * 3 + 1];
+          if (y < ground - 0.3 || y > ground + Math.max(1.2, c.height)) continue;
+          if (!best || t < best.distance) {
+            const kind = this.kinds[cell.kinds[c.index]];
+            best = {
+              id: `${key}:${c.index}`,
+              cellKey: key,
+              index: c.index,
+              species: kind.species.id,
+              bush: kind.species.shape === 'bush',
+              x: c.x,
+              y: ground,
+              z: c.z,
+              radius: c.radius,
+              height: c.height,
+              distance: t,
+            };
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Removes a tree until `regrowHour`. Trees topple away from `fromX/fromZ`;
+   * bushes simply vanish. `onLand` fires when a falling trunk hits the ground.
+   */
+  fell(hit: TreeHit, regrowHour: number, fromX: number, fromZ: number, onLand?: () => void): void {
+    const cell = this.cells.get(hit.cellKey);
+    this.removedFor(hit.cellKey).add(hit.index);
+    this.regrowAt.set(hit.id, regrowHour);
+    this.impostorKey = '';
+    if (!cell || hit.bush) return;
+    const kind = this.kinds[cell.kinds[hit.index]];
+    const matrix = new THREE.Matrix4().fromArray(cell.matrices, hit.index * 16);
+    const group = new THREE.Group();
+    const pivot = new THREE.Group();
+    group.position.set(hit.x, hit.y, hit.z);
+    group.add(pivot);
+    const local = new THREE.Matrix4().makeTranslation(-hit.x, -hit.y, -hit.z).multiply(matrix);
+    const bark = new THREE.Mesh(kind.lod0.bark, kind.bark0.material);
+    bark.applyMatrix4(local);
+    bark.castShadow = true;
+    bark.receiveShadow = true;
+    pivot.add(bark);
+    if (kind.lod0.leaves && kind.leaves0) {
+      const leaves = new THREE.Mesh(kind.lod0.leaves, kind.leaves0.material);
+      leaves.applyMatrix4(local);
+      leaves.castShadow = true;
+      leaves.receiveShadow = true;
+      pivot.add(leaves);
+    }
+    // Fall away from the axe.
+    let fx = hit.x - fromX;
+    let fz = hit.z - fromZ;
+    const fl = Math.hypot(fx, fz) || 1;
+    fx /= fl;
+    fz /= fl;
+    const axis = new THREE.Vector3(fz, 0, -fx);
+    this.group.add(group);
+    this.falling.push({ group, pivot, axis, angle: 0.02, speed: 0.05, height: Math.max(2, hit.height), landed: false, timer: 0, onLand });
+  }
+
+  /** Advances falling trees and regrows harvested ones. */
+  tick(dt: number, totalHours: number): void {
+    for (let i = this.falling.length - 1; i >= 0; i -= 1) {
+      const f = this.falling[i];
+      if (!f.landed) {
+        // A toppling rod: angular acceleration grows with the lean.
+        f.speed += ((3 * 9.81) / (2 * f.height)) * Math.sin(f.angle) * dt;
+        f.angle += f.speed * dt;
+        if (f.angle >= Math.PI / 2 - 0.05) {
+          f.angle = Math.PI / 2 - 0.05;
+          f.landed = true;
+          f.onLand?.();
+        }
+      } else {
+        f.timer += dt;
+        // Settle, then sink out of sight.
+        if (f.timer > 2.5) f.group.position.y -= dt * 0.5;
+      }
+      f.pivot.quaternion.setFromAxisAngle(f.axis, f.angle);
+      if (f.timer > 5) {
+        this.group.remove(f.group);
+        this.falling.splice(i, 1);
+      }
+    }
+    if (this.regrowAt.size > 0) {
+      for (const [id, hour] of this.regrowAt) {
+        if (hour > totalHours) continue;
+        this.regrowAt.delete(id);
+        const [key, index] = id.split(':').map(Number);
+        this.removedByCell.get(key)?.delete(index);
+        this.impostorKey = '';
+      }
+    }
+  }
+
+  serializeHarvest(): [string, number][] {
+    return [...this.regrowAt.entries()];
+  }
+
+  loadHarvest(entries: [string, number][]): void {
+    this.regrowAt.clear();
+    for (const set of this.removedByCell.values()) set.clear();
+    for (const [id, hour] of entries) {
+      const [key, index] = id.split(':').map(Number);
+      this.removedFor(key).add(index);
+      this.regrowAt.set(id, hour);
+    }
+    this.impostorKey = '';
   }
 }

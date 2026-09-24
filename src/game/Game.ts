@@ -16,6 +16,14 @@ import { TerrainMaterialBaker } from '../render/terrain/TerrainMaterialBaker';
 import { FoliageTextures } from '../render/vegetation/foliageTextures';
 import { createVegetationShared, type VegetationShared } from '../render/vegetation/treeMaterials';
 import { WaterSystem, type WaterSample } from '../render/water/WaterSystem';
+import { PropSystem, type PropOptions } from '../world/props/PropSystem';
+import { Viewmodel } from '../player/Viewmodel';
+import { Gathering, type GatherContext } from './Gathering';
+import { Structures, type StructureData, type StructureType } from './Structures';
+import { InventoryScreen } from '../ui/InventoryScreen';
+import { itemDef } from './items';
+import { RECIPES } from './recipes';
+import { craft } from '../ui/InventoryScreen';
 import { DeathScreen, Menu } from '../ui/Menu';
 import { Hud, type CompassMarker } from '../ui/Hud';
 import { bearingOf, MASK } from '../world/gen/generateWorld';
@@ -69,6 +77,11 @@ export class Game {
   vegetationShared!: VegetationShared;
   foliageTextures!: FoliageTextures;
   water!: WaterSystem;
+  props!: PropSystem;
+  gathering!: Gathering;
+  structures!: Structures;
+  inventoryScreen!: InventoryScreen;
+  readonly viewmodel = new Viewmodel();
   player!: PlayerController;
   hud!: Hud;
   menu!: Menu;
@@ -101,6 +114,8 @@ export class Game {
   private readonly biomeScratch = new Float32Array(BIOME_COUNT);
   private readonly treeScratch: TreeCollider[] = [];
   private readonly markers: CompassMarker[] = [];
+  private readonly gatherCtx = { camera: null as unknown as THREE.PerspectiveCamera, totalHours: 0, playerX: 0, playerZ: 0, inWater: false };
+  private viewmodelSetupDone = new Set<string>();
   private readonly discovered = new Set<string>();
   private readonly seen = new Set<string>();
   private currentBiome = -1;
@@ -111,6 +126,10 @@ export class Game {
   private fpsTime = 0;
   private fps = 0;
   private debugVisible = false;
+  private hoursElapsed = 0;
+  private spawnPoint = { ...CAMP_SPAWN };
+  /** Test hooks drive input without pointer lock. */
+  private testInput = false;
   private debugEl: HTMLElement | null = null;
   private fpsEl: HTMLElement | null = null;
   private veilEl: HTMLElement | null = null;
@@ -199,6 +218,25 @@ export class Game {
     this.scene.add(this.water.group);
     this.timings.waterMs = performance.now() - t4;
 
+    progress('Scattering stones', 0.5);
+    await nextFrame();
+    const t5 = performance.now();
+    this.props = new PropSystem(this.world, this.baker, this.vegetation, this.propOptions());
+    for (const material of this.props.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.props.group);
+    this.gathering = new Gathering(this.events, this.world, this.props, this.vegetation, this.inventory, this.survival);
+    this.structures = new Structures(this.world, this.events, 4);
+    for (const material of this.structures.materials) this.lighting.setupMaterial(material);
+    this.scene.add(this.structures.group);
+    this.scene.add(this.camera);
+    this.camera.add(this.viewmodel.root);
+    this.viewmodel.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh && (mesh.material as THREE.Material).type === 'MeshStandardMaterial') this.lighting.setupMaterial(mesh.material as THREE.Material);
+    });
+    this.viewmodelSetupDone = new Set();
+    this.timings.propsMs = performance.now() - t5;
+
     this.flyCam = new FlyCamera(this.camera, this.input, this.world);
     this.player = new PlayerController(this.createPlayerEnvironment(), this.survival);
     this.wirePlayerCallbacks();
@@ -214,6 +252,7 @@ export class Game {
       this.startPlay(SaveSystem.consumeResume() ? 'session' : null);
     }
     this.vegetation.prewarm(this.camera.position.x, this.camera.position.z, 260);
+    this.props.prewarm(this.camera.position.x, this.camera.position.z);
 
     progress('Compiling shaders', 0.8);
     await nextFrame();
@@ -229,7 +268,7 @@ export class Game {
     });
     document.addEventListener('pointerlockchange', () => {
       // Losing the pointer while playing (Esc) opens the pause menu.
-      if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && this.survival.alive && this.running) this.openMenu();
+      if (!this.input.pointerLocked && this.mode === 'play' && !this.menu.isOpen && !this.inventoryScreen.isOpen && this.survival.alive && this.running) this.openMenu();
     });
     progress('Ready', 1);
   }
@@ -241,8 +280,16 @@ export class Game {
     const world = this.world;
     const waterOut: WaterAt = { surface: 0, depth: 0, frozen: false, flowX: 0, flowZ: 0 };
     return {
-      groundHeight: (x, z) => world.heightAt(x, z),
-      groundNormal: (x, z, out) => world.smoothNormalAt(x, z, out),
+      groundHeight: (x, z) => Math.max(world.heightAt(x, z), this.props.heightAt(x, z)),
+      groundNormal: (x, z, out) => {
+        const rock = this.props.heightAt(x, z);
+        if (rock <= world.heightAt(x, z)) return world.smoothNormalAt(x, z, out);
+        // On a boulder: numeric normal of the combined ground.
+        const e = 0.15;
+        const h = (px: number, pz: number) => Math.max(world.heightAt(px, pz), this.props.heightAt(px, pz));
+        out.set(h(x - e, z) - h(x + e, z), 2 * e, h(x, z - e) - h(x, z + e)).normalize();
+        return out;
+      },
       water: (x, z) => {
         const s = this.water.sample(x, z, this.playerWater);
         waterOut.surface = s.surface;
@@ -321,6 +368,19 @@ export class Game {
       gpu: this.gpuName,
     });
     this.death = new DeathScreen(root, () => this.respawn());
+    this.inventoryScreen = new InventoryScreen(root, this.inventory, this.events, {
+      stations: () => this.structures.stationsNear(this.player.position.x, this.player.position.z),
+      onUse: (slot) => {
+        const previous = this.inventory.selected;
+        if (slot < 8) this.inventory.select(slot);
+        else {
+          this.inventory.swap(slot, previous);
+        }
+        this.gathering.use(this.gatherContext());
+        if (slot < 8) this.inventory.select(previous);
+      },
+      onClose: () => this.closeInventory(),
+    });
     this.debugEl = document.createElement('div');
     this.debugEl.className = 'hud-debug';
     this.hud.root.appendChild(this.debugEl);
@@ -385,6 +445,22 @@ export class Game {
         for (const id of data as string[]) this.discovered.add(id);
       },
     });
+    this.saves.register('structures', {
+      save: () => ({ ...this.structures.serialize(), spawn: this.spawnPoint }),
+      load: (data) => {
+        const d = data as ReturnType<Structures['serialize']> & { spawn?: { x: number; z: number; yaw: number } };
+        this.structures.load(d);
+        if (d.spawn) this.spawnPoint = d.spawn;
+      },
+    });
+    this.saves.register('harvest', {
+      save: () => ({ trees: this.vegetation.serializeHarvest(), props: this.props.serialize() }),
+      load: (data) => {
+        const d = data as { trees: [string, number][]; props: [string, number][] };
+        this.vegetation.loadHarvest(d.trees ?? []);
+        this.props.load(d.props ?? []);
+      },
+    });
     this.saves.register('meta', {
       save: () => ({ playtime: this.playtime }),
       load: (data) => {
@@ -440,12 +516,25 @@ export class Game {
   private respawn(): void {
     this.death.hide();
     this.survival.revive();
-    this.player.spawn(CAMP_SPAWN.x, CAMP_SPAWN.z, CAMP_SPAWN.yaw);
+    const sp = this.spawnPoint;
+    this.player.spawn(sp.x, sp.z, sp.yaw);
     this.deathCause = null;
     this.pipeline.post.damage = 0;
     this.hud.setVisible(true);
     this.events.emit('respawned', { x: CAMP_SPAWN.x, z: CAMP_SPAWN.z });
     this.pipeline.resetExposure();
+    this.input.requestPointerLock();
+  }
+
+  private openInventory(chest: StructureData | null = null): void {
+    this.inventoryScreen.show(chest?.contents ?? null, chest ? 'Storage Chest' : '');
+    this.input.gameplayEnabled = false;
+    this.input.exitPointerLock();
+  }
+
+  private closeInventory(): void {
+    this.inventoryScreen.hide();
+    this.input.gameplayEnabled = true;
     this.input.requestPointerLock();
   }
 
@@ -480,6 +569,123 @@ export class Game {
       location: BIOMES[this.world.dominantBiome(p.x, p.z)].name,
       playtime: this.playtime,
     });
+  }
+
+  private propOptions(): PropOptions {
+    const q = this.quality.name;
+    const pick = <T,>(values: [T, T, T, T, T]): T => values[['low', 'medium', 'high', 'extra', 'max'].indexOf(q)];
+    return {
+      largeRadius: pick([260, 380, 520, 700, 900]),
+      smallRadius: pick([45, 60, 75, 90, 110]),
+      lod0: pick([30, 40, 50, 62, 78]),
+      lod1: pick([110, 140, 180, 220, 280]),
+    };
+  }
+
+  private readonly tmpOrigin = new THREE.Vector3();
+  private readonly tmpDir = new THREE.Vector3();
+
+  private targetDistance(): number {
+    const t = this.gathering.target;
+    if (!t) return Infinity;
+    const p = this.camera.position;
+    if (t.kind === 'water') return Math.hypot(t.x - p.x, t.z - p.z);
+    return Math.hypot(t.hit.x - p.x, t.hit.z - p.z);
+  }
+
+  private structurePrompt(d: StructureData): { key: string | null; text: string } {
+    const name = Structures.label(d.type);
+    switch (d.type) {
+      case 'campfire': {
+        const fuel = d.fuel ?? 0;
+        if (fuel <= 0) return this.inventory.has('wood') ? { key: 'E', text: 'Light Campfire (1 wood)' } : { key: null, text: 'Campfire · needs wood' };
+        return this.inventory.has('wood') ? { key: 'E', text: `Add Wood · burns ${fuel.toFixed(1)} h` } : { key: null, text: `Campfire · burns ${fuel.toFixed(1)} h` };
+      }
+      case 'bedroll': {
+        const night = this.clock.hours > 18.5 || this.clock.hours < 5.5;
+        return night ? { key: 'E', text: 'Sleep until morning' } : { key: 'E', text: 'Set as camp' };
+      }
+      case 'chest':
+        return { key: 'E', text: 'Open Storage Chest' };
+      case 'rain_collector':
+        return (d.water ?? 0) >= 1 ? { key: 'E', text: `Drink · ${Math.floor(d.water ?? 0)} sips` } : { key: null, text: 'Rain Collector · empty' };
+      case 'farm_plot': {
+        if (!d.crop) return this.inventory.has('seeds') ? { key: 'E', text: 'Plant Seeds' } : { key: null, text: 'Farm Plot · needs seeds' };
+        const left = d.crop.ready - this.clock.totalHours;
+        return left <= 0 ? { key: 'E', text: 'Harvest' } : { key: null, text: `Growing · ${Math.ceil(left)} h` };
+      }
+      case 'lantern_post':
+        return { key: null, text: name };
+      default:
+        return { key: 'E', text: `Use ${name}` };
+    }
+  }
+
+  private useStructure(d: StructureData): void {
+    switch (d.type) {
+      case 'campfire':
+        if (this.inventory.remove('wood', 1)) {
+          d.fuel = (d.fuel ?? 0) + 2.5;
+          this.events.emit('notify', { text: 'The fire takes', icon: 'campfire', tone: 'good' });
+        }
+        break;
+      case 'bedroll': {
+        this.spawnPoint = { x: d.x + 1.2, z: d.z, yaw: this.player.yaw };
+        const night = this.clock.hours > 18.5 || this.clock.hours < 5.5;
+        if (night) this.sleep();
+        else this.events.emit('notify', { text: 'You will wake here', icon: 'bedroll', tone: 'info' });
+        break;
+      }
+      case 'chest':
+        this.openInventory(d);
+        break;
+      case 'rain_collector':
+        if ((d.water ?? 0) >= 1) {
+          d.water = (d.water ?? 0) - 1;
+          this.survival.drink(20);
+        }
+        break;
+      case 'farm_plot':
+        if (!d.crop && this.inventory.remove('seeds', 1)) {
+          d.crop = { planted: this.clock.totalHours, ready: this.clock.totalHours + 36 };
+          this.events.emit('notify', { text: 'Seeds planted · ready in a day and a half', icon: 'seed', tone: 'good' });
+        } else if (d.crop && d.crop.ready <= this.clock.totalHours) {
+          d.crop = null;
+          this.inventory.add('berries', 6);
+          this.inventory.add('seeds', 2);
+          this.inventory.add('fiber', 3);
+        }
+        break;
+      default:
+        this.openInventory();
+    }
+  }
+
+  /** Sleep through the night: time jumps to dawn, body recovers, needs drop. */
+  private sleep(): void {
+    const target = 6.25;
+    const hours = (target - this.clock.hours + 24) % 24;
+    this.clock.set(this.clock.day + (this.clock.hours > target ? 1 : 0), target);
+    this.hoursElapsed = hours;
+    this.survival.food = Math.max(5, this.survival.food - hours * 1.6);
+    this.survival.water = Math.max(5, this.survival.water - hours * 2);
+    this.survival.heal(40);
+    this.survival.stamina = this.survival.maxStamina;
+    this.survival.bodyTemp = Math.max(this.survival.bodyTemp, 36.6);
+    this.pipeline.post.fade = 1;
+    this.pipeline.resetExposure();
+    this.events.emit('notify', { text: `You slept ${Math.round(hours)} hours`, icon: 'moon', tone: 'info' });
+    this.saveSession('auto');
+  }
+
+  private gatherContext(): GatherContext {
+    const p = this.player.position;
+    this.gatherCtx.camera = this.camera;
+    this.gatherCtx.totalHours = this.clock.totalHours;
+    this.gatherCtx.playerX = p.x;
+    this.gatherCtx.playerZ = p.z;
+    this.gatherCtx.inWater = this.player.state === 'swim';
+    return this.gatherCtx;
   }
 
   private viewOptions() {
@@ -522,18 +728,21 @@ export class Game {
       this.debugVisible = !this.debugVisible;
       this.debugEl?.classList.toggle('show', this.debugVisible);
     }
-    if (this.input.wasPressed('pause', true) && this.mode === 'play' && this.survival.alive) {
+    if (this.mode === 'play' && this.survival.alive && !this.menu.isOpen && (this.input.wasPressed('inventory', true) || (this.inventoryScreen.isOpen && this.input.wasPressed('pause', true)))) {
+      if (this.inventoryScreen.isOpen) this.closeInventory();
+      else this.openInventory();
+    } else if (this.input.wasPressed('pause', true) && this.mode === 'play' && this.survival.alive) {
       if (this.menu.isOpen) this.closeMenu();
       else this.openMenu();
     }
     const frozen = this.paused || this.menuPaused;
     if (!frozen) {
       this.elapsed += dt;
-      this.clock.update(dt);
+      this.hoursElapsed = this.clock.update(dt);
       if (this.mode === 'fly') this.flyCam.update(dt);
       else this.updatePlay(dt);
     }
-    this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && this.survival.alive && this.frame > 30);
+    this.veilEl?.classList.toggle('show', this.mode === 'play' && !this.input.pointerLocked && !this.menu.isOpen && !this.inventoryScreen.isOpen && this.survival.alive && this.frame > 30);
     this.input.endFrame();
   }
 
@@ -568,6 +777,39 @@ export class Game {
     if (input.wasPressed('hotbarNext')) this.inventory.select(this.inventory.selected + 1);
     if (input.wasPressed('hotbarPrev')) this.inventory.select(this.inventory.selected - 1);
 
+    // Looking at things and working them.
+    const ctx = this.gatherContext();
+    const canAct = alive && (input.pointerLocked || this.testInput);
+    const held = this.inventory.held;
+    const placeType = held ? (itemDef(held.id).places as StructureType | undefined) : undefined;
+    let prompt: { key: string | null; text: string } | null = null;
+    const ghostText = this.structures.updateGhost(alive && placeType ? placeType : null, this.camera, canAct && input.wasPressed('rotate'));
+    if (ghostText) {
+      prompt = { key: this.structures.ghostValid ? 'LMB' : null, text: ghostText };
+      if (canAct && input.wasPressed('attack') && this.structures.placeGhost()) {
+        this.inventory.consumeSlot(this.inventory.selected, 1);
+        this.events.emit('crafted', { recipe: 'place', item: placeType as string, count: 1 });
+      }
+    } else if (alive) {
+      prompt = this.gathering.updateTarget(ctx);
+      const origin = this.camera.getWorldPosition(this.tmpOrigin);
+      const dir = this.camera.getWorldDirection(this.tmpDir);
+      const structure = this.structures.pick(origin, dir, 3.2);
+      const gatherDist = this.gathering.target ? this.targetDistance() : Infinity;
+      if (structure && Math.hypot(structure.x - origin.x, structure.z - origin.z) < gatherDist) {
+        prompt = this.structurePrompt(structure);
+        if (canAct && input.wasPressed('interact')) this.useStructure(structure);
+      } else {
+        if (canAct && input.wasPressed('interact')) this.gathering.interact(ctx);
+        if (canAct && input.wasPressed('attack')) this.gathering.use(ctx);
+      }
+    }
+    this.gathering.update(dt, ctx);
+    this.hud.setPrompt(prompt ? (prompt.key === 'LMB' ? this.input.bindingLabel('attack') : prompt.key === 'E' ? this.input.bindingLabel('interact') : null) : null, prompt ? prompt.text : null);
+    this.structures.update(dt, this.hoursElapsed, this.elapsed, this.player.position.x, this.player.position.z, 0);
+    this.vegetation.tick(dt, this.clock.totalHours);
+    this.props.tick(this.clock.totalHours);
+
     this.updateDiscovery(dt);
     this.autosaveTimer += dt;
     if (this.autosaveTimer > 60 && alive) {
@@ -597,6 +839,7 @@ export class Game {
       const d = Math.hypot(p.x - lake.x, p.z - lake.z);
       heat += 10 * (1 - smoothstep(lake.radius, lake.radius + 18, d));
     }
+    heat += this.structures.heatAt(p.x, p.y + 1, p.z);
     const inWater = this.player.state === 'swim';
     return {
       airTemperature: base + diurnal - altitude,
@@ -667,6 +910,33 @@ export class Game {
     this.grass.update(this.camera, this.reducedMotion ? 0 : this.elapsed);
     this.vegetationShared.uTime.value = this.reducedMotion ? 0 : this.elapsed;
     this.vegetation.update(this.camera);
+    this.props.update(this.camera);
+    this.viewmodel.root.visible = this.mode === 'play' && this.survival.alive;
+    if (this.mode === 'play') {
+      const held = this.inventory.held;
+      this.viewmodel.update(dt, {
+        held: held ? held.id : null,
+        swing: this.gathering.swingProgress,
+        speed: this.player.speed,
+        sprinting: this.player.sprinting,
+        lookX: this.look.x,
+        lookY: this.look.y,
+        grounded: this.player.grounded,
+        reducedMotion: this.viewOptions().reducedMotion,
+        climbing: this.player.state === 'climb',
+        swimming: this.player.state === 'swim',
+      });
+      // New tool meshes need CSM shadow setup once.
+      this.viewmodel.root.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const m = mesh.material as THREE.Material;
+        if (m.type === 'MeshStandardMaterial' && !this.viewmodelSetupDone.has(m.uuid)) {
+          this.viewmodelSetupDone.add(m.uuid);
+          this.lighting.setupMaterial(m);
+        }
+      });
+    }
     this.renderer.info.reset();
     const time = this.reducedMotion ? 0 : this.elapsed;
     this.water.update(this.renderer, this.camera, time, { color: this.pipeline.opaqueColor, depth: this.pipeline.opaqueDepth }, this.light);
@@ -921,6 +1191,87 @@ export class Game {
         return { x, z };
       },
       give: (id: string, count = 1) => this.inventory.add(id, count),
+      /** Point the view at a world position. */
+      aim: (x: number, y: number, z: number) => {
+        const eye = this.player.position.clone();
+        eye.y += this.player.eyeHeight;
+        this.player.yaw = Math.atan2(-(x - eye.x), -(z - eye.z));
+        this.player.pitch = Math.atan2(y - eye.y, Math.hypot(x - eye.x, z - eye.z));
+        this.view.update(0, this.player, this.camera, this.viewOptions());
+        const ctx = this.gatherContext();
+        const prompt = this.gathering.updateTarget(ctx);
+        const origin = this.camera.getWorldPosition(new THREE.Vector3());
+        const dir = this.camera.getWorldDirection(new THREE.Vector3());
+        const structure = this.structures.pick(origin, dir, 3.2);
+        return { prompt, structure: structure ? this.structurePrompt(structure) : null };
+      },
+      /** Perform an action as if the button was pressed: interact | use | place. */
+      act: (action: 'interact' | 'use' | 'place', seconds = 1) => {
+        this.testInput = true;
+        const ctx = this.gatherContext();
+        const origin = this.camera.getWorldPosition(new THREE.Vector3());
+        const dir = this.camera.getWorldDirection(new THREE.Vector3());
+        if (action === 'place') {
+          const held = this.inventory.held;
+          const type = held ? (itemDef(held.id).places as StructureType | undefined) : undefined;
+          this.structures.updateGhost(type ?? null, this.camera, false);
+          const placed = this.structures.placeGhost();
+          if (placed) this.inventory.consumeSlot(this.inventory.selected, 1);
+          this.structures.updateGhost(null, this.camera, false);
+          return { placed: placed ? placed.type : null, reason: this.structures.ghostReason };
+        }
+        this.gathering.updateTarget(ctx);
+        const structure = this.structures.pick(origin, dir, 3.2);
+        let result = false;
+        if (action === 'interact') {
+          if (structure) {
+            this.useStructure(structure);
+            result = true;
+          } else result = this.gathering.interact(ctx);
+        } else result = this.gathering.use(ctx);
+        const steps = Math.round(seconds * 30);
+        for (let i = 0; i < steps; i += 1) {
+          this.gathering.update(1 / 30, ctx);
+          this.vegetation.tick(1 / 30, this.clock.totalHours);
+        }
+        return { result, target: this.gathering.target ? this.gathering.target.kind : null };
+      },
+      craft: (recipeId: string) => {
+        const recipe = RECIPES.find((r) => r.id === recipeId);
+        if (!recipe) throw new Error(`Unknown recipe ${recipeId}`);
+        return craft(recipe, this.inventory, this.structures.stationsNear(this.player.position.x, this.player.position.z), this.events);
+      },
+      inventory: () => this.inventory.slots.filter(Boolean).map((s) => `${s!.id}x${s!.count}`),
+      selectItem: (id: string) => {
+        const i = this.inventory.slots.findIndex((s) => s?.id === id);
+        if (i < 0) return false;
+        if (i >= 8) this.inventory.swap(i, this.inventory.selected);
+        else this.inventory.select(i);
+        this.render(0);
+        return true;
+      },
+      nearestProp: (kind: string, radius = 120) => this.props.findNearest(kind as never, this.player.position.x, this.player.position.z, radius),
+      nearestTree: (radius = 60) => {
+        const p = this.player.position;
+        const out: { x: number; z: number; radius: number; height: number }[] = [];
+        this.vegetation.collidersNear(p.x, p.z, radius, out as never);
+        let best: { x: number; z: number; height: number } | null = null;
+        let bestD = Infinity;
+        for (const c of out) {
+          if (c.height < 3) continue;
+          const d = (c.x - p.x) ** 2 + (c.z - p.z) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = { x: c.x, z: c.z, height: c.height };
+          }
+        }
+        return best;
+      },
+      openInventory: () => {
+        this.openInventory();
+        return true;
+      },
+      closeInventory: () => this.closeInventory(),
       setTime: (hours: number) => {
         this.clock.set(this.clock.day, hours);
       },
