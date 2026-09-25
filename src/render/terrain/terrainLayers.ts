@@ -212,18 +212,20 @@ void layerForestFloor(vec2 uv, out vec3 col, out float h) {
   float shadeB;
   float needlesB = strokes(uv, 23.0, 0.45, 0.045, 5.0, shadeB);
   // Fallen leaves: ellipses scattered in cells.
-  vec4 lv = pvoronoi(uv * 12.0, vec2(12.0), 1.0);
-  vec2 lc = uv * 12.0;
-  vec4 cell = pcell(lc, vec2(12.0));
+  vec4 lv = pvoronoi(uv * 22.0, vec2(22.0), 1.0);
+  vec2 lc = uv * 22.0;
+  vec4 cell = pcell(lc, vec2(22.0));
   vec3 lh = hash32(cell.zw + 5.0);
   vec2 lp = rot2(lh.z * 6.28) * (cell.xy - (lh.xy - 0.5) * 0.4);
-  float leaf = 1.0 - smoothstep(0.8, 1.0, length(lp * vec2(3.2, 6.0)));
-  leaf *= step(0.45, lh.x);
+  float lr = length(lp * vec2(3.6, 6.5) * (1.0 + 0.25 * pnoise(lp * 9.0 + lh.xy * 20.0, vec2(64.0))));
+  float leaf = 1.0 - smoothstep(0.8, 1.0, lr);
+  float leafRim = smoothstep(0.55, 0.95, lr) * leaf;
+  leaf *= step(0.6, lh.x);
   float moss = smoothstep(0.1, 0.45, pfbm(uv * 3.0 + 3.1, vec2(3.0), 4));
   h = 0.25 + 0.2 * low + 0.25 * needles + 0.2 * needlesB + 0.3 * leaf + 0.15 * moss;
   vec3 soil = vec3(0.06, 0.045, 0.03);
   vec3 needleCol = mix(vec3(0.24, 0.12, 0.06), vec3(0.34, 0.2, 0.1), shade);
-  vec3 leafCol = mix(vec3(0.22, 0.12, 0.05), vec3(0.3, 0.26, 0.08), lh.y);
+  vec3 leafCol = mix(vec3(0.17, 0.09, 0.04), vec3(0.27, 0.17, 0.07), lh.y) * (1.0 - leafRim * 0.35);
   col = soil;
   col = mix(col, needleCol * 0.8, needlesB * 0.8);
   col = mix(col, needleCol, needles * 0.85);
@@ -245,20 +247,36 @@ void layerMoss(vec2 uv, out vec3 col, out float h) {
 }
 
 void layerDirt(vec2 uv, out vec3 col, out float h) {
+  // Bare soil: crumbly clods and grit, a few stones half buried in it and
+  // the odd twig and dead leaf. Not a pavement of pebbles.
   float low = pfbm(uv * 4.0, vec2(4.0), 5);
-  float grain = pfbm(uv * 48.0, vec2(48.0), 2);
-  vec4 pebA = pvoronoi(uv * 16.0, vec2(16.0), 0.9);
-  float stoneA = smoothstep(0.42, 0.18, pebA.x) * step(0.6, pebA.z);
-  vec4 pebB = pvoronoi(uv * 38.0, vec2(38.0), 0.9);
-  float stoneB = smoothstep(0.38, 0.2, pebB.x) * step(0.5, pebB.z);
-  float crack = smoothstep(0.03, 0.0, pvoronoi(uv * 7.0, vec2(7.0), 1.0).y - pvoronoi(uv * 7.0, vec2(7.0), 1.0).x) * smoothstep(-0.1, 0.3, low);
-  h = 0.35 + 0.15 * low + 0.05 * grain + 0.45 * stoneA * (1.0 - pebA.x * 2.0) + 0.25 * stoneB - 0.2 * crack;
-  col = mix(vec3(0.13, 0.09, 0.06), vec3(0.24, 0.18, 0.12), 0.5 + 0.5 * low);
-  col *= 0.9 + 0.2 * grain;
-  vec3 stoneCol = mix(vec3(0.22, 0.2, 0.18), vec3(0.36, 0.32, 0.27), pebA.z);
-  col = mix(col, stoneCol, stoneA);
-  col = mix(col, stoneCol * 0.9, stoneB * 0.8);
-  col *= 1.0 - crack * 0.5;
+  float grain = pfbm(uv * 48.0, vec2(48.0), 3);
+  vec4 clod = pvoronoi(uv * 60.0, vec2(60.0), 1.0);
+  float clods = smoothstep(0.55, 0.15, clod.x) * (0.4 + 0.6 * clod.z);
+  // Stones: sparse, irregular, with soil washed over their edges.
+  vec2 wuv = uv + vec2(pfbm(uv * 9.0 + 3.0, vec2(9.0), 3), pfbm(uv * 9.0 - 5.0, vec2(9.0), 3)) * 0.02;
+  vec4 st = pvoronoi(wuv * 9.0, vec2(9.0), 0.9);
+  float cover = pfbm(uv * 30.0 + 7.0, vec2(30.0), 3);
+  float ragged = pnoise(wuv * 60.0, vec2(60.0)) * 0.07;
+  float stone = smoothstep(0.26, 0.19, st.x + cover * 0.08 + ragged) * step(0.8, st.z);
+  vec4 gr = pvoronoi(uv * 70.0, vec2(70.0), 1.0);
+  float grit = smoothstep(0.3, 0.18, gr.x) * step(0.82, gr.z);
+  float twigShade;
+  float twig = strokes(uv, 11.0, 0.42, 0.028, 31.0, twigShade) * step(0.55, twigShade);
+  vec4 lc = pcell(uv * 10.0, vec2(10.0));
+  vec3 lh = hash32(lc.zw + 9.0);
+  vec2 lp = rot2(lh.z * 6.28) * (lc.xy - (lh.xy - 0.5) * 0.5);
+  float leaf = (1.0 - smoothstep(0.75, 1.0, length(lp * vec2(4.0, 7.0)))) * step(0.78, lh.x);
+  float damp = smoothstep(0.1, -0.3, low);
+  h = 0.35 + 0.15 * low + 0.06 * grain + 0.12 * clods + 0.4 * stone * (1.0 - st.x * 2.5) + 0.12 * grit + 0.15 * twig + 0.08 * leaf;
+  vec3 soil = mix(vec3(0.11, 0.075, 0.05), vec3(0.2, 0.15, 0.1), 0.5 + 0.5 * low);
+  soil *= 0.85 + 0.2 * grain + 0.1 * clods;
+  soil = mix(soil, soil * vec3(0.7, 0.68, 0.66), damp * 0.6);
+  vec3 stoneCol = mix(vec3(0.12, 0.11, 0.1), vec3(0.22, 0.2, 0.17), fract(st.z * 5.0) * 0.8 + grain * 0.2);
+  col = mix(soil, stoneCol, stone);
+  col = mix(col, stoneCol * 1.15, grit * 0.35);
+  col = mix(col, mix(vec3(0.1, 0.08, 0.06), vec3(0.2, 0.17, 0.13), twigShade), twig * 0.9);
+  col = mix(col, mix(vec3(0.2, 0.12, 0.05), vec3(0.28, 0.22, 0.1), lh.y), leaf * 0.85);
 }
 
 void layerMud(vec2 uv, out vec3 col, out float h) {
@@ -335,18 +353,27 @@ void layerSand(vec2 uv, out vec3 col, out float h) {
 }
 
 void layerGravel(vec2 uv, out vec3 col, out float h) {
-  vec4 a = pvoronoi(uv * 22.0, vec2(22.0), 1.0);
-  vec4 b = pvoronoi(uv * 40.0 + 0.5, vec2(40.0), 1.0);
-  float stoneA = 1.0 - smoothstep(0.1, 0.48, a.x);
-  float stoneB = 1.0 - smoothstep(0.1, 0.45, b.x);
-  float gap = smoothstep(0.08, 0.0, a.y - a.x);
-  h = max(stoneA * (0.6 + 0.4 * a.z), stoneB * 0.7 * (0.5 + 0.5 * b.z)) - gap * 0.3;
-  vec3 ca = mix(vec3(0.2, 0.19, 0.17), vec3(0.42, 0.38, 0.33), a.z);
-  ca = mix(ca, vec3(0.3, 0.22, 0.16), step(0.8, hash12(vec2(a.z, 3.0))));
-  vec3 cb = mix(vec3(0.18, 0.17, 0.16), vec3(0.35, 0.33, 0.3), b.z);
-  col = stoneA > stoneB * 0.7 ? ca : cb;
-  col *= 0.7 + 0.3 * h;
-  col = mix(col, vec3(0.07, 0.06, 0.05), gap * 0.7);
+  // Washed stones of mixed sizes, packed in grit and silt, not tiled.
+  vec2 wuv = uv + vec2(pfbm(uv * 6.0, vec2(6.0), 3), pfbm(uv * 6.0 + 4.0, vec2(6.0), 3)) * 0.015;
+  vec4 a = pvoronoi(wuv * 18.0, vec2(18.0), 1.0);
+  vec4 b = pvoronoi(wuv * 34.0 + 0.5, vec2(34.0), 1.0);
+  vec4 c = pvoronoi(uv * 80.0, vec2(80.0), 1.0);
+  float stoneA = (1.0 - smoothstep(0.18, 0.42, a.x)) * step(0.55, a.z);
+  float stoneB = (1.0 - smoothstep(0.15, 0.4, b.x)) * step(0.45, b.z);
+  float grit = (1.0 - smoothstep(0.2, 0.45, c.x));
+  float low = pfbm(uv * 3.0, vec2(3.0), 4);
+  h = max(max(stoneA * (0.55 + 0.35 * a.z), stoneB * 0.6 * (0.5 + 0.5 * b.z)), grit * 0.3) + 0.08 * low;
+  vec3 silt = mix(vec3(0.12, 0.1, 0.08), vec3(0.19, 0.16, 0.12), 0.5 + 0.5 * low);
+  vec3 ca = mix(vec3(0.13, 0.12, 0.11), vec3(0.26, 0.24, 0.2), fract(a.z * 7.0));
+  ca = mix(ca, vec3(0.26, 0.19, 0.13), step(0.82, hash12(vec2(a.z, 3.0))));
+  vec3 cb = mix(vec3(0.12, 0.11, 0.1), vec3(0.24, 0.22, 0.19), fract(b.z * 5.0));
+  vec3 cc = mix(vec3(0.14, 0.13, 0.12), vec3(0.26, 0.24, 0.21), c.z);
+  col = silt;
+  col = mix(col, cc, grit * 0.7);
+  col = mix(col, cb, stoneB);
+  col = mix(col, ca, stoneA);
+  // Stones darken toward their edges where silt clings.
+  col *= 0.8 + 0.25 * smoothstep(0.0, 0.7, h);
 }
 
 void layerSnow(vec2 uv, out vec3 col, out float h) {

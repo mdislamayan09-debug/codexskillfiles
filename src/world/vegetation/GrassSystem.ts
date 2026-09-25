@@ -118,6 +118,8 @@ const GRASS_BEGIN_VERTEX = /* glsl */ `
   density *= 1.0 - mB.a;                          // snow
   density *= 1.0 - smoothstep(0.4, 0.9, mB.g) * 0.8; // eroded gravel
   density *= mix(0.55, 1.0, patches);
+  // Grass thins in the shade of a closed canopy.
+  density *= 1.0 - smoothstep(0.2, 0.9, mB.b) * 0.7;
 
   float ground = grassGroundHeight(baseXZ);
   float submerged = waterLevel - ground;
@@ -170,6 +172,10 @@ const GRASS_BEGIN_VERTEX = /* glsl */ `
   if (!alive) transformed = vec3(0.0, -1e5, 0.0);
   // Soft normal: mostly sky-facing, tilted with the blade's face and bend.
   vec3 gN = normalize(vec3(0.0, 1.0, 0.0) + vec3(facing.x, 0.0, facing.y) * 0.35 + vec3(bendXZ.x, 0.0, bendXZ.y) * (0.25 * t));
+  // Blades are folded along the midrib: each half faces its own way, so
+  // one catches the light and the other doesn't.
+  float across = position.x > 0.0 ? 1.0 : (position.x < 0.0 ? -1.0 : 0.0);
+  gN = normalize(gN + vec3(side.x, 0.0, side.y) * across * 0.55);
   vNormal = normalize(normalMatrix * gN);
 
   // Color: root to tip, fresh to dry, per-blade variation.
@@ -265,7 +271,7 @@ export class GrassSystem {
     this.patches.length = 0;
     const density = Math.max(0.15, this.options.density);
     const nearOuter = Math.min(18, this.options.radius * 0.4);
-    this.addPatch(0.34 / Math.sqrt(density), 0, nearOuter, 4, 0.05, 7);
+    this.addPatch(0.34 / Math.sqrt(density), 0, nearOuter, 3, 0.034, 9);
     this.addPatch(0.8 / Math.sqrt(density), nearOuter, this.options.radius, 1, 0.08, 4);
   }
 

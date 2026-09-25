@@ -10,7 +10,7 @@ import {
   type VegetationShared,
 } from '../../render/vegetation/treeMaterials';
 import { MASK } from '../gen/generateWorld';
-import { BIOME_COUNT, WORLD_HALF, WORLD_SEED } from '../WorldConfig';
+import { BIOME, BIOME_COUNT, FIELD_CELL, FIELD_RES, WORLD_HALF, WORLD_SEED } from '../WorldConfig';
 import { LANDMARKS } from '../WorldLayout';
 import { plannedCaves } from '../Caves';
 import { VIEWPOINTS } from '../../game/Viewpoints';
@@ -236,6 +236,7 @@ export class VegetationSystem {
     this.impostors = new Impostors(renderer, sources, textures, IMPOSTOR_CAP, options.alphaToCoverage);
     this.materials.push(this.impostors.material);
     this.group.add(this.impostors.mesh);
+    this.paintCanopy();
   }
 
   // ---------------------------------------------------------------------------
@@ -268,6 +269,50 @@ export class VegetationSystem {
     return options[options.length - 1][0];
   }
 
+  /** Plants per 100 m² the blended ecology wants at (x, z): groves, openings and treelines. */
+  private standDensity(x: number, z: number, ground: number, weights: Float32Array, trees: boolean): number {
+    const v = this.noise.fbm(x / 170, z / 170, 4) * 0.65 * 0.5 + this.noise.noise(x / 55, z / 55) * 0.35 * 0.5 + 0.5;
+    let density = 0;
+    for (let b = 0; b < BIOME_COUNT; b += 1) {
+      const w = weights[b];
+      if (w < 0.01) continue;
+      const flora = BIOME_FLORA[b];
+      const grove = trees ? THREE.MathUtils.smoothstep(v, flora.openness - 0.12, flora.openness + 0.1) : 0.4 + 0.6 * THREE.MathUtils.smoothstep(v, flora.openness - 0.3, flora.openness);
+      const line = 1 - THREE.MathUtils.smoothstep(ground, flora.treeline - 25, flora.treeline + 10);
+      density += w * grove * (trees ? line : Math.max(0.3, line)) * (trees ? flora.treeDensity : flora.shrubDensity);
+    }
+    return density;
+  }
+
+  /**
+   * Writes how closed the canopy is over the ground into the forest mask,
+   * from the same stand density the scatter uses, so the terrain can lay
+   * litter under the trees and the grass can thin in their shade. Dead
+   * woods and the fen keep their own ground. 8 m texels, filtered.
+   */
+  private paintCanopy(): void {
+    const tex = this.world.maskTextureB;
+    const data = tex.image.data as Uint8Array;
+    const step = 4;
+    const weights = new Float32Array(BIOME_COUNT);
+    for (let j = 0; j < FIELD_RES; j += step) {
+      for (let i = 0; i < FIELD_RES; i += step) {
+        const x = -WORLD_HALF + (i + step / 2) * FIELD_CELL;
+        const z = -WORLD_HALF + (j + step / 2) * FIELD_CELL;
+        this.world.biomeWeights(x, z, weights);
+        const ground = this.world.heightAt(x, z);
+        let closed = 0;
+        if (ground > this.world.waterLevelAt(x, z) + 0.25 && this.world.slopeAt(x, z) < 0.42) {
+          const d = this.standDensity(x, z, ground, weights, true) * (1 - weights[BIOME.Cinderreach] - weights[BIOME.Drownfen]);
+          closed = THREE.MathUtils.smoothstep(d, 0.35, 2.4);
+        }
+        const v = Math.round(closed * 255);
+        for (let dj = 0; dj < step; dj += 1) for (let di = 0; di < step; di += 1) data[((j + dj) * FIELD_RES + i + di) * 4 + 2] = v;
+      }
+    }
+    tex.needsUpdate = true;
+  }
+
   private generateCell(cx: number, cz: number): Cell {
     const rng = createRng(hash2i(cx, cz, WORLD_SEED + 5));
     const kinds: number[] = [];
@@ -296,17 +341,7 @@ export class VegetationSystem {
           if (Math.abs(x) > WORLD_HALF - 4 || Math.abs(z) > WORLD_HALF - 4) continue;
           const weights = this.world.biomeWeights(x, z, this.biomeScratch);
           const ground = this.world.heightAt(x, z);
-          // Density from the blended ecology.
-          const v = this.noise.fbm(x / 170, z / 170, 4) * 0.65 * 0.5 + this.noise.noise(x / 55, z / 55) * 0.35 * 0.5 + 0.5;
-          let density = 0;
-          for (let b = 0; b < BIOME_COUNT; b += 1) {
-            const w = weights[b];
-            if (w < 0.01) continue;
-            const flora = BIOME_FLORA[b];
-            const grove = trees ? THREE.MathUtils.smoothstep(v, flora.openness - 0.12, flora.openness + 0.1) : 0.4 + 0.6 * THREE.MathUtils.smoothstep(v, flora.openness - 0.3, flora.openness);
-            const line = 1 - THREE.MathUtils.smoothstep(ground, flora.treeline - 25, flora.treeline + 10);
-            density += w * grove * (trees ? line : Math.max(0.3, line)) * (trees ? flora.treeDensity : flora.shrubDensity);
-          }
+          const density = this.standDensity(x, z, ground, weights, trees);
           const probability = (density * spacing * spacing) / 100;
           if (roll > probability) continue;
           const slope = this.world.slopeAt(x, z);

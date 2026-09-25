@@ -198,10 +198,21 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
   shares the atmosphere, fog, cave darkness and shadowing.
 - **Terrain:** CDLOD in one instanced draw with geomorphing; 14 GPU-baked
   PBR ground layers; height blending, anti-tiling, biplanar shading on
-  steep faces; far-field shading; holes cut for caves.
+  steep faces; far-field shading; holes cut for caves. Bare soil is
+  crumbly earth with a few half-buried stones and twigs, not a pavement
+  of pebbles. A **canopy mask** (`VegetationSystem.paintCanopy`, the
+  forest channel of mask B) is painted at boot from the same stand
+  density that places the trees: the ground under a closed canopy turns
+  to needle and leaf litter and moss, and the grass thins there.
 - **Vegetation:** procedurally grown trees per biome (bark and leaf
   textures baked on the GPU), hierarchical wind, baked multi-view
   impostors for distant trees, dense instanced grass with translucency.
+  Leaf cards carry leaves at their real size on branching twigs (about
+  140 per card). Leaf alpha is boosted with the mip level so thin needle
+  cards keep their coverage at a distance (without it, spruces beyond
+  ~20 m went bare). Grass blades are narrow and folded along the midrib,
+  so each half takes the light differently. Pine and spruce bark is
+  irregular plates split by furrows that wander, pinch shut and flake.
 - **Props:** procedural rocks and gatherables, streamed in cells.
 - **Stonework:** dressed masonry and natural rock generated as canvas
   textures and applied in world space (triplanar), so long lintels and

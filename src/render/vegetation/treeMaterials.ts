@@ -164,10 +164,14 @@ export function createLeafMaterial(shared: VegetationShared, textures: FoliageTe
         '#include <map_fragment>',
         `vec4 leafTex = texture(uFoliage, vec3(vLeafUv, floor(vLeafLayer + 0.5)));
 vec4 leafNrm = texture(uFoliageNormal, vec3(vLeafUv, floor(vLeafLayer + 0.5)));
-float leafAlpha = leafTex.a;
+// Needle and leaf cards are mostly empty, so their mips average the
+// alpha away and distant crowns go bare. Give coverage back per mip level.
+vec2 leafTexel = vLeafUv * vec2(textureSize(uFoliage, 0).xy);
+float leafLod = max(0.0, 0.5 * log2(max(dot(dFdx(leafTexel), dFdx(leafTexel)), dot(dFdy(leafTexel), dFdy(leafTexel)))));
+float leafAlpha = clamp(leafTex.a * (1.0 + 0.45 * leafLod), 0.0, 1.0);
 if (uAlphaCoverage > 0.5) {
   // Sharpened coverage keeps foliage from thinning out in lower mips.
-  leafAlpha = clamp((leafTex.a - 0.45) / max(fwidth(leafTex.a), 1e-4) + 0.5, 0.0, 1.0);
+  leafAlpha = clamp((leafAlpha - 0.45) / max(fwidth(leafAlpha), 1e-4) + 0.5, 0.0, 1.0);
   if (leafAlpha < 0.01) discard;
 } else if (leafAlpha < 0.45) discard;
 diffuseColor.rgb = leafTex.rgb;

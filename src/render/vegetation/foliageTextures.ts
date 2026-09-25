@@ -57,23 +57,36 @@ void main() {
   vec2 uv = vUv;
   vec3 col; float h;
   if (uLayer == 0) {
-    // Pine: vertically elongated, irregular plates; deep dark fissures;
-    // flaking scales on the plate faces.
-    vec2 w = vec2(pfbm(uv * vec2(3.0, 2.0), vec2(3.0, 2.0), 3), pfbm(uv * vec2(3.0, 2.0) + 7.3, vec2(3.0, 2.0), 3));
-    vec2 puv = uv + w * vec2(0.05, 0.08);
-    vec4 v = pvoronoi(puv * vec2(9.0, 3.0), vec2(9.0, 3.0), 0.9);
-    float fissure = smoothstep(0.0, 0.16, v.y - v.x);
-    vec4 sub = pvoronoi(puv * vec2(24.0, 10.0), vec2(24.0, 10.0), 1.0);
-    float crack = 1.0 - smoothstep(0.0, 0.05, sub.y - sub.x);
-    float flake = pfbm(uv * vec2(20.0, 40.0), vec2(20.0, 40.0), 4);
+    // Pine: long irregular plates split by furrows that wander, widen and
+    // pinch shut; plates stand at their own depths and flake in thin
+    // layers, grey where weathered and rust-red where freshly shed.
+    vec2 w = vec2(pfbm(uv * vec2(3.0, 2.0), vec2(3.0, 2.0), 4), pfbm(uv * vec2(3.0, 2.0) + 7.3, vec2(3.0, 2.0), 4));
+    vec2 puv = uv + w * vec2(0.09, 0.14);
+    vec4 v = pvoronoi(puv * vec2(8.0, 2.0), vec2(8.0, 2.0), 1.0);
+    float edge = v.y - v.x;
+    // Not every joint opens: some plates are still fused.
+    float open = smoothstep(-0.55, 0.25, pnoise(puv * vec2(16.0, 6.0) + v.z * 7.0, vec2(16.0, 6.0)));
+    float fissure = smoothstep(0.0, 0.02 + 0.2 * open, edge);
+    float fused = 1.0 - open;
+    fissure = max(fissure, fused * 0.7);
+    // Flakes: thin layers peeling on each plate, stepped in height.
+    float fl = pfbm(puv * vec2(14.0, 9.0) + v.z * 3.0, vec2(14.0, 9.0), 4);
+    float layers = floor((fl * 0.5 + 0.5) * 4.0) / 4.0;
+    float lip = smoothstep(0.0, 0.04, fract((fl * 0.5 + 0.5) * 4.0));
+    vec4 sub = pvoronoi(puv * vec2(22.0, 7.0), vec2(22.0, 7.0), 1.0);
+    float crack = (1.0 - smoothstep(0.0, 0.04, sub.y - sub.x)) * step(0.4, sub.z);
     float scale = pfbm(uv * vec2(60.0, 90.0), vec2(60.0, 90.0), 2);
-    h = fissure * (0.55 + 0.35 * v.z + 0.12 * flake) - crack * 0.12 * fissure + scale * 0.04;
-    vec3 plateA = vec3(0.32, 0.19, 0.12);
-    vec3 plateB = vec3(0.24, 0.2, 0.17);
-    vec3 plate = mix(plateA, plateB, smoothstep(0.3, 0.8, v.z + flake * 0.4));
-    plate *= 0.8 + 0.35 * flake + 0.1 * scale;
-    col = mix(vec3(0.025, 0.018, 0.014), plate, pow(fissure, 0.8));
-    col *= 1.0 - crack * 0.35 * fissure;
+    h = fissure * (0.45 + 0.25 * v.z + 0.18 * layers + 0.04 * lip) - crack * 0.1 * fissure + scale * 0.035;
+    vec3 grey = vec3(0.17, 0.145, 0.125);
+    vec3 rust = vec3(0.32, 0.16, 0.085);
+    vec3 umber = vec3(0.14, 0.09, 0.06);
+    float fresh = smoothstep(0.55, 0.85, 1.0 - layers + 0.25 * v.z) * (1.0 - lip * 0.5);
+    vec3 plate = mix(mix(grey, umber, v.z * 0.6), rust, fresh * 0.75);
+    plate *= 0.82 + 0.3 * fl + 0.1 * scale;
+    // Lichen dust on the weathered faces.
+    plate = mix(plate, vec3(0.24, 0.26, 0.19), smoothstep(0.62, 0.8, pfbm(uv * vec2(5.0, 3.0) + 9.0, vec2(5.0, 3.0), 4)) * (1.0 - fresh) * 0.35);
+    col = mix(vec3(0.04, 0.028, 0.02), plate, pow(fissure, 0.7));
+    col *= 1.0 - crack * 0.3 * fissure;
   } else if (uLayer == 1) {
     // Birch: chalk-white with horizontal lenticels and black scar patches.
     // Lenticels: short dark horizontal dashes.
@@ -256,34 +269,45 @@ void main() {
     trans = 0.2;
     ao = mix(0.5, 1.0, uv.y);
   } else {
-    // Broadleaf clusters: leaves along 3 twigs from the card base.
-    float width = uLayer == 2 ? 0.085 : (uLayer == 3 ? 0.11 : (uLayer == 4 ? 0.12 : 0.09));
-    float leafLen = uLayer == 2 ? 0.18 : (uLayer == 3 ? 0.22 : (uLayer == 4 ? 0.16 : 0.19));
+    // Broadleaf sprays: a stem from the card base with twigs branching off
+    // it alternately, each carrying leaves at their real size (a card is
+    // over a metre across, so an oak leaf is under a tenth of it).
+    float width = uLayer == 2 ? 0.034 : (uLayer == 3 ? 0.045 : (uLayer == 4 ? 0.042 : 0.036));
+    float leafLen = uLayer == 2 ? 0.072 : (uLayer == 3 ? 0.092 : (uLayer == 4 ? 0.075 : 0.078));
     float best = 0.0;
     float shade = 0.0;
     vec2 bestLocal = vec2(0.0);
-    float twigMask = 0.0;
-    for (int tw = 0; tw < 3; tw++) {
+    vec2 stemA = vec2(0.5, 0.02);
+    vec2 stemB = vec2(0.52, 0.78);
+    float twigMask = smoothstep(0.007, 0.0025, segDist(uv, stemA, stemB));
+    for (int tw = 0; tw < 7; tw++) {
       float ft = float(tw);
-      vec2 a = vec2(0.5, 0.02);
-      vec2 b = vec2(0.5 + (ft - 1.0) * 0.28, 0.9 - abs(ft - 1.0) * 0.1);
-      twigMask = max(twigMask, smoothstep(0.008, 0.003, segDist(uv, a, b)));
-      for (int i = 0; i < 12; i++) {
+      float sideT = mod(ft, 2.0) < 1.0 ? -1.0 : 1.0;
+      vec2 a = mix(stemA, stemB, 0.08 + 0.13 * ft);
+      float spread = 0.36 * (1.0 - ft / 9.0) + 0.1;
+      vec2 b = a + normalize(vec2(sideT * (0.9 - ft * 0.08), 0.75 + ft * 0.1)) * spread;
+      if (tw == 6) b = vec2(0.5 + (hash12(vec2(ft, float(uLayer))) - 0.5) * 0.1, 0.98);
+      // Cheap reject: this twig's leaves stay within a band round it.
+      if (segDist(uv, a, b) > leafLen * 1.3) continue;
+      twigMask = max(twigMask, smoothstep(0.0045, 0.0015, segDist(uv, a, b)));
+      for (int i = 0; i < 20; i++) {
         float fi = float(i);
         vec3 h = vec3(hash12(vec2(fi + ft * 17.0, float(uLayer))), hash12(vec2(fi * 1.7, ft + 3.0)), hash12(vec2(fi + 9.0, ft * 2.3)));
-        float along = 0.12 + 0.82 * (fi / 12.0);
+        float along = 0.06 + 0.94 * (fi / 19.0);
         vec2 base = mix(a, b, along);
         float side = mod(fi, 2.0) < 1.0 ? -1.0 : 1.0;
-        float ang = side * (0.7 + 0.5 * h.x) + (ft - 1.0) * 0.35;
+        vec2 td = normalize(b - a);
+        float ang = atan(td.x, td.y) + side * (0.55 + 0.6 * h.x);
         vec2 local = rot(-ang) * (uv - base);
-        float size = leafLen * (0.75 + 0.4 * h.y) * (1.0 - along * 0.25);
-        vec2 lp = vec2(local.x / size, local.y / size);
+        float size = leafLen * (0.7 + 0.45 * h.y) * (1.0 - along * 0.2);
+        // A short stalk before the blade.
+        vec2 lp = vec2(local.x / size, local.y / size - 0.12);
         float s = leafShape(lp, width / leafLen, uLayer == 3 ? 0.6 : 0.8);
         if (s > best) { best = s; shade = h.z; bestLocal = lp; }
       }
     }
     alpha = max(best, twigMask);
-    float vein = smoothstep(0.03, 0.0, abs(bestLocal.x)) * 0.5;
+    float vein = smoothstep(0.04, 0.0, abs(bestLocal.x)) * 0.5 + smoothstep(0.03, 0.0, abs(fract((bestLocal.y - abs(bestLocal.x) * 1.4) * 6.0) - 0.5) * 0.12) * 0.15;
     vec3 young, old;
     if (uLayer == 2) { young = vec3(0.25, 0.36, 0.07); old = vec3(0.1, 0.2, 0.04); }
     else if (uLayer == 3) { young = vec3(0.14, 0.24, 0.05); old = vec3(0.05, 0.12, 0.03); }

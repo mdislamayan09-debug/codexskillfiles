@@ -205,6 +205,10 @@ the solid-geometry columns (walls, stairs, doorways, plank walls, slopes)
 - ✅ Survivors rebuilt as proper people (`src/story/figures/`): sculpted
   heads, baked skin, eyes that blink and look, clothes that hang, hands
   with fingers. First-person hands rebuilt as a gloved fist.
+- ✅ Realism pass on the land: soil and gravel rebaked, litter and moss
+  under forest canopy (and thinner grass), real-size leaves on branching
+  twigs, mip-aware leaf coverage (distant spruces no longer go bare),
+  finer folded grass blades, plated pine bark.
 - 🟡 Performance: presets are tuned by eye and by budget. Frame times
   still need measuring on real Apple silicon.
 - ⬜ Key rebinding.

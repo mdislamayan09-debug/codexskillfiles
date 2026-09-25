@@ -274,15 +274,23 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
   deposit = smoothstep(0.3, 1.0, deposit);
   float keep = (1.0 - carve * 0.6);
   for (int i = 0; i < ${LAYER_COUNT}; i++) lw[i] *= keep;
-  lw[L_GRAVEL] += carve * 0.4;
-  lw[L_DIRT] += carve * 0.2;
+  lw[L_GRAVEL] += carve * 0.3;
+  lw[L_DIRT] += carve * 0.3;
   float fertile = deposit * (bA.r + bA.g * 0.5 + bB.a * 0.5);
   lw[L_MEADOW] += fertile * 0.6;
 
+  // Under a closed canopy the ground is litter and moss, not meadow: the
+  // forest mask comes from the same stand density that places the trees.
+  float canopy = smoothstep(0.15, 0.85, mB.b) * gentle;
+  float ck = 1.0 - canopy * 0.7;
+  for (int i = 0; i < ${LAYER_COUNT}; i++) lw[i] *= ck;
+  lw[L_FOREST] += canopy * 0.5;
+  lw[L_MOSS] += canopy * 0.2 * nB;
+
   float pk = 1.0 - path;
   for (int i = 0; i < ${LAYER_COUNT}; i++) lw[i] *= pk;
-  lw[L_DIRT] += path * 0.65;
-  lw[L_GRAVEL] += path * 0.35;
+  lw[L_DIRT] += path * 0.8;
+  lw[L_GRAVEL] += path * 0.2;
 
   float sk = 1.0 - sand;
   for (int i = 0; i < ${LAYER_COUNT}; i++) lw[i] *= sk;

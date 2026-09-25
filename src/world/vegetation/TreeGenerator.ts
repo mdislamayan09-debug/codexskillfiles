@@ -37,15 +37,15 @@ export const SPECIES: Record<string, SpeciesConfig> = {
   },
   birch: {
     id: 'birch', shape: 'columnar', bark: BARK.birch, foliage: FOLIAGE.birch, height: [10, 17], trunkRadius: 0.012, lean: 0.05,
-    crownStart: 0.38, limbs: 7, limbAngle: 0.62, limbLength: 0.34, gravity: -0.1, leafCard: 1.3, leafDensity: 1.45, twigs: true,
+    crownStart: 0.38, limbs: 7, limbAngle: 0.62, limbLength: 0.34, gravity: -0.1, leafCard: 1.35, leafDensity: 1.9, twigs: true,
   },
   oak: {
     id: 'oak', shape: 'round', bark: BARK.oak, foliage: FOLIAGE.oak, height: [11, 17], trunkRadius: 0.04, lean: 0.03,
-    crownStart: 0.28, limbs: 5, limbAngle: 0.95, limbLength: 0.55, gravity: 0.08, leafCard: 1.65, leafDensity: 1.45, twigs: true,
+    crownStart: 0.28, limbs: 5, limbAngle: 0.95, limbLength: 0.55, gravity: 0.08, leafCard: 1.75, leafDensity: 1.9, twigs: true,
   },
   willow: {
     id: 'willow', shape: 'weeping', bark: BARK.oak, foliage: FOLIAGE.bush, height: [9, 13], trunkRadius: 0.045, lean: 0.08,
-    crownStart: 0.35, limbs: 6, limbAngle: 0.8, limbLength: 0.5, gravity: 0.7, leafCard: 1.45, leafDensity: 1.35, twigs: true,
+    crownStart: 0.35, limbs: 6, limbAngle: 0.8, limbLength: 0.5, gravity: 0.7, leafCard: 1.45, leafDensity: 1.7, twigs: true,
   },
   deadwood: {
     id: 'deadwood', shape: 'dead', bark: BARK.dead, foliage: FOLIAGE.dry, height: [7, 13], trunkRadius: 0.032, lean: 0.12,
@@ -61,7 +61,7 @@ export const SPECIES: Record<string, SpeciesConfig> = {
   },
   shrub: {
     id: 'shrub', shape: 'bush', bark: BARK.oak, foliage: FOLIAGE.bush, height: [1.2, 2.2], trunkRadius: 0.03, lean: 0,
-    crownStart: 0, limbs: 7, limbAngle: 0.7, limbLength: 0.6, gravity: 0.05, leafCard: 0.95, leafDensity: 1.6, twigs: false,
+    crownStart: 0, limbs: 7, limbAngle: 0.7, limbLength: 0.6, gravity: 0.05, leafCard: 0.95, leafDensity: 2.0, twigs: false,
   },
   heath: {
     id: 'heath', shape: 'bush', bark: BARK.dead, foliage: FOLIAGE.spruce, height: [0.7, 1.2], trunkRadius: 0.03, lean: 0,
