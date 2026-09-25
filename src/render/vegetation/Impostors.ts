@@ -167,10 +167,10 @@ float frame = mod(rel / (6.2831853 / ${IMPOSTOR_VIEWS}.0) + ${IMPOSTOR_VIEWS * 4
 float f0 = floor(frame);
 float f1 = mod(f0 + 1.0, ${IMPOSTOR_VIEWS}.0);
 float ft = frame - f0;
-vec4 a0 = texture(uImpAlbedo, vec3(vImpUv, vImpBase + f0));
-vec4 a1 = texture(uImpAlbedo, vec3(vImpUv, vImpBase + f1));
-vec4 n0 = texture(uImpNormal, vec3(vImpUv, vImpBase + f0));
-vec4 n1 = texture(uImpNormal, vec3(vImpUv, vImpBase + f1));
+vec4 a0 = texture(uImpAlbedo, vec3(vImpUv, vImpBase + f0), uMipBias * 0.5);
+vec4 a1 = texture(uImpAlbedo, vec3(vImpUv, vImpBase + f1), uMipBias * 0.5);
+vec4 n0 = texture(uImpNormal, vec3(vImpUv, vImpBase + f0), uMipBias * 0.5);
+vec4 n1 = texture(uImpNormal, vec3(vImpUv, vImpBase + f1), uMipBias * 0.5);
 vec4 impAlb = mix(a0, a1, ft);
 vec3 impN = normalize(mix(n0.xyz, n1.xyz, ft) * 2.0 - 1.0);
 // The atlas is baked over transparent black, so its small mips average
@@ -180,7 +180,7 @@ impAlb.rgb /= max(impAlb.a, 0.05);
 // Coverage also averages away in small mips (thin crowns and trunks would
 // erode to nothing): give it back per mip level, as the leaf cards do.
 vec2 impTexel = vImpUv * vec2(textureSize(uImpAlbedo, 0).xy);
-float impLod = max(0.0, 0.5 * log2(max(dot(dFdx(impTexel), dFdx(impTexel)), dot(dFdy(impTexel), dFdy(impTexel)))));
+float impLod = max(0.0, 0.5 * log2(max(dot(dFdx(impTexel), dFdx(impTexel)), dot(dFdy(impTexel), dFdy(impTexel)))) + uMipBias * 0.5);
 float impA = clamp(impAlb.a * (1.0 + 0.25 * impLod), 0.0, 1.0);
 if (uImpA2C > 0.5) {
   impA = clamp((impA - 0.5) / max(fwidth(impA), 1e-4) + 0.5, 0.0, 1.0);

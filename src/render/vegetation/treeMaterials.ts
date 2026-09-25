@@ -109,7 +109,7 @@ export function createBarkMaterial(shared: VegetationShared, textures: FoliageTe
       fs = replaceOnce(
         fs,
         '#include <map_fragment>',
-        `vec4 barkAlb = texture(uBark, vec3(vBarkUv, uBarkLayer));\nvec4 barkNrm = texture(uBarkNormal, vec3(vBarkUv, uBarkLayer));\ndiffuseColor.rgb = barkAlb.rgb;`,
+        `vec4 barkAlb = texture(uBark, vec3(vBarkUv, uBarkLayer), uMipBias);\nvec4 barkNrm = texture(uBarkNormal, vec3(vBarkUv, uBarkLayer), uMipBias);\ndiffuseColor.rgb = barkAlb.rgb;`,
         'bark map',
       );
       fs = replaceOnce(fs, '#include <roughnessmap_fragment>', 'float roughnessFactor = barkNrm.b;', 'bark rough');
@@ -180,12 +180,14 @@ export function createLeafMaterial(shared: VegetationShared, textures: FoliageTe
       fs = replaceOnce(
         fs,
         '#include <map_fragment>',
-        `vec4 leafTex = texture(uFoliage, vec3(vLeafUv, floor(vLeafLayer + 0.5)));
-vec4 leafNrm = texture(uFoliageNormal, vec3(vLeafUv, floor(vLeafLayer + 0.5)));
+        `// Half the LOD bias on leaves: alpha-tested cards gain little from sharper
+// mips and pay for them in bandwidth and shimmer.
+vec4 leafTex = texture(uFoliage, vec3(vLeafUv, floor(vLeafLayer + 0.5)), uMipBias * 0.5);
+vec4 leafNrm = texture(uFoliageNormal, vec3(vLeafUv, floor(vLeafLayer + 0.5)), uMipBias * 0.5);
 // Needle and leaf cards are mostly empty, so their mips average the
 // alpha away and distant crowns go bare. Give coverage back per mip level.
 vec2 leafTexel = vLeafUv * vec2(textureSize(uFoliage, 0).xy);
-float leafLod = max(0.0, 0.5 * log2(max(dot(dFdx(leafTexel), dFdx(leafTexel)), dot(dFdy(leafTexel), dFdy(leafTexel)))));
+float leafLod = max(0.0, 0.5 * log2(max(dot(dFdx(leafTexel), dFdx(leafTexel)), dot(dFdy(leafTexel), dFdy(leafTexel)))) + uMipBias * 0.5);
 float leafAlpha = clamp(leafTex.a * (1.0 + 0.45 * leafLod), 0.0, 1.0);
 if (uAlphaCoverage > 0.5) {
   // Sharpened coverage keeps foliage from thinning out in lower mips.

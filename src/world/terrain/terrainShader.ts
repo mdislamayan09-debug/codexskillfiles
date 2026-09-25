@@ -225,8 +225,9 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
   if (atmoCaveInside(vTerrainPos) > 0.5) discard;
   #endif
   vec3 tPos = vTerrainPos;
-  vec3 tDpdx = dFdx(tPos);
-  vec3 tDpdy = dFdy(tPos);
+  // Gradients shrunk by the mip bias: layers as sharp as the display needs.
+  vec3 tDpdx = dFdx(tPos) * exp2(uMipBias);
+  vec3 tDpdy = dFdy(tPos) * exp2(uMipBias);
   vec2 nUv = (tPos.xz + ${WORLD_HALF.toFixed(1)} + 0.5) / ${HEIGHT_RES.toFixed(1)};
   vec2 fUv = (tPos.xz + ${WORLD_HALF.toFixed(1)}) / ${WORLD_SIZE.toFixed(1)};
   vec4 nTex = texture2D(uTerrainNormal, nUv);

@@ -28,6 +28,12 @@ export const CAVE_SPHERES = 28;
 sharedUniforms.uCaveSpheres = { value: Array.from({ length: CAVE_SPHERES }, () => new THREE.Vector4()) };
 sharedUniforms.uCaveWeights = { value: new Array<number>(CAVE_SPHERES).fill(0) };
 sharedUniforms.uCaveCount = { value: 0 };
+/**
+ * Texture LOD bias: while the scene renders below the display's resolution
+ * (dynamic resolution, temporal upscaling), textures are sampled as sharp as
+ * the display needs, not as blurry as the smaller render would pick.
+ */
+sharedUniforms.uMipBias = { value: 0 };
 
 const FOG_PARS_VERTEX = /* glsl */ `
 #ifdef USE_FOG
@@ -157,6 +163,7 @@ const ATMO_UNIFORM_NAMES = [
   'uCloudBottom',
   'uCloudTop',
   'uCloudType',
+  'uMipBias',
 ];
 
 export function injectSharedUniforms(shader: ShaderObject, names: readonly string[] = ATMO_UNIFORM_NAMES): void {
@@ -168,6 +175,26 @@ export function injectSharedUniforms(shader: ShaderObject, names: readonly strin
 
 let installed = false;
 
+/** Samples every built-in material map with `uMipBias` (see sharedUniforms). */
+function installMipBias(): void {
+  const chunks = THREE.ShaderChunk as unknown as Record<string, string>;
+  chunks.common = `${chunks.common}
+uniform float uMipBias;
+`;
+  const maps: [string, string][] = [
+    ['map_fragment', 'texture2D( map, vMapUv )'],
+    ['normal_fragment_maps', 'texture2D( normalMap, vNormalMapUv )'],
+    ['roughnessmap_fragment', 'texture2D( roughnessMap, vRoughnessMapUv )'],
+    ['metalnessmap_fragment', 'texture2D( metalnessMap, vMetalnessMapUv )'],
+    ['emissivemap_fragment', 'texture2D( emissiveMap, vEmissiveMapUv )'],
+    ['aomap_fragment', 'texture2D( aoMap, vAoMapUv )'],
+  ];
+  for (const [name, call] of maps) {
+    if (!chunks[name].includes(call)) throw new Error(`Mip bias: ${name} changed (Three.js upgrade?)`);
+    chunks[name] = chunks[name].split(call).join(call.replace(' )', ', uMipBias )'));
+  }
+}
+
 /**
  * Replaces Three's fog with aerial perspective + height fog for every
  * built-in material and makes sure every program receives the shared uniforms.
@@ -176,6 +203,7 @@ export function installAtmosphereChunks(uniforms: Record<string, THREE.IUniform>
   Object.assign(sharedUniforms, uniforms);
   if (installed) return;
   installed = true;
+  installMipBias();
   THREE.ShaderChunk.fog_pars_vertex = FOG_PARS_VERTEX;
   THREE.ShaderChunk.fog_vertex = FOG_VERTEX;
   THREE.ShaderChunk.fog_pars_fragment = FOG_PARS_FRAGMENT;

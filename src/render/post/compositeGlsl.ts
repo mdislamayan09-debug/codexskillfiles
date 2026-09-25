@@ -103,6 +103,10 @@ float linearDepth(float d) {
   float z = d * 2.0 - 1.0;
   return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear));
 }
+// Exposure-aware compression into 0..1 (by the brightest channel, so the way
+// back is exact) for the sharpener.
+vec3 sharpenIn(vec3 c, float e) { return c * e / (1.0 + max(c.r, max(c.g, c.b)) * e); }
+vec3 sharpenOut(vec3 c, float e) { return c / (e * max(1.0 - max(c.r, max(c.g, c.b)), 1e-3)); }
 
 void main() {
   vec2 uv = vUv;
@@ -115,22 +119,25 @@ void main() {
   } else {
     col = texture2D(uColor, uv).rgb;
     if (uSharpen > 0.0) {
-      // Contrast-adaptive sharpening (after AMD's CAS): push the pixel away
-      // from its four neighbours, less where local contrast is already high,
-      // and never past the neighbourhood's own range (no halos).
+      // Robust contrast-adaptive sharpening (AMD FSR 1's RCAS): the pixel is
+      // pushed away from its four neighbours by as much as it can go without
+      // any channel leaving the range they span, so edges crisp up with no
+      // halos. Done on exposure-compressed values, where that range is 0..1.
+      float ex = (uAutoExposure > 0.5 ? texture2D(uExposure, vec2(0.5)).r : 1.0) * uManualExposure;
       vec2 t = 1.0 / uResolution;
-      vec3 n = texture2D(uColor, uv + vec2(0.0, t.y)).rgb;
-      vec3 s = texture2D(uColor, uv - vec2(0.0, t.y)).rgb;
-      vec3 e = texture2D(uColor, uv + vec2(t.x, 0.0)).rgb;
-      vec3 w = texture2D(uColor, uv - vec2(t.x, 0.0)).rgb;
-      vec3 mn = min(col, min(min(n, s), min(e, w)));
-      vec3 mx = max(col, max(max(n, s), max(e, w)));
-      float lmn = dot(mn, vec3(0.2126, 0.7152, 0.0722));
-      float lmx = dot(mx, vec3(0.2126, 0.7152, 0.0722));
-      float amp = sqrt(clamp(lmn / max(lmx, 1e-5), 0.0, 1.0));
-      float k = -uSharpen * amp * 0.2;
-      vec3 sharp = (col + (n + s + e + w) * k) / (1.0 + 4.0 * k);
-      col = clamp(sharp, mn, mx);
+      vec3 b = sharpenIn(texture2D(uColor, uv + vec2(0.0, t.y)).rgb, ex);
+      vec3 h = sharpenIn(texture2D(uColor, uv - vec2(0.0, t.y)).rgb, ex);
+      vec3 f = sharpenIn(texture2D(uColor, uv + vec2(t.x, 0.0)).rgb, ex);
+      vec3 d = sharpenIn(texture2D(uColor, uv - vec2(t.x, 0.0)).rgb, ex);
+      vec3 c = sharpenIn(col, ex);
+      vec3 mn4 = min(min(b, d), min(f, h));
+      vec3 mx4 = max(max(b, d), max(f, h));
+      vec3 hitMin = mn4 / (4.0 * max(mx4, vec3(1e-4)));
+      vec3 hitMax = (1.0 - mx4) / min(4.0 * mn4 - 4.0, vec3(-1e-4));
+      vec3 lobe3 = max(-hitMin, hitMax);
+      float lobe = max(-0.1875, min(max(lobe3.r, max(lobe3.g, lobe3.b)), 0.0)) * uSharpen;
+      c = (lobe * (b + d + f + h) + c) / (4.0 * lobe + 1.0);
+      col = sharpenOut(clamp(c, 0.0, 0.998), ex);
     }
   }
   col += texture2D(uBloom, uv).rgb * uBloomStrength;

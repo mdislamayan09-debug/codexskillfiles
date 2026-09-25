@@ -3,14 +3,16 @@ import { createFullscreenMaterial, createHdrTarget, FullscreenPass } from '../Fu
 
 // ---------------------------------------------------------------------------
 // Temporal anti-aliasing and upscaling. Every frame the camera is nudged by a
-// different sub-pixel offset (Halton 2, 3), so over sixteen frames each
-// screen pixel is sampled at sixteen places. The resolve runs at the display
-// resolution: it rebuilds each display pixel from the nearest scene samples
-// (the scene may be rendered smaller), reprojects last frame's result through
-// the depth buffer, clamps it to what this frame's neighbourhood allows (so
-// moving leaves and opened doors don't ghost), and blends. Edges, thin twigs,
-// grass and specular sparkle come out as if supersampled, at full display
-// resolution, for the price of one full-screen pass.
+// different sub-pixel offset (Halton 2, 3; 32 of them), so the scene is
+// sampled at ever-new places. The resolve runs at the display resolution and
+// works like an accumulation buffer: each display pixel keeps a colour and
+// how many samples' worth it holds (in alpha), and takes in this frame's
+// samples in proportion to how close they land to its centre in display
+// pixels. So a scene rendered at half resolution converges to full display
+// detail within a few frames instead of being smeared by a wide filter.
+// Last frame's result is reprojected through the depth buffer and clipped to
+// what this frame's neighbourhood allows (so moving leaves and opened doors
+// don't ghost), and a clipped or fast-moving pixel holds fewer frames.
 
 const RESOLVE_FRAG = /* glsl */ `
 precision highp float;
@@ -23,7 +25,8 @@ uniform vec2 uOutSize;
 uniform vec2 uJitter;        // input pixels: sample k sits at k + 0.5 + uJitter
 uniform mat4 uInvViewProj;   // this frame, unjittered
 uniform mat4 uPrevViewProj;  // last frame, unjittered
-uniform float uBlend;        // this frame's share when a sample lands on the pixel
+uniform float uMaxWeight;    // how many samples' worth a pixel's history may hold
+uniform float uSampleWeight; // weight of a sample landing on the pixel's centre
 uniform float uReset;
 uniform float uExposureScale;
 varying vec2 vUv;
@@ -44,7 +47,8 @@ vec3 compress(vec3 c, float e) { return c * e / (1.0 + max3(c) * e); }
 vec3 expand(vec3 c, float e) { return c / (e * max(1.0 - max3(c), 1e-3)); }
 
 // Catmull-Rom history in five bilinear taps: stays sharp while it moves.
-vec3 sampleHistory(vec2 uv) {
+// Alpha (the sample weight held) comes from the centre tap.
+vec4 sampleHistory(vec2 uv) {
   vec2 samplePos = uv * uOutSize;
   vec2 tp1 = floor(samplePos - 0.5) + 0.5;
   vec2 f = samplePos - tp1;
@@ -56,13 +60,14 @@ vec3 sampleHistory(vec2 uv) {
   vec2 tp0 = (tp1 - 1.0) / uOutSize;
   vec2 tp3 = (tp1 + 2.0) / uOutSize;
   vec2 tp12 = (tp1 + w2 / w12) / uOutSize;
+  vec4 centre;
   vec3 r = texture2D(uHistory, vec2(tp12.x, tp0.y)).rgb * (w12.x * w0.y)
          + texture2D(uHistory, vec2(tp0.x, tp12.y)).rgb * (w0.x * w12.y)
-         + texture2D(uHistory, tp12).rgb * (w12.x * w12.y)
+         + (centre = texture2D(uHistory, tp12)).rgb * (w12.x * w12.y)
          + texture2D(uHistory, vec2(tp3.x, tp12.y)).rgb * (w3.x * w12.y)
          + texture2D(uHistory, vec2(tp12.x, tp3.y)).rgb * (w12.x * w3.y);
   float ws = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
-  return max(r / ws, vec3(0.0));
+  return vec4(max(r / ws, vec3(0.0)), centre.a);
 }
 
 void main() {
@@ -70,10 +75,17 @@ void main() {
   vec2 P = vUv * uInSize;               // this display pixel in scene pixels
   ivec2 k0 = ivec2(floor(P - uJitter)); // the scene sample nearest to it
   ivec2 maxK = ivec2(uInSize) - 1;
+  vec2 upscale = uOutSize / uInSize;
 
-  vec3 sum = vec3(0.0);
-  float wSum = 0.0;
-  float wMax = 0.0;
+  // Two estimates from the same 3 x 3 scene samples: a sharp one, weighted
+  // by how close each sample lands to this display pixel's centre measured
+  // in display pixels (when upscaling most frames have no sample near a
+  // given pixel, and that pixel then keeps its history untouched), and a
+  // soft one for pixels whose history was just thrown away.
+  vec3 sharpSum = vec3(0.0);
+  float sharpW = 0.0;
+  vec3 softSum = vec3(0.0);
+  float softW = 0.0;
   vec3 m1 = vec3(0.0);
   vec3 m2 = vec3(0.0);
   vec3 lo = vec3(1e9);
@@ -82,32 +94,35 @@ void main() {
   vec2 closestUv = vUv;
   for (int y = -1; y <= 1; y++) {
     for (int x = -1; x <= 1; x++) {
-      // A plus-shaped cross: five samples rebuild the pixel and bound its
-      // history nearly as well as nine, for half the reads.
-      if (x != 0 && y != 0) continue;
       ivec2 k = clamp(k0 + ivec2(x, y), ivec2(0), maxK);
       vec2 s = vec2(k) + 0.5 + uJitter;
       vec2 d = s - P;
-      float w = exp(-2.29 * dot(d, d));
       vec3 c = compress(max(texelFetch(uCurrent, k, 0).rgb, vec3(0.0)), e);
-      sum += c * w;
-      wSum += w;
-      wMax = max(wMax, w);
-      vec3 ycc = toYCoCg(c);
-      m1 += ycc;
-      m2 += ycc * ycc;
-      lo = min(lo, ycc);
-      hi = max(hi, ycc);
-      // The nearest surface steers the reprojection, so edges move with
-      // whatever is in front.
-      float z = texelFetch(uDepth, k, 0).r;
-      if (z < closest) {
-        closest = z;
-        closestUv = s / uInSize;
+      vec2 dOut = d * upscale;
+      float ws = exp(-2.5 * dot(dOut, dOut));
+      float wb = exp(-2.29 * dot(d, d));
+      sharpSum += c * ws;
+      sharpW += ws;
+      softSum += c * wb;
+      softW += wb;
+      bool cross = x == 0 || y == 0;
+      if (cross) {
+        // The neighbourhood box and the nearest surface come from the cross.
+        vec3 ycc = toYCoCg(c);
+        m1 += ycc;
+        m2 += ycc * ycc;
+        lo = min(lo, ycc);
+        hi = max(hi, ycc);
+        float z = texelFetch(uDepth, k, 0).r;
+        if (z < closest) {
+          closest = z;
+          closestUv = s / uInSize;
+        }
       }
     }
   }
-  vec3 current = sum / max(wSum, 1e-5);
+  vec3 sharp = sharpSum / max(sharpW, 1e-6);
+  vec3 soft = softSum / max(softW, 1e-6);
 
   // The held tool and hands are squeezed into the nearest few percent of the
   // depth range and move with the camera: they have no motion of their own.
@@ -120,38 +135,50 @@ void main() {
     prevUv = vUv + (prev.xy / prev.w * 0.5 + 0.5 - closestUv);
   }
 
-  float alpha = clamp(uBlend * wMax * 1.4, 0.02, 1.0);
-  if (viewmodel) alpha = max(alpha, 0.35);
-  if (uReset > 0.5 || any(lessThan(prevUv, vec2(0.0))) || any(greaterThan(prevUv, vec2(1.0)))) alpha = 1.0;
-
-  vec3 result = current;
-  if (alpha < 1.0) {
-    #ifdef TAA_BILINEAR_HISTORY
-    vec3 history = compress(texture2D(uHistory, prevUv).rgb, e);
-    #else
-    vec3 history = compress(sampleHistory(prevUv), e);
-    #endif
+  // History carries how many samples' worth it holds in its alpha.
+  float histW = 0.0;
+  vec3 history = soft;
+  bool onScreen = all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0)));
+  if (uReset < 0.5 && onScreen) {
+    vec4 raw = sampleHistory(prevUv);
+    histW = raw.a;
+    history = compress(raw.rgb, e);
     // Variance clipping (Salvi) inside the neighbourhood's min/max box.
     vec3 mu = m1 / 5.0;
     vec3 sigma = sqrt(max(m2 / 5.0 - mu * mu, vec3(0.0)));
-    vec3 bmin = max(lo, mu - sigma * 1.35);
-    vec3 bmax = min(hi, mu + sigma * 1.35);
+    vec3 bmin = max(lo, mu - sigma * 1.25);
+    vec3 bmax = min(hi, mu + sigma * 1.25);
     vec3 h = toYCoCg(history);
     vec3 center = (bmin + bmax) * 0.5;
     vec3 extent = max((bmax - bmin) * 0.5, vec3(1e-4));
     vec3 offset = h - center;
     vec3 ts = abs(offset / extent);
     float t = max(ts.x, max(ts.y, ts.z));
-    if (t > 1.0) h = center + offset / t;
+    if (t > 1.0) {
+      h = center + offset / t;
+      // Clipped history is partly someone else's: trust it less.
+      histW *= clamp(1.6 - t * 0.6, 0.15, 1.0);
+    }
     history = fromYCoCg(h);
-    // Motion softens the history a little each frame: trust it less.
+    // Each reprojection resamples the history and softens it a little, so
+    // it holds fewer frames while the view moves.
     float motion = length((prevUv - vUv) * uOutSize);
-    alpha = min(1.0, alpha + clamp(motion * 0.01, 0.0, 0.12));
-    result = mix(history, current, alpha);
+    histW = min(histW, mix(uMaxWeight, 4.0, clamp(motion / 12.0, 0.0, 1.0)));
+    // The held tool barely moves on screen but sways a little: a few frames.
+    if (viewmodel) histW = min(histW, 5.0);
   }
+  // A little of the soft estimate always goes in, so a pixel no sample has
+  // reached yet is never left without one.
+  float softShare = (viewmodel ? 0.25 : 0.04) + 0.3 * step(histW, 0.5);
+  float total = histW + sharpW * uSampleWeight + softShare;
+  vec3 result = (history * histW + sharp * sharpW * uSampleWeight + soft * softShare) / total;
+  float weight = min(total, uMaxWeight);
   result = expand(clamp(result, 0.0, 0.998), e);
-  if (any(isnan(result)) || any(isinf(result))) result = vec3(0.0);
-  gl_FragColor = vec4(result, 1.0);
+  if (any(isnan(result)) || any(isinf(result))) {
+    result = vec3(0.0);
+    weight = 0.0;
+  }
+  gl_FragColor = vec4(result, weight);
 }
 `;
 
@@ -167,7 +194,7 @@ function halton(index: number, base: number): number {
   return r;
 }
 
-const JITTER: [number, number][] = Array.from({ length: 16 }, (_, i) => [halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5]);
+const JITTER: [number, number][] = Array.from({ length: 32 }, (_, i) => [halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5]);
 
 export class TemporalAA {
   private targets: THREE.WebGLRenderTarget[] = [];
@@ -189,15 +216,10 @@ export class TemporalAA {
   private jittered = false;
   private readonly pass: FullscreenPass;
 
-  /**
-   * @param cheap one bilinear history tap instead of five (Catmull-Rom):
-   *   a little softer in motion, for thin graphics budgets.
-   */
-  constructor(cheap = false) {
+  constructor() {
     this.pass = new FullscreenPass(
       createFullscreenMaterial({
         fragmentShader: RESOLVE_FRAG,
-        defines: cheap ? { TAA_BILINEAR_HISTORY: 1 } : {},
         uniforms: {
           uCurrent: { value: null },
           uDepth: { value: null },
@@ -208,7 +230,8 @@ export class TemporalAA {
           uJitter: { value: this.jitter },
           uInvViewProj: { value: this.invViewProj },
           uPrevViewProj: { value: this.prevViewProj },
-          uBlend: { value: 0.1 },
+          uMaxWeight: { value: 12 },
+          uSampleWeight: { value: 1 },
           uReset: { value: 1 },
           uExposureScale: { value: 1 },
         },

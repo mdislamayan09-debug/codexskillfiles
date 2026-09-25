@@ -61,13 +61,13 @@ void rockTriplanar(float layer, vec3 P, vec3 N, float tile, out vec4 albedo, out
   vec2 uvX = P.zy / tile;
   vec2 uvY = P.xz / tile;
   vec2 uvZ = P.xy / tile;
-  vec4 aX = texture(uGroundAlbedo, vec3(uvX, layer));
-  vec4 aY = texture(uGroundAlbedo, vec3(uvY, layer));
-  vec4 aZ = texture(uGroundAlbedo, vec3(uvZ, layer));
+  vec4 aX = texture(uGroundAlbedo, vec3(uvX, layer), uMipBias);
+  vec4 aY = texture(uGroundAlbedo, vec3(uvY, layer), uMipBias);
+  vec4 aZ = texture(uGroundAlbedo, vec3(uvZ, layer), uMipBias);
   albedo = aX * w.x + aY * w.y + aZ * w.z;
-  vec4 nX = texture(uGroundNormal, vec3(uvX, layer));
-  vec4 nY = texture(uGroundNormal, vec3(uvY, layer));
-  vec4 nZ = texture(uGroundNormal, vec3(uvZ, layer));
+  vec4 nX = texture(uGroundNormal, vec3(uvX, layer), uMipBias);
+  vec4 nY = texture(uGroundNormal, vec3(uvY, layer), uMipBias);
+  vec4 nZ = texture(uGroundNormal, vec3(uvZ, layer), uMipBias);
   // Whiteout-blended tangent normals swizzled into world space.
   vec2 tX = nX.xy * 2.0 - 1.0;
   vec2 tY = nY.xy * 2.0 - 1.0;

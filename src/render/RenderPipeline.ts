@@ -3,7 +3,7 @@ import { Atmosphere, type AtmosphereState } from './atmosphere/Atmosphere';
 import { createCloudUniforms, VolumetricClouds, type CloudParams, type CloudUniforms } from './clouds/VolumetricClouds';
 import { createFullscreenMaterial, createHdrTarget, FullscreenPass } from './FullscreenPass';
 import { GpuTimer } from './GpuTimer';
-import { installAtmosphereChunks } from './materials/MaterialPatches';
+import { installAtmosphereChunks, sharedUniforms } from './materials/MaterialPatches';
 import { COMPOSITE_FRAG, RESTORE_FRAG } from './post/compositeGlsl';
 import { BloomPass, ExposurePass, GodRaysPass, SSAOPass } from './post/PostPasses';
 import { TemporalAA } from './post/TemporalAA';
@@ -158,7 +158,8 @@ export class RenderPipeline {
     autoExposure: true,
     bloomStrength: 0.045,
     vignette: 0.22,
-    grain: 0.018,
+    // Grain reads as noise over fine detail; a trace keeps gradients from banding.
+    grain: 0.008,
     fringe: 0.0,
     aoStrength: 0.75,
     godRayStrength: 0.35,
@@ -172,6 +173,8 @@ export class RenderPipeline {
     grade: defaultGrade(),
   };
 
+  /** Share of the full texture LOD bias applied (tuning). */
+  mipBiasScale = 1;
   readonly resolution: ResolutionSettings = { dynamic: true, targetFps: 60, sharpness: 0.5 };
   /** The detail-culling thresholds (shared module state; here for tests and tuning). */
   readonly detailCull = detailCull;
@@ -215,7 +218,7 @@ export class RenderPipeline {
     public quality: QualitySettings,
   ) {
     this.gpu = new GpuTimer(renderer.getContext() as WebGL2RenderingContext);
-    this.taa = new TemporalAA(quality.budget < 1);
+    this.taa = new TemporalAA();
     const dummyWeather = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     dummyWeather.needsUpdate = true;
     this.cloudUniforms.uCloudWeather.value = dummyWeather;
@@ -459,6 +462,8 @@ export class RenderPipeline {
     this.time += dt;
     this.updateDynamicResolution(dt);
     this.resize();
+    // Sample textures for the display, not the smaller scene render.
+    sharedUniforms.uMipBias.value = Math.max(-2, Math.min(0, Math.log2(this.width / Math.max(1, this.outWidth)) * this.mipBiasScale));
     const gpu = this.gpu;
     gpu.poll();
 
@@ -592,7 +597,7 @@ export class RenderPipeline {
     (cu.uResolution.value as THREE.Vector2).set(this.outWidth, this.outHeight);
     // Sharpen more the further the scene is scaled up to the display.
     const upscale = this.outWidth / Math.max(1, this.width);
-    cu.uSharpen.value = this.resolution.sharpness * (0.35 + 0.35 * Math.min(1, Math.max(0, upscale - 1)));
+    cu.uSharpen.value = Math.min(1, this.resolution.sharpness * (0.8 + 0.6 * Math.min(1, Math.max(0, upscale - 1))));
     this.composite.render(renderer, null);
     gpu.finishFrame();
   }

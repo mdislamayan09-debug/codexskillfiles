@@ -225,13 +225,18 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
   textures and applied in world space (triplanar), so long lintels and
   tall piers never stretch.
 - **Temporal anti-aliasing and upscaling** (`post/TemporalAA.ts`): the
-  projection is jittered (Halton 2,3) and each display pixel is rebuilt
-  from the nearest scene samples plus last frame's result, reprojected
-  through depth and clipped to the neighbourhood (variance clipping in
-  YCoCg on tone-compressed values). It resolves at the display's full
-  resolution whatever the scene resolution; the composite then sharpens
-  (CAS-style). The held tool (squeezed into the nearest few percent of
-  depth) is not reprojected.
+  projection is jittered (Halton 2,3, 32 positions) and the resolve, at
+  the display's full resolution, is an accumulation buffer: each display
+  pixel keeps a colour and how many samples' worth it holds (history
+  alpha), and takes in this frame's samples in proportion to how close
+  they land to its centre in display pixels. A scene rendered at 42%
+  converges to nearly native sharpness. History is reprojected through
+  depth (Catmull-Rom), clipped to the neighbourhood (variance clipping in
+  YCoCg on tone-compressed values), and holds fewer frames when clipped or
+  moving. The held tool is not reprojected. Every material samples its
+  textures with `uMipBias` (log2 of scene/display width; half on leaves
+  and impostors) so textures stay as sharp as the display needs, and the
+  composite sharpens with FSR 1's RCAS.
 - **Dynamic resolution** holds a target frame rate (Settings → Graphics:
   dynamic resolution, target fps, sharpness). It steers by the graphics
   card's time and learns what the browser adds on top from missed frames.

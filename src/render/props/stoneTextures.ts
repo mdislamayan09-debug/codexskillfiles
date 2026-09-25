@@ -287,7 +287,7 @@ tpB /= max(1e-4, tpB.x + tpB.y + tpB.z);
 vec2 tpUvX = vTpPos.zy * uTpScale;
 vec2 tpUvY = vTpPos.xz * uTpScale + vec2(0.37, 0.61);
 vec2 tpUvZ = vTpPos.xy * uTpScale;
-vec3 tpAlbedo = texture2D(uTpMap, tpUvX).rgb * tpB.x + texture2D(uTpMap, tpUvY).rgb * tpB.y + texture2D(uTpMap, tpUvZ).rgb * tpB.z;
+vec3 tpAlbedo = texture2D(uTpMap, tpUvX, uMipBias).rgb * tpB.x + texture2D(uTpMap, tpUvY, uMipBias).rgb * tpB.y + texture2D(uTpMap, tpUvZ, uMipBias).rgb * tpB.z;
 diffuseColor.rgb *= tpAlbedo * 1.35;
 `;
 
@@ -295,9 +295,9 @@ diffuseColor.rgb *= tpAlbedo * 1.35;
 const TRI_NORMAL = /* glsl */ `
 #include <normal_fragment_maps>
 {
-  vec3 tnX = texture2D(uTpNormal, tpUvX).xyz * 2.0 - 1.0;
-  vec3 tnY = texture2D(uTpNormal, tpUvY).xyz * 2.0 - 1.0;
-  vec3 tnZ = texture2D(uTpNormal, tpUvZ).xyz * 2.0 - 1.0;
+  vec3 tnX = texture2D(uTpNormal, tpUvX, uMipBias).xyz * 2.0 - 1.0;
+  vec3 tnY = texture2D(uTpNormal, tpUvY, uMipBias).xyz * 2.0 - 1.0;
+  vec3 tnZ = texture2D(uTpNormal, tpUvZ, uMipBias).xyz * 2.0 - 1.0;
   tnX.xy *= uTpNormalScale;
   tnY.xy *= uTpNormalScale;
   tnZ.xy *= uTpNormalScale;
