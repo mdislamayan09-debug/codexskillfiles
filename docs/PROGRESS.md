@@ -209,8 +209,13 @@ the solid-geometry columns (walls, stairs, doorways, plank walls, slopes)
   under forest canopy (and thinner grass), real-size leaves on branching
   twigs, mip-aware leaf coverage (distant spruces no longer go bare),
   finer folded grass blades, plated pine bark.
-- 🟡 Performance: presets are tuned by eye and by budget. Frame times
-  still need measuring on real Apple silicon.
+- 🟡 Performance: temporal upscaling, dynamic resolution, staggered
+  shadow cascades, detail culling and integrated-GPU budgets. Max holds
+  ~30 fps at 1080p on an Intel Iris Xe laptop (`scripts/bench.mjs
+  --headed`); frame times still need measuring on real Apple silicon.
+- ✅ Look: less aerial haze, weathered granite, crown occlusion on leaves
+  and impostors (whose mips no longer go dark), fuller green conifers, a
+  real crash camp (ridge tents, crates, a fire ring).
 - ⬜ Key rebinding.
 
 ## Next up

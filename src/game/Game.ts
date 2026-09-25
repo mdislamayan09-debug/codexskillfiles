@@ -292,6 +292,7 @@ export class Game {
     this.terrain = new TerrainRenderer(this.world, this.baker, {
       gridN: this.quality.terrainGrid,
       detailDistance: this.quality.terrainDetailDistance,
+      blendLayers: this.quality.budget < 1 ? 3 : 4,
     });
     this.lighting.setupMaterial(this.terrain.material);
     this.scene.add(this.terrain.mesh);
@@ -924,6 +925,9 @@ export class Game {
     this.pipeline.resolution.dynamic = dynres !== null ? dynres === '1' : s.dynamicResolution && !params.has('capture');
     this.pipeline.resolution.targetFps = Number(params.get('fps')) || s.targetFps;
     this.pipeline.resolution.sharpness = s.sharpness;
+    // Stage-by-stage GPU timing costs main-thread time: only for the frame
+    // rate display and the profiling scripts (?gpustages).
+    this.pipeline.gpu.detailed = s.showFps || params.has('gpustages');
     document.documentElement.style.setProperty('--ui-scale', String(s.uiScale));
     this.hud?.setOpacity(s.hudOpacity);
     document.documentElement.dataset.subtitles = s.subtitles ? s.subtitleSize : 'off';
@@ -2084,6 +2088,7 @@ export class Game {
     this.renderer.info.reset();
     const time = this.reducedMotion ? 0 : this.elapsed;
     // The sea's wave cascades are rendered here, before the frame proper.
+    this.pipeline.gpu.startFrame();
     this.pipeline.gpu.begin('waves');
     this.water.update(this.renderer, this.camera, time, { color: this.pipeline.opaqueColor, depth: this.pipeline.opaqueDepth }, this.light);
     this.pipeline.gpu.end();
@@ -2455,7 +2460,7 @@ export class Game {
 
   private vegetationOptions() {
     const q = this.quality;
-    const b = Math.min(1, 0.3 + q.budget * 0.7);
+    const b = Math.min(1, q.budget);
     return {
       lod0Distance: Math.round((q.name === 'low' ? 30 : q.name === 'medium' ? 38 : q.name === 'high' ? 45 : q.name === 'extra' ? 58 : 75) * b),
       lod1Distance: q.impostorDistance,

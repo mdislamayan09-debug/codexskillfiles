@@ -76,7 +76,9 @@ const BARK_MIN_WIDTH = /* glsl */ `
   #else
   vec3 barkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
   #endif
-  transformed += objectNormal * distance(barkWorld, cameraPosition) * 0.0007;
+  // The trunk only (branches carry wind weight): fattened limbs would turn a
+  // far conifer's crown to wood.
+  transformed += objectNormal * distance(barkWorld, cameraPosition) * 0.0007 * (1.0 - step(0.05, aWind.y));
 }
 `;
 

@@ -224,19 +224,46 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
 - **Stonework:** dressed masonry and natural rock generated as canvas
   textures and applied in world space (triplanar), so long lintels and
   tall piers never stretch.
+- **Temporal anti-aliasing and upscaling** (`post/TemporalAA.ts`): the
+  projection is jittered (Halton 2,3) and each display pixel is rebuilt
+  from the nearest scene samples plus last frame's result, reprojected
+  through depth and clipped to the neighbourhood (variance clipping in
+  YCoCg on tone-compressed values). It resolves at the display's full
+  resolution whatever the scene resolution; the composite then sharpens
+  (CAS-style). The held tool (squeezed into the nearest few percent of
+  depth) is not reprojected.
+- **Dynamic resolution** holds a target frame rate (Settings → Graphics:
+  dynamic resolution, target fps, sharpness). It steers by the graphics
+  card's time and learns what the browser adds on top from missed frames.
+  Captures keep a fixed resolution unless `?dynres=1`.
+- **Frame cost:** far shadow cascades are redrawn in turn inside a little
+  slack and refit when the view's shape changes; meshes under ~1.5 px are
+  skipped and small ones stop casting shadows (`detailCull`); empty
+  instanced pools are not drawn; trees are culled per tree in shadow
+  range, drawn nearest first and before grass and terrain; point lights
+  leave the scene while all are dark; the sun's visibility is worked out
+  once per pixel; GPU timing is one query every 7th frame unless the
+  frame-rate display is on or `?gpustages` is set.
 - **Five quality presets:** Low, Medium, High, Extra High and Max, picked
   from the GPU name (Apple M-series Max or Ultra → Max, Pro → Extra High,
   other M chips → High) and changeable in Settings → Graphics.
 
-| Preset | Render scale, max DPR | MSAA | Shadow map, cascades, reach | SSAO, god rays | Cloud steps (buffer) | Grass density, radius | Trees to | Far plane |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Low | 0.7, 1 | off | 1024, 2, 140 m | off, off | off | 0.35, 26 m | 420 m | 4.2 km |
-| Medium | 0.85, 1.25 | off | 2048, 3, 220 m | on, off | 36 (1/16) | 0.65, 38 m | 650 m | 5.5 km |
-| High | 1.0, 1.5 | 4× | 2048, 3, 320 m | on, on | 56 (1/16) | 1.0, 56 m | 900 m | 7 km |
-| Extra High | 1.0, 2 | 4× | 4096, 4, 480 m | on, on | 72 (1/9) | 1.35, 70 m | 1200 m | 9 km |
-| Max | 1.0, 3 | 4× | 4096, 4, 650 m | on, on | 96 (1/4) | 1.8, 85 m | 1600 m | 11 km |
+| Preset | Scene scale (floor), max DPR | Shadow map, cascades, reach | SSAO, god rays | Cloud steps (buffer) | Grass density, radius | Trees to | Far plane |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Low | 0.75 (0.5), 1 | 1024, 2, 140 m | off, off | off | 0.35, 26 m | 420 m | 4.2 km |
+| Medium | 0.85 (0.5), 1.25 | 2048, 3, 220 m | on, off | 36 (1/16) | 0.65, 38 m | 650 m | 5.5 km |
+| High | 1.0 (0.55), 1.5 | 2048, 3, 320 m | on, on | 56 (1/9) | 1.0, 56 m | 900 m | 7 km |
+| Extra High | 1.0 (0.6), 2 | 4096, 4, 480 m | on, on | 72 (1/4) | 1.35, 70 m | 1200 m | 9 km |
+| Max | 1.0 (0.6), 3 | 4096, 4, 650 m | on, on | 96 (1/4) | 1.8, 85 m | 1600 m | 11 km |
 
-(All values: `src/render/Quality.ts`.)
+(All values: `src/render/Quality.ts`.) No preset uses MSAA: temporal AA
+replaces it. Clouds march a quarter of their buffer each frame. On
+**integrated graphics** (`fitToGpu`, budget 0.4; `?budget=` overrides)
+every preset keeps its effects but fits its geometry to the chip: about a
+fifth of the grass out to ~45 m, full trees to 30 m and mid-detail to
+~130 m, trees to ~900 m, two 1536 shadow cascades out to 280 m (one redrawn
+per frame), 3-layer terrain blending, cheaper clouds and waves, and a
+scene-resolution floor of 42%.
 
 ### The player
 
@@ -928,6 +955,21 @@ are done; see §10.)
 ---
 
 ## 12. Lessons learned
+
+- **Measure frame pacing in a real window.** `scripts/bench.mjs --headed`
+  shows what a player gets; headless Chrome composites differently and
+  reads 15-20% slower. Under vsync a frame a millisecond over budget costs
+  a whole refresh (30 fps becomes 20), so aim the GPU well under it.
+- **GPU timer queries are not free on Windows.** Seven queries a frame and
+  a disjoint check cost ~13 ms of main thread; hence one sampled query.
+- **Three counts texture units against one stage's limit (16)** and warned
+  on every draw of terrain and water (17 and 18 across both stages). The
+  combined limit is what matters; see the note in `Game`'s constructor.
+- **Impostor atlases are baked over transparent black:** divide colour by
+  the mip-averaged alpha, or far trees turn to dark blobs.
+- **Lights are filtered by layer per pass:** a light on one layer only
+  makes the passes see different light sets, and three then rechecks every
+  material's program twice a frame.
 
 - **Vite reloads the page when an imported source file changes.** Editing
   `src/` while a playtest runs breaks the test. Edit scripts, docs and

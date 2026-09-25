@@ -13,3 +13,4 @@ artifacts/playtest/
 .claude/settings.local.json
 artifacts/review/
 artifacts/perf/
+artifacts/profiles/

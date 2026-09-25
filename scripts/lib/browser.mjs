@@ -28,6 +28,9 @@ export function softwareRendering(args = process.argv.slice(2)) {
 export async function launchChromium(args = process.argv.slice(2)) {
   const software = softwareRendering(args);
   const options = {
+    // `--headed` opens a real window: frame pacing as a player sees it
+    // (headless compositing adds its own cost).
+    headless: !args.includes('--headed'),
     // The full Chromium, never the headless shell (which has no GPU backend).
     ...(existsSync(PREINSTALLED) ? { executablePath: PREINSTALLED } : { channel: 'chromium' }),
     args: software

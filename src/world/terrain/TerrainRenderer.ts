@@ -26,6 +26,8 @@ const MAX_NODES = 1400;
 export interface TerrainOptions {
   gridN: number;
   detailDistance: number;
+  /** Ground layers blended per pixel (4; 3 is cheaper). */
+  blendLayers?: number;
 }
 
 /**
@@ -94,6 +96,7 @@ export class TerrainRenderer {
 
     this.material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
     this.material.name = 'terrain';
+    this.material.defines = { TERRAIN_BLEND: options.blendLayers ?? 4 };
     const uniforms = this.uniforms;
     addPatch(this.material, {
       key: 'terrain-cdlod',

@@ -31,7 +31,7 @@ for (const preset of presets) {
   // One page per preset: the preset is fixed at boot. The island is cached
   // after the first load, so later presets start quickly.
   const page = await browser.newPage({ viewport: { width, height } });
-  await page.goto(`${url}/?quality=${preset}&capture=1`, { waitUntil: 'load' });
+  await page.goto(`${url}/?quality=${preset}&capture=1&gpustages`, { waitUntil: 'load' });
   await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 300_000, polling: 500 });
   for (const view of views) {
     await page.evaluate((view) => {

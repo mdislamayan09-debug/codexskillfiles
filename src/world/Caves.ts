@@ -471,6 +471,8 @@ export class Caves {
   readonly group = new THREE.Group();
   readonly materials: THREE.MeshStandardMaterial[] = [];
   readonly caves: Cave[] = [];
+  /** Each cave's meshes: hidden when far (they are under the hill). */
+  private readonly meshes = new Map<Cave, THREE.Mesh[]>();
   /** Shared with every lit material (see MaterialPatches). */
   readonly uniforms = {
     uCaveSpheres: sharedUniforms.uCaveSpheres as THREE.IUniform<THREE.Vector4[]>,
@@ -513,12 +515,15 @@ export class Caves {
       const look = cave.look;
       this.caves.push(cave);
       const seed = hashString(cave.id);
+      const own: THREE.Mesh[] = [];
+      this.meshes.set(cave, own);
       const shell = mergeGeometries([tunnelGeometry(world, cave, seed).toNonIndexed(), chamberGeometry(cave, seed)], false);
       if (shell) {
         const mesh = new THREE.Mesh(shell, walls[look]);
         mesh.name = `cave:${cave.id}`;
         mesh.receiveShadow = true;
         this.group.add(mesh);
+        own.push(mesh);
       }
       const decor: Decor = { parts: new Map() };
       decorate(cave, decor, createRng(seed ^ 0x5eed));
@@ -531,6 +536,7 @@ export class Caves {
         mesh.castShadow = m !== 'lava' && m !== 'pool';
         mesh.receiveShadow = true;
         this.group.add(mesh);
+        own.push(mesh);
       }
     }
   }
@@ -631,6 +637,12 @@ export class Caves {
         nd = d;
         near = c;
       }
+    }
+    // From further than this a cave is a dark mouth in a hillside: its
+    // tunnel and chamber cannot be seen, only drawn.
+    for (const [c, list] of this.meshes) {
+      const show = Math.hypot(camera.x - c.bx, camera.z - c.bz) - c.br < 150;
+      for (const m of list) m.visible = show;
     }
     const want = near && nd < 220 ? near : null;
     if (want !== this.active) {

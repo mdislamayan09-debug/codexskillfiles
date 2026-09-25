@@ -312,19 +312,25 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
     lw[L_MUD] += underwater * (1.0 - sea) * 0.4;
   }
 
-  // Pick the four strongest layers.
+  // The strongest layers are blended (TERRAIN_BLEND of them: 4, or 3 on
+  // integrated graphics), kept sorted in one pass over the layers.
   int li[4];
   float lv[4];
-  for (int k = 0; k < 4; k++) {
-    int best = 0;
-    float bestW = -1.0;
-    for (int i = 0; i < ${LAYER_COUNT}; i++) {
-      bool used = false;
-      for (int q = 0; q < 4; q++) { if (q < k && li[q] == i) used = true; }
-      if (!used && lw[i] > bestW) { bestW = lw[i]; best = i; }
+  for (int k = 0; k < 4; k++) { li[k] = 0; lv[k] = 0.0; }
+  for (int i = 0; i < ${LAYER_COUNT}; i++) {
+    float w = lw[i];
+    if (w <= lv[TERRAIN_BLEND - 1]) continue;
+    int at = i;
+    for (int k = 0; k < TERRAIN_BLEND; k++) {
+      if (w > lv[k]) {
+        float tw = lv[k];
+        int ti = li[k];
+        lv[k] = w;
+        li[k] = at;
+        w = tw;
+        at = ti;
+      }
     }
-    li[k] = best;
-    lv[k] = max(bestW, 0.0);
   }
 
   vec3 surfAlbedo = vec3(0.0);
@@ -341,7 +347,7 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
     vec2 ra[4];
     float hmax = -1.0;
     float hb[4];
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < TERRAIN_BLEND; k++) {
       if (lv[k] <= 0.001) { al[k] = vec4(0.0); wn[k] = tN; ra[k] = vec2(0.85, 1.0); hb[k] = -1.0; continue; }
       al[k] = sampleLayer(li[k], tPos, tN, steep, tv, tvS, tDpdx, tDpdy, wn[k], ra[k]);
       hb[k] = al[k].a * uLayerHeightBias[li[k]] + lv[k];
@@ -349,14 +355,14 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
     }
     float bw[4];
     float bsum = 0.0;
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < TERRAIN_BLEND; k++) {
       bw[k] = max(hb[k] - (hmax - 0.18), 0.0) * step(0.001, lv[k]);
       bsum += bw[k];
     }
     vec3 nsum = vec3(0.0);
     surfRough = 0.0;
     surfAO = 0.0;
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < TERRAIN_BLEND; k++) {
       float wk2 = bw[k] / max(bsum, 1e-5);
       surfAlbedo += al[k].rgb * wk2;
       nsum += wn[k] * wk2;
@@ -367,12 +373,12 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
     // Fade toward the far-field look so the transition is invisible.
     float far = smoothstep(uDetailDistance * 0.6, uDetailDistance, camDist);
     vec3 farAlbedo = vec3(0.0);
-    for (int k = 0; k < 4; k++) farAlbedo += textureLod(uLayerAlbedo, vec3(0.5, 0.5, float(li[k])), 12.0).rgb * lv[k];
+    for (int k = 0; k < TERRAIN_BLEND; k++) farAlbedo += textureLod(uLayerAlbedo, vec3(0.5, 0.5, float(li[k])), 12.0).rgb * lv[k];
     surfAlbedo = mix(surfAlbedo, farAlbedo / max(lv[0] + lv[1] + lv[2] + lv[3], 1e-4), far);
     surfNormal = normalize(mix(surfNormal, tN, far));
     surfAO = mix(surfAO, 1.0, far);
   } else {
-    for (int k = 0; k < 4; k++) surfAlbedo += textureLod(uLayerAlbedo, vec3(0.5, 0.5, float(li[k])), 12.0).rgb * lv[k];
+    for (int k = 0; k < TERRAIN_BLEND; k++) surfAlbedo += textureLod(uLayerAlbedo, vec3(0.5, 0.5, float(li[k])), 12.0).rgb * lv[k];
     surfAlbedo /= max(lv[0] + lv[1] + lv[2] + lv[3], 1e-4);
     surfRough = 0.88;
   }

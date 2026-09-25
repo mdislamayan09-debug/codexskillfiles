@@ -25,6 +25,12 @@ export class Lighting {
   private fittedAspect = 0;
   private fittedFov = 0;
   private readonly offset = new THREE.Vector3();
+  /**
+   * On a thin budget exactly one cascade is redrawn each frame, in turn:
+   * every frame then costs the same, instead of a heavy one every other
+   * frame missing the display's refresh.
+   */
+  private alternate = false;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -35,6 +41,7 @@ export class Lighting {
   }
 
   private createCsm(quality: QualitySettings): CSM {
+    this.alternate = quality.budget < 1;
     const csm = new CSM({
       camera: this.camera,
       parent: this.scene,
@@ -57,12 +64,13 @@ export class Lighting {
       light.shadow.autoUpdate = false;
       light.layers.enableAll();
     }
-    // Widen every cascade but the nearest whenever CSM fits them to the view.
+    // Widen the cascades that are not redrawn every frame whenever CSM fits
+    // them to the view.
     const internals = csm as unknown as { _updateShadowBounds(): void };
     const fit = internals._updateShadowBounds.bind(csm);
     internals._updateShadowBounds = () => {
       fit();
-      for (let i = 1; i < csm.lights.length; i += 1) {
+      for (let i = this.alternate ? 0 : 1; i < csm.lights.length; i += 1) {
         const cam = csm.lights[i].shadow.camera;
         cam.left *= CASCADE_SLACK;
         cam.right *= CASCADE_SLACK;
@@ -92,7 +100,7 @@ export class Lighting {
       const light = lights[i];
       const cam = light.shadow.camera;
       const period = 1 << i;
-      const due = i === 0 || frame % period === period >> 1;
+      const due = this.alternate ? frame % lights.length === i : i === 0 || frame % period === period >> 1;
       // How far the cascade CSM wants now sits from the one on the map.
       this.offset.copy(light.position).sub(this.drawnAt[i]);
       this.offset.addScaledVector(this.lightDir, -this.offset.dot(this.lightDir));

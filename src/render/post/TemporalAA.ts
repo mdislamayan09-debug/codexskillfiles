@@ -126,7 +126,11 @@ void main() {
 
   vec3 result = current;
   if (alpha < 1.0) {
+    #ifdef TAA_BILINEAR_HISTORY
+    vec3 history = compress(texture2D(uHistory, prevUv).rgb, e);
+    #else
     vec3 history = compress(sampleHistory(prevUv), e);
+    #endif
     // Variance clipping (Salvi) inside the neighbourhood's min/max box.
     vec3 mu = m1 / 5.0;
     vec3 sigma = sqrt(max(m2 / 5.0 - mu * mu, vec3(0.0)));
@@ -183,25 +187,34 @@ export class TemporalAA {
   private saved8 = 0;
   private saved9 = 0;
   private jittered = false;
-  private readonly pass = new FullscreenPass(
-    createFullscreenMaterial({
-      fragmentShader: RESOLVE_FRAG,
-      uniforms: {
-        uCurrent: { value: null },
-        uDepth: { value: null },
-        uHistory: { value: null },
-        uExposure: { value: null },
-        uInSize: { value: new THREE.Vector2(1, 1) },
-        uOutSize: { value: new THREE.Vector2(1, 1) },
-        uJitter: { value: this.jitter },
-        uInvViewProj: { value: this.invViewProj },
-        uPrevViewProj: { value: this.prevViewProj },
-        uBlend: { value: 0.1 },
-        uReset: { value: 1 },
-        uExposureScale: { value: 1 },
-      },
-    }),
-  );
+  private readonly pass: FullscreenPass;
+
+  /**
+   * @param cheap one bilinear history tap instead of five (Catmull-Rom):
+   *   a little softer in motion, for thin graphics budgets.
+   */
+  constructor(cheap = false) {
+    this.pass = new FullscreenPass(
+      createFullscreenMaterial({
+        fragmentShader: RESOLVE_FRAG,
+        defines: cheap ? { TAA_BILINEAR_HISTORY: 1 } : {},
+        uniforms: {
+          uCurrent: { value: null },
+          uDepth: { value: null },
+          uHistory: { value: null },
+          uExposure: { value: null },
+          uInSize: { value: new THREE.Vector2(1, 1) },
+          uOutSize: { value: new THREE.Vector2(1, 1) },
+          uJitter: { value: this.jitter },
+          uInvViewProj: { value: this.invViewProj },
+          uPrevViewProj: { value: this.prevViewProj },
+          uBlend: { value: 0.1 },
+          uReset: { value: 1 },
+          uExposureScale: { value: 1 },
+        },
+      }),
+    );
+  }
 
   /** The resolved frame at display resolution (linear HDR). */
   get texture(): THREE.Texture {

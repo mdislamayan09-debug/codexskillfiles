@@ -146,7 +146,7 @@ npm run preview    # http://127.0.0.1:4188
 The first launch generates the island and caches it; later launches start
 faster.
 
-### Graphics on a Mac
+### Graphics
 
 Quality is chosen from your GPU and can be changed any time in
 **Settings → Graphics**: Low, Medium, High, Extra High and Max. On Apple
@@ -154,6 +154,15 @@ silicon, **High** is the default; an M4 Pro gets **Extra High** and an M4
 Max gets **Max**, which turns everything up: finer volumetric clouds, the
 longest view distance and the densest forests. Use Chrome or Safari in full
 screen, and turn on **Show frame rate** in the same tab to compare presets.
+
+Every preset renders with temporal anti-aliasing that rebuilds the image
+at your display's full resolution, and **dynamic resolution** (on by
+default, target 60 fps; choose 30 on a laptop) lowers the scene's
+resolution only when frames run long. On integrated graphics (Intel Iris
+Xe and the like) the presets keep their effects but fit their geometry to
+the chip: Max holds about 30 fps at 1080p on an Iris Xe laptop with the
+target at 30. The production build (`npm run build`, then `npm run
+preview`) is noticeably faster than the dev server.
 
 ## Controls
 

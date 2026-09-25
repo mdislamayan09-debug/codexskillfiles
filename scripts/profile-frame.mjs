@@ -35,7 +35,7 @@ mkdirSync('artifacts/perf/shots', { recursive: true });
 const browser = await launchChromium(args);
 const page = await browser.newPage({ viewport: { width, height } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`${url}/?quality=${preset}&capture=1${arg('query', '')}`, { waitUntil: 'load' });
+await page.goto(`${url}/?quality=${preset}&capture=1&gpustages${arg('query', '')}`, { waitUntil: 'load' });
 await page.waitForFunction(() => Boolean(window.__THREE_GAME_TEST_HOOKS__), null, { timeout: 300_000, polling: 500 });
 await page.evaluate((scale) => {
   const H = window.__THREE_GAME_TEST_HOOKS__;

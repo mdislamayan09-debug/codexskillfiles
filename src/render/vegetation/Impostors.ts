@@ -17,6 +17,7 @@ export interface ImpostorSource {
 const BAKE_VERT = /* glsl */ `
 attribute float aLayer;
 attribute float aShade;
+attribute vec4 aWind;
 uniform float uUseAttrLayer;
 varying vec2 vUvB;
 varying vec3 vNormalObj;
@@ -29,9 +30,9 @@ void main() {
   // Leaves carry their crown depth (bark has none): bake it in, as the
   // near trees shade it, so trees don't brighten as they turn to impostors.
   vShadeB = uUseAttrLayer > 0.5 ? mix(0.55, 1.0, aShade) : 1.0;
-  // Trunks and limbs baked a little thicker: far off they would be thinner
-  // than a pixel and the crowns would seem to float.
-  vec3 p = uUseAttrLayer > 0.5 ? position : position + normal * 0.16;
+  // Trunks (not limbs: those carry wind weight) baked a little thicker: far
+  // off they would be thinner than a pixel and the crowns would seem to float.
+  vec3 p = uUseAttrLayer > 0.5 ? position : position + normal * 0.16 * (1.0 - step(0.05, aWind.y));
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `;
@@ -51,7 +52,7 @@ void main() {
   float layer = uUseAttrLayer > 0.5 ? floor(vLayerB + 0.5) : uLayer;
   vec4 t = texture(uTex, vec3(vUvB, layer));
   if (uCutout > 0.5 && t.a < 0.5) discard;
-  if (uMode == 0) gl_FragColor = vec4(t.rgb * vShadeB * mix(0.8, 1.0, vShadeB), 1.0);
+  if (uMode == 0) gl_FragColor = vec4(t.rgb * mix(0.72, 1.0, vShadeB), 1.0);
   else gl_FragColor = vec4(normalize(vNormalObj) * 0.5 + 0.5, 1.0);
 }
 `;
@@ -172,7 +173,15 @@ vec4 n0 = texture(uImpNormal, vec3(vImpUv, vImpBase + f0));
 vec4 n1 = texture(uImpNormal, vec3(vImpUv, vImpBase + f1));
 vec4 impAlb = mix(a0, a1, ft);
 vec3 impN = normalize(mix(n0.xyz, n1.xyz, ft) * 2.0 - 1.0);
-float impA = impAlb.a;
+// The atlas is baked over transparent black, so its small mips average
+// black into the edges: far trees went to dark blobs. Dividing by the
+// averaged coverage gives back the foliage's own colour.
+impAlb.rgb /= max(impAlb.a, 0.05);
+// Coverage also averages away in small mips (thin crowns and trunks would
+// erode to nothing): give it back per mip level, as the leaf cards do.
+vec2 impTexel = vImpUv * vec2(textureSize(uImpAlbedo, 0).xy);
+float impLod = max(0.0, 0.5 * log2(max(dot(dFdx(impTexel), dFdx(impTexel)), dot(dFdy(impTexel), dFdy(impTexel)))));
+float impA = clamp(impAlb.a * (1.0 + 0.25 * impLod), 0.0, 1.0);
 if (uImpA2C > 0.5) {
   impA = clamp((impA - 0.5) / max(fwidth(impA), 1e-4) + 0.5, 0.0, 1.0);
   if (impA < 0.01) discard;

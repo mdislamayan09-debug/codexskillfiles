@@ -37,17 +37,31 @@ await page.evaluate(() => {
   window.__THREE_GAME_TEST_HOOKS__.hideDebugUi();
   window.game.clock.set(1, 10);
 });
+if (arg('eval', '')) await page.evaluate(arg('eval', ''));
 const results = [];
 for (const spot of spots) {
   const [x, z, yaw] = SPOTS[spot];
   await page.evaluate(([x, z, yaw]) => window.__THREE_GAME_TEST_HOOKS__.teleport(x, z, yaw), [x, z, yaw]);
   await page.waitForTimeout(settle * 1000);
   await page.evaluate(() => window.game.pipeline.gpu.reset());
+  await page.evaluate(() => {
+    window.__dts = [];
+    let last = performance.now();
+    const tick = (t) => {
+      window.__dts.push(t - last);
+      last = t;
+      if (window.__dts.length < 100000) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   const f0 = await page.evaluate(() => window.game.frame);
   const t0 = Date.now();
   await page.waitForTimeout(seconds * 1000);
   const d = await page.evaluate(() => ({ frame: window.game.frame, gpu: window.game.pipeline.gpu.total, stages: { ...window.game.pipeline.gpu.ms }, res: window.game.quality.renderScale * window.game.pipeline.resolutionScale, cpu: window.__THREE_GAME_DIAGNOSTICS__.timings.frameMs }));
   const fps = ((d.frame - f0) * 1000) / (Date.now() - t0);
+  const dts = (await page.evaluate(() => window.__dts.splice(0))).slice(2).sort((a, b) => a - b);
+  const pct = (q) => dts[Math.min(dts.length - 1, Math.floor(q * dts.length))]?.toFixed(1);
+  console.log(`        frame ms p10 ${pct(0.1)} p50 ${pct(0.5)} p90 ${pct(0.9)} p99 ${pct(0.99)} max ${dts.at(-1)?.toFixed(1)}`);
   results.push(fps);
   const st = Object.entries(d.stages).filter(([, v]) => v > 0.4).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ');
   console.log(`${spot.padEnd(7)} ${fps.toFixed(1).padStart(5)} fps  gpu ${d.gpu.toFixed(1).padStart(5)} ms  cpu ${(d.cpu ?? 0).toFixed(1).padStart(5)} ms  res ${Math.round(d.res * 100)}%  [${st}]`);

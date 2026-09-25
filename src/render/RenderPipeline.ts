@@ -59,6 +59,23 @@ export const detailCull = {
   minShadowRatio: 0.012,
 };
 
+/**
+ * Pools of instanced meshes (arrows, building pieces, birds) sit empty most
+ * of the time, yet three still sets up a program and draws zero instances,
+ * in every pass and shadow cascade.
+ */
+function skipEmptyDraws(renderer: THREE.WebGLRenderer): void {
+  const r = renderer as THREE.WebGLRenderer & { __emptyPatched?: boolean };
+  if (r.__emptyPatched) return;
+  r.__emptyPatched = true;
+  const direct = renderer.renderBufferDirect.bind(renderer);
+  renderer.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+    if ((object as THREE.InstancedMesh).isInstancedMesh && (object as THREE.InstancedMesh).count === 0) return;
+    if ((geometry as THREE.InstancedBufferGeometry).isInstancedBufferGeometry && (geometry as THREE.InstancedBufferGeometry).instanceCount === 0) return;
+    direct(camera, scene, geometry, material, object, group);
+  };
+}
+
 function installDetailCulling(): void {
   const proto = THREE.Frustum.prototype as THREE.Frustum & { __detailPatched?: boolean };
   if (proto.__detailPatched) return;
@@ -165,7 +182,7 @@ export class RenderPipeline {
   private readonly exposure = new ExposurePass();
   private readonly ssao = new SSAOPass();
   private readonly godRays = new GodRaysPass();
-  private readonly taa = new TemporalAA();
+  private readonly taa: TemporalAA;
   private readonly restoreMesh: THREE.Mesh;
   private readonly composite: FullscreenPass;
   private readonly whiteTexture: THREE.DataTexture;
@@ -181,6 +198,8 @@ export class RenderPipeline {
   private scaleTimer = 0;
   private scaleFrames = 0;
   private frameMs = 16.7;
+  /** Frame time the GPU timer cannot see, learnt from missed frames. */
+  private overheadMs = 0;
   private time = 0;
   private readonly sunUv = new THREE.Vector2();
   private readonly tmp = new THREE.Vector3();
@@ -196,12 +215,14 @@ export class RenderPipeline {
     public quality: QualitySettings,
   ) {
     this.gpu = new GpuTimer(renderer.getContext() as WebGL2RenderingContext);
+    this.taa = new TemporalAA(quality.budget < 1);
     const dummyWeather = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     dummyWeather.needsUpdate = true;
     this.cloudUniforms.uCloudWeather.value = dummyWeather;
     installAtmosphereChunks({ ...this.atmosphere.uniforms, ...this.cloudUniforms, uLightDir: this.lightDir });
     installShadowProxyLayer(renderer, LAYER_SHADOW_PROXY);
     installDetailCulling();
+    skipEmptyDraws(renderer);
     // Any Fog instance turns on USE_FOG; the chunks it enables are replaced by
     // aerial perspective, height fog and cloud-shadow visibility.
     scene.fog = new THREE.Fog(0xffffff, 1, 2);
@@ -411,8 +432,16 @@ export class RenderPipeline {
     // frame interval (which cannot see headroom under vsync).
     const gpuMs = this.gpu.available ? this.gpu.total : 0;
     const measured = gpuMs > 0 ? gpuMs : this.frameMs;
-    const headroom = gpuMs > 0 ? 0.85 : 0.97;
-    const ratio = (budget * headroom) / Math.max(measured, 0.1);
+    // The browser and driver spend time the timer cannot see (handing the
+    // frame over, compositing the page). While frames still miss the target
+    // with the card's time inside it, grow an allowance for that; shrink it
+    // slowly once they fit, so resolution can creep back up.
+    if (gpuMs > 0) {
+      const missing = this.frameMs > budget * 1.06;
+      this.overheadMs = Math.min(budget * 0.45, Math.max(0, this.overheadMs + (missing ? 1.5 : -0.3)));
+    }
+    const target = gpuMs > 0 ? budget * 0.92 - this.overheadMs : budget * 0.97;
+    const ratio = Math.max(target, budget * 0.4) / Math.max(measured, 0.1);
     let next = this.dynamicScale;
     if (ratio < 0.95) next *= Math.max(0.7, Math.sqrt(ratio));
     else if (ratio > 1.2) next *= Math.min(1.08, Math.sqrt(ratio));
@@ -489,7 +518,10 @@ export class RenderPipeline {
     camera.layers.set(LAYER_TRANSPARENT);
     renderer.setRenderTarget(this.finalTarget);
     renderer.clear(true, true, false);
+    // The first pass already brought every world matrix up to date.
+    this.scene.matrixWorldAutoUpdate = false;
     renderer.render(this.scene, camera);
+    this.scene.matrixWorldAutoUpdate = true;
     camera.layers.set(LAYER_MAIN);
     detailCull.enabled = false;
     this.taa.restoreCamera(camera);
@@ -562,7 +594,7 @@ export class RenderPipeline {
     const upscale = this.outWidth / Math.max(1, this.width);
     cu.uSharpen.value = this.resolution.sharpness * (0.35 + 0.35 * Math.min(1, Math.max(0, upscale - 1)));
     this.composite.render(renderer, null);
-    gpu.end();
+    gpu.finishFrame();
   }
 
   /** Snap eye adaptation to the next frame's target (camera cuts, loads). */

@@ -231,25 +231,26 @@ export function isIntegratedGpu(renderer: string): boolean {
  * by the tree and prop streaming.
  */
 export function fitToGpu(q: QualitySettings, renderer: string, override?: number): QualitySettings {
-  const budget = override ?? (isIntegratedGpu(renderer) ? 0.5 : 1);
+  const budget = override ?? (isIntegratedGpu(renderer) ? 0.4 : 1);
   if (budget >= 1) return q;
   const b = Math.max(0.2, budget);
-  const heavy = q.name === 'extra' || q.name === 'max';
   return {
     ...q,
     budget: b,
     grassDensity: q.grassDensity * Math.min(1, b * 1.1),
-    grassRadius: Math.round(q.grassRadius * Math.min(1, 0.4 + b * 0.6)),
+    grassRadius: Math.round(q.grassRadius * Math.min(1, 0.25 + b * 0.6)),
     impostorDistance: Math.round(q.impostorDistance * Math.min(1, b * 1.1)),
-    vegetationDistance: Math.round(q.vegetationDistance * Math.min(1, 0.5 + b * 0.5)),
-    shadowCascades: heavy ? Math.min(q.shadowCascades, 3) : q.shadowCascades,
-    shadowMapSize: Math.min(q.shadowMapSize, 2048),
-    shadowDistance: Math.round(q.shadowDistance * Math.min(1, 0.4 + b * 0.6)),
-    cloudSteps: q.cloudSteps > 0 ? Math.max(32, Math.round(q.cloudSteps * Math.min(1, b))) : 0,
+    vegetationDistance: Math.round(q.vegetationDistance * Math.min(1, 0.35 + b * 0.5)),
+    // Two cascades out to under 300 m: every caster is drawn once per cascade.
+    shadowCascades: Math.min(q.shadowCascades, 2),
+    shadowMapSize: Math.min(q.shadowMapSize, 1536),
+    shadowDistance: Math.round(Math.min(280, q.shadowDistance * Math.min(1, 0.4 + b * 0.6))),
+    cloudSteps: q.cloudSteps > 0 ? Math.max(28, Math.round(q.cloudSteps * Math.min(1, b) * 0.8)) : 0,
     cloudDivisor: Math.max(q.cloudDivisor, 4),
     terrainDetailDistance: Math.round(q.terrainDetailDistance * Math.min(1, 0.4 + b * 0.6)),
     waterGrid: Math.round(q.waterGrid * Math.min(1, 0.5 + b * 0.5)),
     waterReflectionSteps: Math.round(q.waterReflectionSteps * Math.min(1, 0.4 + b * 0.6)),
-    minRenderScale: Math.min(q.minRenderScale, 0.5),
+    waveResolution: Math.min(q.waveResolution, 128),
+    minRenderScale: Math.min(q.minRenderScale, 0.42),
   };
 }
