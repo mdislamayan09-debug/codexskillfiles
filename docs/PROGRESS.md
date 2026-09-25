@@ -202,6 +202,9 @@ the solid-geometry columns (walls, stairs, doorways, plank walls, slopes)
   toggle sprint and crouch, reduced motion, colour-blind filters,
   interface scale, HUD opacity and subtitles.
 - ✅ Full controller support, menus included.
+- ✅ Survivors rebuilt as proper people (`src/story/figures/`): sculpted
+  heads, baked skin, eyes that blink and look, clothes that hang, hands
+  with fingers. First-person hands rebuilt as a gloved fist.
 - 🟡 Performance: presets are tuned by eye and by budget. Frame times
   still need measuring on real Apple silicon.
 - ⬜ Key rebinding.

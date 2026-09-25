@@ -227,7 +227,10 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
   mantle, swim, fall damage, stamina coupling, a dodge dash.
 - Camera with head bob, landing dip, sprint FOV and reduced-motion support
   (`PlayerView.ts`). Hands and held items, torches that light the way,
-  a bow rig and a guard pose (`Viewmodel.ts`).
+  a bow rig and a guard pose (`Viewmodel.ts`). The hand is a gloved fist
+  built in `hand.ts`: jointed fingers wrapped round the grip with the
+  knuckles standing proud, the thumb over the index finger, baked leather
+  and a wool sleeve with a knitted cuff.
 
 ### Survival, gathering, crafting, building, farming
 
@@ -274,6 +277,15 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
 - **Survivors** with dialogue and subtitles: Captain Ilse Varga, Tomas
   "Tock" Brennet (engineer), Dr. Wren Okafor (naturalist) and Ilyr (the
   Listener, an echo of the Veyr). They move to camp once found.
+- **Survivors' bodies** (`src/story/figures/`, see `docs/CHARACTERS.md`):
+  each is built from a written description (`Person` in `StoryData.ts`:
+  sex, age, build, face, eyes, hair, beard, weather, coat). A sculpted
+  head (nose, sockets, cheekbones, lips, ears), eyes with baked irises and
+  blinking lids, skin painted on the face's own anatomy with a wrap-light
+  scatter, hair and beards, and clothes lofted and hung like cloth over
+  a body in proportion: coats with collars, pockets, buttons and belts,
+  hands with jointed fingers, boots. They breathe, shift their weight,
+  blink and turn to look at the player.
 - **Main quest:** Waking → Shelter Before Dark → The Singing Stones (a
   tuning puzzle; the Echo Lantern) → What the Needle Knows (the Rim) → The
   Five Bells (one quest per Warden) → The Held Note (the Stillheart).
@@ -528,7 +540,8 @@ Line counts at hand-off. 97 TypeScript files, about 37,000 lines in `src`.
 | --- | --- | --- |
 | `PlayerController.ts` | 629 | Movement, climbing, swimming, colliders, the dodge dash |
 | `PlayerView.ts` | 89 | The first-person camera |
-| `Viewmodel.ts` | 502 | Hands, held items, bow rig, guard pose, torch light |
+| `Viewmodel.ts` | 495 | Hands, held items, bow rig, guard pose, torch light |
+| `hand.ts` | 213 | The gloved fist and sleeve: jointed finger tubes round the grip |
 
 ### `src/game`
 
@@ -565,7 +578,11 @@ Line counts at hand-off. 97 TypeScript files, about 37,000 lines in `src`.
 | --- | --- | --- |
 | `StoryData.ts` | ~550 | Survivors, quests, dialogue, cave echoes |
 | `Quests.ts` | 181 | Quest state machine and flags |
-| `StoryWorld.ts` | 651 | Survivors in the world, the Singing Stones, Tock's vault, bells |
+| `StoryWorld.ts` | 593 | Survivors in the world, the Singing Stones, Tock's vault, bells |
+| `figures/HumanFigure.ts` | 1,011 | A survivor's body, clothes, kit and idle rig from their `Person` |
+| `figures/head.ts` | 582 | The sculpted head: face depth, masks, eyes, lids, hair, beard |
+| `figures/textures.ts` | 352 | Baked skin, iris, cloth, leather and hair textures |
+| `figures/skinShading.ts` | 31 | Wrap-light scatter for skin |
 | `Stillheart.ts` | 319 | The Veil, the Hush, Hallowmere and the Crown |
 | `Landmarks.ts` | 951 | The set pieces, caches, lighthouse beam, lanternflies, traps |
 | `LandmarkData.ts` | 199 | Cache contents, journal pages, cache spots |

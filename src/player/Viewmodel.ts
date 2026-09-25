@@ -4,6 +4,8 @@ import { addPatch, replaceOnce } from '../render/materials/MaterialPatches';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
 import { generateRock } from '../world/props/RockGenerator';
 import { itemDef } from '../game/items';
+import { bakeCloth, bakeLeather } from '../story/figures/textures';
+import { buildHand } from './hand';
 
 // First-person hands and held items. Drawn in the second (transparent)
 // pass with clip-space depth squeezed toward the near plane, so the tool
@@ -145,33 +147,24 @@ export class Viewmodel {
   }
 
   private buildArm(): void {
-    // Sleeve disappearing off the bottom-right of the screen.
-    // The forearm runs down and back toward the camera from the wrist
-    // (expressed in the arm's tilted local frame).
-    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.07, 0.45, 12, 1, true), this.materials.sleeve);
-    sleeve.rotation.x = -0.49;
-    sleeve.position.set(0.02, -0.25, 0.135);
-    this.arm.add(sleeve);
-    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 6, 14), this.materials.leather);
-    cuff.rotation.x = Math.PI / 2 - 0.49;
-    cuff.position.set(0.02, -0.05, 0.03);
-    this.arm.add(cuff);
-    // Gloved fist around a vertical grip at the origin.
-    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), this.materials.glove);
-    palm.scale.set(0.9, 1.25, 1.05);
-    palm.position.set(0.025, -0.01, 0.02);
-    this.arm.add(palm);
-    for (let f = 0; f < 4; f += 1) {
-      const y = 0.035 - f * 0.024;
-      const finger = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.012, 6, 10, Math.PI * 1.25), this.materials.glove);
-      finger.position.set(-0.004, y, 0.002);
-      finger.rotation.set(Math.PI / 2, 0, -0.9 + f * 0.05);
-      this.arm.add(finger);
-    }
-    const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.035, 4, 8), this.materials.glove);
-    thumb.position.set(-0.02, 0.05, -0.015);
-    thumb.rotation.set(0.5, 0, 0.9);
-    this.arm.add(thumb);
+    // A gloved fist round a grip at the origin, the forearm running back
+    // toward the camera into the coat sleeve (hand.ts). Leather and wool
+    // are baked like the survivors' own.
+    const leather = bakeLeather(0x5a4030, 11);
+    const glove = this.materials.glove;
+    glove.map = leather.map;
+    glove.normalMap = leather.normalMap;
+    glove.normalScale.set(0.8, 0.8);
+    glove.color.set(0xffffff);
+    glove.roughness = 0.58;
+    const wool = bakeCloth('wool', 0x2f3a2c, 5);
+    const sleeve = this.materials.sleeve;
+    sleeve.map = wool.map;
+    sleeve.normalMap = wool.normalMap;
+    sleeve.normalScale.set(0.35, 0.35);
+    sleeve.color.set(0xffffff);
+    const hand = buildHand();
+    this.arm.add(new THREE.Mesh(hand.glove, glove), new THREE.Mesh(hand.sleeve, sleeve));
   }
 
   // ---------------------------------------------------------------------------

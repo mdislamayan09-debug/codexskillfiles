@@ -6,6 +6,7 @@ import { generateRock } from '../world/props/RockGenerator';
 import type { QuestTracker } from './Quests';
 import { BELL_WARDENS, GLYPHS, NPCS, TUNING_ORDER, type NpcDef } from './StoryData';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
+import { buildHumanFigure, type HumanFigure } from './figures/HumanFigure';
 
 // The physical side of the story: the survivors standing in the world,
 // the set pieces that make landmarks recognisable, and the interactables
@@ -27,6 +28,7 @@ interface NpcFigure {
   body: THREE.Object3D;
   present: boolean;
   materials: THREE.MeshStandardMaterial[];
+  figure: HumanFigure;
 }
 
 function mat(color: number, roughness = 0.85, metalness = 0, emissive = 0, emissiveIntensity = 1): THREE.MeshStandardMaterial {
@@ -75,6 +77,7 @@ export class StoryWorld {
   private readonly bellGlows = new Map<string, THREE.MeshStandardMaterial>();
   private bellPulse = 0;
   private time = 0;
+  private readonly lookTarget = new THREE.Vector3();
   private readonly m = {
     stone: mat(0x7c786f, 0.92),
     darkStone: mat(0x55524c, 0.9),
@@ -467,91 +470,14 @@ export class StoryWorld {
 
   private buildNpc(def: NpcDef): void {
     const look = def.look;
-    const H = look.height;
     const echo = Boolean(look.echo);
-    const coat = echo ? new THREE.MeshStandardMaterial({ color: look.coat, emissive: look.coat, emissiveIntensity: 1.6, transparent: true, opacity: 0.55, roughness: 0.4, depthWrite: false }) : mat(look.coat, 0.9);
-    const trim = echo ? coat : mat(look.trim, 0.5, look.trim === 0xb08d4a ? 1 : 0);
-    const skin = echo ? coat : mat(look.skin, 0.65);
-    const dark = echo ? coat : mat(0x1c1a18, 0.8);
-    if (echo) this.ilyrMaterial = coat;
-    const g = new THREE.Group();
-    const body = new THREE.Group();
-    g.add(body);
-    // Boots and legs.
-    for (const side of [-1, 1]) {
-      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.075 * H, 0.42 * H, 3, 8), dark);
-      leg.position.set(side * 0.1 * H, 0.27 * H, 0);
-      body.add(leg);
-    }
-    // Long coat: a flared lathe.
-    const coatPts = [
-      new THREE.Vector2(0.001, 0.86 * H),
-      new THREE.Vector2(0.17 * H, 0.84 * H),
-      new THREE.Vector2(0.2 * H, 0.72 * H),
-      new THREE.Vector2(0.17 * H, 0.55 * H),
-      new THREE.Vector2(0.2 * H, 0.35 * H),
-      new THREE.Vector2(0.24 * H, 0.2 * H),
-    ];
-    const coatMesh = new THREE.Mesh(new THREE.LatheGeometry(coatPts, 14), coat);
-    coatMesh.scale.z = 0.72;
-    (coatMesh.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
-    body.add(coatMesh);
-    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.17 * H, 0.012 * H, 5, 16), trim);
-    belt.rotation.x = Math.PI / 2;
-    belt.scale.y = 0.72;
-    belt.position.y = 0.56 * H;
-    body.add(belt);
-    // Arms.
-    for (const side of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055 * H, 0.32 * H, 3, 8), coat);
-      arm.position.set(side * 0.21 * H, 0.66 * H, 0.01);
-      arm.rotation.z = side * 0.12;
-      body.add(arm);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045 * H, 8, 6), skin);
-      hand.position.set(side * 0.235 * H, 0.47 * H, 0.02);
-      body.add(hand);
-    }
-    // Head.
-    const head = new THREE.Group();
-    head.position.y = 0.9 * H;
-    body.add(head);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * H, 0.05 * H, 0.06 * H, 8), skin);
-    neck.position.y = -0.02 * H;
-    head.add(neck);
-    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.075 * H, 14, 12), skin);
-    skull.scale.set(0.9, 1.08, 0.98);
-    skull.position.y = 0.06 * H;
-    head.add(skull);
-    for (const side of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.009 * H, 6, 4), dark);
-      eye.position.set(side * 0.027 * H, 0.07 * H, -0.068 * H);
-      head.add(eye);
-    }
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.079 * H, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), dark);
-    hair.position.y = 0.065 * H;
-    hair.rotation.x = 0.25;
-    head.add(hair);
-    if (look.hat === 'captain') {
-      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * H, 0.1 * H, 0.012 * H, 16), coat);
-      brim.position.y = 0.125 * H;
-      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * H, 0.08 * H, 0.06 * H, 16), coat);
-      crown.position.y = 0.155 * H;
-      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.03 * H, 0.02 * H, 0.005), trim);
-      badge.position.set(0, 0.155 * H, -0.08 * H);
-      head.add(brim, crown, badge);
-    } else if (look.hat === 'goggles') {
-      for (const side of [-1, 1]) {
-        const lens = new THREE.Mesh(new THREE.TorusGeometry(0.022 * H, 0.007 * H, 6, 12), trim);
-        lens.position.set(side * 0.03 * H, 0.12 * H, -0.05 * H);
-        lens.rotation.x = 0.8;
-        head.add(lens);
-      }
-    } else if (look.hat === 'hood') {
-      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.1 * H, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.7), coat);
-      hood.position.set(0, 0.05 * H, 0.015 * H);
-      hood.rotation.x = -0.3;
-      head.add(hood);
-    }
+    // Ilyr is an echo: one glowing, see-through material over a real form.
+    const echoMat = echo ? new THREE.MeshStandardMaterial({ color: look.coat, emissive: look.coat, emissiveIntensity: 1.6, transparent: true, opacity: 0.55, roughness: 0.4, depthWrite: false }) : null;
+    if (echoMat) this.ilyrMaterial = echoMat;
+    const figure = buildHumanFigure(look, echoMat);
+    const g = figure.group;
+    const head = figure.head;
+    const body = figure.body;
     g.traverse((o) => {
       if ((o as THREE.Mesh).isMesh && echo) {
         o.layers.set(LAYER_TRANSPARENT);
@@ -562,9 +488,9 @@ export class StoryWorld {
     // Survivors walk about: not part of the solid ground.
     g.userData.moving = true;
     this.group.add(g);
-    const materials = [coat, trim, skin, dark].filter((m, i, a) => a.indexOf(m) === i) as THREE.MeshStandardMaterial[];
+    const materials = echoMat ? [echoMat] : figure.materials;
     for (const m of materials) if (!this.materials.includes(m)) this.materials.push(m);
-    this.npcs.push({ def, group: g, head, body, present: false, materials });
+    this.npcs.push({ def, group: g, head, body, present: false, materials, figure });
     this.interactables.push({
       id: `npc:${def.id}`,
       position: new THREE.Vector3(),
@@ -623,8 +549,9 @@ export class StoryWorld {
         delta = ((delta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
         f.group.rotation.y += delta * Math.min(1, dt * 2.5);
       }
-      f.body.scale.y = 1 + Math.sin(this.time * 1.6 + f.def.id.length) * 0.006;
-      f.head.rotation.x = Math.sin(this.time * 0.7 + f.def.id.length) * 0.05 - (d < 4 ? 0.05 : 0);
+      // Breathing, blinking, and eyes on whoever comes to talk.
+      this.lookTarget.set(player.x, player.y + 1.6, player.z);
+      f.figure.update(dt, this.time, d < 7 ? this.lookTarget : null);
     }
     this.bellPulse = Math.max(0, this.bellPulse - dt * 0.12);
     for (const [id, glow] of this.bellGlows) {

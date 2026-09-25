@@ -74,7 +74,10 @@ full of things to find.
 - **The story:** find the crew (Captain Varga, Tock, Wren and Ilyr), tune
   the Singing Stones, climb to the Rim, calm the five Wardens (Mossback,
   Tidemother, Emberjaw, Rimebrow, Old Croak), ring the bells and walk down
-  into Hallowmere to release the note. Seven side quests.
+  into Hallowmere to release the note. Seven side quests. The survivors
+  are proper people built from a description: sculpted faces, eyes that
+  blink and follow you, skin, hair and clothes that hang like cloth
+  (`docs/CHARACTERS.md`).
 - **Places:** 28 landmarks with caches and journal pages, four caves you
   walk into (dark without a torch), and about seventy curiosities between
   them: carved cairns, lost packs, shrines and echo stones. The set pieces
@@ -91,7 +94,7 @@ full of things to find.
   crafting, title screen, full settings, subtitles, colour-blind filters,
   reduced motion, and full controller support.
 
-**Tests:** 73 unit tests and 18 browser playtests and captures, all passing on a real GPU (`node scripts/playtest-all.mjs --gpu`). Typecheck is clean.
+**Tests:** 79 unit tests and 18 browser playtests and captures, all passing on a real GPU (`node scripts/playtest-all.mjs --gpu`). Typecheck is clean.
 
 **Known gaps:** frame rates have not been measured on a real M4, key
 rebinding is missing, and some of the design (three more survivors, the

@@ -11,7 +11,40 @@ export interface NpcDef {
   camp: { dx: number; dz: number };
   /** Starts at the crash camp (true) or must be found first. */
   startsAtCamp: boolean;
-  look: { coat: number; trim: number; skin: number; hat: 'captain' | 'goggles' | 'hood' | 'none' | 'tricorn'; height: number; echo?: boolean };
+  look: { coat: number; trim: number; skin: number; hat: 'captain' | 'goggles' | 'hood' | 'none' | 'tricorn'; height: number; echo?: boolean; person: Person };
+}
+
+/** Who a survivor is, bodily: what the figure builder sculpts and dresses. */
+export interface Person {
+  /** Seeds every small irregularity, so each face is its own. */
+  seed: number;
+  sex: 'f' | 'm';
+  /** Years: lines, greying, how the skin sits. */
+  age: number;
+  /** 0 slight .. 1 heavy-set. */
+  build: number;
+  face: {
+    /** 0 fine .. 1 broad, square jaw. */
+    jaw: number;
+    /** Nose length and breadth, about 1. */
+    nose: number;
+    /** 0 soft .. 1 heavy brow ridge. */
+    brow: number;
+    /** 0 flat .. 1 high cheekbones. */
+    cheek: number;
+    /** 0 thin .. 1 full lips. */
+    lips: number;
+    /** Head width, about 1. */
+    width: number;
+  };
+  /** Iris colour. */
+  eyes: number;
+  hair: { style: 'bun' | 'balding' | 'coils' | 'crop'; color: number; grey: number };
+  /** 0 clean-shaven .. 1 full beard. */
+  beard: number;
+  /** Weather in the skin: freckles, redness, fine lines (0..1). */
+  weather: number;
+  coat: 'greatcoat' | 'workcoat' | 'fieldcoat' | 'robe';
 }
 
 export const NPCS: readonly NpcDef[] = [
@@ -22,7 +55,16 @@ export const NPCS: readonly NpcDef[] = [
     home: { landmark: 'crash_camp', dx: 3, dz: -2 },
     camp: { dx: 3, dz: -2 },
     startsAtCamp: true,
-    look: { coat: 0x1f2a3a, trim: 0xb08d4a, skin: 0xc79a7a, hat: 'captain', height: 1.74 },
+    look: {
+      coat: 0x1f2a3a,
+      trim: 0xb08d4a,
+      skin: 0xc79a7a,
+      hat: 'captain',
+      height: 1.74,
+      // Forty-six, twenty-odd years in the air: a lean, weathered face, a
+      // hard jaw, grey coming into the dark hair she keeps pinned up.
+      person: { seed: 101, sex: 'f', age: 46, build: 0.35, face: { jaw: 0.6, nose: 1.05, brow: 0.45, cheek: 0.8, lips: 0.35, width: 0.97 }, eyes: 0x5d7488, hair: { style: 'bun', color: 0x3a2a20, grey: 0.3 }, beard: 0, weather: 0.7, coat: 'greatcoat' },
+    },
   },
   {
     id: 'tock',
@@ -31,7 +73,16 @@ export const NPCS: readonly NpcDef[] = [
     home: { landmark: 'tocks_vault', dx: 4, dz: 3 },
     camp: { dx: -4, dz: 3 },
     startsAtCamp: false,
-    look: { coat: 0x5a4632, trim: 0x8a8d92, skin: 0xa8765a, hat: 'goggles', height: 1.8 },
+    look: {
+      coat: 0x5a4632,
+      trim: 0x8a8d92,
+      skin: 0xa8765a,
+      hat: 'goggles',
+      height: 1.8,
+      // Fifty-two, broad as a boiler: thinning on top, a grizzled beard,
+      // laughter lines and engine oil in every crease.
+      person: { seed: 202, sex: 'm', age: 52, build: 0.85, face: { jaw: 0.9, nose: 1.15, brow: 0.75, cheek: 0.45, lips: 0.5, width: 1.06 }, eyes: 0x5a3e28, hair: { style: 'balding', color: 0x4a3a2c, grey: 0.55 }, beard: 0.85, weather: 0.6, coat: 'workcoat' },
+    },
   },
   {
     id: 'wren',
@@ -40,16 +91,34 @@ export const NPCS: readonly NpcDef[] = [
     home: { landmark: 'hollow_elder', dx: 6, dz: 2 },
     camp: { dx: -2, dz: -5 },
     startsAtCamp: false,
-    look: { coat: 0x3d5a3a, trim: 0xd9c9a0, skin: 0x5a3a28, hat: 'none', height: 1.68 },
+    look: {
+      coat: 0x3d5a3a,
+      trim: 0xd9c9a0,
+      skin: 0x5a3a28,
+      hat: 'none',
+      height: 1.68,
+      // Thirty-four, fine-boned and quick-eyed, close-cropped coils.
+      person: { seed: 303, sex: 'f', age: 34, build: 0.25, face: { jaw: 0.3, nose: 0.95, brow: 0.3, cheek: 0.7, lips: 0.8, width: 0.95 }, eyes: 0x3a2618, hair: { style: 'coils', color: 0x161210, grey: 0 }, beard: 0, weather: 0.15, coat: 'fieldcoat' },
+    },
   },
   {
     id: 'ilyr',
     name: 'Ilyr',
     title: 'The Listener',
-    home: { landmark: 'singing_stones', dx: 0, dz: 0 },
-    camp: { dx: 0, dz: 0 },
+    // Beside the pedestal in the ring's middle, not inside it.
+    home: { landmark: 'singing_stones', dx: 2.2, dz: -1.6 },
+    camp: { dx: 2.2, dz: -1.6 },
     startsAtCamp: false,
-    look: { coat: 0x3fd9c4, trim: 0xbff5ea, skin: 0x9ff0e4, hat: 'hood', height: 1.9, echo: true },
+    look: {
+      coat: 0x3fd9c4,
+      trim: 0xbff5ea,
+      skin: 0x9ff0e4,
+      hat: 'hood',
+      height: 1.9,
+      echo: true,
+      // What is left of a young apprentice: long-boned, hooded, made of light.
+      person: { seed: 404, sex: 'm', age: 24, build: 0.2, face: { jaw: 0.4, nose: 1, brow: 0.35, cheek: 0.65, lips: 0.45, width: 0.96 }, eyes: 0xbff5ea, hair: { style: 'crop', color: 0x2a2420, grey: 0 }, beard: 0, weather: 0, coat: 'robe' },
+    },
   },
 ];
 
