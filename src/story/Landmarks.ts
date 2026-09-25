@@ -589,7 +589,13 @@ export class Landmarks {
       // and its dome; a keeper's cottage beside it.
       const base = p.cy - 0.5;
       this.cyl(p, 'stone', 2.6, 3.6, 24, 0, 0, -0.5, 24);
-      for (let i = 0; i < 3; i += 1) this.cyl(p, 'red', 2.78 - i * 0.28, 2.95 - i * 0.28, 1.6, 0, 0, 4 + i * 6.5, 24);
+      // Painted bands follow the shaft's taper (3.6 m at its foot to 2.6 m at
+      // 24 m), standing just proud of the stone.
+      const shaftR = (y: number) => 3.6 - (y + 0.5) / 24 + 0.03;
+      for (let i = 0; i < 3; i += 1) {
+        const y0 = 4 + i * 6.5;
+        this.cyl(p, 'red', shaftR(y0 + 1.6), shaftR(y0), 1.6, 0, 0, y0, 24);
+      }
       // Gallery and rail.
       this.put(p, 'dark', new THREE.CylinderGeometry(3.5, 3.1, 0.4, 24), 0, base + 24.2, 0);
       for (let i = 0; i < 24; i += 1) {
@@ -599,8 +605,13 @@ export class Landmarks {
       const rail = new THREE.TorusGeometry(3.35, 0.05, 5, 36);
       rail.rotateX(Math.PI / 2);
       this.put(p, 'iron', rail, 0, base + 25.5, 0);
-      // Lantern room: glazing between iron mullions, a copper dome and vane.
-      this.put(p, 'glass', new THREE.CylinderGeometry(1.9, 1.9, 2.6, 16), 0, base + 25.7, 0);
+      // Lantern room: a low parapet, glazing you see through between iron
+      // mullions to the lens at its heart, a copper dome and vane.
+      this.put(p, 'dark', new THREE.CylinderGeometry(1.95, 1.95, 0.7, 16), 0, base + 24.75, 0);
+      this.put(p, 'iron', new THREE.CylinderGeometry(1.96, 1.96, 0.1, 16), 0, base + 26.95, 0);
+      this.put(p, 'dark', new THREE.CylinderGeometry(0.35, 0.5, 0.9, 10), 0, base + 25.5, 0);
+      this.put(p, 'glass', new THREE.CylinderGeometry(0.62, 0.62, 1.1, 16), 0, base + 26.2, 0);
+      this.put(p, 'lamp', new THREE.SphereGeometry(0.28, 12, 8), 0, base + 26.2, 0);
       for (let i = 0; i < 8; i += 1) {
         const a = (i / 8) * Math.PI * 2;
         this.put(p, 'iron', new THREE.BoxGeometry(0.12, 2.7, 0.12), Math.cos(a) * 1.93, base + 25.75, Math.sin(a) * 1.93);
