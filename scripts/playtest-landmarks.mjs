@@ -93,8 +93,15 @@ if (want('lighthouse')) {
 }
 if (want('galleon')) {
   const g = marks.galleon;
-  // Across the hull amidships, from the port side (the breach is to starboard).
-  const port = { x: -Math.sin(0.4), z: -Math.cos(0.4) };
+  // Across the hull amidships, from the port side: she lies along the
+  // beach listing to seaward, so port is uphill (the breach is to starboard).
+  const port = await page.evaluate(([x, z]) => {
+    const w = window.game.world;
+    const gx = w.groundAt(x + 3, z) - w.groundAt(x - 3, z);
+    const gz = w.groundAt(x, z + 3) - w.groundAt(x, z - 3);
+    const l = Math.hypot(gx, gz) || 1;
+    return { x: gx / l, z: gz / l };
+  }, [g.x, g.z]);
   const p = await walk(g.x + port.x * 10, g.z + port.z * 10, g.x, g.z, 5);
   check('the galleon hull stops you', Math.hypot(p.x - g.x, p.z - g.z) > 2.5, { d: r2(Math.hypot(p.x - g.x, p.z - g.z)) });
 }

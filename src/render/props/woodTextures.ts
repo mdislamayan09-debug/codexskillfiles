@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { createRng } from '../../core/rng';
 
 // Procedural timber for everything the survivor builds: sawn planks with
-// grain, knots, seams and gaps, and overlapping roof shingles. Albedo and a
+// grain, knots, seams and gaps, and overlapping roof shingles; and the old
+// roofs of the island's places, split slate and reed thatch. Albedo and a
 // normal map derived from the same height field, generated once at boot.
 
 export interface WoodTextures {
   planks: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
   shingles: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
+  slate: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
+  thatch: { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture };
 }
 
 function valueNoise(rng: () => number, size: number): (x: number, y: number) => number {
@@ -173,8 +176,104 @@ function shingles(size: number, seed: number): { map: THREE.CanvasTexture; norma
   return toTextures(size, albedo, height, 6);
 }
 
+/** Split slates in staggered courses: blue-grey, each its own tone, chipped edges and lichen. */
+function slates(size: number, seed: number): { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture } {
+  const rng = createRng(seed);
+  const noise = valueNoise(rng, 64);
+  const rows = 10;
+  const rh = size / rows;
+  const albedo = new Uint8ClampedArray(size * size * 4);
+  const height = new Float32Array(size * size);
+  const rowCuts = Array.from({ length: rows }, (_, r) => {
+    const cuts: number[] = [];
+    let x = (r % 2) * 26 + rng() * 8;
+    while (x < size) {
+      cuts.push(x);
+      x += 44 + rng() * 26;
+    }
+    return cuts;
+  });
+  for (let y = 0; y < size; y += 1) {
+    const r = Math.floor(y / rh);
+    const v = (y % rh) / rh;
+    const cuts = rowCuts[r];
+    for (let x = 0; x < size; x += 1) {
+      let k = 0;
+      while (k + 1 < cuts.length && cuts[k + 1] <= x) k += 1;
+      const id = ((Math.sin(k * 12.9898 + r * 78.233) * 43758.5453) % 1 + 1) % 1;
+      const dCut = Math.min(Math.abs(x - cuts[k]), k + 1 < cuts.length ? Math.abs(cuts[k + 1] - x) : 99);
+      // Chipped lower edges: the exposed edge wanders.
+      const edge = 0.93 - noise(x * 0.35 + r * 17, 3) * 0.08;
+      const cleave = noise(x * 0.08 + id * 40, y * 0.5) * 0.5 + noise(x * 0.5, y * 0.5) * 0.25;
+      let h = 0.35 + v * 0.45 + cleave * 0.12;
+      let shade = (0.78 + id * 0.3) * (0.6 + 0.4 * Math.min(1, v * 4)) * (0.9 + 0.2 * cleave);
+      if (dCut < 1.6) {
+        shade *= 0.35;
+        h -= 0.25;
+      }
+      if (v > edge) {
+        shade *= 0.4;
+        h = 0.2;
+      }
+      const lichen = Math.max(0, noise(x * 0.03 + 5, y * 0.03 + 2) - 0.6) * 2 * (0.5 + 0.5 * noise(x * 0.4, y * 0.4));
+      const i = (y * size + x) * 4;
+      // Blue-grey slate, a few rust-brown ones, pale-green lichen spots.
+      const rust = id > 0.85 ? 1 : 0;
+      albedo[i] = Math.min(255, 255 * shade * (0.26 + rust * 0.08) * (1 - lichen) + 255 * lichen * 0.42);
+      albedo[i + 1] = Math.min(255, 255 * shade * (0.28 + rust * 0.02) * (1 - lichen) + 255 * lichen * 0.44);
+      albedo[i + 2] = Math.min(255, 255 * shade * (0.32 - rust * 0.06) * (1 - lichen) + 255 * lichen * 0.34);
+      albedo[i + 3] = 255;
+      height[y * size + x] = h;
+    }
+  }
+  return toTextures(size, albedo, height, 5);
+}
+
+/** Reed thatch in courses: fibres running down the slope, bundle butts at each course's foot. */
+function thatch(size: number, seed: number): { map: THREE.CanvasTexture; normalMap: THREE.CanvasTexture } {
+  const rng = createRng(seed);
+  const noise = valueNoise(rng, 128);
+  const rows = 6;
+  const rh = size / rows;
+  const albedo = new Uint8ClampedArray(size * size * 4);
+  const height = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const r = Math.floor(y / rh);
+    const v = (y % rh) / rh;
+    for (let x = 0; x < size; x += 1) {
+      // Each course's foot is ragged: reeds end at different lengths.
+      const foot = 0.86 + noise(x * 0.6 + r * 31, r * 7) * 0.12;
+      const bundle = Math.floor((x + r * 13 + noise(x * 0.02, y * 0.02) * 20) / 22);
+      const fibre = noise(x * 1.3 + bundle * 5.1, y * 0.035 + r * 3);
+      const strand = 0.5 + 0.5 * Math.sin((x + noise(x * 0.05, y * 0.05) * 30) * 1.9);
+      const inBundle = ((x + r * 13) % 22) / 22;
+      const gap = Math.min(inBundle, 1 - inBundle) < 0.05 ? 1 : 0;
+      let h = 0.3 + v * 0.35 + fibre * 0.2 + strand * 0.12 - gap * 0.15;
+      let shade = (0.62 + fibre * 0.35 + strand * 0.12) * (0.55 + 0.45 * Math.min(1, v * 2.5)) * (1 - gap * 0.35);
+      if (v > foot) {
+        // Cut butts, darker and in shadow under the course above.
+        shade *= 0.45 + noise(x * 2, y * 2) * 0.2;
+        h = 0.9 - (v - foot) * 2;
+      }
+      // Weather: grey on top, green-black rot and moss in patches.
+      const grey = 0.4 + 0.4 * noise(x * 0.01, y * 0.01);
+      const moss = Math.max(0, noise(x * 0.012 + 7, y * 0.012 + 3) - 0.6) * 2.2;
+      const i = (y * size + x) * 4;
+      const cr = 0.5 * (1 - grey) + 0.38 * grey;
+      const cg = 0.41 * (1 - grey) + 0.35 * grey;
+      const cb = 0.24 * (1 - grey) + 0.28 * grey;
+      albedo[i] = Math.min(255, 255 * shade * (cr * (1 - moss) + 0.16 * moss));
+      albedo[i + 1] = Math.min(255, 255 * shade * (cg * (1 - moss) + 0.2 * moss));
+      albedo[i + 2] = Math.min(255, 255 * shade * (cb * (1 - moss) + 0.1 * moss));
+      albedo[i + 3] = 255;
+      height[y * size + x] = h;
+    }
+  }
+  return toTextures(size, albedo, height, 4);
+}
+
 export function createWoodTextures(size = 512): WoodTextures {
-  return { planks: planks(size, 0x91a7e), shingles: shingles(size, 0x5a1e) };
+  return { planks: planks(size, 0x91a7e), shingles: shingles(size, 0x5a1e), slate: slates(size, 0x51a7), thatch: thatch(size, 0x7ea) };
 }
 
 let shared: WoodTextures | null = null;

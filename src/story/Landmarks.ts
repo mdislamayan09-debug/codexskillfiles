@@ -70,10 +70,9 @@ export class Landmarks {
   ) {
     const wood = getWoodTextures();
     const plank = new THREE.MeshStandardMaterial({ map: wood.planks.map, normalMap: wood.planks.normalMap, roughness: 0.86 });
-    // Roofs: the shingle texture, weathered grey like old slate.
-    const slate = new THREE.MeshStandardMaterial({ map: wood.shingles.map, normalMap: wood.shingles.normalMap, color: 0x8a9098, roughness: 0.78 });
-    // Reed thatch: the shingle texture, straw-coloured and matte.
-    const thatch = new THREE.MeshStandardMaterial({ map: wood.shingles.map, normalMap: wood.shingles.normalMap, color: 0xc8b078, roughness: 0.97 });
+    // Roofs: split slate, and reed thatch on the fen huts.
+    const slate = new THREE.MeshStandardMaterial({ map: wood.slate.map, normalMap: wood.slate.normalMap, roughness: 0.66 });
+    const thatch = new THREE.MeshStandardMaterial({ map: wood.thatch.map, normalMap: wood.thatch.normalMap, roughness: 0.97 });
     this.m = {
       stone: mat(0xe0d8c8, 0.9),
       dark: mat(0x8e887e, 0.92),
@@ -533,21 +532,49 @@ export class Landmarks {
     galleon(this: Landmarks, p) {
       // A tall-sided ship aground and listing on the sand, planks sprung
       // from her ribs amidships, masts snapped, the stern lamp still lit.
-      const yaw = 0.4;
-      const roll = 0.3;
+      // She lies along the beach, not across it: her length follows the
+      // sand's contour, she lists toward the sea, and her keel is bedded a
+      // little below the sand she actually lies on.
+      const gx = this.g(p.cx + 3, p.cz) - this.g(p.cx - 3, p.cz);
+      const gz = this.g(p.cx, p.cz + 3) - this.g(p.cx, p.cz - 3);
+      const flat = Math.hypot(gx, gz) < 0.05;
+      const yaw = (flat ? 0.4 : Math.atan2(-gx, -gz)) + 0.22;
+      // Local +z after the yaw; list its way if that side is downhill.
+      const roll = (Math.sin(yaw) * -gx + Math.cos(yaw) * -gz >= 0 ? 1 : -1) * 0.28;
+      let sum = 0;
+      let n = 0;
+      for (let s = -14; s <= 14; s += 3.5) {
+        for (const t of [-2.5, 0, 2.5]) {
+          sum += this.g(p.cx + Math.cos(yaw) * s + Math.sin(yaw) * t, p.cz - Math.sin(yaw) * s + Math.cos(yaw) * t);
+          n += 1;
+        }
+      }
+      // Aground, not sunk: at most a third of her hull under the sea.
+      const keel = Math.max(sum / n - 1.6, this.world.waterLevelAt(p.cx, p.cz) - 1.9);
       const place = (m: Mat, g: THREE.BufferGeometry, lift = 0) => {
         g.rotateX(roll);
         g.rotateY(yaw);
-        this.put(p, m, g, 0, p.cy - 1.4 + lift, 0);
+        this.put(p, m, g, 0, keel + lift, 0);
       };
       const ship = hull(30, 8.4, 5.6, [0.38, 0.56]);
       place('plank', ship.shell);
       place('wood', ship.ribs);
       place('plank', ship.deck);
-      // Sterncastle with its windows.
-      const castle = new THREE.BoxGeometry(6, 3.4, 7);
-      castle.translate(-12, 7.6, 0);
+      // Sterncastle with its windows: its sides lean in above the hull
+      // (tumblehome) and a rail caps it.
+      const profile = new THREE.Shape();
+      profile.moveTo(-3.5, 0);
+      profile.lineTo(3.5, 0);
+      profile.lineTo(2.85, 3.4);
+      profile.lineTo(-2.85, 3.4);
+      profile.closePath();
+      const castle = new THREE.ExtrudeGeometry(profile, { depth: 6, bevelEnabled: false });
+      castle.rotateY(-Math.PI / 2);
+      castle.translate(-9, 5.9, 0);
       place('plank', castle);
+      const cap = new THREE.BoxGeometry(6.2, 0.18, 5.9);
+      cap.translate(-12, 9.35, 0);
+      place('wood', cap);
       for (let k = -1; k <= 1; k += 1) {
         const win = new THREE.BoxGeometry(0.1, 1, 1.1);
         win.translate(-15.05, 7.8, k * 1.8);
@@ -836,36 +863,57 @@ export class Landmarks {
     stilt_village(this: Landmarks, p) {
       // Plank huts on stilts over the fen, with doors, shuttered windows and
       // reed-thatched roofs; boardwalks between them and a ladder down.
-      const houses: [number, number, number][] = [
-        [0, 0, 0],
-        [9, 4, 0.5],
-        [-8, 6, -0.4],
-        [4, -9, 1.2],
-        [-6, -7, 2],
+      // Each hut built by a different hand: its own size, roof pitch and
+      // door, the same wall height so the eaves clear a head.
+      const houses: [number, number, number, number, number, number][] = [
+        [0, 0, 0, 3.6, 1.5, 0.5],
+        [9, 4, 0.5, 3.2, 1.25, -0.6],
+        [-8, 6, -0.4, 4.0, 1.75, 0.2],
+        [4, -9, 1.2, 3.35, 1.35, 0.7],
+        [-6, -7, 2, 3.8, 1.6, -0.3],
       ];
       const deck = this.world.waterLevelAt(p.cx, p.cz) + 1.6;
-      const W = 3.6;
       // Tall enough that the eaves clear a head on the ledge below them.
       const Hh = 2.7;
-      for (const [x, z, yaw] of houses) {
+      for (const [x, z, yaw, W, rise, door] of houses) {
         const rot = (dx: number, dz: number): [number, number] => [x + dx * Math.cos(yaw) - dz * Math.sin(yaw), z + dx * Math.sin(yaw) + dz * Math.cos(yaw)];
-        for (const [a, b] of [
-          [-1.8, -1.8],
-          [1.8, -1.8],
-          [-1.8, 1.8],
-          [1.8, 1.8],
-        ]) {
+        const c = W / 2;
+        const piles: [number, number][] = [
+          [-c, -c],
+          [c, -c],
+          [-c, c],
+          [c, c],
+        ];
+        for (const [a, b] of piles) {
           const [px, pz] = rot(a, b);
           const base = this.g(p.cx + px, p.cz + pz);
           const h = deck + 0.3 - base;
           if (h > 0) this.put(p, 'wood', new THREE.CylinderGeometry(0.14, 0.17, h + 0.6, 6), px, base - 0.3 + (h + 0.6) / 2, pz);
         }
+        // Diagonal braces between the piles on two sides, above the water.
+        const water = this.world.waterLevelAt(p.cx + x, p.cz + z);
+        const braceLow = water + 0.25;
+        const braceHigh = deck + 0.15;
+        if (braceHigh - braceLow > 0.5) {
+          for (const side of [-1, 1]) {
+            const [bx, bz] = rot(0, side * c);
+            const len = Math.hypot(W, braceHigh - braceLow);
+            const brace = new THREE.BoxGeometry(0.1, len, 0.08);
+            brace.rotateZ(Math.atan2(W, braceHigh - braceLow) * side);
+            brace.rotateY(yaw);
+            this.put(p, 'wood', brace, bx, (braceLow + braceHigh) / 2, bz);
+          }
+        }
         // The deck runs a metre out past the walls: a ledge to walk round
-        // from the door to the boardwalks.
-        this.put(p, 'plank', new THREE.BoxGeometry(5.6, 0.2, 5.6), x, deck + 0.3, z, 0, yaw, 0);
+        // from the door to the boardwalks, on joists.
+        this.put(p, 'plank', new THREE.BoxGeometry(W + 2, 0.2, W + 2), x, deck + 0.3, z, 0, yaw, 0);
+        for (const j of [-1, 0, 1]) {
+          const [jx, jz] = rot(j * c * 0.9, 0);
+          this.put(p, 'wood', new THREE.BoxGeometry(0.14, 0.2, W + 1.8), jx, deck + 0.1, jz, 0, yaw, 0);
+        }
         // Walls: a door at the front, a window each side.
         const walls: [number, number, number, { x: number; y: number; w: number; h: number }[]][] = [
-          [0, W / 2, 0, [{ x: 0.5, y: 0.15, w: 0.9, h: 1.8 }]],
+          [0, W / 2, 0, [{ x: door, y: 0.15, w: 0.9, h: 1.8 }]],
           [0, -W / 2, 0, [{ x: -0.4, y: 1, w: 0.8, h: 0.7 }]],
           [W / 2, 0, Math.PI / 2, [{ x: 0, y: 1, w: 0.8, h: 0.7 }]],
           [-W / 2, 0, Math.PI / 2, []],
@@ -876,14 +924,14 @@ export class Landmarks {
           const [wx, wz] = rot(dx, dz);
           this.put(p, 'plank', g, wx, deck + 0.4, wz);
         }
-        const ends = gableEnds(W, W, 1.5, 0.12);
+        const ends = gableEnds(W, W, rise, 0.12);
         ends.rotateY(yaw);
         this.put(p, 'plank', ends, x, deck + 0.4 + Hh, z);
-        const roof = gableRoof(W, W, 1.5, 0.55, 0.22, 0.9);
+        const roof = gableRoof(W, W, rise, 0.55, 0.22, 0.9);
         roof.rotateY(yaw);
         this.put(p, 'thatch', roof, x, deck + 0.4 + Hh, z);
         // A lamp by the door.
-        const [lx, lz] = rot(1.4, W / 2 + 0.15);
+        const [lx, lz] = rot(door > 0 ? door - 0.9 : door + 0.9, W / 2 + 0.15);
         this.put(p, 'glass', new THREE.BoxGeometry(0.2, 0.28, 0.2), lx, deck + 2.2, lz);
       }
       for (let i = 0; i < houses.length - 1; i += 1) {

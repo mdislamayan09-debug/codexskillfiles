@@ -218,6 +218,9 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
   so each half takes the light differently. Pine and spruce bark is
   irregular plates split by furrows that wander, pinch shut and flake.
 - **Props:** procedural rocks and gatherables, streamed in cells.
+- **Roofs:** split slate (blue-grey courses, chipped edges, lichen) and
+  reed thatch (fibres down the slope, ragged course butts, moss) baked in
+  `woodTextures.ts` beside the planks and shingles.
 - **Stonework:** dressed masonry and natural rock generated as canvas
   textures and applied in world space (triplanar), so long lintels and
   tall piers never stretch.
