@@ -203,7 +203,11 @@ Status by milestone (the live list is `docs/PROGRESS.md`):
   of pebbles. A **canopy mask** (`VegetationSystem.paintCanopy`, the
   forest channel of mask B) is painted at boot from the same stand
   density that places the trees: the ground under a closed canopy turns
-  to needle and leaf litter and moss, and the grass thins there.
+  to needle and leaf litter and moss, and the grass thins there. Rock
+  faces get metre-scale relief in the shading (`rockRelief`: beds of
+  uneven thickness stepping out as ledges, gullies down the fall line,
+  water stains), fading out by 450 m; basalt is continuous weathered
+  rock with only some joints open.
 - **Vegetation:** procedurally grown trees per biome (bark and leaf
   textures baked on the GPU), hierarchical wind, baked multi-view
   impostors for distant trees, dense instanced grass with translucency.

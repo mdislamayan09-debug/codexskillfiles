@@ -327,17 +327,26 @@ void layerGranite(vec2 uv, out vec3 col, out float h) {
 }
 
 void layerBasalt(vec2 uv, out vec3 col, out float h) {
-  vec4 v = pvoronoi(uv * vec2(6.0, 6.0), vec2(6.0), 0.35);
-  float joint = 1.0 - smoothstep(0.0, 0.07, v.y - v.x);
+  // Dark lava rock: columns and blocks with bevelled joints (only some of
+  // them open), rough vesicular faces, rust and pale salt weathering.
+  vec2 w = vec2(pfbm(uv * 3.0, vec2(3.0), 3), pfbm(uv * 3.0 + 5.0, vec2(3.0), 3)) * 0.06;
+  vec4 v = pvoronoi((uv + w) * 5.0, vec2(5.0), 0.55);
+  float edge = v.y - v.x;
+  float open = smoothstep(0.55, 0.78, pnoise((uv + w) * 9.0 + v.z * 4.0, vec2(9.0)) * 0.5 + 0.5);
+  float bevel = mix(1.0, smoothstep(0.0, 0.18, edge), 0.3 + 0.7 * open);
+  float joint = (1.0 - smoothstep(0.0, 0.015 + 0.03 * open, edge)) * open;
   vec4 ves = pvoronoi(uv * 55.0, vec2(55.0), 1.0);
-  float pit = smoothstep(0.22, 0.1, ves.x) * step(0.55, ves.z);
-  float detail = pfbm(uv * 20.0, vec2(20.0), 4);
-  h = 0.55 + 0.15 * v.z + 0.1 * detail - 0.4 * joint - 0.15 * pit;
-  col = mix(vec3(0.035, 0.035, 0.038), vec3(0.1, 0.1, 0.105), 0.5 + 0.5 * detail);
-  col *= 0.85 + 0.3 * v.z;
-  float rust = smoothstep(0.4, 0.7, pfbm(uv * 5.0 + 2.0, vec2(5.0), 4));
-  col = mix(col, vec3(0.16, 0.08, 0.04), rust * 0.35);
-  col *= 1.0 - joint * 0.6 - pit * 0.4;
+  float pit = smoothstep(0.2, 0.1, ves.x) * step(0.7, ves.z);
+  float detail = pfbm(uv * 20.0, vec2(20.0), 5);
+  float rough = pridged(uv * 12.0, vec2(12.0), 4);
+  h = 0.45 + 0.12 * v.z * bevel + 0.14 * bevel + 0.1 * detail + 0.08 * rough - 0.3 * joint - 0.1 * pit;
+  col = mix(vec3(0.045, 0.043, 0.045), vec3(0.12, 0.115, 0.115), 0.5 + 0.5 * detail);
+  col *= 0.8 + 0.3 * v.z + 0.15 * rough;
+  float rust = smoothstep(0.45, 0.75, pfbm(uv * 4.0 + 2.0, vec2(4.0), 4));
+  col = mix(col, vec3(0.15, 0.08, 0.045), rust * 0.3);
+  float salt = smoothstep(0.6, 0.8, pfbm(uv * 6.0 + 11.0, vec2(6.0), 4)) * (1.0 - bevel * 0.5);
+  col = mix(col, vec3(0.22, 0.22, 0.21), salt * 0.25);
+  col *= 1.0 - joint * 0.45 - pit * 0.3 - (1.0 - bevel) * 0.12;
 }
 
 void layerSand(vec2 uv, out vec3 col, out float h) {

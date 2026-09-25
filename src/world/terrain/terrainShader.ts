@@ -84,6 +84,22 @@ float tNoise(vec2 p) {
 }
 float tFbm(vec2 p) { return tNoise(p) * 0.5 + tNoise(p * 2.03 + 7.1) * 0.3 + tNoise(p * 4.1 - 3.7) * 0.2; }
 
+// Broken rock at the scale of metres: strata that step out as ledges and
+// gullies worn down the fall line. The heightfield is a metre apart, too
+// coarse for either, so they live in the shading.
+float rockRelief(vec3 p, vec2 across) {
+  // Beds of uneven thickness: the height is bent by noise before banding,
+  // and some beds are weak and barely step out.
+  float warp = tFbm(p.xz * 0.02) * 2.2 + tNoise(p.xz * 0.09) * 0.6 + tNoise(vec2(p.y * 0.07, 3.1)) * 1.5;
+  float bed = p.y * 0.2 + warp;
+  float s = fract(bed);
+  float hard = smoothstep(0.35, 0.75, tNoise(vec2(floor(bed) * 1.7, p.x * 0.01 + p.z * 0.013)));
+  float strata = (smoothstep(0.0, 0.8, s) * 0.9 + smoothstep(0.8, 1.0, s) * -0.9) * hard;
+  float g = tNoise(vec2(dot(p.xz, across) * 0.22, p.y * 0.035)) * 0.7 + tNoise(vec2(dot(p.xz, across) * 0.6, p.y * 0.08)) * 0.3;
+  float gully = 1.0 - abs(g - 0.5) * 2.0;
+  return strata * 0.55 - gully * gully * 0.9;
+}
+
 void biomeRules(int b, float wb, float slope, float nA, float nB, float height, inout float w[${LAYER_COUNT}]) {
   if (wb < 0.004) return;
   float rock = smoothstep(0.24, 0.38, slope + (nA - 0.5) * 0.1);
@@ -380,6 +396,24 @@ export const TERRAIN_SURFACE_FRAGMENT = /* glsl */ `
   // Macro variation breaks up large uniform areas.
   float macro = tFbm(tPos.xz * 0.0065) * 0.65 + tFbm(tPos.xz * 0.028 + 3.0) * 0.35;
   surfAlbedo *= 0.8 + 0.4 * macro;
+
+  // Rock faces: ledges and gullies bent into the normal, water stains and
+  // dark seams in the albedo.
+  float rockW = clamp(lw[L_GRANITE] + lw[L_BASALT] + lw[L_LIME], 0.0, 1.0) * smoothstep(0.2, 0.38, slope) * (1.0 - lw[L_SNOW]);
+  if (rockW > 0.01) {
+    vec2 downhill = normalize(tN.xz + vec2(1e-4, 0.0));
+    vec2 across = vec2(-downhill.y, downhill.x);
+    float r0 = rockRelief(tPos, across);
+    float e = 0.35;
+    vec3 grad = vec3(rockRelief(tPos + vec3(e, 0.0, 0.0), across) - r0, rockRelief(tPos + vec3(0.0, e, 0.0), across) - r0, rockRelief(tPos + vec3(0.0, 0.0, e), across) - r0) / e;
+    grad -= surfNormal * dot(grad, surfNormal);
+    float reliefFade = rockW * (1.0 - smoothstep(120.0, 450.0, camDist));
+    surfNormal = normalize(surfNormal - grad * 0.55 * reliefFade);
+    float stain = smoothstep(0.55, 0.85, tNoise(vec2(dot(tPos.xz, across) * 0.5, tPos.y * 0.012)));
+    float seam = smoothstep(-0.2, -0.6, r0);
+    surfAlbedo *= 1.0 - rockW * stain * 0.32 - reliefFade * seam * 0.25;
+    surfAlbedo *= 1.0 + reliefFade * smoothstep(0.3, 0.5, r0) * 0.12;
+  }
   surfAlbedo = mix(surfAlbedo, surfAlbedo * vec3(1.06, 1.0, 0.9), smoothstep(0.55, 0.8, tNoise(tPos.xz * 0.004 + 5.0)) * 0.6);
 
   // Wetness from rain and water margins; puddles gather in hollows.
