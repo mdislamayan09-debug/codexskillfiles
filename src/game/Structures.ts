@@ -167,6 +167,8 @@ export class Structures {
     for (let i = 0; i < lightCount; i += 1) {
       const light = new THREE.PointLight(0xff9a50, 0, 22, 2);
       light.castShadow = false;
+      // In both passes, so water and the held tool catch the firelight too.
+      light.layers.enableAll();
       this.lights.push(light);
       this.group.add(light);
     }

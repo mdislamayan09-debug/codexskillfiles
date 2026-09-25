@@ -12,9 +12,12 @@ export const QUALITY_LABELS: Record<QualityName, string> = {
 
 export interface QualitySettings {
   name: QualityName;
-  /** Internal resolution relative to the canvas. */
+  /** Scene resolution relative to the canvas (at most `maxDpr` pixels per CSS pixel). */
   renderScale: number;
+  /** Dynamic resolution never goes below this share of the canvas. */
+  minRenderScale: number;
   maxDpr: number;
+  /** Multisampling. Off in every preset: temporal AA does the job better and cheaper. */
   msaa: number;
   shadowMapSize: number;
   shadowCascades: number;
@@ -43,12 +46,18 @@ export interface QualitySettings {
   /** Wave cascade texture size and spectrum samples per cascade. */
   waveResolution: number;
   wavesPerCascade: number;
+  /**
+   * Geometry budget, 1 = the preset as designed. Integrated graphics get less
+   * (fitToGpu): the same effects, fewer blades, trees and shadow casters.
+   */
+  budget: number;
 }
 
 export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
   low: {
     name: 'low',
-    renderScale: 0.7,
+    renderScale: 0.75,
+    minRenderScale: 0.5,
     maxDpr: 1,
     msaa: 0,
     shadowMapSize: 1024,
@@ -71,10 +80,12 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     waterReflectionSteps: 0,
     waveResolution: 128,
     wavesPerCascade: 32,
+    budget: 1,
   },
   medium: {
     name: 'medium',
     renderScale: 0.85,
+    minRenderScale: 0.5,
     maxDpr: 1.25,
     msaa: 0,
     shadowMapSize: 2048,
@@ -97,12 +108,14 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     waterReflectionSteps: 16,
     waveResolution: 256,
     wavesPerCascade: 40,
+    budget: 1,
   },
   high: {
     name: 'high',
     renderScale: 1,
+    minRenderScale: 0.55,
     maxDpr: 1.5,
-    msaa: 4,
+    msaa: 0,
     shadowMapSize: 2048,
     shadowCascades: 3,
     shadowDistance: 320,
@@ -110,7 +123,7 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     godRays: true,
     bloom: true,
     cloudSteps: 56,
-    cloudDivisor: 4,
+    cloudDivisor: 3,
     terrainGrid: 32,
     terrainDetailDistance: 420,
     grassDensity: 1,
@@ -123,12 +136,14 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     waterReflectionSteps: 24,
     waveResolution: 256,
     wavesPerCascade: 48,
+    budget: 1,
   },
   extra: {
     name: 'extra',
     renderScale: 1,
+    minRenderScale: 0.6,
     maxDpr: 2,
-    msaa: 4,
+    msaa: 0,
     shadowMapSize: 4096,
     shadowCascades: 4,
     shadowDistance: 480,
@@ -136,7 +151,7 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     godRays: true,
     bloom: true,
     cloudSteps: 72,
-    cloudDivisor: 3,
+    cloudDivisor: 2,
     terrainGrid: 32,
     terrainDetailDistance: 520,
     grassDensity: 1.35,
@@ -149,12 +164,14 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     waterReflectionSteps: 32,
     waveResolution: 256,
     wavesPerCascade: 56,
+    budget: 1,
   },
   max: {
     name: 'max',
     renderScale: 1,
+    minRenderScale: 0.6,
     maxDpr: 3,
-    msaa: 4,
+    msaa: 0,
     shadowMapSize: 4096,
     shadowCascades: 4,
     shadowDistance: 650,
@@ -175,6 +192,7 @@ export const QUALITY_PRESETS: Record<QualityName, QualitySettings> = {
     waterReflectionSteps: 40,
     waveResolution: 256,
     wavesPerCascade: 64,
+    budget: 1,
   },
 };
 
@@ -195,4 +213,43 @@ export function suggestQuality(renderer: string): QualityName {
   if (/rtx|radeon rx [67]/.test(r)) return 'extra';
   if (r.includes('intel') && !r.includes('arc')) return 'medium';
   return 'high';
+}
+
+/** Integrated graphics share memory and power with the CPU. */
+export function isIntegratedGpu(renderer: string): boolean {
+  const r = renderer.toLowerCase();
+  if (r.includes('intel')) return !r.includes('arc');
+  return /radeon\(tm\) graphics|radeon graphics|vega \d+ graphics|mali|adreno|powervr/.test(r);
+}
+
+/**
+ * Fits a preset's geometry to the graphics card. On integrated graphics every
+ * effect stays (volumetric clouds, god rays, ambient occlusion, temporal AA)
+ * but the heaviest geometry is cut: grass blades, how far trees keep their
+ * full shape, shadow casters and cascades, cloud march steps and the sea's
+ * mesh. Dynamic resolution then holds the frame rate. `budget` is also read
+ * by the tree and prop streaming.
+ */
+export function fitToGpu(q: QualitySettings, renderer: string, override?: number): QualitySettings {
+  const budget = override ?? (isIntegratedGpu(renderer) ? 0.5 : 1);
+  if (budget >= 1) return q;
+  const b = Math.max(0.2, budget);
+  const heavy = q.name === 'extra' || q.name === 'max';
+  return {
+    ...q,
+    budget: b,
+    grassDensity: q.grassDensity * Math.min(1, b * 1.1),
+    grassRadius: Math.round(q.grassRadius * Math.min(1, 0.4 + b * 0.6)),
+    impostorDistance: Math.round(q.impostorDistance * Math.min(1, b * 1.1)),
+    vegetationDistance: Math.round(q.vegetationDistance * Math.min(1, 0.5 + b * 0.5)),
+    shadowCascades: heavy ? Math.min(q.shadowCascades, 3) : q.shadowCascades,
+    shadowMapSize: Math.min(q.shadowMapSize, 2048),
+    shadowDistance: Math.round(q.shadowDistance * Math.min(1, 0.4 + b * 0.6)),
+    cloudSteps: q.cloudSteps > 0 ? Math.max(32, Math.round(q.cloudSteps * Math.min(1, b))) : 0,
+    cloudDivisor: Math.max(q.cloudDivisor, 4),
+    terrainDetailDistance: Math.round(q.terrainDetailDistance * Math.min(1, 0.4 + b * 0.6)),
+    waterGrid: Math.round(q.waterGrid * Math.min(1, 0.5 + b * 0.5)),
+    waterReflectionSteps: Math.round(q.waterReflectionSteps * Math.min(1, 0.4 + b * 0.6)),
+    minRenderScale: Math.min(q.minRenderScale, 0.5),
+  };
 }

@@ -4,6 +4,12 @@ import { createFullscreenMaterial, createHdrTarget, FullscreenPass } from '../Fu
 import { CLOUD_MARCH_FRAG, DETAIL_NOISE_FRAG, SHAPE_NOISE_FRAG, WEATHER_MAP_FRAG } from './cloudGlsl';
 
 const FS_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const BAYER: [number, number][] = [
+  [0, 0],
+  [1, 1],
+  [1, 0],
+  [0, 1],
+];
 
 export interface CloudUniforms {
   uCloudWeather: { value: THREE.Texture | null };
@@ -36,9 +42,10 @@ export interface CloudParams {
 }
 
 /**
- * Raymarched cloud layer rendered at 1/16 of the scene resolution with a
- * per-frame sub-pixel jitter and temporal reprojection. Also owns the weather
- * map uniforms that ground materials use for moving cloud shadows.
+ * Raymarched cloud layer rendered at a fraction of the scene resolution with
+ * a per-frame sub-pixel jitter, a quarter of its pixels marched each frame,
+ * and temporal reprojection. Also owns the weather map uniforms that ground
+ * materials use for moving cloud shadows.
  */
 export class VolumetricClouds {
   readonly shape: THREE.WebGL3DRenderTarget;
@@ -58,6 +65,8 @@ export class VolumetricClouds {
   private height = 1;
   private readonly offset = new THREE.Vector2(3100, -1700);
   steps = 48;
+  /** March a quarter of the pixels each frame (the rest reproject). */
+  interleave = true;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -117,6 +126,8 @@ export class VolumetricClouds {
           uHistoryWeight: { value: 0 },
           uDensityScale: { value: 1 },
           uWind: { value: new THREE.Vector2(1, 0) },
+          uInterleave: { value: 1 },
+          uPhase: { value: new THREE.Vector2() },
         },
       }),
     );
@@ -205,7 +216,12 @@ export class VolumetricClouds {
     (m.uJitter.value as THREE.Vector2).set(jx / this.width, jy / this.height);
     m.uSteps.value = this.steps;
     m.uWind.value.set(params.windX, params.windZ);
-    m.uHistoryWeight.value = this.hasHistory ? 0.88 : 0;
+    // One pixel in each 2 x 2 block is marched per frame, in a Bayer order,
+    // so a fresh sample reaches every pixel every fourth frame.
+    const phase = BAYER[this.frame % 4];
+    m.uInterleave.value = this.interleave ? 1 : 0;
+    (m.uPhase.value as THREE.Vector2).set(phase[0], phase[1]);
+    m.uHistoryWeight.value = this.hasHistory ? (this.interleave ? 0.8 : 0.88) : 0;
     const next = 1 - this.current;
     m.uHistory.value = this.targets[this.current].texture;
     this.march.render(renderer, this.targets[next]);

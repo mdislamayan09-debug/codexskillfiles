@@ -166,11 +166,14 @@ void flowPhases(vec2 flow, out vec2 offA, out vec2 offB, out float wA) {
   wA = 1.0 - abs(1.0 - 2.0 * t0);
 }
 
-vec4 waterReflect(vec3 posV, vec3 nV) {
+vec4 waterReflect(vec3 posV, vec3 nV, float surfY) {
   vec3 dir = reflect(normalize(posV), nV);
   vec4 result = vec4(0.0);
+  // A ray reflected downward off a wave's back would only meet the water
+  // again; marching it finds the sea bed through the surface instead.
+  float dirUp = (vec4(dir, 0.0) * viewMatrix).y;
 #if WATER_SSR_STEPS > 0
-  if (dir.z < 0.35) {
+  if (dir.z < 0.35 && dirUp > 0.0) {
     float stepLen = 0.4 + (-posV.z) * 0.012;
     vec3 p = posV;
     vec3 prev = p;
@@ -198,7 +201,8 @@ vec4 waterReflect(vec3 posV, vec3 nV) {
         vec4 bc = projectionMatrix * vec4(b, 1.0);
         vec2 buv = bc.xy / bc.w * 0.5 + 0.5;
         float bz = -waterDepthToViewZ(texture2D(uSceneDepth, buv).r, uCamNear, uCamFar);
-        if (-b.z - bz < max(2.0, stepLen * 2.0)) {
+        float hitY = cameraPosition.y + (vec4(b, 0.0) * viewMatrix).y;
+        if (-b.z - bz < max(2.0, stepLen * 2.0) && hitY > surfY - 0.25) {
           vec2 e = smoothstep(vec2(0.0), vec2(0.07), buv) * smoothstep(vec2(1.0), vec2(0.93), buv);
           result = vec4(min(texture2D(uSceneColor, buv).rgb, vec3(uSkyClamp)), e.x * e.y);
         }
@@ -347,7 +351,7 @@ wRough = mix(wRough, 0.55, wFoam);
 float wThin = clamp(vCrest * 0.9 + wShore.x * 2.0, 0.0, 1.5);
 float wSssView = pow(clamp(dot(wV, -uWaterLightDir) * 0.5 + 0.5, 0.0, 1.0), 5.0);
 vec3 wSss = uWaterLightColor * wScatter * 26.0 * wThin * wSssView * (1.0 - wFoam) * (1.0 - wTurb * 0.7);
-vec4 wReflection = waterReflect(wViewPos, wNV);
+vec4 wReflection = waterReflect(wViewPos, wNV, vWaterWorld.y);
 if (wBelow) wReflection = vec4(wScatter * 2.0, 1.0);
 `;
 

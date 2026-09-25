@@ -349,6 +349,8 @@ export class GrassSystem {
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.name = `grass-${inner}`;
+    // Before the terrain, so blades hide the ground they stand on from its shader.
+    mesh.renderOrder = -25;
     this.group.add(mesh);
     this.patches.push({ mesh, geometry, side: cells, spacing, inner, outer });
   }

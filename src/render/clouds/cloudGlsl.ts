@@ -149,6 +149,8 @@ uniform float uSteps;
 uniform float uHistoryWeight;
 uniform float uDensityScale;
 uniform vec2 uWind;
+uniform float uInterleave;
+uniform vec2 uPhase;
 varying vec2 vUv;
 ${NOISE3D}
 
@@ -209,6 +211,27 @@ void main() {
   vec3 ro = uCamPos;
   vec4 result = vec4(0.0, 0.0, 0.0, 1.0);
   float entry = 1e9;
+
+  // Interleaved: each frame marches one pixel of every 2 x 2 block; the
+  // other three carry their reprojected history (Schneider's 1/16 update).
+  if (uInterleave > 0.5 && uHistoryWeight > 0.0) {
+    vec2 cell = mod(floor(gl_FragCoord.xy), 2.0);
+    if (any(notEqual(cell, uPhase))) {
+      if (rd.y <= 0.01 || uCloudCoverage <= 0.01) {
+        gl_FragColor = result;
+        return;
+      }
+      float t0 = max((uCloudBottom - ro.y) / rd.y, 0.0);
+      if (t0 < 60000.0) {
+        vec4 prevClip = uPrevViewProj * vec4(ro + rd * min(t0 + 400.0, 60000.0), 1.0);
+        vec2 prevUv = prevClip.xy / prevClip.w * 0.5 + 0.5;
+        if (prevClip.w > 0.0 && all(greaterThan(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
+          gl_FragColor = texture2D(uHistory, prevUv);
+          return;
+        }
+      }
+    }
+  }
 
   if (rd.y > 0.01 && uCloudCoverage > 0.01) {
     float t0 = (uCloudBottom - ro.y) / rd.y;

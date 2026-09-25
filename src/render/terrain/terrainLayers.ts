@@ -309,7 +309,7 @@ void layerGranite(vec2 uv, out vec3 col, out float h) {
   float micro = pfbm(uv * 90.0, vec2(90.0), 2);
   float strata = pnoise(vec2(uv.y * 30.0 + pnoise(uv * 4.0, vec2(4.0)) * 2.0, 0.5), vec2(30.0, 1.0));
   h = 0.5 + 0.16 * large + 0.14 * (block - 0.5) * bevel + 0.08 * bevel + 0.1 * detail + 0.04 * micro - 0.32 * crack - 0.07 * chip;
-  vec3 base = mix(vec3(0.19, 0.185, 0.17), vec3(0.36, 0.345, 0.32), 0.5 + 0.5 * detail);
+  vec3 base = mix(vec3(0.13, 0.125, 0.115), vec3(0.26, 0.25, 0.23), 0.5 + 0.5 * detail);
   // Each block weathers a little differently; large-scale staining ties them together.
   base *= 0.9 + 0.16 * block + 0.1 * large;
   float stain = smoothstep(0.2, 0.7, pfbm(uv * 3.0 + 5.0, vec2(3.0), 4));

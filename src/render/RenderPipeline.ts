@@ -6,6 +6,7 @@ import { GpuTimer } from './GpuTimer';
 import { installAtmosphereChunks } from './materials/MaterialPatches';
 import { COMPOSITE_FRAG, RESTORE_FRAG } from './post/compositeGlsl';
 import { BloomPass, ExposurePass, GodRaysPass, SSAOPass } from './post/PostPasses';
+import { TemporalAA } from './post/TemporalAA';
 import type { QualitySettings } from './Quality';
 import { SkyRenderer, type SkyState } from './sky/SkyRenderer';
 
@@ -27,13 +28,54 @@ function installShadowProxyLayer(renderer: THREE.WebGLRenderer, layer: number): 
   shadowMap.render = (lights: THREE.Light[], scene: THREE.Scene, camera: THREE.Camera) => {
     const mask = camera.layers.mask;
     camera.layers.enable(layer);
+    detailCull.shadowPass = true;
     try {
       original(lights, scene, camera);
     } finally {
       camera.layers.mask = mask;
+      detailCull.shadowPass = false;
     }
   };
   shadowMap.__proxyPatched = true;
+}
+
+/**
+ * Detail culling. Three draws every mesh whose bounds touch the view, however
+ * small it is on screen: a survivor's buttons at 200 m, a Sunwell's
+ * flagstones from across the island, each drawn again into every shadow
+ * cascade. A mesh is skipped when its bounding sphere would cover less than
+ * a pixel or two from the eye, and it stops casting shadows once it is too
+ * small for its shadow to matter. Meshes with `frustumCulled = false` (the
+ * sky, instanced forests, the held tool) are never culled.
+ */
+export const detailCull = {
+  /** On only while the pipeline draws the frame (not for bakes and probes). */
+  enabled: false,
+  shadowPass: false,
+  eye: new THREE.Vector3(),
+  /** Smallest radius/distance drawn: about 1.5 px across at 1080 lines. */
+  minRatio: 0.0011,
+  /** Smallest radius/distance that still casts a shadow. */
+  minShadowRatio: 0.012,
+};
+
+function installDetailCulling(): void {
+  const proto = THREE.Frustum.prototype as THREE.Frustum & { __detailPatched?: boolean };
+  if (proto.__detailPatched) return;
+  proto.__detailPatched = true;
+  const original = proto.intersectsObject;
+  const sphere = new THREE.Sphere();
+  proto.intersectsObject = function intersectsObject(this: THREE.Frustum, object: THREE.Object3D): boolean {
+    if (!original.call(this, object)) return false;
+    if (!detailCull.enabled) return true;
+    const mesh = object as THREE.Mesh;
+    const bounds = mesh.geometry?.boundingSphere;
+    if (!bounds || (object as THREE.InstancedMesh).isInstancedMesh) return true;
+    sphere.copy(bounds).applyMatrix4(object.matrixWorld);
+    const d = sphere.center.distanceTo(detailCull.eye) - sphere.radius;
+    if (d <= 0) return true;
+    return sphere.radius > d * (detailCull.shadowPass ? detailCull.minShadowRatio : detailCull.minRatio);
+  };
 }
 
 export interface GradeSettings {
@@ -63,6 +105,15 @@ export interface PostSettings {
   underwater: number;
   underwaterColor: THREE.Color;
   grade: GradeSettings;
+}
+
+/** How the frame's resolution is chosen (live; from Settings → Graphics). */
+export interface ResolutionSettings {
+  /** Lower the scene's resolution when frames run long, raise it when there is room. */
+  dynamic: boolean;
+  targetFps: number;
+  /** 0..1: how much the final image is sharpened. */
+  sharpness: number;
 }
 
 export function defaultGrade(): GradeSettings {
@@ -104,18 +155,32 @@ export class RenderPipeline {
     grade: defaultGrade(),
   };
 
+  readonly resolution: ResolutionSettings = { dynamic: true, targetFps: 60, sharpness: 0.5 };
+  /** The detail-culling thresholds (shared module state; here for tests and tuning). */
+  readonly detailCull = detailCull;
+
   private sceneTarget!: THREE.WebGLRenderTarget;
   private finalTarget!: THREE.WebGLRenderTarget;
   private readonly bloom = new BloomPass(6);
   private readonly exposure = new ExposurePass();
   private readonly ssao = new SSAOPass();
   private readonly godRays = new GodRaysPass();
+  private readonly taa = new TemporalAA();
   private readonly restoreMesh: THREE.Mesh;
   private readonly composite: FullscreenPass;
   private readonly whiteTexture: THREE.DataTexture;
   private readonly blackTexture: THREE.DataTexture;
+  /** Scene (internal) resolution. */
   private width = 1;
   private height = 1;
+  /** Display resolution: temporal AA, bloom and the composite run here. */
+  private outWidth = 1;
+  private outHeight = 1;
+  /** Dynamic resolution: the share of the preset's resolution in use. */
+  private dynamicScale = 1;
+  private scaleTimer = 0;
+  private scaleFrames = 0;
+  private frameMs = 16.7;
   private time = 0;
   private readonly sunUv = new THREE.Vector2();
   private readonly tmp = new THREE.Vector3();
@@ -136,6 +201,7 @@ export class RenderPipeline {
     this.cloudUniforms.uCloudWeather.value = dummyWeather;
     installAtmosphereChunks({ ...this.atmosphere.uniforms, ...this.cloudUniforms, uLightDir: this.lightDir });
     installShadowProxyLayer(renderer, LAYER_SHADOW_PROXY);
+    installDetailCulling();
     // Any Fog instance turns on USE_FOG; the chunks it enables are replaced by
     // aerial perspective, height fog and cloud-shadow visibility.
     scene.fog = new THREE.Fog(0xffffff, 1, 2);
@@ -210,6 +276,7 @@ export class RenderPipeline {
           uNear: { value: 0.1 },
           uFar: { value: 1000 },
           uResolution: { value: new THREE.Vector2() },
+          uSharpen: { value: 0 },
         },
       }),
     );
@@ -244,54 +311,124 @@ export class RenderPipeline {
     this.sceneTarget?.dispose();
     this.finalTarget?.dispose();
     const samples = this.quality.msaa;
+    const depthTexture = () => {
+      const d = new THREE.DepthTexture(width, height, THREE.FloatType);
+      d.minFilter = THREE.NearestFilter;
+      d.magFilter = THREE.NearestFilter;
+      return d;
+    };
     this.sceneTarget = createHdrTarget(width, height, { depthBuffer: true, samples });
-    this.sceneTarget.depthTexture = new THREE.DepthTexture(width, height, THREE.FloatType);
-    this.sceneTarget.depthTexture.minFilter = THREE.NearestFilter;
-    this.sceneTarget.depthTexture.magFilter = THREE.NearestFilter;
+    this.sceneTarget.depthTexture = depthTexture();
     this.finalTarget = createHdrTarget(width, height, { depthBuffer: true, samples });
-    this.finalTarget.resolveDepthBuffer = false;
+    // Without MSAA the second pass keeps its depth (water, the held tool) for
+    // the temporal resolve; with it, the resolve falls back to the opaque depth.
+    if (samples === 0) this.finalTarget.depthTexture = depthTexture();
+    else this.finalTarget.resolveDepthBuffer = false;
   }
 
   setQuality(quality: QualitySettings): void {
     const msaaChanged = quality.msaa !== this.quality.msaa;
     this.quality = quality;
+    this.dynamicScale = 1;
     if (msaaChanged) this.createTargets(this.width, this.height);
     this.resize(true);
     this.configureClouds();
   }
 
-  /** Matches internal targets to the canvas size (call every frame; cheap when unchanged). */
+  /** Share of the preset's scene resolution in use (dynamic resolution). */
+  get resolutionScale(): number {
+    return this.dynamicScale;
+  }
+
+  /**
+   * Matches the targets to the canvas (call every frame; cheap when
+   * unchanged). The canvas and the final passes run at the display's own
+   * resolution; the scene renders at the preset's share of it, scaled down
+   * further by dynamic resolution, and temporal AA rebuilds the full image.
+   */
   resize(force = false): boolean {
     const canvas = this.renderer.domElement;
     const cssW = Math.max(1, canvas.clientWidth);
     const cssH = Math.max(1, canvas.clientHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, this.quality.maxDpr);
-    const w = Math.max(1, Math.floor(cssW * dpr * this.quality.renderScale));
-    const h = Math.max(1, Math.floor(cssH * dpr * this.quality.renderScale));
-    const canvasW = Math.floor(cssW * dpr);
-    const canvasH = Math.floor(cssH * dpr);
+    const deviceDpr = window.devicePixelRatio || 1;
+    const outDpr = Math.min(deviceDpr, 3);
+    const sceneDpr = Math.min(deviceDpr, this.quality.maxDpr) * this.quality.renderScale * this.dynamicScale;
+    const w = Math.max(1, Math.floor(cssW * sceneDpr));
+    const h = Math.max(1, Math.floor(cssH * sceneDpr));
+    const canvasW = Math.floor(cssW * outDpr);
+    const canvasH = Math.floor(cssH * outDpr);
     if (!force && w === this.width && h === this.height && canvas.width === canvasW && canvas.height === canvasH) return false;
-    this.renderer.setPixelRatio(dpr);
+    const outChanged = canvasW !== this.outWidth || canvasH !== this.outHeight || force;
+    this.renderer.setPixelRatio(outDpr);
     this.renderer.setSize(cssW, cssH, false);
+    this.outWidth = canvas.width;
+    this.outHeight = canvas.height;
     this.width = w;
     this.height = h;
     this.sceneTarget.setSize(w, h);
     this.finalTarget.setSize(w, h);
-    this.bloom.setSize(w, h);
     this.ssao.setSize(w, h);
     this.godRays.setSize(w, h);
-    this.clouds?.setSize(w, h, this.quality.cloudDivisor);
-    this.camera.aspect = cssW / cssH;
-    this.camera.updateProjectionMatrix();
+    // Bloom is a wide blur: it reads the scene-resolution frame.
+    this.bloom.setSize(w, h);
     this.atmosphere.uniforms.uResolution.value.set(w, h);
-    this.exposure.forceReset();
+    if (outChanged) {
+      this.taa.setSize(this.outWidth, this.outHeight);
+      // Clouds follow the preset's resolution, not dynamic resolution: their
+      // history would be thrown away at every step.
+      const base = Math.min(deviceDpr, this.quality.maxDpr) * this.quality.renderScale;
+      this.clouds?.setSize(Math.floor(cssW * base), Math.floor(cssH * base), this.quality.cloudDivisor);
+      this.camera.aspect = cssW / cssH;
+      this.camera.updateProjectionMatrix();
+      this.exposure.forceReset();
+    }
     return true;
+  }
+
+  /**
+   * Dynamic resolution: every half second (after the graphics card's timings
+   * for the new size have come in), compare the frame's cost with the
+   * target's budget and move the scene resolution toward it. Cost scales
+   * roughly with pixel count, so the step is the square root of the ratio.
+   */
+  private updateDynamicResolution(dt: number): void {
+    this.frameMs += (Math.min(dt, 0.25) * 1000 - this.frameMs) * 0.1;
+    this.scaleTimer += dt;
+    this.scaleFrames += 1;
+    const floor = Math.min(1, this.quality.minRenderScale / this.quality.renderScale);
+    if (!this.resolution.dynamic) {
+      if (this.dynamicScale !== 1) {
+        this.dynamicScale = 1;
+        this.resize();
+      }
+      return;
+    }
+    if (this.scaleTimer < 0.5 || this.scaleFrames < 12) return;
+    this.scaleTimer = 0;
+    this.scaleFrames = 0;
+    const budget = 1000 / Math.max(15, this.resolution.targetFps);
+    // Graphics-card time where the browser can measure it; otherwise the
+    // frame interval (which cannot see headroom under vsync).
+    const gpuMs = this.gpu.available ? this.gpu.total : 0;
+    const measured = gpuMs > 0 ? gpuMs : this.frameMs;
+    const headroom = gpuMs > 0 ? 0.85 : 0.97;
+    const ratio = (budget * headroom) / Math.max(measured, 0.1);
+    let next = this.dynamicScale;
+    if (ratio < 0.95) next *= Math.max(0.7, Math.sqrt(ratio));
+    else if (ratio > 1.2) next *= Math.min(1.08, Math.sqrt(ratio));
+    next = Math.min(1, Math.max(floor, Math.round(next * 40) / 40));
+    if (Math.abs(next - this.dynamicScale) < 0.02) return;
+    this.dynamicScale = next;
+    this.resize();
+    // Timings from before the change would steer the next step.
+    this.gpu.reset();
   }
 
   render(dt: number, atmosphereState: AtmosphereState, skyState: SkyState): void {
     const renderer = this.renderer;
     const camera = this.camera;
     this.time += dt;
+    this.updateDynamicResolution(dt);
     this.resize();
     const gpu = this.gpu;
     gpu.poll();
@@ -301,19 +438,30 @@ export class RenderPipeline {
     const sunDir = this.atmosphere.uniforms.uSunDir.value;
     this.lightDir.value.copy(sunDir.y > -0.06 ? sunDir : this.atmosphere.uniforms.uMoonDir.value);
     if (this.clouds && this.quality.cloudSteps > 0) {
+      gpu.begin('clouds');
       this.clouds.update(renderer, camera, dt, this.time, this.cloudParams);
       this.sky.setClouds(this.clouds.texture);
     } else {
       this.cloudUniforms.uCloudCoverage.value = 0;
       this.sky.setClouds(null);
     }
+    gpu.begin('env');
     this.sky.update(camera, skyState);
     const env = this.sky.updateEnvironment(dt);
     if (env) this.scene.environment = env;
 
-    // Pass 1: opaque world + sky into the MSAA HDR target.
+    // Pass 1: opaque world + sky into the HDR target, seen through this
+    // frame's sub-pixel jitter.
     gpu.begin('scene');
     renderer.shadowMap.needsUpdate = true;
+    camera.getWorldPosition(detailCull.eye);
+    // About 1.5 px across at 1080 lines for this field of view (fixed, so
+    // dynamic resolution never makes things pop in and out).
+    detailCull.minRatio = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * (1.5 / 1080);
+    // Thinner budgets drop small shadow casters sooner.
+    detailCull.minShadowRatio = 0.012 / Math.max(0.25, this.quality.budget);
+    this.taa.jitterCamera(camera, this.width, this.height);
+    detailCull.enabled = true;
     camera.layers.set(LAYER_MAIN);
     renderer.setRenderTarget(this.sceneTarget);
     renderer.setClearColor(0x000000, 1);
@@ -343,13 +491,19 @@ export class RenderPipeline {
     renderer.clear(true, true, false);
     renderer.render(this.scene, camera);
     camera.layers.set(LAYER_MAIN);
+    detailCull.enabled = false;
+    this.taa.restoreCamera(camera);
 
-    const color = this.finalTarget.texture;
+    // Temporal resolve up to the display's resolution.
+    gpu.begin('taa');
+    const exposureTexture = this.post.autoExposure ? this.exposure.texture : this.whiteTexture;
+    this.taa.resolve(renderer, this.finalTarget.texture, (this.finalTarget.depthTexture ?? depthA) as THREE.Texture, exposureTexture, this.post.manualExposure);
+    const color = this.taa.texture;
     const cu = this.composite.material.uniforms;
     gpu.begin('post');
 
     if (this.quality.bloom) {
-      this.bloom.render(renderer, color, this.width, this.height);
+      this.bloom.render(renderer, this.finalTarget.texture, this.width, this.height);
       cu.uBloom.value = this.bloom.texture;
     } else {
       cu.uBloom.value = this.blackTexture;
@@ -372,7 +526,7 @@ export class RenderPipeline {
     }
     if (godStrength <= 0.001) cu.uGodRays.value = this.blackTexture;
 
-    if (this.post.autoExposure) this.exposure.render(renderer, color, dt);
+    if (this.post.autoExposure) this.exposure.render(renderer, this.finalTarget.texture, dt);
 
     const p = this.post;
     cu.uColor.value = color;
@@ -403,7 +557,10 @@ export class RenderPipeline {
     (cu.uUnderwaterColor.value as THREE.Color).copy(p.underwaterColor);
     cu.uNear.value = camera.near;
     cu.uFar.value = camera.far;
-    (cu.uResolution.value as THREE.Vector2).set(this.width, this.height);
+    (cu.uResolution.value as THREE.Vector2).set(this.outWidth, this.outHeight);
+    // Sharpen more the further the scene is scaled up to the display.
+    const upscale = this.outWidth / Math.max(1, this.width);
+    cu.uSharpen.value = this.resolution.sharpness * (0.35 + 0.35 * Math.min(1, Math.max(0, upscale - 1)));
     this.composite.render(renderer, null);
     gpu.end();
   }
@@ -412,6 +569,7 @@ export class RenderPipeline {
   resetExposure(): void {
     this.exposure.forceReset();
     this.clouds?.reset();
+    this.taa.reset();
   }
 
   /** Debug probe (stalls the GPU): exposure state. */
@@ -426,6 +584,7 @@ export class RenderPipeline {
     this.exposure.dispose();
     this.ssao.dispose();
     this.godRays.dispose();
+    this.taa.dispose();
     this.composite.dispose();
     this.sky.dispose();
     this.atmosphere.dispose();

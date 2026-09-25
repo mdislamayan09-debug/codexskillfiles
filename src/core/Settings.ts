@@ -11,6 +11,11 @@ export interface GameSettings {
   quality: QualityName | 'auto';
   fov: number;
   renderScale: number;
+  /** Scale the scene's resolution to hold `targetFps`. */
+  dynamicResolution: boolean;
+  targetFps: number;
+  /** 0..1: sharpening of the final image. */
+  sharpness: number;
   brightness: number;
   mouseSensitivity: number;
   padSensitivity: number;
@@ -38,6 +43,9 @@ export const DEFAULT_SETTINGS: GameSettings = {
   quality: 'auto',
   fov: 74,
   renderScale: 1,
+  dynamicResolution: true,
+  targetFps: 60,
+  sharpness: 0.5,
   brightness: 1,
   mouseSensitivity: 1,
   padSensitivity: 1,

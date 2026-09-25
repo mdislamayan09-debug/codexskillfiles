@@ -10,7 +10,7 @@ import { PlayerView } from '../player/PlayerView';
 import { MOON_ILLUMINANCE, SUN_ILLUMINANCE } from '../render/atmosphere/Atmosphere';
 import { createFullscreenMaterial, FullscreenPass } from '../render/FullscreenPass';
 import { Lighting } from '../render/Lighting';
-import { qualityFromName, suggestQuality, type QualityName, type QualitySettings } from '../render/Quality';
+import { fitToGpu, qualityFromName, suggestQuality, type QualityName, type QualitySettings } from '../render/Quality';
 import { RenderPipeline } from '../render/RenderPipeline';
 import { TerrainMaterialBaker } from '../render/terrain/TerrainMaterialBaker';
 import { FoliageTextures } from '../render/vegetation/foliageTextures';
@@ -241,13 +241,21 @@ export class Game {
       powerPreference: 'high-performance',
       preserveDrawingBuffer: params.has('capture'),
     });
+    // Three counts a material's texture units against one shader stage's
+    // limit (16), but units are numbered across both stages (usually 32);
+    // the linker already refuses a stage with too many. Terrain and water
+    // use 17 and 18 between their stages, and the warning three printed for
+    // every draw of them cost about 13 ms a frame.
+    const gl = this.renderer.getContext();
+    (this.renderer.capabilities as { maxTextures: number }).maxTextures = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
     // Captures step time frame by frame, so real-time CSS fades would catch a
     // screenshot half-way through (see base.css).
     if (params.has('capture')) document.documentElement.dataset.capture = '';
     this.gpuName = detectGpu(this.renderer);
     this.detectedQuality = suggestQuality(this.gpuName);
     const chosen = params.get('quality') ?? this.settings.get('quality');
-    this.quality = qualityFromName(chosen === 'auto' ? this.detectedQuality : chosen);
+    const budget = params.get('budget');
+    this.quality = fitToGpu(qualityFromName(chosen === 'auto' ? this.detectedQuality : chosen), this.gpuName, budget ? Number(budget) : undefined);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = true;
@@ -285,7 +293,6 @@ export class Game {
       gridN: this.quality.terrainGrid,
       detailDistance: this.quality.terrainDetailDistance,
     });
-    this.terrain.setCullDistance(this.quality.shadowDistance);
     this.lighting.setupMaterial(this.terrain.material);
     this.scene.add(this.terrain.mesh);
 
@@ -570,7 +577,12 @@ export class Game {
     const t2 = performance.now();
     this.updateEnvironment(0);
     this.terrain.update(this.camera, 0);
-    this.renderer.compile(this.scene, this.camera);
+    // Compile both light states (see gatePointLights), so the first torch or
+    // campfire of the game does not stall on shader compiles.
+    for (const on of [true, false]) {
+      for (const light of this.pointLights()) light.visible = on;
+      this.renderer.compile(this.scene, this.camera);
+    }
     this.timings.compileMs = performance.now() - t2;
 
     this.installTestHooks();
@@ -905,6 +917,13 @@ export class Game {
     this.survival.difficulty = s.difficulty;
     this.pipeline.post.colorblind = s.colorblind;
     this.pipeline.post.manualExposure = s.brightness;
+    // Captures step time frame by frame and must come out the same each run,
+    // so they hold the preset's resolution unless asked (?dynres=1).
+    const params = new URLSearchParams(location.search);
+    const dynres = params.get('dynres');
+    this.pipeline.resolution.dynamic = dynres !== null ? dynres === '1' : s.dynamicResolution && !params.has('capture');
+    this.pipeline.resolution.targetFps = Number(params.get('fps')) || s.targetFps;
+    this.pipeline.resolution.sharpness = s.sharpness;
     document.documentElement.style.setProperty('--ui-scale', String(s.uiScale));
     this.hud?.setOpacity(s.hudOpacity);
     document.documentElement.dataset.subtitles = s.subtitles ? s.subtitleSize : 'off';
@@ -1170,11 +1189,12 @@ export class Game {
   private propOptions(): PropOptions {
     const q = this.quality.name;
     const pick = <T,>(values: [T, T, T, T, T]): T => values[['low', 'medium', 'high', 'extra', 'max'].indexOf(q)];
+    const b = Math.min(1, 0.4 + this.quality.budget * 0.6);
     return {
-      largeRadius: pick([260, 380, 520, 700, 900]),
-      smallRadius: pick([45, 60, 75, 90, 110]),
-      lod0: pick([30, 40, 50, 62, 78]),
-      lod1: pick([110, 140, 180, 220, 280]),
+      largeRadius: Math.round(pick([260, 380, 520, 700, 900]) * b),
+      smallRadius: Math.round(pick([45, 60, 75, 90, 110]) * b),
+      lod0: Math.round(pick([30, 40, 50, 62, 78]) * b),
+      lod1: Math.round(pick([110, 140, 180, 220, 280]) * b),
     };
   }
 
@@ -1994,6 +2014,24 @@ export class Game {
     void dt;
   }
 
+  /** The held light and the campfire and lantern pool: the scene's only point lights. */
+  private pointLights(): THREE.PointLight[] {
+    return [this.viewmodel.light, ...this.structures.lights];
+  }
+
+  /**
+   * Point lights are costly for every pixel even when dark, so while all of
+   * them are out (most of the day) none is in the scene; once any is lit
+   * they all are, lighting both passes alike. Two shader variants in all,
+   * compiled at boot, and the passes always see the same lights (a
+   * difference made three recheck every material's program twice a frame).
+   */
+  private gatePointLights(): void {
+    const lights = this.pointLights();
+    const any = lights.some((l) => l.intensity > 0);
+    for (const light of lights) light.visible = any;
+  }
+
   private render(dt: number): void {
     const t = performance.now();
     if (this.mode === 'play') this.view.update(dt, this.player, this.camera, this.viewOptions());
@@ -2052,6 +2090,7 @@ export class Game {
     this.updateUnderwater();
     this.updatePostFeedback(dt);
     this.updateAudio(dt);
+    this.gatePointLights();
     this.pipeline.render(
       dt,
       {
@@ -2285,7 +2324,10 @@ export class Game {
       this.fpsFrames = 0;
       this.fpsTime = 0;
       const gpu = this.pipeline.gpu;
-      if (this.fpsEl && this.settings.get('showFps')) this.fpsEl.textContent = `${this.fps.toFixed(0)} fps · ${gpu.available ? `${gpu.total.toFixed(1)} ms gpu · ` : ''}${this.quality.name}`;
+      if (this.fpsEl && this.settings.get('showFps')) {
+        const res = Math.round(this.quality.renderScale * this.pipeline.resolutionScale * 100);
+        this.fpsEl.textContent = `${this.fps.toFixed(0)} fps · ${gpu.available ? `${gpu.total.toFixed(1)} ms gpu · ` : ''}${this.quality.name} · ${res}% res`;
+      }
     }
     if (this.mode !== 'play') return;
     const p = this.player.position;
@@ -2413,12 +2455,13 @@ export class Game {
 
   private vegetationOptions() {
     const q = this.quality;
+    const b = Math.min(1, 0.3 + q.budget * 0.7);
     return {
-      lod0Distance: q.name === 'low' ? 30 : q.name === 'medium' ? 38 : q.name === 'high' ? 45 : q.name === 'extra' ? 58 : 75,
+      lod0Distance: Math.round((q.name === 'low' ? 30 : q.name === 'medium' ? 38 : q.name === 'high' ? 45 : q.name === 'extra' ? 58 : 75) * b),
       lod1Distance: q.impostorDistance,
       maxDistance: q.vegetationDistance,
       alphaToCoverage: q.msaa > 0,
-      shadowDistance: q.name === 'low' ? 35 : q.name === 'medium' ? 55 : q.name === 'high' ? 80 : q.name === 'extra' ? 115 : 160,
+      shadowDistance: Math.round((q.name === 'low' ? 35 : q.name === 'medium' ? 55 : q.name === 'high' ? 80 : q.name === 'extra' ? 115 : 160) * b),
     };
   }
 

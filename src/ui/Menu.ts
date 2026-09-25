@@ -19,11 +19,11 @@ export interface MenuHooks {
 type Tab = 'graphics' | 'controls' | 'audio' | 'accessibility' | 'gameplay';
 
 const QUALITY_NOTES: Record<QualityName, string> = {
-  low: 'Integrated graphics. Reduced resolution, no volumetric clouds, short draw distance.',
-  medium: 'Mainstream laptops. Volumetric clouds, soft shadows, moderate foliage.',
-  high: 'Recommended for Apple M-series and modern GPUs. Anti-aliasing, god rays, reflections.',
+  low: 'Older integrated graphics. No volumetric clouds, short draw distance.',
+  medium: 'Integrated graphics and mainstream laptops. Volumetric clouds, soft shadows, moderate foliage.',
+  high: 'Recommended for Apple M-series and modern GPUs. God rays, reflections, full-resolution scene.',
   extra: 'Pro / Max class GPUs. Retina resolution, 4K shadows, denser grass and forests.',
-  max: 'Everything. Full-resolution clouds, longest view distance, densest vegetation.',
+  max: 'Everything: the finest clouds, longest view distance, densest vegetation. With dynamic resolution on, it holds your frame rate on any GPU.',
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, parent?: HTMLElement, text?: string): HTMLElementTagNameMap[K] {
@@ -170,6 +170,17 @@ export class Menu {
       });
       el('p', 'menu-note faint', s, 'The world reloads in a few seconds; your position, time and pack are kept.');
     }
+    const r = this.section('Resolution');
+    this.toggle(r, 'Dynamic resolution (holds the frame rate)', 'dynamicResolution');
+    this.select(r, 'Target frame rate', 'targetFps', [
+      [30, '30 fps'],
+      [45, '45 fps'],
+      [60, '60 fps'],
+      [90, '90 fps'],
+      [120, '120 fps'],
+    ]);
+    this.slider(r, 'Sharpness', 'sharpness', 0, 1, 0.05, (n) => `${Math.round(n * 100)}%`);
+    el('p', 'menu-note faint', r, 'Temporal anti-aliasing rebuilds every frame at your display’s full resolution; dynamic resolution renders the scene smaller only when frames run long.');
     const v = this.section('View');
     this.slider(v, 'Field of view', 'fov', 60, 100, 1, (n) => `${n}°`);
     this.slider(v, 'Brightness', 'brightness', 0.6, 1.6, 0.05, (n) => `${Math.round(n * 100)}%`);

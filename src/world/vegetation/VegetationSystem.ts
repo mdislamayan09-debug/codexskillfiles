@@ -100,6 +100,8 @@ interface Cell {
   radius: number;
   /** Instances felled or harvested (hidden until they regrow). */
   removed: Set<number>;
+  /** Distance from the camera to the cell's bounds, this frame. */
+  distance: number;
 }
 
 const LOD0_CAP = 700;
@@ -129,6 +131,9 @@ export class VegetationSystem {
   readonly impostors: Impostors;
   stats = { cells: 0, lod0: 0, lod1: 0, impostors: 0, shadows: 0 };
   private impostorKey = '';
+  private readonly cellOrder: Cell[] = [];
+  private impostorsStale = false;
+  private impostorAge = 0;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -206,6 +211,11 @@ export class VegetationSystem {
           n1: 0,
           ns: 0,
         };
+        // Near trees draw first, then mid-distance ones, then impostors and
+        // (at the default order) the terrain: the depth test then skips the
+        // ground's heavy shading wherever trunks and leaves already cover it.
+        for (const mesh of [kind.bark0, kind.leaves0]) if (mesh) mesh.renderOrder = -30;
+        for (const mesh of [kind.bark1, kind.leaves1]) if (mesh) mesh.renderOrder = -20;
         for (const mesh of [kind.leaves0, kind.leaves1]) {
           if (!mesh) continue;
           mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(mesh.instanceMatrix.count * 3), 3);
@@ -234,6 +244,7 @@ export class VegetationSystem {
       impostorIndex += 1;
     }
     this.impostors = new Impostors(renderer, sources, textures, IMPOSTOR_CAP, options.alphaToCoverage);
+    this.impostors.mesh.renderOrder = -10;
     this.materials.push(this.impostors.material);
     this.group.add(this.impostors.mesh);
     this.paintCanopy();
@@ -406,6 +417,7 @@ export class VegetationSystem {
       center: new THREE.Vector3(x0 + CELL / 2, cy, z0 + CELL / 2),
       radius: Math.hypot(CELL / 2, CELL / 2, halfY) + 12,
       removed: this.removedFor(this.cellKey(cx, cz)),
+      distance: 0,
     };
   }
 
@@ -453,12 +465,15 @@ export class VegetationSystem {
     }
     if (this.pending.length) {
       this.pending.sort((a, b) => this.keyDistance(a, camX, camZ) - this.keyDistance(b, camX, camZ));
-      const budget = Math.min(this.pending.length, 3);
-      for (let i = 0; i < budget; i += 1) {
+      // A couple of milliseconds a frame, nearest first (always at least one).
+      const start = performance.now();
+      for (let i = 0; i < this.pending.length; i += 1) {
+        if (i > 0 && performance.now() - start > 2) break;
         const key = this.pending[i];
         const cx = Math.floor(key / 1024) - 512;
         const cz = (key % 1024) - 512;
         this.cells.set(key, this.generateCell(cx, cz));
+        this.impostorsStale = true;
       }
     }
 
@@ -471,38 +486,58 @@ export class VegetationSystem {
     const lod1Sq = opts.lod1Distance * opts.lod1Distance;
     const shadowSq = opts.shadowDistance * opts.shadowDistance;
     const maxSq = opts.maxDistance * opts.maxDistance;
-    // Impostors are rebuilt only when the camera crosses a 12 m grid or cells arrive.
-    const key = `${Math.floor(camX / 12)},${Math.floor(camZ / 12)},${this.cells.size}`;
-    const rebuildImpostors = key !== this.impostorKey;
+    // Impostors are rebuilt when the camera crosses a 12 m grid, and while
+    // cells stream in at most every 15th frame (a rebuild walks every far tree).
+    const key = `${Math.floor(camX / 12)},${Math.floor(camZ / 12)}`;
+    this.impostorAge += 1;
+    const rebuildImpostors = key !== this.impostorKey || (this.impostorsStale && this.impostorAge >= 15);
     if (rebuildImpostors) {
       this.impostorKey = key;
+      this.impostorsStale = false;
+      this.impostorAge = 0;
       this.impostors.begin();
     }
     let visibleCells = 0;
+    // Nearest cells first, so each mesh draws its trees front to back and the
+    // depth test rejects the leaves hidden behind nearer ones.
+    // Only cells near enough for real trees need sorting; the far ones matter
+    // only when the impostors are rebuilt.
+    const order = this.cellOrder;
+    order.length = 0;
     for (const cell of this.cells.values()) {
       const dx = cell.center.x - camX;
       const dz = cell.center.z - camZ;
       const cellDist = Math.sqrt(dx * dx + dz * dz) - cell.radius;
+      cell.distance = cellDist;
       if (cellDist > opts.maxDistance) continue;
-      const pos = cell.positions;
-      if (cellDist > opts.lod1Distance) {
-        // Entirely in impostor range.
-        if (!rebuildImpostors) continue;
-        for (let i = 0; i < cell.count; i += 1) {
-          if (cell.removed.has(i)) continue;
-          const ix = pos[i * 3] - camX;
-          const iz = pos[i * 3 + 2] - camZ;
-          if (ix * ix + iz * iz > maxSq) continue;
-          this.pushImpostor(cell, i);
-        }
+      if (cellDist <= opts.lod1Distance) {
+        order.push(cell);
         continue;
       }
-      let inFrustum = true;
-      if (cellDist > opts.shadowDistance) {
-        this.sphere.center.copy(cell.center);
-        this.sphere.radius = cell.radius;
-        inFrustum = this.frustum.intersectsSphere(this.sphere);
+      // Entirely in impostor range.
+      if (!rebuildImpostors) continue;
+      const pos = cell.positions;
+      for (let i = 0; i < cell.count; i += 1) {
+        if (cell.removed.has(i)) continue;
+        const ix = pos[i * 3] - camX;
+        const iz = pos[i * 3 + 2] - camZ;
+        if (ix * ix + iz * iz > maxSq) continue;
+        this.pushImpostor(cell, i);
       }
+    }
+    order.sort((a, b) => a.distance - b.distance);
+    for (const cell of order) {
+      const cellDist = cell.distance;
+      const pos = cell.positions;
+      // Shadow casters are their own meshes, so the trees you see can be
+      // culled to the view: whole cells when they are out of shadow reach,
+      // tree by tree inside it (where the cell must still cast shadows).
+      this.sphere.center.copy(cell.center);
+      this.sphere.radius = cell.radius;
+      const inFrustum = this.frustum.intersectsSphere(this.sphere);
+      if (!inFrustum && cellDist > opts.shadowDistance) continue;
+      const cullEach = cellDist <= opts.shadowDistance;
+      const mat = cell.matrices;
       visibleCells += 1;
       for (let i = 0; i < cell.count; i += 1) {
         if (cell.removed.size > 0 && cell.removed.has(i)) continue;
@@ -519,6 +554,13 @@ export class VegetationSystem {
           continue;
         }
         if (!inFrustum) continue;
+        if (cullEach) {
+          const o = i * 16;
+          const h = kind.lod0.height * Math.hypot(mat[o], mat[o + 1], mat[o + 2]);
+          this.sphere.center.set(pos[i * 3], pos[i * 3 + 1] + h * 0.5, pos[i * 3 + 2]);
+          this.sphere.radius = h * 0.7 + 2;
+          if (!this.frustum.intersectsSphere(this.sphere)) continue;
+        }
         if (d2 < lod0Sq) {
           if (kind.n0 >= LOD0_CAP) continue;
           this.writeInstance(kind.bark0, kind.leaves0, kind.n0, cell, i);

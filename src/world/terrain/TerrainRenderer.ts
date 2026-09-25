@@ -46,7 +46,7 @@ export class TerrainRenderer {
   private count = 0;
   private camX = 0;
   private camZ = 0;
-  private cullDistance = 350;
+  private cullDistance = 30;
   selectedNodes = 0;
 
   constructor(
@@ -163,7 +163,10 @@ export class TerrainRenderer {
     this.options = options;
   }
 
-  /** Nodes closer than this are never frustum culled (they may cast/receive visible shadows). */
+  /**
+   * Nodes closer than this are never frustum culled (the ground under your
+   * feet). The terrain casts no shadows, so nothing behind the view is needed.
+   */
   setCullDistance(distance: number): void {
     this.cullDistance = distance;
   }
@@ -192,8 +195,8 @@ export class TerrainRenderer {
 
   private visible(x: number, z: number, size: number, distance: number): boolean {
     if (distance < this.cullDistance) return true;
-    this.box.min.set(x, -80, z);
-    this.box.max.set(x + size, 380, z + size);
+    this.box.min.set(x, -200, z);
+    this.box.max.set(x + size, 1200, z + size);
     return this.frustum.intersectsBox(this.box);
   }
 

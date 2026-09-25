@@ -8,11 +8,23 @@ import type { QualitySettings } from './Quality';
  * comes from the sky's PMREM environment (image-based lighting), so there is
  * no hemisphere/ambient light fighting the physically based sky.
  */
+/**
+ * Far cascades are drawn a little wider than the view needs, so they can be
+ * redrawn less often: the slack covers the camera's movement in between.
+ */
+const CASCADE_SLACK = 1.16;
+
 export class Lighting {
   csm: CSM;
   private readonly materials = new Set<THREE.Material>();
   private readonly lightDir = new THREE.Vector3(0, -1, 0);
   private readonly color = new THREE.Color();
+  private frame = 0;
+  /** Where each cascade's shadow camera stood when its map was last drawn. */
+  private drawnAt: THREE.Vector3[] = [];
+  private fittedAspect = 0;
+  private fittedFov = 0;
+  private readonly offset = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -42,9 +54,56 @@ export class Lighting {
     patchDirectionalLightVisibility();
     for (const light of csm.lights) {
       light.shadow.normalBias = 0.035;
+      light.shadow.autoUpdate = false;
       light.layers.enableAll();
     }
+    // Widen every cascade but the nearest whenever CSM fits them to the view.
+    const internals = csm as unknown as { _updateShadowBounds(): void };
+    const fit = internals._updateShadowBounds.bind(csm);
+    internals._updateShadowBounds = () => {
+      fit();
+      for (let i = 1; i < csm.lights.length; i += 1) {
+        const cam = csm.lights[i].shadow.camera;
+        cam.left *= CASCADE_SLACK;
+        cam.right *= CASCADE_SLACK;
+        cam.top *= CASCADE_SLACK;
+        cam.bottom *= CASCADE_SLACK;
+        cam.updateProjectionMatrix();
+      }
+    };
+    csm.updateFrustums();
+    this.drawnAt = csm.lights.map(() => new THREE.Vector3(Number.NaN, 0, 0));
+    this.fittedAspect = this.camera.aspect;
+    this.fittedFov = this.camera.fov;
     return csm;
+  }
+
+  /**
+   * The nearest cascade is redrawn every frame; the others take turns
+   * (every 2nd, 4th and 8th frame), so a frame draws at most two shadow
+   * maps instead of four. A cascade is also redrawn at once when the view
+   * has drifted far enough to use up its slack.
+   */
+  private scheduleCascades(): void {
+    const lights = this.csm.lights;
+    const frame = this.frame;
+    this.frame += 1;
+    for (let i = 0; i < lights.length; i += 1) {
+      const light = lights[i];
+      const cam = light.shadow.camera;
+      const period = 1 << i;
+      const due = i === 0 || frame % period === period >> 1;
+      // How far the cascade CSM wants now sits from the one on the map.
+      this.offset.copy(light.position).sub(this.drawnAt[i]);
+      this.offset.addScaledVector(this.lightDir, -this.offset.dot(this.lightDir));
+      const width = cam.right - cam.left;
+      const slack = (width * (1 - 1 / CASCADE_SLACK)) / 2;
+      const drifted = !(this.offset.length() < slack * 0.8);
+      if (due || drifted) {
+        light.shadow.needsUpdate = true;
+        this.drawnAt[i].copy(light.position);
+      }
+    }
   }
 
   /** Registers a lit material for cascaded shadows (chains existing patches). */
@@ -62,7 +121,6 @@ export class Lighting {
     const materials = [...this.materials];
     this.materials.clear();
     for (const material of materials) this.setupMaterial(material);
-    this.csm.updateFrustums();
   }
 
   /**
@@ -83,7 +141,16 @@ export class Lighting {
       light.shadow.intensity = shadowStrength;
       light.castShadow = elevation > 0.01;
     }
+    // Refit the cascades when the view's shape changes (window size, field
+    // of view, the spyglass): they were sized for the view at boot.
+    if (this.camera.aspect !== this.fittedAspect || this.camera.fov !== this.fittedFov) {
+      this.fittedAspect = this.camera.aspect;
+      this.fittedFov = this.camera.fov;
+      this.csm.updateFrustums();
+      for (const p of this.drawnAt) p.set(Number.NaN, 0, 0);
+    }
     this.csm.update();
+    this.scheduleCascades();
   }
 
   dispose(): void {

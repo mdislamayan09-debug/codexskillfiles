@@ -103,7 +103,9 @@ export class Atmosphere {
           uInvViewProj: { value: this.invViewProj },
           uCameraWorld: { value: new THREE.Vector3() },
           uMaxDistance: this.uniforms.uAerialMaxDistance,
-          uDistanceScale: { value: 11 },
+          // The island is small, so its air is thickened to read as deep;
+          // more than ~6x washes the middle distance to flat blue-grey.
+          uDistanceScale: { value: 6 },
         },
       }),
     );

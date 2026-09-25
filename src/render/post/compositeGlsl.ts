@@ -33,6 +33,7 @@ uniform vec3 uUnderwaterColor;
 uniform float uNear;
 uniform float uFar;
 uniform vec2 uResolution;
+uniform float uSharpen;
 varying vec2 vUv;
 
 vec3 agxContrast(vec3 x) {
@@ -113,6 +114,24 @@ void main() {
     col = vec3(texture2D(uColor, uv - shift).r, texture2D(uColor, uv).g, texture2D(uColor, uv + shift).b);
   } else {
     col = texture2D(uColor, uv).rgb;
+    if (uSharpen > 0.0) {
+      // Contrast-adaptive sharpening (after AMD's CAS): push the pixel away
+      // from its four neighbours, less where local contrast is already high,
+      // and never past the neighbourhood's own range (no halos).
+      vec2 t = 1.0 / uResolution;
+      vec3 n = texture2D(uColor, uv + vec2(0.0, t.y)).rgb;
+      vec3 s = texture2D(uColor, uv - vec2(0.0, t.y)).rgb;
+      vec3 e = texture2D(uColor, uv + vec2(t.x, 0.0)).rgb;
+      vec3 w = texture2D(uColor, uv - vec2(t.x, 0.0)).rgb;
+      vec3 mn = min(col, min(min(n, s), min(e, w)));
+      vec3 mx = max(col, max(max(n, s), max(e, w)));
+      float lmn = dot(mn, vec3(0.2126, 0.7152, 0.0722));
+      float lmx = dot(mx, vec3(0.2126, 0.7152, 0.0722));
+      float amp = sqrt(clamp(lmn / max(lmx, 1e-5), 0.0, 1.0));
+      float k = -uSharpen * amp * 0.2;
+      vec3 sharp = (col + (n + s + e + w) * k) / (1.0 + 4.0 * k);
+      col = clamp(sharp, mn, mx);
+    }
   }
   col += texture2D(uBloom, uv).rgb * uBloomStrength;
   col += texture2D(uGodRays, uv).rgb * uGodRayColor * uGodRayStrength;

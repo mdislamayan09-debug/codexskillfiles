@@ -27,8 +27,8 @@ export interface WeatherState {
 }
 
 const PRESETS: Record<WeatherKind, WeatherState> = {
-  clear: { coverage: 0.32, cloudType: 0.35, fog: 0, haze: 1.8, wind: 0.3, rain: 0, snow: 0, ash: 0, lightning: 0, chill: 0 },
-  cloudy: { coverage: 0.66, cloudType: 0.55, fog: 0.0006, haze: 2.4, wind: 0.5, rain: 0, snow: 0, ash: 0, lightning: 0, chill: -1.5 },
+  clear: { coverage: 0.32, cloudType: 0.35, fog: 0, haze: 1.2, wind: 0.3, rain: 0, snow: 0, ash: 0, lightning: 0, chill: 0 },
+  cloudy: { coverage: 0.66, cloudType: 0.55, fog: 0.0006, haze: 1.8, wind: 0.5, rain: 0, snow: 0, ash: 0, lightning: 0, chill: -1.5 },
   fog: { coverage: 0.58, cloudType: 0.3, fog: 0.014, haze: 4.5, wind: 0.12, rain: 0, snow: 0, ash: 0, lightning: 0, chill: -2 },
   rain: { coverage: 0.86, cloudType: 0.75, fog: 0.0025, haze: 3, wind: 0.6, rain: 0.75, snow: 0, ash: 0, lightning: 0, chill: -3.5 },
   storm: { coverage: 0.97, cloudType: 0.95, fog: 0.003, haze: 3.4, wind: 1, rain: 1, snow: 0, ash: 0, lightning: 1, chill: -5 },

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { damp } from '../core/math';
 import { addPatch, replaceOnce } from '../render/materials/MaterialPatches';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
@@ -90,7 +91,8 @@ export class Viewmodel {
     cloth: viewmodelMaterial(0x2a2118, 0.95),
     brass: viewmodelMaterial(0xb08d4a, 0.35, 1),
     glass: viewmodelMaterial(0x2ec9b4, 0.1, 0, 0x1a9c8c),
-    berry: viewmodelMaterial(0x7a0c14, 0.35),
+    berry: viewmodelMaterial(0x6e0a14, 0.28),
+    leaf: Object.assign(viewmodelMaterial(0x2f4a1c, 0.7), { side: THREE.DoubleSide }),
     mushroom: viewmodelMaterial(0x8a5a36, 0.7),
     meat: viewmodelMaterial(0x8a3024, 0.55),
     cooked: viewmodelMaterial(0x5a2e16, 0.6),
@@ -131,6 +133,8 @@ export class Viewmodel {
     this.arm.add(this.holder);
     this.holder.position.set(0, 0, 0);
     this.setLayer(this.root);
+    // The held light lights the world as well as the hand.
+    this.light.layers.enableAll();
   }
 
   private setLayer(obj: THREE.Object3D): void {
@@ -280,7 +284,40 @@ export class Viewmodel {
       // Drawn by the bow rig (see poseBow); the fist holds nothing.
     } else if (def.category === 'food' || def.category === 'medicine') {
       let mesh: THREE.Mesh;
-      if (id === 'berries' || id === 'berry_mash') mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 1), m.berry);
+      if (id === 'berries') {
+        // A sprig of lanternberries: small berries clustered on a stalk with
+        // a leaf or two, not one ball.
+        const parts: THREE.BufferGeometry[] = [];
+        const rng = (i: number) => {
+          const v = Math.sin(i * 91.7 + 3.1) * 43758.5453;
+          return v - Math.floor(v);
+        };
+        for (let i = 0; i < 8; i += 1) {
+          const r = 0.011 + rng(i) * 0.004;
+          const berry = new THREE.IcosahedronGeometry(r, 2);
+          const a = i * 2.39996;
+          const ring = i === 0 ? 0 : 0.014 + rng(i + 9) * 0.01;
+          berry.translate(Math.cos(a) * ring, 0.012 * (i % 3) + rng(i + 4) * 0.008, Math.sin(a) * ring);
+          parts.push(berry.toNonIndexed());
+        }
+        const cluster = new THREE.Mesh(mergeGeometries(parts), m.berry);
+        cluster.position.set(-0.005, 0.045, -0.015);
+        g.add(cluster);
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.0018, 0.0022, 0.035, 4), m.wood);
+        stalk.position.set(0.004, 0.068, 0.006);
+        stalk.rotation.set(0.9, 0, 0.5);
+        g.add(stalk);
+        for (const side of [-1, 1]) {
+          const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.012, 7), m.leaf);
+          leaf.scale.set(0.55, 1.3, 1);
+          leaf.position.set(side * 0.014, 0.066, 0.004);
+          leaf.rotation.set(-1.2, side * 0.8, side * 0.9);
+          g.add(leaf);
+        }
+        this.setLayer(g);
+        return visual;
+      }
+      if (id === 'berry_mash') mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 1), m.berry);
       else if (id.includes('mushroom')) mesh = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), m.mushroom);
       else if (id.includes('meat') || id.includes('fish')) mesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), id.startsWith('raw') ? m.meat : m.cooked);
       else mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.09, 10), m.leather);

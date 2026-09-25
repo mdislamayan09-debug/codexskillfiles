@@ -272,11 +272,17 @@ export function patchDirectionalLightVisibility(): void {
   const chunk = THREE.ShaderChunk.lights_fragment_begin;
   if (chunk.includes('atmoSunVisibility')) return;
   let count = 0;
-  THREE.ShaderChunk.lights_fragment_begin = chunk.replace(DIR_LIGHT_INFO, (match) => {
+  let patched = chunk.replace(DIR_LIGHT_INFO, (match) => {
     count += 1;
-    return `${match}\n#ifdef USE_FOG\n\tdirectLight.color *= atmoSunVisibility( geometryPosition );\n#endif\n`;
+    return `${match}\n#ifdef USE_FOG\n\tdirectLight.color *= atmoSunVis;\n#endif\n`;
   });
   if (count === 0) throw new Error('Could not patch directional light visibility (Three.js chunk changed?)');
+  // Every cascade is a light of its own: work the visibility out once per
+  // pixel rather than once per cascade.
+  const anchor = 'vec3 geometryPosition = - vViewPosition;';
+  if (!patched.includes(anchor)) throw new Error('Could not find geometryPosition in lights_fragment_begin (Three.js chunk changed?)');
+  patched = patched.replace(anchor, `${anchor}\n#ifdef USE_FOG\n\tfloat atmoSunVis = atmoSunVisibility( geometryPosition );\n#endif`);
+  THREE.ShaderChunk.lights_fragment_begin = patched;
 }
 
 /** Replace exactly one occurrence of `search` in shader source or throw (catches Three upgrades). */

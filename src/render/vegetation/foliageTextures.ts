@@ -204,9 +204,10 @@ void main() {
         float ns = mod(fn, 2.0) < 1.0 ? -1.0 : 1.0;
         vec2 perp = vec2(-dir.y, dir.x) * ns;
         vec2 nd = normalize(perp + dir * 0.9);
-        float nl = 0.055 * (1.0 - along * 0.35);
+        float nl = 0.065 * (1.0 - along * 0.3);
         float d = segDist(uv, np, np + nd * nl);
-        float nv = smoothstep(0.0075, 0.0025, d);
+        // Thick enough to stay a dense mass when the card is far and small.
+        float nv = smoothstep(0.011, 0.0035, d);
         if (nv > needles) { needles = nv; shade = hash12(vec2(fk * 13.0 + fn, 3.0)); }
       }
     }
@@ -217,13 +218,15 @@ void main() {
       vec2 np = mix(a, b, along);
       float ns = mod(fn, 2.0) < 1.0 ? -1.0 : 1.0;
       vec2 nd = normalize(vec2(ns, 0.9));
-      float d = segDist(uv, np, np + nd * 0.06);
-      float nv = smoothstep(0.008, 0.003, d);
+      float d = segDist(uv, np, np + nd * 0.07);
+      float nv = smoothstep(0.012, 0.004, d);
       if (nv > needles) { needles = nv; shade = hash12(vec2(fn, 9.0)); }
     }
     alpha = max(needles, twig);
-    vec3 needleCol = mix(vec3(0.025, 0.07, 0.045), vec3(0.07, 0.16, 0.1), shade);
-    col = mix(needleCol, vec3(0.22, 0.13, 0.07), twig * (1.0 - needles * 0.7));
+    // Deep green, a little blue in the young tips: under a blue sky anything
+    // bluer reads as teal plastic.
+    vec3 needleCol = mix(vec3(0.028, 0.06, 0.026), vec3(0.075, 0.14, 0.07), shade);
+    col = mix(needleCol, vec3(0.1, 0.065, 0.04), twig * (1.0 - needles * 0.85));
     nrm = vec2((uv.x - 0.5) * 0.8, 0.0);
     trans = 0.3;
     ao = mix(0.55, 1.0, uv.y);
@@ -243,13 +246,13 @@ void main() {
         vec2 nd = vec2(sin(ang), cos(ang));
         float nl = 0.36 * (0.75 + 0.25 * hash12(vec2(fn, ff + 4.0)));
         float d = segDist(uv, base, base + nd * nl);
-        float nv = smoothstep(0.006, 0.002, d);
+        float nv = smoothstep(0.0085, 0.003, d);
         if (nv > needles) { needles = nv; shade = hash12(vec2(ff * 7.0 + fn, 1.0)); }
       }
     }
     alpha = max(needles, twig);
-    vec3 needleCol = mix(vec3(0.06, 0.12, 0.04), vec3(0.17, 0.25, 0.09), shade);
-    col = mix(needleCol, vec3(0.25, 0.15, 0.08), twig * (1.0 - needles * 0.8));
+    vec3 needleCol = mix(vec3(0.05, 0.1, 0.035), vec3(0.14, 0.21, 0.08), shade);
+    col = mix(needleCol, vec3(0.13, 0.08, 0.05), twig * (1.0 - needles * 0.85));
     nrm = vec2((uv.x - 0.5) * 0.9, 0.0);
     trans = 0.35;
     ao = mix(0.6, 1.0, uv.y);

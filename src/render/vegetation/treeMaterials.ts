@@ -64,6 +64,22 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
 }
 `;
 
+/**
+ * Far trunks keep about a pixel of width: pushed out along their normals by
+ * half a pixel's worth of distance, so a pine on a far ridge still stands on
+ * something instead of its crown floating over the skyline.
+ */
+const BARK_MIN_WIDTH = /* glsl */ `
+{
+  #ifdef USE_INSTANCING
+  vec3 barkWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+  #else
+  vec3 barkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  #endif
+  transformed += objectNormal * distance(barkWorld, cameraPosition) * 0.0007;
+}
+`;
+
 export function createBarkMaterial(shared: VegetationShared, textures: FoliageTextures, barkLayer: number): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
   material.name = `bark-${barkLayer}`;
@@ -79,7 +95,7 @@ export function createBarkMaterial(shared: VegetationShared, textures: FoliageTe
       Object.assign(shader.uniforms, uniforms);
       let vs = shader.vertexShader;
       vs = replaceOnce(vs, '#include <common>', `#include <common>\n${WIND_PARS}\nvarying vec2 vBarkUv;`, 'bark vpars');
-      vs = replaceOnce(vs, '#include <begin_vertex>', `#include <begin_vertex>\ntransformed = vegetationWind(transformed, objectNormal);\nvBarkUv = uv;`, 'bark wind');
+      vs = replaceOnce(vs, '#include <begin_vertex>', `#include <begin_vertex>\ntransformed = vegetationWind(transformed, objectNormal);\nvBarkUv = uv;\n${BARK_MIN_WIDTH}`, 'bark wind');
       shader.vertexShader = vs;
       let fs = shader.fragmentShader;
       fs = replaceOnce(
@@ -136,13 +152,13 @@ export function createLeafMaterial(shared: VegetationShared, textures: FoliageTe
       vs = replaceOnce(
         vs,
         '#include <common>',
-        `#include <common>\n${WIND_PARS}\nattribute float aLayer;\nvarying vec2 vLeafUv;\nvarying float vLeafLayer;\nvarying vec3 vLeafWorld;`,
+        `#include <common>\n${WIND_PARS}\nattribute float aLayer;\nattribute float aShade;\nvarying vec2 vLeafUv;\nvarying float vLeafLayer;\nvarying float vLeafShade;\nvarying vec3 vLeafWorld;`,
         'leaf vpars',
       );
       vs = replaceOnce(
         vs,
         '#include <begin_vertex>',
-        `#include <begin_vertex>\ntransformed = vegetationWind(transformed, objectNormal);\nvLeafUv = uv;\nvLeafLayer = aLayer;`,
+        `#include <begin_vertex>\ntransformed = vegetationWind(transformed, objectNormal);\nvLeafUv = uv;\nvLeafLayer = aLayer;\nvLeafShade = aShade;`,
         'leaf wind',
       );
       vs = replaceOnce(
@@ -156,7 +172,7 @@ export function createLeafMaterial(shared: VegetationShared, textures: FoliageTe
       fs = replaceOnce(
         fs,
         '#include <common>',
-        `#include <common>\nprecision highp sampler2DArray;\nuniform sampler2DArray uFoliage;\nuniform sampler2DArray uFoliageNormal;\nuniform float uAlphaCoverage;\nuniform vec3 uSunDirV;\nuniform vec3 uSunColorV;\nvarying vec2 vLeafUv;\nvarying float vLeafLayer;\nvarying vec3 vLeafWorld;`,
+        `#include <common>\nprecision highp sampler2DArray;\nuniform sampler2DArray uFoliage;\nuniform sampler2DArray uFoliageNormal;\nuniform float uAlphaCoverage;\nuniform vec3 uSunDirV;\nuniform vec3 uSunColorV;\nvarying vec2 vLeafUv;\nvarying float vLeafLayer;\nvarying float vLeafShade;\nvarying vec3 vLeafWorld;`,
         'leaf fpars',
       );
       fs = replaceOnce(
@@ -174,7 +190,8 @@ if (uAlphaCoverage > 0.5) {
   leafAlpha = clamp((leafAlpha - 0.45) / max(fwidth(leafAlpha), 1e-4) + 0.5, 0.0, 1.0);
   if (leafAlpha < 0.01) discard;
 } else if (leafAlpha < 0.45) discard;
-diffuseColor.rgb = leafTex.rgb;
+// Leaves deep in the crown are darker: less sky, more leaves in the way.
+diffuseColor.rgb = leafTex.rgb * mix(0.55, 1.0, vLeafShade);
 diffuseColor.a = leafAlpha;`,
         'leaf map',
       );
@@ -187,7 +204,7 @@ diffuseColor.a = leafAlpha;`,
       fs = replaceOnce(
         fs,
         '#include <aomap_fragment>',
-        `reflectedLight.indirectDiffuse *= leafNrm.a;\nreflectedLight.indirectSpecular *= leafNrm.a * 0.6;`,
+        `reflectedLight.indirectDiffuse *= leafNrm.a * vLeafShade;\nreflectedLight.indirectSpecular *= leafNrm.a * 0.6 * vLeafShade;`,
         'leaf ao',
       );
       fs = replaceOnce(
@@ -198,7 +215,10 @@ diffuseColor.a = leafAlpha;`,
   vec3 viewDirW = normalize(cameraPosition - vLeafWorld);
   float back = pow(clamp(dot(-viewDirW, uSunDirV), 0.0, 1.0), 4.0);
   vec3 trans = diffuseColor.rgb * uSunColorV * (back * 1.6 + 0.12) * leafNrm.b * max(uSunDirV.y, 0.0) * 2.2;
-  reflectedLight.directDiffuse += trans;
+  // Sunlight gets into a crown only in flecks.
+  reflectedLight.directDiffuse *= mix(0.4, 1.0, vLeafShade);
+  reflectedLight.directSpecular *= vLeafShade;
+  reflectedLight.directDiffuse += trans * mix(0.5, 1.0, vLeafShade);
 }`,
         'leaf translucency',
       );

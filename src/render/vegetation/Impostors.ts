@@ -16,14 +16,23 @@ export interface ImpostorSource {
 
 const BAKE_VERT = /* glsl */ `
 attribute float aLayer;
+attribute float aShade;
+uniform float uUseAttrLayer;
 varying vec2 vUvB;
 varying vec3 vNormalObj;
 varying float vLayerB;
+varying float vShadeB;
 void main() {
   vUvB = uv;
   vNormalObj = normal;
   vLayerB = aLayer;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  // Leaves carry their crown depth (bark has none): bake it in, as the
+  // near trees shade it, so trees don't brighten as they turn to impostors.
+  vShadeB = uUseAttrLayer > 0.5 ? mix(0.55, 1.0, aShade) : 1.0;
+  // Trunks and limbs baked a little thicker: far off they would be thinner
+  // than a pixel and the crowns would seem to float.
+  vec3 p = uUseAttrLayer > 0.5 ? position : position + normal * 0.16;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `;
 
@@ -37,11 +46,12 @@ uniform int uMode; // 0 albedo, 1 normal
 varying vec2 vUvB;
 varying vec3 vNormalObj;
 varying float vLayerB;
+varying float vShadeB;
 void main() {
   float layer = uUseAttrLayer > 0.5 ? floor(vLayerB + 0.5) : uLayer;
   vec4 t = texture(uTex, vec3(vUvB, layer));
   if (uCutout > 0.5 && t.a < 0.5) discard;
-  if (uMode == 0) gl_FragColor = vec4(t.rgb, 1.0);
+  if (uMode == 0) gl_FragColor = vec4(t.rgb * vShadeB * mix(0.8, 1.0, vShadeB), 1.0);
   else gl_FragColor = vec4(normalize(vNormalObj) * 0.5 + 0.5, 1.0);
 }
 `;

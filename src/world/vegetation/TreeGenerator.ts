@@ -83,11 +83,13 @@ interface Builder {
   uv: number[];
   wind: number[];
   layer: number[];
+  /** Leaves: how open to the sky each vertex is (0 deep in the crown, 1 outside). */
+  shade: number[];
   idx: number[];
 }
 
 function newBuilder(): Builder {
-  return { pos: [], nrm: [], uv: [], wind: [], layer: [], idx: [] };
+  return { pos: [], nrm: [], uv: [], wind: [], layer: [], shade: [], idx: [] };
 }
 
 function toGeometry(b: Builder): THREE.BufferGeometry {
@@ -97,6 +99,7 @@ function toGeometry(b: Builder): THREE.BufferGeometry {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
   g.setAttribute('aWind', new THREE.Float32BufferAttribute(b.wind, 4));
   if (b.layer.length) g.setAttribute('aLayer', new THREE.Float32BufferAttribute(b.layer, 1));
+  if (b.shade.length) g.setAttribute('aShade', new THREE.Float32BufferAttribute(b.shade, 1));
   g.setIndex(b.idx);
   g.computeBoundingSphere();
   g.computeBoundingBox();
@@ -339,7 +342,7 @@ export function generateTree(species: SpeciesConfig, options: GenerateOptions): 
         // Branch wood is mostly hidden by needles: cheap tubes, none at LOD 1.
         if (lod === 0 && len > 0.6) addTube(bark, pts, 3, H, 0.45, phase, 1);
         // Sprays along the branch, bigger toward the tip.
-        const sprays = Math.max(1, Math.round(len / 0.85));
+        const sprays = Math.max(1, Math.round(len / 0.65));
         for (let s = 0; s < sprays; s += 1) {
           const f = (s + 0.6) / sprays;
           const idx = Math.min(pts.length - 1, Math.floor(f * (pts.length - 1)));
@@ -411,6 +414,29 @@ export function generateTree(species: SpeciesConfig, options: GenerateOptions): 
         }
         addLeafCluster(limb[limb.length - 1].p, dir, species.leafCard * 1.1, 0.8, phase);
       }
+    }
+  }
+
+  // Crown depth: leaves deep inside a crown, and low in it, see little of the
+  // sky and are shaded by the leaves around them. Without it every card is
+  // lit like the outermost one and a tree reads as flat cut-outs.
+  const leafCount = leaves.pos.length / 3;
+  if (leafCount > 0) {
+    const dist = new Float32Array(leafCount);
+    let maxD = 1e-3;
+    for (let i = 0; i < leafCount; i += 1) {
+      const dx = leaves.pos[i * 3] - canopyCenter.x;
+      const dy = (leaves.pos[i * 3 + 1] - canopyCenter.y) * 0.8;
+      const dz = leaves.pos[i * 3 + 2] - canopyCenter.z;
+      dist[i] = Math.hypot(dx, dy, dz);
+      maxD = Math.max(maxD, dist[i]);
+    }
+    const bottom = H * species.crownStart;
+    for (let i = 0; i < leafCount; i += 1) {
+      const t = Math.min(1, Math.max(0, (dist[i] / maxD - 0.2) / 0.75));
+      const outer = t * t * (3 - 2 * t);
+      const rel = Math.min(1, Math.max(0, (leaves.pos[i * 3 + 1] - bottom) / Math.max(H - bottom, 0.5)));
+      leaves.shade.push((0.3 + 0.7 * outer) * (0.72 + 0.28 * rel));
     }
   }
 

@@ -7,6 +7,7 @@ import type { QuestTracker } from './Quests';
 import { BELL_WARDENS, GLYPHS, NPCS, TUNING_ORDER, type NpcDef } from './StoryData';
 import { LAYER_TRANSPARENT } from '../render/RenderPipeline';
 import { buildHumanFigure, type HumanFigure } from './figures/HumanFigure';
+import { buildCrate, buildFireRing, buildTent, createCampMaterials } from './campProps';
 
 // The physical side of the story: the survivors standing in the world,
 // the set pieces that make landmarks recognisable, and the interactables
@@ -137,19 +138,14 @@ export class StoryWorld {
 
   private buildCamp(): void {
     const c = this.lm('crash_camp');
-    // Two tents from salvaged envelope canvas.
-    for (const [dx, dz, yaw] of [
-      [-6, 4, 0.4],
-      [7, 5, -0.6],
+    const kit = createCampMaterials();
+    this.materials.push(...Object.values(kit));
+    // Two ridge tents from salvaged envelope canvas, guyed out.
+    for (const [dx, dz, yaw, seed] of [
+      [-6, 4, 0.4, 11],
+      [7, 5, -0.6, 12],
     ]) {
-      const tent = new THREE.Group();
-      const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 1.7, 1.9, 4, 1, true), this.m.canvas);
-      cloth.position.y = 0.95;
-      cloth.rotation.y = Math.PI / 4;
-      cloth.material.side = THREE.DoubleSide;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.1, 6), this.m.wood);
-      pole.position.y = 1.05;
-      tent.add(cloth, pole);
+      const tent = buildTent(kit, seed);
       tent.rotation.y = yaw;
       this.add(tent, c.x + dx, c.z + dz);
     }
@@ -159,21 +155,15 @@ export class StoryWorld {
       [-2.2, -5.4, 0.5],
       [5, -4, 0.6],
     ]) {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), this.m.plank);
+      const crate = buildCrate(kit, s);
       crate.rotation.y = dx;
-      this.add(crate, c.x + dx, c.z + dz, s / 2);
+      this.add(crate, c.x + dx, c.z + dz);
     }
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 2.6), this.m.brass);
     blade.rotation.set(0.3, 0.8, 0.15);
     this.add(blade, c.x - 8, c.z - 2, 0.3);
-    // Old campfire ring (decor).
-    const stone = generateRock({ seed: 4400, kind: 'pebble', detail: 1 }).geometry;
-    for (let i = 0; i < 8; i += 1) {
-      const a = (i / 8) * Math.PI * 2;
-      const s = new THREE.Mesh(stone, this.m.darkStone);
-      s.scale.setScalar(0.14);
-      this.add(s, c.x + Math.cos(a) * 0.5, c.z + 1.5 + Math.sin(a) * 0.5, 0.03);
-    }
+    // Last night's fire, burnt down to embers.
+    this.add(buildFireRing(kit, 4400), c.x, c.z + 1.5);
   }
 
   private buildWreck(): void {
