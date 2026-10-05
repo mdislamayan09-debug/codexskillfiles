@@ -92,9 +92,10 @@ export class NPCs {
     // outlaws
     this.outlaws = [];
     for (let i = 0; i < 7; i++) {
-      const ang = (i / 7) * Math.PI * 2 + 0.2;
-      const sit = i % 2 === 0;
-      const rad = sit ? 2.9 : 5 + r() * 3;
+      // three sit on the logs round the fire (logs lie at angles k*2.1, radius 3), the rest stand watch
+      const sit = i < 3;
+      const ang = sit ? i * 2.1 : (i / 7) * Math.PI * 2 + 0.9;
+      const rad = sit ? 3.0 : 5.5 + r() * 2.5;
       const x = CAMP.x + Math.cos(ang) * rad, z = CAMP.z + Math.sin(ang) * rad;
       const a = this.add(new Human('outlaw', 600 + i), 'outlaw', x, z, Math.atan2(CAMP.x - x, CAMP.z - z));
       a.sitting = sit;
