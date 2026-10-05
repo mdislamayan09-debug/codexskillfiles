@@ -333,8 +333,8 @@ export class Town {
     };
     for (const c of this.colliders) {
       const pad = 1.8;
-      for (let x = c.minx - pad; x <= c.maxx + pad; x += 1.5) { stamp(x, c.minz - pad * 0.5, 2.2, 0.75); stamp(x, c.maxz + pad * 0.5, 2.2, 0.75); }
-      for (let z = c.minz - pad; z <= c.maxz + pad; z += 1.5) { stamp(c.minx - pad * 0.5, z, 2.2, 0.75); stamp(c.maxx + pad * 0.5, z, 2.2, 0.75); }
+      for (let x = c.minx - pad; x <= c.maxx + pad; x += 1.5) { stamp(x, c.minz - pad * 0.5, 3.2, 0.85); stamp(x, c.maxz + pad * 0.5, 3.2, 0.85); }
+      for (let z = c.minz - pad; z <= c.maxz + pad; z += 1.5) { stamp(c.minx - pad * 0.5, z, 3.2, 0.85); stamp(c.maxx + pad * 0.5, z, 3.2, 0.85); }
     }
     const { x, z } = RANCH;
     const paths = [
@@ -348,7 +348,7 @@ export class Town {
       const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.8);
       for (let k = 0; k <= n; k++) {
         const t = k / n, wob = Math.sin((ax + t * (bx - ax)) * 0.3) * 0.6;
-        stamp(ax + (bx - ax) * t + wob, az + (bz - az) * t, 1.5, 0.85);
+        stamp(ax + (bx - ax) * t + wob, az + (bz - az) * t, 2.8, 1.0);
       }
     }
     W.splatTex.needsUpdate = true;
