@@ -753,7 +753,7 @@ export class Vegetation {
           vec4 c = texture(uAtlas, vUv);
           if (c.a < 0.5) discard;
           if (vFade < bayer(gl_FragCoord.xy)) discard;
-          vec3 alb = c.rgb / max(c.a, 0.001);
+          vec3 alb = c.rgb; // atlas is alpha-tested, not premultiplied
           // fake rounded-canopy normal from the billboard UV, lit like the near trees
           vec2 q = fract(vUv * vec2(uCols, 2.0)) * 2.0 - 1.0;
           vec3 toCam = normalize(cameraPosition - vW);
