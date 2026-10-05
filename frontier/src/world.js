@@ -90,6 +90,13 @@ export class World {
     const ridge = n.ridged(wx / 1300 + 10, wz / 1300, 6);
     const massif = 0.55 + 0.45 * n.fbm(wx / 2600, wz / 2600, 3);
     h += north * (Math.pow(ridge, 1.5) * 430 * massif + 80 * massif + 45 * n2.fbm(x / 300, z / 300, 4));
+    // erosion-like ridges and gullies on high, steep ground
+    const hi = smoothstep(70, 260, h);
+    if (hi > 0) {
+      const g1 = n2.ridged(wx / 210 + 3.3, wz / 210 - 1.7, 4);
+      const g2 = n.ridged(wx / 75 - 8.1, wz / 75 + 2.2, 3);
+      h += hi * (g1 * 46 + g2 * 12 - 26);
+    }
     // Enclosing ranges at the west and east edges
     const ex = Math.abs(x) / HALF, ez = Math.abs(z) / HALF;
     const edge = smoothstep(0.78, 0.98, Math.max(ex, z > 0 ? ez : 0));
