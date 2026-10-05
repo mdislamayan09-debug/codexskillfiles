@@ -1,7 +1,7 @@
 // Dust & Redemption — bootstrap, game rules and main loop.
 import './style.css';
 import * as THREE from 'three';
-import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution } from './world.js';
+import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution, loadRealTerrain } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
 import { loadSurfaces } from './assets.js';
@@ -54,6 +54,7 @@ async function init() {
   // heightmap detail per preset: 3.2 m (high), 2.7 m (ultra), 4 m (low/med) over the 8 km map
   setWorldResolution(QUALITY > 1 ? 3072 : QUALITY >= 1 ? 2560 : 2048);
   U.uRes.value = RES;
+  await loadRealTerrain();
   const world = new World(1899);
   await world.generate((p) => setLoad(0.02 + p * 0.5, 'Raising mountains and cutting rivers…'));
   console.log(`world ${RES}² generated in ${Math.round(world.genMs)} ms`);
@@ -248,36 +249,33 @@ async function init() {
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
   G.findVista = () => {
-    // up-valley, over the cabin and the braided creek toward the head of the valley and the peaks beyond it
-    const tx = -1420, tz = -3800;
-    const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
+    // A lookout over the cabin: look up or down the valley from an open shoulder, the cabin in the lower third
     const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
+    const V = world.valley;
+    const targets = [V[Math.floor(V.length * 0.06)]];   // up-valley: the range closes the view, as in the reference
     let best = null, bs = -1e9;
-    for (let r = 120; r <= 420; r += 20) for (let da = -0.7; da <= 0.7; da += 0.1) {
-      const a = toT + Math.PI + da; // behind the cabin, looking past it
+    for (const [tx, tz] of targets) for (let r = 110; r <= 560; r += 30) for (let a = 0; a < Math.PI * 2; a += Math.PI / 18) {
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
-      const ch = world.heightAt(cx, cz) + 3.2;
-      const above = ch - cabY;
-      if (above < 35) continue;
-      // line of sight to the cabin roof
+      const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
+      if (above < 30 || above > 220) continue;
+      const va = Math.atan2(tx - cx, tz - cz);
+      let off = Math.atan2(CABIN.x - cx, CABIN.z - cz) - va;
+      off = Math.atan2(Math.sin(off), Math.cos(off));
+      if (Math.abs(off) > 0.4) continue;
       let clear = true;
-      for (let k = 1; k < 40 && clear; k++) {
-        const t = k / 40;
-        if (world.heightAt(cx + (CABIN.x - cx) * t, cz + (CABIN.z - cz) * t) > ch + (cabY - ch) * t - 1.5) clear = false;
-      }
+      for (let k = 1; k < 30 && clear; k++) { const t = k / 30; if (world.heightAt(cx + (CABIN.x - cx) * t, cz + (CABIN.z - cz) * t) > ch + (cabY - ch) * t - 1.5) clear = false; }
       if (!clear) continue;
-      // nothing rising into the frame either side of the view
-      const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
+      // openness: nothing rising into a 65 degree fan in front of the lens
       let blocked = 0;
-      for (let b = -0.6; b <= 0.6; b += 0.1) for (let d = 15; d <= 200; d += 15) {
-        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 4 - d * 0.12) blocked += Math.abs(b) < 0.3 ? 6 : 2;
+      for (let b = -0.55; b <= 0.56; b += 0.11) for (let d = 20; d <= 320; d += 25) {
+        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 2 - d * 0.1) blocked += Math.abs(b) < 0.3 ? 3 : 1;
       }
-      const score = -Math.abs(above - 62) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 170) * 0.12 - blocked * 3;
-      if (score > bs) { bs = score; best = { cx, cz, ch, va, dist: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
+      const score = -blocked * 4 - Math.abs(above - 95) * 0.4 - Math.abs(off) * 40 - Math.abs(r - 280) * 0.03;
+      if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
     }
-    if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), dist: 250 }; }
-    // aim so the cabin sits in the lower third, with the valley and the storm sky above it
-    const pitch = Math.atan2(cabY - best.ch, best.dist) + 0.21;
+    if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
+    // pitch so the cabin sits in the lower third with the valley and the sky above it
+    const pitch = Math.atan2(cabY - best.ch, best.cab) + 0.2;
     const D = 1200, lx = best.cx + Math.sin(best.va) * D, lz = best.cz + Math.cos(best.va) * D;
     return { cx: best.cx, cz: best.cz, tx: lx, tz: lz, th: best.ch + Math.tan(pitch) * D - world.heightAt(lx, lz) };
   };
@@ -322,7 +320,9 @@ async function init() {
       for (const side of [12, -12, 25, -25]) {
         const x = ax + Math.cos(yaw) * side, z = az - Math.sin(yaw) * side;
         const cx = x - Math.sin(yaw) * 6.5, cz = z - Math.cos(yaw) * 6.5;
-        if (G.treesNear(x, z, 6) === 0 && G.treesNear(cx, cz, 5) === 0 && G.treesNear(x + Math.sin(yaw) * 12, z + Math.cos(yaw) * 12, 4) === 0) return [x, z, yaw];
+        // on snow, not the iced braids of the creek: the rider, the camera and the ground just ahead
+        const dry = [[x, z], [cx, cz], [x + Math.sin(yaw) * 8, z + Math.cos(yaw) * 8]].every(([qx, qz]) => world.splatAt(qx, qz).wet < 0.12);
+        if (dry && G.treesNear(x, z, 6) === 0 && G.treesNear(cx, cz, 5) === 0 && G.treesNear(x + Math.sin(yaw) * 12, z + Math.cos(yaw) * 12, 4) === 0) return [x, z, yaw];
       }
     }
     const [ax, az] = v[v.length - 2]; return [ax, az, 0];

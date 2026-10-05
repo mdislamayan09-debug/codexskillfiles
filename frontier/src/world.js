@@ -34,7 +34,7 @@ export const REGIONS = [
 ];
 
 // Frostwater Valley: a glacial U-valley in the snowy range, running down to the river gorge.
-export const FROST_VALLEY = [[-1500, -3950], [-1280, -3560], [-1040, -3160], [-870, -2800], [-770, -2500], [-720, -2250]];
+export const FROST_VALLEY = [[-1500, -3950], [-1280, -3560], [-1040, -3160], [-870, -2800], [-770, -2500], [-720, -2250]]; // (replaced by the real valley floor)
 const FROST_FLOOR = [345, 305, 266, 228, 190, 150]; // floor height at each valley point: a gentle glacial grade
 // the valley opens out as it descends: a tight glacial trough at the head, a broad forested floor at the mouth.
 // Valley distances are divided by this, so every profile below is written for the narrow head.
@@ -67,6 +67,53 @@ export const PINE_TRAIL = 5; // index of the logging trail in ROADS
 // turns a wagon road into a narrow foot-and-hoof trail
 const ROAD_SCALE = [1, 1, 1, 1, 1.15, 1.8];
 
+// --- Real ground -------------------------------------------------------------
+// The snowy north is a real place: a window of Kawuneeche Valley in Colorado's Rocky Mountain National Park
+// (USGS 3DEP elevation via AWS Terrain Tiles), baked by scripts/bake_dem.py into public/terrain at 0.55x
+// horizontal and 0.75x vertical scale. Real erosion carves the ridges, cirques, talus fans and the broad glacial
+// floor that noise can only imitate. The generated world takes over at the patch edges.
+export let REAL = null; // { meta, h: Float32Array }
+export function setRealTerrain(real) {
+  REAL = real;
+  if (!real) return;
+  const m = real.meta;
+  // the valley, its floor, the cabin, the road up to it and the head of the river all follow the real ground
+  FROST_VALLEY.length = 0; for (const v of m.valley) FROST_VALLEY.push([v[0], v[1]]);
+  FROST_FLOOR.length = 0; for (const v of m.valley) FROST_FLOOR.push(v[2]);
+  CABIN.x = m.cabin[0]; CABIN.z = m.cabin[1];
+  const vx = (z) => {
+    const V = m.valley;
+    for (let i = 0; i < V.length - 1; i++) if (z >= V[i][1] && z <= V[i + 1][1]) return lerp(V[i][0], V[i + 1][0], (z - V[i][1]) / (V[i + 1][1] - V[i][1]));
+    return z < V[0][1] ? V[0][0] : V[V.length - 1][0];
+  };
+  RIVER[0] = [vx(-1850), -1850]; RIVER[1] = [vx(-1620), -1620];
+  const side = CABIN.x > vx(CABIN.z) ? 1 : -1;
+  const road = ROADS[1];
+  road.length = 0;
+  road.push([60, 0], [80, -200], [40, -480], [120, -800], [60, -1150], [-260, -1420]);
+  for (let z = -1680; z > CABIN.z + 90; z -= 230) road.push([vx(z) + side * 75, z]);
+  road.push([CABIN.x, CABIN.z]);
+}
+// Fetch and decode the baked heightmap (RGB PNG: R*256+G in 0.1 m steps). Falls back to generated mountains.
+export async function loadRealTerrain(base = 'terrain/kawuneeche') {
+  try {
+    const meta = await (await fetch(base + '.json')).json();
+    const blob = await (await fetch(base + '.png')).blob();
+    const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+    const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(bmp.width, bmp.height) : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0);
+    const px = g.getImageData(0, 0, bmp.width, bmp.height).data;
+    const h = new Float32Array(meta.w * meta.h);
+    for (let i = 0; i < h.length; i++) h[i] = (px[i * 4] * 256 + px[i * 4 + 1]) * meta.step - meta.offset;
+    setRealTerrain({ meta, h });
+    return true;
+  } catch (e) {
+    console.warn('real terrain unavailable; using generated mountains', e);
+    return false;
+  }
+}
+
 // Smooth the polylines with Catmull-Rom so rivers and roads meander naturally.
 function smoothPolyline(pts, steps = 8) {
   const v = pts.map((p) => new THREE.Vector3(p[0], 0, p[1]));
@@ -82,12 +129,25 @@ export class World {
     this.n3 = new Simplex2(seed + 13);
     this.river = smoothPolyline(RIVER, 10);
     this.roads = ROADS.map((r) => smoothPolyline(r, 8));
-    this.valley = smoothPolyline(FROST_VALLEY, 10);
+    this.valley = smoothPolyline(FROST_VALLEY, REAL ? 4 : 10);
     // floor height along the valley, resampled onto the smoothed polyline by arc length
     const seg = (pts) => { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return L; };
     this.valleyLen = seg(this.valley);
     this.valleyTotal = this.valleyLen[this.valleyLen.length - 1];
     this.cabinH = null;
+  }
+
+  // real ground height (game metres) at a point, or null outside the baked window
+  realAt(x, z) {
+    const m = REAL.meta, fx = (x - m.x0) / m.cell, fz = (z - m.z0) / m.cell;
+    if (fx < 0 || fz < 0 || fx > m.w - 1.001 || fz > m.h - 1.001) return null;
+    const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j, H = REAL.h, k = j * m.w + i;
+    return lerp(lerp(H[k], H[k + 1], tx), lerp(H[k + m.w], H[k + m.w + 1], tx), tz);
+  }
+  // how much of the real ground shows: all of it in the north, giving way to the generated pine belt to the
+  // south and to the boundary ranges at the map edges
+  realWeight(x, z) {
+    return smoothstep(-1550, -1950, z) * smoothstep(4070, 3720, Math.abs(x));
   }
 
   riverWidth(x, z) {
@@ -180,6 +240,22 @@ export class World {
         h += cw * (f + rr - t) * S * 0.7;
       }
     }
+    // Real ground in the north (see setRealTerrain); a faint fine roughness on top of the 4 m samples
+    let realW = 0;
+    if (REAL) {
+      realW = this.realWeight(x, z);
+      if (realW > 0) {
+        const r = this.realAt(x, z);
+        if (r === null) realW = 0;
+        else {
+          // the map's north boundary: the real ground climbs into a closing ridge rather than ending at a cut
+          const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3));
+          h = lerp(h, r + rise + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
+          // the creek winds down the real valley floor
+          if (d && d.vd < 8) h -= 1.0 * smoothstep(4, 1.5, d.vd) * realW;
+        }
+      }
+    }
     // Desert: terraced red mesas over sand flats
     if (R.desert > 0) {
       const m = n2.fbm(x / 1100 + 20, z / 1100 - 4, 4) + 0.035 * n.fbm(x / 90, z / 90, 3);
@@ -238,7 +314,8 @@ export class World {
     if (out) {
       out.road = smoothstep(3.9, 2.0, roadD + 1.2 * n2.noise(x / 9, z / 9));
       // main channel runs open (wet = 1); the braided side channels are iced over (wet ~0.7)
-      const braid = d && d.vd < 60 ? Math.max(smoothstep(5, 2, d.vd), 0.7 * smoothstep(60, 35, d.vd) * smoothstep(0.6, 0.68, n.noise(x / 34, z / 34) * 0.5 + 0.5)) : 0;
+      // (valley distances are scaled by the widening, so keep the braid band narrow in those units)
+      const braid = d && d.vd < 36 ? Math.max(smoothstep(4, 1.5, d.vd), 0.7 * smoothstep(36, 22, d.vd) * smoothstep(0.62, 0.7, n.noise(x / 30, z / 30) * 0.5 + 0.5)) : 0;
       out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid);
       out.town = Math.max(town, rnd * 0.32, cc, cb * 0.6);
       out.swamp = sw;
@@ -276,7 +353,8 @@ export class World {
     };
     stamp(this.river, 700, rd);
     this.roads.forEach((r, ri) => stamp(r, 24, roadD, null, null, null, ROAD_SCALE[ri] || 1));
-    stamp(this.valley, 720 * valleyWiden(1), vd, vt, this.valleyLen, this.valleyTotal, 1, valleyWiden);
+    // (the real valley carries its own width, so no widening there)
+    stamp(this.valley, REAL ? 720 : 720 * valleyWiden(1), vd, vt, this.valleyLen, this.valleyTotal, 1, REAL ? null : valleyWiden);
     return { rd, roadD, vd, vt };
   }
 
@@ -342,7 +420,7 @@ export class World {
       const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
       const t = clamp(((CABIN.x - ax) * dx + (CABIN.z - az) * dz) / L2, 0, 1);
       const tn = (this.valleyLen[s] + t * (this.valleyLen[s + 1] - this.valleyLen[s])) / this.valleyTotal;
-      const dd = Math.hypot(ax + dx * t - CABIN.x, az + dz * t - CABIN.z) / valleyWiden(tn);
+      const dd = Math.hypot(ax + dx * t - CABIN.x, az + dz * t - CABIN.z) / (REAL ? 1 : valleyWiden(tn));
       if (dd < best) { best = dd; bt = tn; }
     }
     D.vd = best; D.vt = bt;
@@ -374,7 +452,9 @@ export class World {
           const feed = (w) => {
             if (next >= bands.length) { w.terminate(); return; }
             const [a, b] = bands[next++];
-            w.postMessage({ seed: this.seed, res: RES, j0: a, j1: b });
+            // each worker gets the real heightmap with its first band
+            w.postMessage({ seed: this.seed, res: RES, j0: a, j1: b, real: w.gotReal ? null : REAL });
+            w.gotReal = true;
           };
           for (let k = 0; k < nW; k++) {
             const w = new Worker(new URL('./worldgen.worker.js', import.meta.url), { type: 'module' });

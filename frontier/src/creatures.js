@@ -122,7 +122,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         {
           vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.6, 0.95, wn.y) * (0.5 + 0.5 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.28);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.16);
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));

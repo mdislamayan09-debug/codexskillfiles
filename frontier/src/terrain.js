@@ -171,14 +171,24 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // cold granite reads darker and bluer under snow, like wet rock in a storm
   rock = mix(rock, rock * vec3(0.56, 0.6, 0.68), snowC);
 
-  vec3 snow = srgb(vec3(232,236,242));
+  vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
   snow = mix(snow, snowT * 1.15, 0.6);
   // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
   // snow follows the slope: it holds on ledges and benches (where the relief normal flattens) and sheds off
   // steep faces, instead of lying in noise-shaped blotches
-  // high faces are wind-plastered: snow clings to much steeper ground up there
-  float hiSnow = smoothstep(480.0, 760.0, wp.y + 60.0 * (fbm2(xz / 90.0) - 0.5)) * smoothstep(0.5, 0.8, snowC);
+  // high faces are wind-plastered: snow clings to steeper ground up there
+  float hiSnow = 0.5 * smoothstep(480.0, 760.0, wp.y + 60.0 * (fbm2(xz / 90.0) - 0.5)) * smoothstep(0.5, 0.8, snowC);
+  // curvature: wind strips the convex ribs and crests to rock and packs the snow into gullies and couloirs
+  float lapS = 0.0;
+  {
+    float h0 = heightAt(xz);
+    float e1 = 14.0, e2 = 40.0;
+    float l1 = (heightAt(xz + vec2(e1, 0.0)) + heightAt(xz - vec2(e1, 0.0)) + heightAt(xz + vec2(0.0, e1)) + heightAt(xz - vec2(0.0, e1))) * 0.25 - h0;
+    float l2 = (heightAt(xz + vec2(e2, 0.0)) + heightAt(xz - vec2(e2, 0.0)) + heightAt(xz + vec2(0.0, e2)) + heightAt(xz - vec2(0.0, e2))) * 0.25 - h0;
+    lapS = l1 * 0.6 + l2 * 0.25;   // metres: negative on ribs and crests, positive in gullies
+  }
+  float ribs = smoothstep(0.15, 1.4, -lapS + 0.9 * (fbm2(xz / 30.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
   float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.25, snowC), 0.42, hiSnow), mix(mix(0.5, 0.46, snowC), 0.66, hiSnow), slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
@@ -187,6 +197,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   scour = max(scour, outcrop);
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
+  snowAmt *= 1.0 - 0.85 * ribs;
+  snowAmt = max(snowAmt, smoothstep(0.6, 3.0, lapS) * smoothstep(0.4, 0.75, snowC) * smoothstep(0.62, 0.45, slope));   // gully snow
+  rockAmt = max(rockAmt, ribs * 0.9);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
   vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
