@@ -196,6 +196,8 @@ export class Player {
 
   // boardwalk floors in town
   floorAt(p) {
+    const az = Math.abs(p.z);
+    if (Math.abs(p.x) < 132 && az > 8.0 && az < 11.6) return this.world.heightAt(p.x, p.z) + 0.42;
     return -1e9;
   }
 

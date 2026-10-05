@@ -44,7 +44,7 @@ export class NPCs {
     for (let i = 0; i < 22; i++) {
       const h = new Human(outfits[i % outfits.length], 50 + i);
       const side = r() < 0.5 ? -1 : 1;
-      const x = -110 + r() * 220, z = side * (r() < 0.6 ? 13.6 : 5 + r() * 3);
+      const x = -110 + r() * 220, z = side * (r() < 0.6 ? 9.6 + r() * 1.2 : 3 + r() * 2.5);
       const a = this.add(h, 'towns', x, z, side > 0 ? Math.PI / 2 : -Math.PI / 2);
       a.lane = z; a.home = new THREE.Vector3(x, 0, z);
     }
@@ -198,7 +198,7 @@ export class NPCs {
   place(a) {
     a.pos.y = this.world.heightAt(a.pos.x, a.pos.z);
     // stand on boardwalks
-    if (a.kind === 'towns' && Math.abs(a.pos.x) < 135 && Math.abs(Math.abs(a.pos.z) - 13.4) < 1.8) a.pos.y += 0.42;
+    if (a.kind === 'towns' && Math.abs(a.pos.x) < 132 && Math.abs(a.pos.z) > 8.0 && Math.abs(a.pos.z) < 11.6) a.pos.y += 0.42;
     a.root.position.copy(a.pos);
     a.root.rotation.y = a.yaw;
   }
