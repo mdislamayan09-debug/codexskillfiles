@@ -119,7 +119,7 @@ export class Sky {
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
       fragmentShader: SKY_GLSL + /* glsl */ `
         // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
-        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.78, 0.84, 0.94) * (0.62 + 0.45 * uBlizzard), min(uStorm * 1.05, 1.0)); }
+        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.86, 0.95) * (0.8 + 0.3 * uBlizzard), min(uStorm * 1.05, 1.0)); }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
@@ -165,7 +165,7 @@ export class Sky {
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
-            cl.rgb *= mix(1.0, mix(0.5, 0.85, far), uStorm * (1.0 - uBlizzard));
+            cl.rgb *= mix(1.0, mix(0.62, 0.95, far), uStorm * (1.0 - uBlizzard));
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;

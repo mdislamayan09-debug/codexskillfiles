@@ -1087,7 +1087,18 @@ export class Vegetation {
       const px = x + r() * cell, pz = z + r() * cell;
       const sp = w.splatAt(px, pz);
       const h = w.heightAt(px, pz);
-      if (h < 0.4 || h > 980 || sp.road > 0.1) { r(); r(); continue; }
+      if (h < 0.4 || h > 980) { r(); r(); continue; }
+      if (sp.road > 0.1) {
+        // trail verges: ferns and scrub crowd the edges of forest tracks (never the wheel line itself)
+        if (pz < -700 && !blocked(px, pz)) {
+          const cl0 = w.climateAt(px, pz);
+          if (cl0.snow < 0.4 && cl0.jungle < 0.4) for (let k = 0; k < 7; k++) {
+            const bx = x + r() * cell, bz = z + r() * cell, rs = w.splatAt(bx, bz);
+            if (rs.road > 0.05 && rs.road < 0.55 && r() < 0.6) this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, 0.45 + r() * 0.6, r() < 0.75 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
+          }
+        }
+        continue;
+      }
       const cl = w.climateAt(px, pz);
       const n = w.normalAt(px, pz);
       // boulder fields: talus and erratics gather in clusters rather than dotting the ground evenly
@@ -1123,13 +1134,14 @@ export class Vegetation {
         else if (h > 70) v = pick(G.pine);
         else v = r() < 0.75 ? pick(G.oak) : pick(G.pine);
         if (sp.forest < 0.2 && cl.jungle < 0.4 && !swamp && cl.snow < 0.45 && pz > -700) v = pick(G.oak); // lone meadow oaks
-        const s = 0.8 + r() * 0.5;
+        const s = cl.snow > 0.45 ? 0.5 + r() * r() * 1.1 + r() * 0.3 : 0.8 + r() * 0.5;   // spruce stands of mixed ages
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         continue;
       }
       if (blocked(px, pz, -20)) continue;
       // ground cover by biome
-      const under = 0.05 + sp.forest * 0.45;
+      // the pine belt keeps its undergrowth right out to the trail edges, where the light gets in
+      const under = 0.05 + (pz < -700 && cl.snow < 0.4 ? Math.max(sp.forest, 0.5) : sp.forest) * 0.45;
       if (cl.jungle > 0.4) {
         if (r() < under * 2.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.1, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
       } else if (cl.snow > 0.5) {

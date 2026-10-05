@@ -246,7 +246,7 @@ export class Snowfall {
           vec4 mv = viewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           float d = -mv.z;
-          gl_PointSize = max((0.014 + 0.022 * aSeed.x * aSeed.x) * uScale / max(d, 0.3), 1.2);
+          gl_PointSize = max((0.02 + 0.03 * aSeed.x * aSeed.x) * uScale / max(d, 0.3), 1.6);
           vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.8, 2.6, d) * smoothstep(28.0, 14.0, d) * (0.55 + 0.45 * aSeed.z);
           if (vA <= 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         }`,

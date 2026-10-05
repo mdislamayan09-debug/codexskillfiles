@@ -172,7 +172,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xa48c6c, furHat: true, furHatColor: 0x6a5238, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x4c3422, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x5a3c26, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -239,6 +239,7 @@ function humanPrims(o) {
   }
   add(EL([0, 1.705, 0.098], [0.022, 0.007, 0.008]), L.lips, 'head', 0.006);
   add(EL([0, 1.81, -0.022], [0.088, 0.088, 0.096]), L.hair, 'head', 0.012); // hair cap
+  add(EL([0, 1.755, -0.052], [0.08, 0.075, 0.062]), L.hair, 'head', 0.014); // hair down the back of the head to the nape
   if (o.furHat) {
     // trapper hat: a deep fur crown with ear flaps
     add(RC([0, 1.8, -0.014], [0, 1.885, -0.014], 0.112, 0.106), L.furHat, 'head', 0.03);
@@ -673,12 +674,12 @@ export class Quadruped {
       // tail: a dock plus fanned, curved hair cards with alpha strands
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x6a4a32), 0.45).getHex(), 150, true);
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x7a5a3e), 0.55).getHex(), 120, true);
       const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.45 });
       const tcards = [];
       // a hanging switch of narrow locks: full at the dock, separating into wisps toward the hocks
-      for (let i = 0; i < 26; i++) {
-        const a = (i / 25 - 0.5) * 1.1 + (r() - 0.5) * 0.25;
+      for (let i = 0; i < 15; i++) {
+        const a = (i / 14 - 0.5) * 1.0 + (r() - 0.5) * 0.25;
         const len = 0.85 + r() * 0.4;
         const c = new THREE.PlaneGeometry(0.075 + r() * 0.035, len, 1, 8);
         c.translate(0, -len / 2, 0);

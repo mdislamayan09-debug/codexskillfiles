@@ -239,7 +239,7 @@ async function init() {
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22] }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22], trailDress: true }; },
     snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 2.5, -5.4], lookRel: [-0.9, 1.6, 18], weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
@@ -253,12 +253,12 @@ async function init() {
     const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
     const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
     let best = null, bs = -1e9;
-    for (let r = 140; r <= 460; r += 20) for (let da = -0.7; da <= 0.7; da += 0.1) {
+    for (let r = 120; r <= 420; r += 20) for (let da = -0.7; da <= 0.7; da += 0.1) {
       const a = toT + Math.PI + da; // behind the cabin, looking past it
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 3.2;
       const above = ch - cabY;
-      if (above < 40) continue;
+      if (above < 35) continue;
       // line of sight to the cabin roof
       let clear = true;
       for (let k = 1; k < 40 && clear; k++) {
@@ -272,7 +272,7 @@ async function init() {
       for (let b = -0.6; b <= 0.6; b += 0.1) for (let d = 15; d <= 200; d += 15) {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 4 - d * 0.12) blocked += Math.abs(b) < 0.3 ? 6 : 2;
       }
-      const score = -Math.abs(above - 95) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 270) * 0.08 - blocked * 3;
+      const score = -Math.abs(above - 75) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 210) * 0.1 - blocked * 3;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, dist: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), dist: 250 }; }
@@ -399,6 +399,21 @@ async function init() {
       const camX = px + rt[0] * rel[0] + f[0] * rel[2], camZ = pz + rt[1] * rel[0] + f[1] * rel[2];
       G.clearTreesNear(camX, camZ, 5);
       G.clearTreesAlong(camX, camZ, px, pz, 2.5);
+    }
+    // trailside anchors, as a set dresser would place them: a mossy boulder and a fallen trunk off the left verge,
+    // ferns and scrub around them
+    if (s.trailDress && !G.trailDressed) {
+      G.trailDressed = true;
+      const f = [Math.sin(yaw), Math.cos(yaw)], rt = [Math.cos(yaw), -Math.sin(yaw)];
+      const at = (ahead, side) => [px + f[0] * ahead + rt[0] * side, pz + f[1] * ahead + rt[1] * side];
+      const [bx, bz] = at(9, -4.6); veg.rocks.add(bx, world.heightAt(bx, bz) - 0.5, bz, 1.1, 1.5, 1);
+      const [lx, lz] = at(10.5, -6.5); veg.logs.add(lx, world.heightAt(lx, lz) - 0.05, lz, yaw + 1.25, 1.35, 0);
+      const [rx, rz] = at(15, 5.2); veg.rocks.add(rx, world.heightAt(rx, rz) - 0.4, rz, 2.4, 1.1, 3);
+      for (let i = 0; i < 14; i++) {
+        const [ux, uz] = at(3 + i * 1.3, (i % 2 ? 1 : -1) * (2.4 + (i * 0.37) % 1.6));
+        veg.bushes.add(ux, world.heightAt(ux, uz) - 0.05, uz, i * 1.3, 0.55 + (i % 3) * 0.2, i % 4 === 3 ? 7 : 3 + (i % 2));
+      }
+      veg.update(player.hpos, true);
     }
     // a frosted rock outcrop at the camera's feet to anchor a vista, as a location artist would place one
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
@@ -545,7 +560,7 @@ async function init() {
       const fo = world.splatAt(camera.position.x, camera.position.z).forest;
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 1.1 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 0.6 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);

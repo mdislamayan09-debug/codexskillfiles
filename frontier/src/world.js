@@ -313,9 +313,10 @@ export class World {
         // glacial valley: dark conifer forest on the lower walls, an open floor with scattered firs
         if (D.vd[k] < 700) {
           const vd = D.vd[k];
-          const wallBand = smoothstep(85, 150, vd) * smoothstep(430, 300, vd);
+          const edgeN = 45 * n2.fbm(x / 120 + 1.1, z / 120 - 2.2, 2);
+          const wallBand = smoothstep(85 + edgeN, 150 + edgeN, vd) * smoothstep(430, 300, vd);
           f = Math.max(f, snowLat * wallBand * smoothstep(0.3, 0.48, forest.fbm(x / 240 + 2.2, z / 240, 3) * 0.5 + 0.5) * 0.92 * smoothstep(2.5, 6.5, o.roadD));
-          f *= 1 - 0.7 * snowLat * smoothstep(110, 50, vd);
+          f *= 1 - 0.95 * snowLat * smoothstep(110, 50, vd);
           // stands of spruce out on the floor, with open snow meadows between them
           f = Math.max(f, snowLat * 0.85 * smoothstep(0.5, 0.62, forest.fbm(x / 170 - 6.6, z / 170 + 2.9, 3) * 0.5 + 0.5) * smoothstep(12, 30, vd) * smoothstep(2.5, 6.5, o.roadD));
         }

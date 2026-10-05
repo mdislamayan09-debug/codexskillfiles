@@ -251,7 +251,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float ph = dot(xz, wdir) * 1.7 + fbm2(xz * 0.2) * 7.0;
     float rip = sin(ph) * smoothstep(3.0, 0.6, fp);
     float drift = fbm2(xz / 11.0);
-    vec2 dg = wdir * rip * 0.2 * mix(0.3, 1.0, drift) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.4;
+    vec2 dg = wdir * rip * 0.2 * mix(0.3, 1.0, drift) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.4
+            + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
   }
@@ -267,7 +268,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // dark meltwater only in short open leads; most of the channel is iced and drifted over
   float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.58, 0.72, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
-  c = mix(c, mix(snow, srgb(vec3(150,170,182)), 0.55 + 0.25 * vnoise(xz * 0.6)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
+  c = mix(c, mix(srgb(vec3(112,128,140)), snow, 0.25 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);
   c = mix(c, srgb(vec3(22,30,36)), openW); tn = mix(tn, vec3(0.0, 0.0, 1.0), openW); rough = mix(rough, 0.04, openW);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));

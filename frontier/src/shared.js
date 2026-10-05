@@ -120,6 +120,8 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     float bank = smoothstep(70.0, 5.0, above) * (0.35 + 0.65 * smoothstep(0.35, 0.7, mistN(wpos.xz / 420.0)));
     float m = uMist * bank * (1.0 - exp(-dist / 1100.0));
     col = mix(col, mix(uFogColor * 1.15, fogCol, 0.4), clamp(m, 0.0, 0.85));
+    // and the far ranges step back in pale blue-grey layers
+    col = mix(col, uFogColor * vec3(1.15, 1.25, 1.45), uMist * 0.62 * (1.0 - exp(-dist / 2600.0)));
   }
   return col;
 }
