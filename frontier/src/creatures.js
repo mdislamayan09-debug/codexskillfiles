@@ -64,10 +64,10 @@ function skinnedMaterial(extraFrag = '', uniforms = {}) {
         #include <emissivemap_fragment>
         {
           vec3 Vv = normalize(vViewPosition);
-          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), 3.0);
+          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), 5.0);
           vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           float back = smoothstep(-0.2, 0.8, dot(-Vv, wsun));
-          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * fres * back * 0.9 + diffuseColor.rgb * uFogColor * fres * 0.25;
+          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * fres * back * 0.35 + diffuseColor.rgb * uFogColor * fres * 0.15;
         }`);
     },
   });
