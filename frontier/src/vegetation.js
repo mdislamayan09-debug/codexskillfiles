@@ -1129,7 +1129,8 @@ export class Vegetation {
         if (r() < 0.004) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.5 + r() * 2.0, Math.floor(r() * 4));
         continue;
       }
-      let p = sp.forest * (cl.snow > 0.45 ? 0.85 : 0.6) + 0.012;
+      // (a flat background chance sprinkled lone trees evenly over open snow like pepper; up there trees keep to stands)
+      let p = sp.forest * (cl.snow > 0.45 ? 0.85 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
       if (blocked(px, pz)) p = 0;
       if (r() < p) {
         let v;

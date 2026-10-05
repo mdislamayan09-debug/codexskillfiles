@@ -45,12 +45,12 @@ const ShaftShader = {
 
 const GradeShader = {
   uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uDeadEye: { value: 0 }, uDamage: { value: 0 }, uNight: { value: 0 }, uStorm: { value: 0 },
+    tDiffuse: { value: null }, uTime: { value: 0 }, uDeadEye: { value: 0 }, uDamage: { value: 0 }, uNight: { value: 0 }, uStorm: { value: 0 }, uForest: { value: 0 },
     uRes: { value: new THREE.Vector2(1, 1) }, uVignette: { value: 1 }, uLetterbox: { value: 0 }, uFade: { value: 0 },
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse; uniform float uTime; uniform float uDeadEye; uniform float uDamage; uniform float uNight; uniform float uStorm;
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uDeadEye; uniform float uDamage; uniform float uNight; uniform float uStorm; uniform float uForest;
     uniform vec2 uRes; uniform float uVignette; uniform float uLetterbox; uniform float uFade;
     varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
@@ -72,6 +72,12 @@ const GradeShader = {
       col = sat(col, 0.92 - uNight*0.3);
       col = mix(col, col*col*(3.0-2.0*col), 0.28);
       col = pow(max(col, 0.0), vec3(1.0)) * 1.02 + vec3(0.012, 0.01, 0.006);
+      // under the canopy: deeper shadows and richer greens, sun-warmed highlights (no milky lift)
+      {
+        vec3 c2 = col * col * (3.0 - 2.0 * col);
+        c2 = sat(c2, 1.15) * mix(vec3(0.94, 0.98, 0.94), vec3(1.06, 1.0, 0.88), smoothstep(0.2, 0.8, l));
+        col = mix(col, c2 - 0.012, uForest * 0.55);
+      }
       // storm: cold, blue-grey and low-saturation
       col = mix(col, sat(col, 0.55) * vec3(0.88, 0.96, 1.1), uStorm * 0.7);
       // night: blue shift
@@ -148,6 +154,7 @@ export class Post {
     g.uDamage.value = state.damage || 0;
     g.uNight.value = U.uNight.value;
     g.uStorm.value = state.storm || 0;
+    g.uForest.value = state.forest || 0;
     g.uLetterbox.value = state.letterbox || 0;
     g.uFade.value = state.fade || 0;
     // sun shafts from projected sun position
