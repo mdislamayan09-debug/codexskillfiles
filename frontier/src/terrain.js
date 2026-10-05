@@ -169,7 +169,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     rock = mix(rock, red * clamp(lumi(rock) / 0.09, 0.5, 1.5), des);
   }
   // cold granite reads darker and bluer under snow, like wet rock in a storm
-  rock = mix(rock, rock * vec3(0.5, 0.54, 0.62), snowC);
+  rock = mix(rock, rock * vec3(0.56, 0.6, 0.68), snowC);
 
   vec3 snow = srgb(vec3(232,236,242));
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
@@ -177,7 +177,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
   // snow follows the slope: it holds on ledges and benches (where the relief normal flattens) and sheds off
   // steep faces, instead of lying in noise-shaped blotches
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(0.3, 0.22, snowC), mix(0.5, 0.42, snowC), slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
+  // high faces are wind-plastered: snow clings to much steeper ground up there
+  float hiSnow = smoothstep(480.0, 760.0, wp.y + 60.0 * (fbm2(xz / 90.0) - 0.5)) * smoothstep(0.5, 0.8, snowC);
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.25, snowC), 0.42, hiSnow), mix(mix(0.5, 0.46, snowC), 0.66, hiSnow), slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters

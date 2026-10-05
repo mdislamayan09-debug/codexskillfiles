@@ -251,38 +251,35 @@ async function init() {
     // up-valley, over the cabin and the braided creek toward the head of the valley and the peaks beyond it
     const tx = -1420, tz = -3800;
     const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
+    const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
     let best = null, bs = -1e9;
-    for (let r = 80; r <= 520; r += 20) for (let da = -0.9; da <= 0.9; da += 0.15) {
+    for (let r = 140; r <= 460; r += 20) for (let da = -0.7; da <= 0.7; da += 0.1) {
       const a = toT + Math.PI + da; // behind the cabin, looking past it
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
-      const ch = world.heightAt(cx, cz) + 2.6;
-      if (ch < world.heightAt(CABIN.x, CABIN.z) + 25) continue;
-      // line of sight to the cabin and 1.5 km down-valley must clear the ground
-      let clear = 1;
-      for (const [px, pz, ph] of [[CABIN.x, CABIN.z, world.heightAt(CABIN.x, CABIN.z) + 3], [tx, tz, world.heightAt(tx, tz) + 20]]) {
-        for (let k = 1; k < 40; k++) {
-          const t = k / 40, x = cx + (px - cx) * t, z = cz + (pz - cz) * t, y = ch + (ph - ch) * t;
-          if (world.heightAt(x, z) > y - 1.5) { clear = 0; break; }
-        }
+      const ch = world.heightAt(cx, cz) + 3.2;
+      const above = ch - cabY;
+      if (above < 40) continue;
+      // line of sight to the cabin roof
+      let clear = true;
+      for (let k = 1; k < 40 && clear; k++) {
+        const t = k / 40;
+        if (world.heightAt(cx + (CABIN.x - cx) * t, cz + (CABIN.z - cz) * t) > ch + (cabY - ch) * t - 1.5) clear = false;
       }
       if (!clear) continue;
-      // nothing rising into the frame on either side of the view: a lookout, not a ledge beside a cliff
-      const va = Math.atan2(tx - cx, tz - cz);
+      // nothing rising into the frame either side of the view
+      const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
       let blocked = 0;
-      for (let a = -0.55; a <= 0.55; a += 0.11) for (let d = 15; d <= 240; d += 15) {
-        if (world.heightAt(cx + Math.sin(va + a) * d, cz + Math.cos(va + a) * d) > ch - 3 - d * 0.03) blocked += Math.abs(a) < 0.3 ? 10 : 1;
+      for (let b = -0.6; b <= 0.6; b += 0.1) for (let d = 15; d <= 200; d += 15) {
+        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 4 - d * 0.12) blocked += Math.abs(b) < 0.3 ? 6 : 2;
       }
-      if (blocked > 6) continue;
-      const above = ch - world.heightAt(CABIN.x, CABIN.z);
-      const score = -Math.abs(above - 110) - Math.abs(da) * 30 - Math.abs(r - 300) * 0.06 - blocked * 4;
-      if (score > bs) { bs = score; best = { cx, cz }; }
+      const score = -Math.abs(above - 95) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 270) * 0.08 - blocked * 3;
+      if (score > bs) { bs = score; best = { cx, cz, ch, va, dist: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
     }
-    best = best || { cx: CABIN.x + 120, cz: CABIN.z - 60 };
-    // aim between the cabin and the valley floor beyond it
-    // aim far down the valley so the horizon and storm sky fill the top of the frame, cabin below
-    // pitch down a few degrees so the horizon sits about a third of the way down the frame, cabin below centre
-    const ch = world.heightAt(best.cx, best.cz) + 3.2, dist = Math.hypot(tx - best.cx, tz - best.cz);
-    return { ...best, tx, tz, th: ch - 0.17 * dist - world.heightAt(tx, tz) };
+    if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), dist: 250 }; }
+    // aim so the cabin sits in the lower third, with the valley and the storm sky above it
+    const pitch = Math.atan2(cabY - best.ch, best.dist) + 0.21;
+    const D = 1200, lx = best.cx + Math.sin(best.va) * D, lz = best.cz + Math.cos(best.va) * D;
+    return { cx: best.cx, cz: best.cz, tx: lx, tz: lz, th: best.ch + Math.tan(pitch) * D - world.heightAt(lx, lz) };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -397,6 +394,11 @@ async function init() {
         if (hm < hp) rel[0] = -rel[0];
       }
       G.camOverride = { rel, lookRel: s.lookRel };
+      // keep the lens clear: no boughs between the camera and the rider
+      const f = [Math.sin(yaw), Math.cos(yaw)], rt = [Math.cos(yaw), -Math.sin(yaw)];
+      const camX = px + rt[0] * rel[0] + f[0] * rel[2], camZ = pz + rt[1] * rel[0] + f[1] * rel[2];
+      G.clearTreesNear(camX, camZ, 5);
+      G.clearTreesAlong(camX, camZ, px, pz, 2.5);
     }
     // a frosted rock outcrop at the camera's feet to anchor a vista, as a location artist would place one
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
@@ -404,7 +406,7 @@ async function init() {
       const c = G.camOverride.pos, l = G.camOverride.look;
       // clear the lookout itself, and a sightline down to the cabin, as a location artist would
       G.clearTreesNear(c.x, c.z, 40);
-      G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 14, 0.85);
+      G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 10, 0.8);
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
       const g0 = world.heightAt(c.x, c.z);
       // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
