@@ -104,58 +104,53 @@ export function barkTexture(seed = 5, base = [70, 58, 46]) {
   return tex(c, { repeat: true });
 }
 
-// Weathered plank siding. paint: [r,g,b] or null for bare wood
+// Weathered clapboard siding: long horizontal boards, soft grain, lap shadows, optional peeling paint.
 export function plankTexture(seed = 7, paint = null, vertical = false) {
   const [c, g] = canvas(512, 512);
   const r = mulberry32(seed);
   const boards = 16;
   const bw = 512 / boards;
   for (let b = 0; b < boards; b++) {
-    const tone = -18 + r() * 30;
-    const wood = [112 + tone, 86 + tone, 60 + tone * 0.8];
+    const tone = -10 + r() * 16;
+    // weathered grey-brown timber
+    const wood = [104 + tone, 92 + tone, 76 + tone * 0.8];
     g.fillStyle = `rgb(${wood})`;
     g.fillRect(0, b * bw, 512, bw);
-    // grain
-    for (let k = 0; k < 40; k++) {
-      g.strokeStyle = `rgba(40,28,18,${0.06 + r() * 0.12})`;
-      g.lineWidth = 0.8 + r() * 1.5;
-      const y = b * bw + r() * bw;
+    // long soft grain: low-contrast sinuous lines spanning the whole board
+    for (let k = 0; k < 7; k++) {
+      g.strokeStyle = `rgba(${r() < 0.5 ? '60,48,36' : '150,136,112'},${0.08 + r() * 0.08})`;
+      g.lineWidth = 0.6 + r() * 1.0;
+      const y = b * bw + 3 + r() * (bw - 6), ph = r() * 6, amp = 0.6 + r() * 1.2;
       g.beginPath(); g.moveTo(0, y);
-      for (let x = 0; x <= 512; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + k) * 1.5 + (r() - 0.5) * 1.5);
+      for (let x = 0; x <= 512; x += 16) g.lineTo(x, y + Math.sin(x * 0.011 + ph) * amp);
       g.stroke();
     }
-    // knots
-    for (let k = 0; k < 1; k++) {
-      if (r() < 0.7) continue;
-      g.fillStyle = 'rgba(50,32,20,0.6)';
-      g.beginPath(); g.ellipse(r() * 512, b * bw + bw / 2, 5 + r() * 6, 3 + r() * 3, 0, 0, 7); g.fill();
-    }
     if (paint) {
-      // peeling paint
-      g.fillStyle = `rgba(${paint},0.88)`;
+      g.fillStyle = `rgba(${paint},0.86)`;
       g.fillRect(0, b * bw + 1, 512, bw - 2);
-      for (let k = 0; k < 70; k++) {
-        g.fillStyle = `rgba(${wood},${0.6 + r() * 0.4})`;
-        const x = r() * 512, y = b * bw + r() * bw;
-        g.beginPath(); g.ellipse(x, y, 3 + r() * 26, 1 + r() * 4, 0, 0, 7); g.fill();
+      // peeling: long thin flakes along the grain
+      for (let k = 0; k < 18; k++) {
+        g.fillStyle = `rgba(${wood},${0.5 + r() * 0.4})`;
+        const x = r() * 512, y = b * bw + 2 + r() * (bw - 4);
+        g.beginPath(); g.ellipse(x, y, 6 + r() * 34, 0.8 + r() * 1.8, 0, 0, 7); g.fill();
       }
-      // grime gradient towards bottom of each board
-      const gr = g.createLinearGradient(0, b * bw, 0, b * bw + bw);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(30,20,10,0.25)');
-      g.fillStyle = gr; g.fillRect(0, b * bw, 512, bw);
     }
     // lap shadow under each board + highlight on its lower lip
-    const lg = g.createLinearGradient(0, b * bw, 0, b * bw + 6);
-    lg.addColorStop(0, 'rgba(10,6,3,0.75)'); lg.addColorStop(1, 'rgba(10,6,3,0)');
-    g.fillStyle = lg; g.fillRect(0, b * bw, 512, 6);
-    g.fillStyle = 'rgba(255,240,210,0.08)'; g.fillRect(0, b * bw + bw - 2, 512, 2);
-    // board butt joints, staggered
-
+    const lg = g.createLinearGradient(0, b * bw, 0, b * bw + 7);
+    lg.addColorStop(0, 'rgba(12,8,5,0.7)'); lg.addColorStop(1, 'rgba(12,8,5,0)');
+    g.fillStyle = lg; g.fillRect(0, b * bw, 512, 7);
+    g.fillStyle = 'rgba(255,240,210,0.07)'; g.fillRect(0, b * bw + bw - 2, 512, 2);
   }
-  // overall weathering: soft grime toward the bottom of the texture tile
+  // grime: darker toward the bottom of the tile and a few rain streaks from nail lines
   const wg = g.createLinearGradient(0, 0, 0, 512);
-  wg.addColorStop(0, 'rgba(20,14,8,0)'); wg.addColorStop(1, 'rgba(20,14,8,0.18)');
+  wg.addColorStop(0, 'rgba(20,14,8,0)'); wg.addColorStop(1, 'rgba(20,14,8,0.16)');
   g.fillStyle = wg; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 6; i++) {
+    const x = r() * 512;
+    const sg = g.createLinearGradient(x, 0, x, 512);
+    sg.addColorStop(0, 'rgba(30,22,14,0.10)'); sg.addColorStop(1, 'rgba(30,22,14,0)');
+    g.fillStyle = sg; g.fillRect(x, 0, 3 + r() * 4, 512);
+  }
   const t = tex(c, { repeat: true });
   if (vertical) { t.rotation = Math.PI / 2; t.center.set(0.5, 0.5); }
   return t;
