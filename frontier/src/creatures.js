@@ -55,7 +55,7 @@ function buildBones(spec) {
 }
 
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
-const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.88, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8';
+const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8'; // coat (index 3) is worn leather
 const ROUGH_QUAD = '0.6, 0.58, 0.35, 0.5, 0.72, 0.65, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
 function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
@@ -121,7 +121,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 
 // ===================================================================================== HUMANS
 export const OUTFITS = {
-  arthur: { coat: 0x5c544c, shirt: 0x6a7a8e, vest: 0x5a4632, pants: 0x4a423a, hat: 0x2e2620, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null },
+  arthur: { coat: 0x5e432c, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },

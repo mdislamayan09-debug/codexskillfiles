@@ -120,7 +120,7 @@ export class Sky {
           vec3 s = normalize(uSunDir);
           vec3 col = skyColor(d, s);
           // storm: a low, flat, blue-grey overcast
-          col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.87, 0.98) * 0.8, uStorm * 0.8);
+          col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.87, 0.98) * 0.7, uStorm * 0.85);
           float day = smoothstep(-0.12, 0.25, s.y);
           // sun disc
           float mu = dot(d, s);
@@ -151,7 +151,8 @@ export class Sky {
             vec3 ambTop = zen * 0.62 + hor * 0.14 + vec3(0.006, 0.008, 0.014);
             vec3 ambBot = mix(hor, vec3(0.30, 0.27, 0.2) * day, 0.5) * 0.16 + vec3(0.003, 0.004, 0.008);
             ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
-            ambBot *= 1.0 - 0.45 * uStorm;
+            ambBot *= 1.0 - 0.6 * uStorm;
+            ambTop *= 1.0 - 0.35 * uStorm;
             vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.8 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
@@ -279,7 +280,7 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= 1 + 5.5 * W.blizzard + 0.6 * W.storm + 0.9 * W.humid - 0.4 * W.dry;
+    U.uFogDensity.value *= (1 + 5.5 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
 

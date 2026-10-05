@@ -111,7 +111,7 @@ async function init() {
   // pooled lamp lights for night
   const lamps = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffa850, 0, 18, 1.8); scene.add(l); return l; });
 
-  Object.assign(G, { world, sky, terrain, town, veg, water, particles, tracers, npcs, player, hud, audio, input, post, scene, camera, renderer });
+  Object.assign(G, { world, sky, terrain, town, veg, water, particles, tracers, npcs, player, hud, audio, input, post, scene, camera, renderer, snowTrail });
   player.onStep = (kind, v) => (kind === 'hoof' ? audio.hoof(v) : audio.step());
   npcs.onAlert = () => { hud.feed('The Cutter Gang has spotted you', 'bad'); hud.subtitle('"There he is! Kill him!"', 3); };
   npcs.onPlayerHit = (dmg) => { if (player.dead) return; player.health -= dmg; G.damage = 1; if (player.health <= 0) die(); };
@@ -241,7 +241,7 @@ async function init() {
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22] }; },
     snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.6, 2.6, -6.5], lookRel: [0, 2.2, 16], weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { weather: { storm: 0.85, blizzard: 0.12 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
@@ -358,6 +358,15 @@ async function init() {
         if (hm < hp) rel[0] = -rel[0];
       }
       G.camOverride = { rel, lookRel: s.lookRel };
+    }
+    // a frosted rock outcrop at the camera's feet to anchor a vista, as a location artist would place one
+    if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
+      G.fgPlaced = true;
+      const c = G.camOverride.pos, l = G.camOverride.look;
+      const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
+      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff; veg.rocks.add(x, world.heightAt(x, z) - 0.4 * scale, z, f * 1.3, scale, v); };
+      put(4.5, -3.2, 2.6, 0); put(6.0, 2.8, 2.1, 1); put(3.2, 0.6, 1.3, 2); put(7.5, -6.5, 3.2, 3); put(5.5, 6.8, 1.7, 2);
+      for (let i = 0; i < 9; i++) { const x = c.x + d.x * (2.5 + i * 0.7) + rt.x * (-4 + i), z = c.z + d.z * (2.5 + i * 0.7) + rt.z * (-4 + i); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');

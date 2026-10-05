@@ -1,7 +1,7 @@
 // Vegetation: GPU grass fields, procedural trees (oak / pine / cypress) with distant impostors,
 // bushes, ferns and rocks. Everything is instanced and streamed around the camera.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
@@ -834,7 +834,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
 // ---------------------------------------------------------------------------- rocks
 function rockGeometry(seed) {
   const n = new Simplex2(seed);
-  const g = new THREE.IcosahedronGeometry(1, 4);
+  // welded so the boulder gets smooth normals instead of a faceted, low-poly look
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 5).deleteAttribute('uv').deleteAttribute('normal'));
   const p = g.attributes.position;
   const v = new THREE.Vector3();
   const sx = 1 + (seed % 3) * 0.3, sz = 0.8 + (seed % 5) * 0.12;
@@ -843,7 +844,7 @@ function rockGeometry(seed) {
     const d = 1 + 0.32 * n.fbm(v.x * 1.4 + seed, v.y * 1.4 + v.z, 4) + 0.12 * n.noise(v.x * 5, v.z * 5 + v.y * 3);
     v.multiplyScalar(d);
     // facet/strata flattening
-    v.y = Math.round(v.y * 6) / 6 * 0.35 + v.y * 0.65;
+    v.y = Math.round(v.y * 6) / 6 * 0.12 + v.y * 0.88;
     v.x *= sx; v.z *= sz;
     if (v.y < -0.2) v.y = -0.2 - (v.y + 0.2) * 0.2;
     p.setXYZ(i, v.x, v.y * 0.75, v.z);
@@ -970,7 +971,7 @@ export class Vegetation {
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(950 + i), fr = [];
       const n = 9 + Math.floor(rnd() * 5);
-      for (let k = 0; k < n; k++) { const g = frondGeo(1.3 + rnd() * 0.7, 0.55, 0.6, 1.35); g.rotateY((k / n) * 6.28 + rnd() * 0.3); g.translate(0, 0.05, 0); fr.push(g); }
+      for (let k = 0; k < n; k++) { const g = frondGeo(1.4 + rnd() * 0.8, 0.5, 1.05, 0.95); g.rotateY((k / n) * 6.28 + rnd() * 0.3); g.translate(0, 0.05, 0); fr.push(g); }
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(fr), (x, y, z) => Math.hypot(x, z) * 0.4), true), material: fernMat, castShadow: false }] });
     }
     const bigT = bigLeafTexture(), bigMat = leafMat(bigT, 0xd0dcc0);

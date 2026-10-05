@@ -286,7 +286,7 @@ export class SnowTrail {
     for (let i = 0; i < max - 1; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
     g.setIndex(idx);
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
-    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     patchMaterial(m, {
       fragColor: /* glsl */ `
         #include <color_fragment>
@@ -341,7 +341,7 @@ export class SnowTrail {
       for (let s = 0; s < 2; s++) {
         const sx = x + (s ? -tz : tz) * W, sz = z + (s ? tx : -tx) * W;
         const k = (i * 2 + s);
-        P[k * 3] = sx; P[k * 3 + 1] = this.world.heightAt(sx, sz) + 0.03; P[k * 3 + 2] = sz;
+        P[k * 3] = sx; P[k * 3 + 1] = this.world.heightAt(sx, sz) + 0.14; P[k * 3 + 2] = sz;
         N[k * 3] = 0; N[k * 3 + 1] = 1; N[k * 3 + 2] = 0;
         UV[k * 2] = s; UV[k * 2 + 1] = along * 0.5;
       }

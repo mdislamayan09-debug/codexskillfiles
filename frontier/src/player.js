@@ -10,7 +10,7 @@ export class Player {
   constructor({ world, town, veg, scene, camera, input }) {
     Object.assign(this, { world, town, veg, scene, camera, input });
     this.rider = new Human('arthur', 7);
-    this.horse = new Quadruped('horse', 11, 'pinto');
+    this.horse = new Quadruped('horse', 11, 'bay'); // a dark bay, like the reference rides
     scene.add(this.horse.root);
     this.pos = new THREE.Vector3();
     this.yaw = 0; this.speed = 0; this.vy = 0; this.grounded = true;

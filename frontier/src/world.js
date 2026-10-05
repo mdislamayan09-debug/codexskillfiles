@@ -62,7 +62,7 @@ export const ROADS = [
 export const PINE_TRAIL = 5; // index of the logging trail in ROADS
 // width multiplier per road: distances are scaled by this before the road mask and clearing, so a value of 2.6
 // turns a wagon road into a narrow foot-and-hoof trail
-const ROAD_SCALE = [1, 1, 1, 1, 1.15, 2.6];
+const ROAD_SCALE = [1, 1, 1, 1, 1.15, 1.8];
 
 // Smooth the polylines with Catmull-Rom so rivers and roads meander naturally.
 function smoothPolyline(pts, steps = 8) {
