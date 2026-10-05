@@ -77,7 +77,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // clover/flower specks
   grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.35);
   vec3 forestFloor = mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8+0.3*micro);
-  vec3 dirt = mix(srgb(vec3(116,92,66)), srgb(vec3(138,112,82)), micro);
+  vec3 dirt = mix(srgb(vec3(104,80,56)), srgb(vec3(128,100,72)), micro);
   vec3 roadC = mix(srgb(vec3(128,104,78)), srgb(vec3(104,84,64)), vnoise(xz*0.6)) * (0.88+0.2*micro);
   vec3 mud = srgb(vec3(62,52,40)) * (0.85+0.25*micro);
   vec3 rock = mix(srgb(vec3(96,92,86)), srgb(vec3(70,68,66)), fbm2(xz/7.0)) * (0.75+0.4*micro);
@@ -145,6 +145,19 @@ export class Terrain {
         float camD = length(vWPos - cameraPosition);
         float bumpS = 0.9 * smoothstep(120.0, 10.0, camD);
         nW = normalize(nW + vec3(b0-b1, 0.0, b0-b2) * bumpS * 1.8);
+        // far-field rock relief on steep high ground: gullies, buttresses and strata the
+        // 2.7 m heightfield can't carry, so mountains read eroded rather than smooth cones
+        {
+          float steep = smoothstep(0.12, 0.4, 1.0 - nW.y) * smoothstep(60.0, 160.0, vWPos.y);
+          if (steep > 0.0) {
+            float E = 3.0;
+            vec2 q = vWPos.xz;
+            float g0 = fbm2(q / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2(q / 7.0);
+            float gx = fbm2((q + vec2(E, 0.0)) / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2((q + vec2(E, 0.0)) / 7.0);
+            float gz = fbm2((q + vec2(0.0, E)) / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2((q + vec2(0.0, E)) / 7.0);
+            nW = normalize(nW + vec3(g0 - gx, 0.0, g0 - gz) * steep * 3.5);
+          }
+        }
         float tr;
         diffuseColor.rgb = terrainAlbedo(vWPos, nW, tr);
         // distant forests read as a canopy mass (impostors thin out with distance)

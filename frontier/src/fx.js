@@ -161,8 +161,8 @@ export class Campfire {
       { color: [6, 2.2, 0.5], alpha: 0.9, size: 0.45, life: 0.55, grow: -1.2, drag: 1, add: 1 });
     if (Math.random() < dt * 6) this.particles.emit(this.pos.clone().add(new THREE.Vector3(0, 0.3, 0)), new THREE.Vector3((Math.random() - 0.5) * 0.4, 2.2 + Math.random(), (Math.random() - 0.5) * 0.4),
       { color: [8, 3, 0.6], alpha: 1, size: 0.05, life: 1.8, grow: 0, drag: 0.3, add: 1 });
-    if (Math.random() < dt * 8) this.particles.emit(this.pos.clone().add(new THREE.Vector3(0, 1.0, 0)), new THREE.Vector3(0, 1.1, 0),
-      { color: [0.55, 0.52, 0.5], alpha: 0.35, size: 0.8, life: 5, grow: 0.5, drag: 0.4 });
+    if (Math.random() < dt * 14) this.particles.emit(this.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.0, (Math.random() - 0.5) * 0.3)), new THREE.Vector3((Math.random() - 0.5) * 0.2, 1.0 + Math.random() * 0.4, (Math.random() - 0.5) * 0.2),
+      { color: [0.75, 0.62, 0.52], alpha: 0.4, size: 0.9, life: 6, grow: 0.55, drag: 0.35 });
   }
 }
 

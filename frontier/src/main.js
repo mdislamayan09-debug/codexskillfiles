@@ -218,7 +218,7 @@ async function init() {
     forest: () => { const f = G.findForest(-200, -650); return { time: 8.4, player: [f[0], f[1], 0.4], camRel: [-3.2, 1.5, -4.2], lookRel: [0, 1.6, 0] }; },
     vista: () => ({ time: 17.8, player: [-60, 280, -0.2], cam: [-60, null, 330, 30], look: [40, null, -700, 120] }),
     gallop: () => ({ time: 17.2, player: [62, -330, Math.PI], camRel: [7.5, 1.8, 2.5], lookRel: [0, 1.6, 0.6], gallop: true }),
-    camp: () => ({ time: 20.4, player: [CAMP.x - 18, CAMP.z + 14, 2.2], cam: [CAMP.x - 14, null, CAMP.z + 16, 2.2], look: [CAMP.x, null, CAMP.z, 1] }),
+    camp: () => ({ time: 20.4, player: [CAMP.x - 18, CAMP.z + 14, 2.2], cam: [CAMP.x - 7.5, null, CAMP.z + 6.5, 1.55], look: [CAMP.x + 2, null, CAMP.z - 2, 1.1] }),
     night: () => ({ time: 21.5, player: [-20, 2, Math.PI / 2], cam: [-46, null, -1, 2.4], look: [60, null, -3, 4] }),
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
@@ -270,6 +270,15 @@ async function init() {
     document.getElementById('title').classList.remove('show');
     document.getElementById('loading').classList.add('done');
     veg.update(player.hpos, true);
+    // pre-warm campfire smoke columns that would already be hanging in the air
+    for (const c of campfires) {
+      if (c.pos.distanceTo(player.hpos) > 120) continue;
+      for (let i = 0; i < 45; i++) {
+        const h = Math.random() * 7;
+        particles.emit(c.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * (0.3 + h * 0.25) + h * 0.15, 0.8 + h, (Math.random() - 0.5) * (0.3 + h * 0.25))),
+          new THREE.Vector3(0, 0.6, 0), { color: [0.75, 0.62, 0.52], alpha: 0.38 * (1 - h / 8), size: 0.8 + h * 0.35, life: 4, grow: 0.3, drag: 0.4 });
+      }
+    }
     if (s.gallop) {
       // pre-warm the dust trail a galloping horse would already have kicked up
       const back = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));

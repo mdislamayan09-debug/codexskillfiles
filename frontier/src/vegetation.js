@@ -480,7 +480,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
-      float hgt = mix(0.24, 0.62, smoothstep(0.3, 0.75, field)) * (0.65 + 0.5*aOff.w) * (0.9 + 0.3*dry);
+      float hgt = mix(0.18, 0.66, smoothstep(0.25, 0.8, field)) * (0.55 + 0.7*aOff.w) * (0.85 + 0.35*dry) * (0.7 + 0.6 * fbm2(xz / 9.0));
       hgt *= alive * fade;
       float ang = aOff.z * 37.0 + aOff.w * 11.0;
       float ca = cos(ang), sa = sin(ang);
@@ -500,7 +500,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec3 dryc = mix(srgbV(vec3(235,205,140)), srgbV(vec3(210,190,130)), aOff.z);
       float midV = fbm2(xz / 34.0 + 9.0);
       float dryPatch = smoothstep(0.5, 0.72, fbm2(xz / 58.0 - 4.0));
-      vGCol = mix(lush, dryc, max(dry, dryPatch * 0.7)) * 1.1 * (0.8 + 0.42 * midV);
+      vGCol = mix(lush, dryc, max(dry, dryPatch * 0.85)) * 1.1 * (0.68 + 0.62 * midV);
       vGCol = mix(vGCol, vGCol * vec3(1.08, 0.98, 0.78), smoothstep(0.6, 0.8, fbm2(xz / 18.0)) * 0.5);
       vGY = y;
     `,

@@ -95,3 +95,15 @@ code-only browser build can approach but not match.
 
 Next pieces to loop on, in the critic's order: characters, sun-tinted fog and shafts, terrain wear and paths,
 set-dressing density, foliage shading.
+
+### Round 5 — blind critic: 0 / 8 (all landslides)
+Gaps: near-black rider clothing, no visible mane, tiny fire pool, white canopy tops, stair-stepped grass edges,
+no ripples. Builder response: lifted clothing albedo, sculpted mane ridge plus 22 hair cards, 900 cd fire,
+toned foliage, noise-broken grass density, water ripple rings and foam around legs, porch-framed town shot,
+wider worn paths.
+
+### Round 6 — blind critic: 0 / 8 (town "clearly", the rest landslides)
+The porch-framed town shot is the closest yet. Remaining gaps the critic repeats every round: mannequin
+characters, flat atmosphere, no material breakdown, cone mountains, empty foregrounds. Builder response (round 7):
+far-field rock relief on steep high ground (gullies and strata in the shader), stronger pasture hue/height
+variation with muddier paths, camera pushed into the outlaw camp, denser lit smoke.
