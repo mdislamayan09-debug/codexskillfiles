@@ -304,6 +304,16 @@ export class Town {
     for (let i = 0; i < 4; i++) this.wagon(-90 + i * 60 + r() * 10, (r() < 0.5 ? -1 : 1) * 6.5, r() * 0.3 - 0.15 + (r() < 0.5 ? 0 : Math.PI));
     // water tower behind the street
     this.waterTower(-30, -38);
+    // street clutter: troughs, hay, crates, barrels clustered by the boardwalks
+    for (let i = 0; i < 26; i++) {
+      const x = -125 + r() * 250, side = r() < 0.5 ? -1 : 1, z = side * (7.15 + r() * 0.3);
+      const y = this.h(x, z);
+      const k = r();
+      if (k < 0.3) { B.add(M.bare, box(2.2, 0.55, 0.7, x, y + 0.28, z, r() * 0.2)); B.add(M.water, box(2.0, 0.05, 0.5, x, y + 0.5, z)); }
+      else if (k < 0.55) { B.add(M.hay, box(1.1, 0.5, 0.55, x, y + 0.25, z, r())); if (r() < 0.5) B.add(M.hay, box(1.1, 0.5, 0.55, x + 0.2, y + 0.75, z, r())); }
+      else if (k < 0.8) { for (let j = 0; j < 3; j++) B.add(M.bare, this.barrelGeo(x + j * 0.7, y + 0.45, z + (r() - 0.5) * 0.4)); }
+      else { B.add(M.bare2, box(0.9, 0.9, 0.9, x, y + 0.45, z, r())); B.add(M.bare2, box(0.7, 0.7, 0.7, x + 0.2, y + 1.25, z, r())); }
+    }
   }
 
   wagon(x, z, ry) {

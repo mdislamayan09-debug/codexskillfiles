@@ -201,7 +201,7 @@ export class HUD {
 
   drawMini(pos, yaw, game) {
     const g = this.mini, S = 220, R = S / 2;
-    const scale = 2.4; // map px per world px at minimap
+    const scale = 1.35; // minimap zoom
     const src = this.mapCanvas, ms = src.width;
     g.save();
     g.clearRect(0, 0, S, S);

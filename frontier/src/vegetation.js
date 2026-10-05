@@ -619,6 +619,7 @@ export class Vegetation {
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
 
     this.scatter();
+    this.dressHomesteads();
 
     // impostors for every tree
     this.atlas = renderImpostorAtlas(renderer, this.treeBuilds, this.treeBuilds.length);
@@ -668,6 +669,22 @@ export class Vegetation {
     }
   }
 
+  // hand-placed shade trees around homesteads (authored, like a set dresser would)
+  dressHomesteads() {
+    const w = this.world, R = RANCH;
+    const spots = [[-72, -44], [-70, 18], [-4, -60], [58, -48], [64, 34], [-36, 52], [20, 56], [-92, -6]];
+    spots.forEach(([dx, dz], i) => {
+      const x = R.x + dx, z = R.z + dz;
+      this.trees.add(x, w.heightAt(x, z) - 0.2, z, i * 1.7, 1.05 + (i % 3) * 0.15, i % 4);
+    });
+    // trees behind the main street buildings
+    for (let i = 0; i < 18; i++) {
+      const side = i % 2 ? 1 : -1;
+      const x = -140 + i * 16 + (i % 3) * 3, z = side * (40 + (i % 4) * 9);
+      this.trees.add(x, w.heightAt(x, z) - 0.2, z, i * 2.3, 0.9 + (i % 3) * 0.15, i % 4);
+    }
+  }
+
   buildImpostors(scene) {
     const items = this.trees.items;
     const g = new THREE.InstancedBufferGeometry();
@@ -701,7 +718,7 @@ export class Vegetation {
           vec3 toCam = cameraPosition - base; toCam.y = 0.0;
           float d = length(toCam);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
-          vFade = smoothstep(uNear - 25.0, uNear, d);
+          vFade = smoothstep(uNear - 25.0, uNear, d) * smoothstep(2600.0, 1500.0, d);
           vec3 p = base + right * position.x * h + vec3(0.0, (position.y * h) - 0.5 * s, 0.0);
           // gentle sway of top
           p += right * sin(uTime*1.2 + base.x*0.03) * 0.15 * position.y * position.y;

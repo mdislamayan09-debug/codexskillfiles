@@ -29,3 +29,18 @@ horseback shot, train-robbery ride, forest hunt, Strawberry establishing shot.
   outlaw AI, HUD, procedural audio, post stack (god rays, GTAO, bloom, film grade).
 - Bugs fixed before any critique: tree-impostor bake leaked the canvas viewport (black screen); pine cards were
   edge-on from the side (floating specks); shadow frustum did not reach the mid-ground.
+
+### Round 1 — blind critic: 0 / 8
+| piece | winner | biggest gap named by the critic | builder response |
+| --- | --- | --- | --- |
+| ranch | RDR2 | buildings are boxes dropped on an even grass field | dirt yards, hand-placed shade trees, tighter framing |
+| vista | RDR2 | ground and trees ignore the pink dusk sky | env-map driven ambient (PMREM ×0.75–0.95), hemi light cut, impostors relit in-shader |
+| ride | RDR2 | rider and horse are rough mannequins | **new SDF-sculpted, skinned horse + rider** (surface nets, bone weights), hair-card tail, rim light |
+| swamp | RDR2 | water is a clean mirror lake, not murk | depth absorption ×2.4, weaker near-field Fresnel, 2.6k lily pads |
+| gallop | RDR2 | no depth: every distance equally sharp | height fog density ×2 with steeper falloff, light motes |
+| forest | RDR2 | it isn't a forest; bloom blows out the sky | shot now searches for dense forest; bloom threshold 0.95 → 2.2, shafts −35% |
+| town | RDR2 | empty street, no people, props or wear | 22 townsfolk, saddled horses at hitching rails, troughs/hay/barrels, wheel ruts and puddles, clapboard siding |
+| camp | RDR2 | campfire lights nothing | 160 cd shadow-casting fire light with flicker, procedural flame billboards, brighter moonlight, round stars |
+
+Cross-cutting fixes: grass rebuilt as alpha clump cards (~30 painted blades + seed heads per card),
+foliage self-occlusion via vertex AO, distant forest canopy tint on terrain, impostor fade beyond 1.5 km.
