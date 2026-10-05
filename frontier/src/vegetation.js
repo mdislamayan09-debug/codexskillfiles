@@ -497,7 +497,10 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       transformed.y = h0 + y * hgt * (1.0 - 0.25*min(length(lean),1.0)*bend) - 0.02;
       vec3 lush = mix(srgbV(vec3(150,170,110)), srgbV(vec3(190,196,130)), aOff.w);
       vec3 dryc = mix(srgbV(vec3(235,205,140)), srgbV(vec3(210,190,130)), aOff.z);
-      vGCol = mix(lush, dryc, dry) * 1.1;
+      float midV = fbm2(xz / 34.0 + 9.0);
+      float dryPatch = smoothstep(0.5, 0.72, fbm2(xz / 58.0 - 4.0));
+      vGCol = mix(lush, dryc, max(dry, dryPatch * 0.7)) * 1.1 * (0.8 + 0.42 * midV);
+      vGCol = mix(vGCol, vGCol * vec3(1.08, 0.98, 0.78), smoothstep(0.6, 0.8, fbm2(xz / 18.0)) * 0.5);
       vGY = y;
     `,
     beginNormal: /* glsl */ `
