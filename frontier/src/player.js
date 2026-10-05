@@ -96,6 +96,9 @@ export class Player {
 
     // horse pose
     this.horse.root.position.copy(this.hpos);
+    // hooves sink into deep snow up to the fetlocks
+    this.snowDepth = THREE.MathUtils.smoothstep(W.climateAt(this.hpos.x, this.hpos.z).snow, 0.45, 0.8);
+    this.horse.root.position.y -= 0.24 * this.snowDepth;
     this.horse.root.rotation.y = this.hyaw;
     // pitch horse to terrain slope
     const fwd = tmp.set(Math.sin(this.hyaw), 0, Math.cos(this.hyaw));

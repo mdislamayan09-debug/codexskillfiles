@@ -15,6 +15,7 @@ export const U = {
   uFogSunColor: { value: new THREE.Color(1.0, 0.8, 0.55) },
   uFogDensity: { value: 0.0009 },
   uFogFalloff: { value: 0.022 },
+  uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
   uWind: { value: new THREE.Vector2(1, 0.3) },
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
@@ -84,12 +85,14 @@ uniform vec3 uFogColor;
 uniform vec3 uFogSunColor;
 uniform float uFogDensity;
 uniform float uFogFalloff;
+uniform float uFogBase;
 uniform float uNight;
 vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 ray = wpos - cameraPosition;
   float dist = length(ray);
   vec3 rd = ray / max(dist, 1e-4);
-  float camH = max(cameraPosition.y, 0.0);
+  // the fog layer follows the local ground, so mountain valleys are as hazy as the lowlands
+  float camH = max(cameraPosition.y - uFogBase, 0.0);
   float fh = uFogFalloff;
   float ry = rd.y; if (abs(ry) < 1e-3) ry = 1e-3;
   float amount = (uFogDensity / fh) * exp(-camH * fh) * (1.0 - exp(-dist * ry * fh)) / ry;
@@ -101,7 +104,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 fogCol = mix(mix(cool, uFogColor, 0.5 + 0.5 * mu), uFogSunColor, sunAmt);
   // Extinction tints far colours blue-grey before full fog (aerial perspective)
   vec3 ext = exp(-dist * vec3(0.00011, 0.00007, 0.00004) * (1.0 - uNight*0.5));
-  col = col * ext + fogCol * (1.0 - ext) * 0.35;
+  col = col * ext + fogCol * (1.0 - ext) * 0.55;
   return mix(col, fogCol, fogF);
 }
 `;

@@ -11,7 +11,7 @@ import { Water } from './water.js';
 import { Town } from './town.js';
 import { Player } from './player.js';
 import { NPCs } from './npc.js';
-import { Particles, Campfire, Tracers, Snowfall } from './fx.js';
+import { Particles, Campfire, Tracers, Snowfall, SnowTrail } from './fx.js';
 import { HUD } from './hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
@@ -75,7 +75,8 @@ async function init() {
   if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
-  const snowfall = new Snowfall(scene, QUALITY > 1 ? 14000 : 9000);
+  const snowfall = new Snowfall(scene, QUALITY > 1 ? 22000 : 15000);
+  const snowTrail = new SnowTrail(scene, world);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));
   // lily pads drifting on shallow bayou water
   {
@@ -237,16 +238,17 @@ async function init() {
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL); return { time: 8.2, player: [x, z, yaw], camRel: [0.7, 2.5, -5.8], lookRel: [0, 1.9, 14] }; },
+    // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22] }; },
     snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.6, 2.6, -6.5], lookRel: [0, 2.2, 16], weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { weather: { storm: 0.85, blizzard: 0.12 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
   G.findVista = () => {
-    const tx = -760, tz = -2380;  // down-valley, toward the valley mouth
+    const tx = -700, tz = -1750;  // far down-valley: out past the mouth over the pine belt
     const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
     let best = null, bs = -1e9;
     for (let r = 60; r <= 300; r += 20) for (let da = -0.9; da <= 0.9; da += 0.15) {
@@ -270,7 +272,7 @@ async function init() {
     best = best || { cx: CABIN.x + 120, cz: CABIN.z - 60 };
     // aim between the cabin and the valley floor beyond it
     // aim far down the valley so the horizon and storm sky fill the top of the frame, cabin below
-    return { ...best, tx, tz, th: 60 };
+    return { ...best, tx, tz, th: 40 };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -281,10 +283,10 @@ async function init() {
     return [ax, az, Math.atan2(dx, dz)];
   };
   // the point along a road deepest inside forest (trees close on both sides)
-  G.denseOnRoad = (ri) => {
-    let best = G.onRoad(ri, 0.5), bs = -1;
+  G.denseOnRoad = (ri, reverse = false) => {
+    let best = G.onRoad(ri, 0.5, reverse), bs = -1;
     for (let t = 0.15; t < 0.9; t += 0.02) {
-      const [x, z, yaw] = G.onRoad(ri, t);
+      const [x, z, yaw] = G.onRoad(ri, t, reverse);
       let f = 0;
       for (let k = 0; k < 12; k++) { const a = k * 0.5236; f += world.splatAt(x + Math.cos(a) * 30, z + Math.sin(a) * 30).forest; }
       if (f > bs) { bs = f; best = [x, z, yaw]; }
@@ -343,6 +345,7 @@ async function init() {
     player.hspeed = s.gallop ? 13 : 0;
     G.forceGallop = !!s.gallop;
     G.camOverride = null;
+    G.weatherOverride = s.weather && typeof s.weather === 'object' ? s.weather : null;
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
       G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz) };
@@ -385,6 +388,8 @@ async function init() {
         particles.emit(p, new THREE.Vector3(0, 0.3, 0), { color: [0.55, 0.46, 0.36], alpha: 0.22 * (1 - t / 16), size: 0.7 + t * 0.08, life: 2.2, grow: 0.5, drag: 1 });
       }
     }
+    // a ride through deep snow has already ploughed a trench behind the horse
+    if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw); else snowTrail.clear();
     G.started = true;
     G.frame = 0;
     G.hold = false;
@@ -485,7 +490,7 @@ async function init() {
       const fo = world.splatAt(camera.position.x, camera.position.z).forest;
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 1.6 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 1.1 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -494,8 +499,15 @@ async function init() {
         storm: THREE.MathUtils.smoothstep(cc.snow, 0.35, 0.8),
         humid: Math.max(cc.jungle, swampy * 0.7),
         dry: cc.desert,
+        ...(G.weatherOverride || {}),
       }, G.frame < 3 ? 1 : rdt * 0.2);
-      snowfall.update(camera.position, sky.weather.storm * (U.uNight.value < 0.9 ? 1 : 0.6));
+      snowfall.update(camera.position, sky.weather.blizzard * (U.uNight.value < 0.9 ? 1 : 0.6));
+      if (player.mounted && player.hspeed > 0.5 && (player.snowDepth || 0) > 0.3) snowTrail.add(player.hpos.x, player.hpos.z);
+      // the fog layer rests on the ground beneath the camera (low points win: it settles into valleys)
+      let gmin = world.heightAt(camera.position.x, camera.position.z);
+      for (let k = 0; k < 8; k++) { const a = k * 0.785; gmin = Math.min(gmin, world.heightAt(camera.position.x + Math.cos(a) * 220, camera.position.z + Math.sin(a) * 220)); }
+      const fb = Math.max(0, gmin - 10);
+      U.uFogBase.value += (fb - U.uFogBase.value) * (G.frame < 3 ? 1 : Math.min(1, rdt * 0.5));
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
@@ -559,7 +571,7 @@ async function init() {
     water.update(camera);
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
-    post.render(rdt, { shaftK: 1 + (G.forestK || 0) * 1.5 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: sky.weather.blizzard, shaftK: 1 + (G.forestK || 0) * 0.8 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;

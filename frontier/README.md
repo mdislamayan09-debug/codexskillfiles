@@ -4,9 +4,18 @@ An open-world western for the browser, built with Three.js and aimed at the look
 Models, animation and most materials are procedural. Ground, rock, timber and water surfaces use scanned CC0
 photographic textures from ambientCG (see `public/textures/CREDITS.md`). Fonts are three web fonts.
 
-Ride a horse across 16 km² of frontier: rolling Heartlands grass, oak meadows, pine ridges, a river valley,
-a lake, a cypress bayou and a snow-capped range. The world includes the frontier town of Copper Hollow, a
-ranch with livestock, deer herds, and the Cutter Gang's hideout. A full day/night cycle runs throughout.
+Ride a horse across 67 km² of frontier that holds every climate (see `WORLD_PLAN.md`). The map takes in:
+- the snowy Grizzly Peaks and the glacial Frostwater Valley with a trapper's cabin;
+- a belt of giant pines on the foothills;
+- the Heartlands around the town of Copper Hollow, with a ranch, a lake, a river and the Cutter Gang's
+  hideout;
+- the autumn-coloured Ember Hills;
+- Sundown Mesa's red desert;
+- the bayou;
+- a palm-and-karst jungle coast on the ocean.
+
+Weather follows the region: snowstorms in the north, humid haze in the south and clear desert air. A full
+day/night cycle runs throughout.
 
 ## Run
 
@@ -46,16 +55,26 @@ it with `?q=ultra` and press P for 4K stills, for example `?q=ultra&ss=2`.
 
 ## What's in it
 
-- **Terrain**: a 1536² float heightfield generated on load (domain-warped ridged mountains, river and lake
-  carving, town plateaus, road beds). It is rendered as GPU-displaced, instanced chunk LOD with skirts, and a
-  per-pixel splat shader blends scanned grass, dirt, gravel, pebble riverbed, triplanar rock and snow (albedo
-  plus normal maps, two scales mixed by noise to hide tiling) with roads, wheel ruts, puddles and wet mud.
+- **Terrain**: an 8 km float heightfield generated on load in Web Workers. It is 2048² to 3072² depending
+  on quality, which is 4 to 2.7 m per sample.
+  - Landforms: ridged mountains, a carved glacial valley, mesas, karst hills, coast, river gorge, lake, town
+    plateaus and road beds.
+  - Climate texture: a second texture carries the climate weights (snow, jungle, autumn, desert).
+  - Rendering: GPU-displaced, instanced chunk LOD with skirts. A per-pixel splat shader samples texture arrays
+    of scanned ground (grass, dirt, gravel, sand, pebble riverbed, triplanar rock, snow, forest litter) and
+    blends them by climate. That covers snow on gentle ground with bare cliffs, frozen falls and a braided ice
+    creek; red banded mesas; beaches; leaf litter; roads, wheel ruts, puddles and wet mud.
 - **Sky and light**: analytic scattering sky with raymarched cumulus (a 3D Perlin-Worley noise volume, sun
   self-shadowing, silver lining and aerial perspective), cirrus, sun disc, stars and moon. Sun and moon lights follow the time of day, with a PMREM environment re-baked as it changes.
   Height fog with sun in-scattering and aerial perspective is patched into every material.
-- **Vegetation**: wind-animated instanced grass blades (two rings, trampled by the player), procedural oaks,
-  pines and moss-hung cypress with spherical foliage normals and leaf translucency, real-time baked billboard
-  impostors for every tree out to the horizon, bushes, and moss-capped rocks.
+- **Vegetation**: everything is procedural.
+  - Grass: wind-animated instanced blades in two rings, trampled by the player. They turn gold, straw or jungle
+    green by climate and disappear under snow.
+  - Trees: oaks, pines, forest-giant pines, snow firs, moss-hung cypress, palms, buttressed jungle trees with
+    lianas, and saguaro.
+  - Ground cover: ferns, big-leaf plants, dry scrub, fallen logs and rocks.
+  - Climate on foliage: snow settles on boughs, rocks and roofs, and broadleaf crowns turn autumn colours.
+  - Distance: real-time baked billboard impostors carry every tree out to the horizon.
 - **Water**: one plane with planar reflections, heightfield-driven depth colour and transparency, shoreline
   foam, sun glints and bayou algae.
 - **Town and props**: false-front buildings with porches, balconies, hand-painted signage, glowing night

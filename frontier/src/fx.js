@@ -1,6 +1,6 @@
 // Pooled GPU particles (dust, gun smoke, blood, embers, chimney smoke), campfires, muzzle flashes, tracers.
 import * as THREE from 'three';
-import { U, GLSL_FOG_PARS } from './shared.js';
+import { U, GLSL_FOG_PARS, patchMaterial } from './shared.js';
 
 
 export class Particles {
@@ -246,7 +246,7 @@ export class Snowfall {
           vec4 mv = viewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           float d = -mv.z;
-          gl_PointSize = (0.03 + 0.03 * aSeed.x) * uScale / max(d, 0.3);
+          gl_PointSize = (0.045 + 0.05 * aSeed.x) * uScale / max(d, 0.3);
           vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.4, 1.5, d) * smoothstep(28.0, 14.0, d);
           if (vA <= 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         }`,
@@ -270,5 +270,83 @@ export class Snowfall {
     this.mat.uniforms.uCam.value.copy(camPos);
     this.mat.uniforms.uIntensity.value = intensity;
     this.points.visible = intensity > 0.01;
+  }
+}
+
+// The trench a horse ploughs through deep snow: a ribbon following the ride, churned with hoof pits and
+// raised rims, laid just above the terrain.
+export class SnowTrail {
+  constructor(scene, world, max = 360) {
+    this.world = world; this.max = max; this.pts = [];
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(max * 2 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(max * 2 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(max * 2 * 2), 2).setUsage(THREE.DynamicDrawUsage));
+    const idx = [];
+    for (let i = 0; i < max - 1; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    g.setIndex(idx);
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    patchMaterial(m, {
+      fragColor: /* glsl */ `
+        #include <color_fragment>
+        {
+          float across = vUv.x;                       // 0..1 across the trench
+          float along = vUv.y;
+          float lane = min(abs(across - 0.32), abs(across - 0.68));
+          float pit = smoothstep(0.62, 0.8, vnoise(vec2(across * 6.0, along * 2.2))) * smoothstep(0.2, 0.05, lane);
+          vec3 trough = vec3(0.6, 0.66, 0.76);       // shadowed, compacted snow
+          vec3 rim = vec3(0.94, 0.95, 0.97);         // thrown-up snow on the lips
+          float edge = smoothstep(0.32, 0.5, abs(across - 0.5));
+          vec3 col = mix(trough * (0.9 + 0.2 * vnoise(vWPos.xz * 4.0)), rim, edge);
+          col = mix(col, vec3(0.45, 0.5, 0.6), pit * 0.7);
+          diffuseColor.rgb = col;
+          diffuseColor.a = smoothstep(0.5, 0.36, abs(across - 0.5)) * 0.92 * smoothstep(0.0, 0.04, along);
+        }`,
+    });
+    m.defines = { USE_UV: '' }; // three declares and fills vUv for us
+    this.mesh = new THREE.Mesh(g, m);
+    this.mesh.frustumCulled = false;
+    this.mesh.receiveShadow = true;
+    this.mesh.renderOrder = 1;
+    scene.add(this.mesh);
+  }
+  add(x, z) {
+    const last = this.pts[this.pts.length - 1];
+    if (last && Math.hypot(x - last[0], z - last[1]) < 0.7) return;
+    this.pts.push([x, z]);
+    if (this.pts.length > this.max) this.pts.shift();
+    this.rebuild();
+  }
+  clear() { this.pts = []; this.rebuild(); }
+  // a trench already ploughed behind a rider (for shots that start mid-ride)
+  prefill(x, z, yaw, len = 45) {
+    this.pts = [];
+    const bx = -Math.sin(yaw), bz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    for (let d = len; d >= 0; d -= 0.8) {
+      const w = Math.sin(d * 0.11) * 1.2 + Math.sin(d * 0.37) * 0.25;
+      this.pts.push([x + bx * (d + 1.4) + rx * w, z + bz * (d + 1.4) + rz * w]);
+    }
+    this.rebuild();
+  }
+  rebuild() {
+    const g = this.mesh.geometry, P = g.attributes.position.array, N = g.attributes.normal.array, UV = g.attributes.uv.array;
+    const n = this.pts.length, W = 0.75;
+    let along = 0;
+    for (let i = 0; i < n; i++) {
+      const [x, z] = this.pts[i];
+      const [px, pz] = this.pts[Math.max(0, i - 1)], [nx, nz] = this.pts[Math.min(n - 1, i + 1)];
+      let tx = nx - px, tz = nz - pz; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      if (i > 0) along += Math.hypot(x - px, z - pz);
+      for (let s = 0; s < 2; s++) {
+        const sx = x + (s ? -tz : tz) * W, sz = z + (s ? tx : -tx) * W;
+        const k = (i * 2 + s);
+        P[k * 3] = sx; P[k * 3 + 1] = this.world.heightAt(sx, sz) + 0.03; P[k * 3 + 2] = sz;
+        N[k * 3] = 0; N[k * 3 + 1] = 1; N[k * 3 + 2] = 0;
+        UV[k * 2] = s; UV[k * 2 + 1] = along * 0.5;
+      }
+    }
+    g.setDrawRange(0, Math.max(0, n - 1) * 6);
+    g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true; g.attributes.uv.needsUpdate = true;
   }
 }

@@ -60,6 +60,9 @@ export const ROADS = [
   [[60, -1150], [330, -1240], [640, -1300], [980, -1420], [1350, -1500]],
 ];
 export const PINE_TRAIL = 5; // index of the logging trail in ROADS
+// width multiplier per road: distances are scaled by this before the road mask and clearing, so a value of 2.6
+// turns a wagon road into a narrow foot-and-hoof trail
+const ROAD_SCALE = [1, 1, 1, 1, 1.15, 2.6];
 
 // Smooth the polylines with Catmull-Rom so rivers and roads meander naturally.
 function smoothPolyline(pts, steps = 8) {
@@ -213,7 +216,8 @@ export class World {
 
     if (out) {
       out.road = smoothstep(3.9, 2.0, roadD + 1.2 * n2.noise(x / 9, z / 9));
-      const braid = d && d.vd < 60 ? Math.max(smoothstep(5, 2, d.vd), smoothstep(60, 35, d.vd) * smoothstep(0.6, 0.68, n.noise(x / 34, z / 34) * 0.5 + 0.5)) : 0;
+      // main channel runs open (wet = 1); the braided side channels are iced over (wet ~0.7)
+      const braid = d && d.vd < 60 ? Math.max(smoothstep(5, 2, d.vd), 0.7 * smoothstep(60, 35, d.vd) * smoothstep(0.6, 0.68, n.noise(x / 34, z / 34) * 0.5 + 0.5)) : 0;
       out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid);
       out.town = Math.max(town, rnd * 0.32, cc, cb * 0.6);
       out.swamp = sw;
@@ -227,7 +231,7 @@ export class World {
     const N = (j1 - j0) * RES;
     const rd = new Float32Array(N).fill(1e9), roadD = new Float32Array(N).fill(1e9);
     const vd = new Float32Array(N).fill(1e9), vt = new Float32Array(N);
-    const stamp = (pts, maxD, arr, tArr, lens, total) => {
+    const stamp = (pts, maxD, arr, tArr, lens, total, scale = 1) => {
       for (let s = 0; s < pts.length - 1; s++) {
         const ax = pts[s][0], az = pts[s][1], bx = pts[s + 1][0], bz = pts[s + 1][1];
         const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
@@ -241,7 +245,7 @@ export class World {
             const px = -HALF + i * CELL;
             const t = clamp(((px - ax) * dx + (pz - az) * dz) / L2, 0, 1);
             const qx = ax + dx * t - px, qz = az + dz * t - pz;
-            const dd = Math.sqrt(qx * qx + qz * qz);
+            const dd = Math.sqrt(qx * qx + qz * qz) * scale;
             const k = row + i;
             if (dd < arr[k]) { arr[k] = dd; if (tArr) tArr[k] = (lens[s] + t * (lens[s + 1] - lens[s])) / total; }
           }
@@ -249,7 +253,7 @@ export class World {
       }
     };
     stamp(this.river, 700, rd);
-    for (const r of this.roads) stamp(r, 24, roadD);
+    this.roads.forEach((r, ri) => stamp(r, 24, roadD, null, null, null, ROAD_SCALE[ri] || 1));
     stamp(this.valley, 720, vd, vt, this.valleyLen, this.valleyTotal);
     return { rd, roadD, vd, vt };
   }
@@ -284,6 +288,13 @@ export class World {
         f *= 1 - 0.5 * snowLat * smoothstep(300, 600, h);
         // in the cold north trees gather in groves rather than dotting every slope
         f *= 1 - snowLat * (1 - smoothstep(0.42, 0.62, forest.fbm(x / 260 + 4.4, z / 260 - 1.3, 3) * 0.5 + 0.5));
+        // glacial valley: dark conifer forest on the lower walls, an open floor with scattered firs
+        if (D.vd[k] < 700) {
+          const vd = D.vd[k];
+          const wallBand = smoothstep(85, 150, vd) * smoothstep(430, 300, vd);
+          f = Math.max(f, snowLat * wallBand * smoothstep(0.3, 0.48, forest.fbm(x / 240 + 2.2, z / 240, 3) * 0.5 + 0.5) * 0.92 * smoothstep(2.5, 6.5, o.roadD));
+          f *= 1 - 0.7 * snowLat * smoothstep(110, 50, vd);
+        }
         splat[k * 4 + 0] = o.road * 255;
         splat[k * 4 + 1] = o.wet * 255;
         splat[k * 4 + 2] = f * 255;

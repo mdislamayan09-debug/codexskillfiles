@@ -205,7 +205,7 @@ function buildPine(seed, kind = 'pine') {
   const rnd = mulberry32(seed);
   const wood = [], leaves = [];
   const height = kind === 'tall' ? 26 + rnd() * 9 : kind === 'fir' ? 11 + rnd() * 7 : 14 + rnd() * 9;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.04, 8));
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height - 1.2, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.05, 8));
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
   const base = kind === 'tall' ? height * (0.3 + rnd() * 0.1) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
@@ -219,7 +219,7 @@ function buildPine(seed, kind = 'pine') {
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
-    const r = (1 - t) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.35 : 0.5);
+    const r = (1 - t) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.35 : 0.5) + (kind === 'tall' ? 0.35 * t : 0);
     const n = 8 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * 0.7 + w;
@@ -244,11 +244,11 @@ function buildPine(seed, kind = 'pine') {
       }
     }
   }
-  // top tuft
-  for (let i = 0; i < 3; i++) {
-    const g = new THREE.PlaneGeometry(0.9, 2.2);
-    g.rotateY((i / 3) * Math.PI);
-    g.translate(0, height - 0.6, 0);
+  // top tuft: a short leader wrapped in needles, no bare pole
+  for (let i = 0; i < 4; i++) {
+    const g = new THREE.PlaneGeometry(1.3, 2.6);
+    g.rotateY((i / 4) * Math.PI);
+    g.translate(0, height - 1.2, 0);
     leaves.push(g);
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => (y / height) ** 2 * 0.5);
@@ -655,6 +655,58 @@ function clumpGeometry() {
   return g;
 }
 
+// Forest-floor clutter tiled around the camera like the grass: pine cones, fallen twigs, stones.
+// mode 'litter' keeps to forest floors; 'stone' also scatters along trails and in the desert.
+function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness = 0.9, mode = 'litter', flat = false, seed = 1 }) {
+  const tile = radius * 2, n = Math.floor(tile / spacing);
+  const g = new THREE.InstancedBufferGeometry();
+  g.index = geo.index; g.attributes = geo.attributes;
+  const off = new Float32Array(n * n * 4), r = mulberry32(seed);
+  let k = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { off[k++] = (i + r()) * spacing - radius; off[k++] = (j + r()) * spacing - radius; off[k++] = r(); off[k++] = r(); }
+  g.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 4));
+  g.instanceCount = n * n;
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+  const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, vertexColors: !!geo.attributes.color });
+  patchMaterial(mat, {
+    sunShadow: true,
+    vertexHead: /* glsl */ `
+      attribute vec4 aOff;
+      #define TILE ${tile.toFixed(2)}
+      #define RADIUS ${radius.toFixed(2)}
+      mat3 cRot;
+    `,
+    beginNormal: /* glsl */ `
+      vec2 cam = cameraPosition.xz;
+      vec2 xz = aOff.xy + floor((cam - aOff.xy) / TILE + 0.5) * TILE;
+      float ang = aOff.z * 6.2832;
+      float ca = cos(ang), sa = sin(ang);
+      float tilt = ${flat ? '0.0' : '(aOff.w - 0.5) * 0.6'};
+      cRot = mat3(ca, 0.0, -sa, 0.0, 1.0, 0.0, sa, 0.0, ca) * mat3(1.0, 0.0, 0.0, 0.0, cos(tilt), sin(tilt), 0.0, -sin(tilt), cos(tilt));
+      vec3 objectNormal = cRot * normal;
+    `,
+    vertexBody: /* glsl */ `
+      vec4 sp = splatAt(xz);
+      vec4 cl = climateAt(xz);
+      float dist = length(xz - cam);
+      float dens = ${mode === 'stone'
+        ? 'max(sp.b * 0.8, max(smoothstep(0.3, 0.8, sp.r) * 0.7, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
+        : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
+      dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
+      float keep = step(aOff.w, dens);
+      float sc = mix(${smin.toFixed(3)}, ${smax.toFixed(3)}, fract(aOff.z * 13.7 + aOff.w * 7.1)) * keep;
+      vec3 transformed = cRot * position * sc;
+      transformed.xz += xz;
+      transformed.y += heightAt(xz) - 0.02;
+    `,
+  });
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.frustumCulled = false;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
 function makeGrass(scene, spacing, radius, size, innerCut) {
   const tile = radius * 2;
   const n = Math.floor(tile / spacing);
@@ -701,7 +753,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float dens = (1.0 - smoothstep(0.2, 0.45, sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(700.0, 860.0, h0);
-      dens *= 1.0 - 0.6*smoothstep(0.3, 0.8, sp.b);
+      dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
       dens *= 1.0 - snowG;          // buried under snow
@@ -918,7 +970,7 @@ export class Vegetation {
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(950 + i), fr = [];
       const n = 9 + Math.floor(rnd() * 5);
-      for (let k = 0; k < n; k++) { const g = frondGeo(0.9 + rnd() * 0.5, 0.42, 0.55, 0.9); g.rotateY((k / n) * 6.28 + rnd() * 0.3); g.translate(0, 0.05, 0); fr.push(g); }
+      for (let k = 0; k < n; k++) { const g = frondGeo(1.3 + rnd() * 0.7, 0.55, 0.6, 1.35); g.rotateY((k / n) * 6.28 + rnd() * 0.3); g.translate(0, 0.05, 0); fr.push(g); }
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(fr), (x, y, z) => Math.hypot(x, z) * 0.4), true), material: fernMat, castShadow: false }] });
     }
     const bigT = bigLeafTexture(), bigMat = leafMat(bigT, 0xd0dcc0);
@@ -960,6 +1012,24 @@ export class Vegetation {
       const q = quality;
       this.grass.push(makeGrass(scene, 0.3 / Math.sqrt(q), 28, 0.6, 0));
       this.grass.push(makeGrass(scene, 0.7 / Math.sqrt(q), 85, 1.2, 24));
+      // forest-floor clutter
+      const cone = (() => {
+        const c = new THREE.ConeGeometry(0.045, 0.13, 7, 3); c.rotateZ(Math.PI / 2); c.translate(0, 0.035, 0);
+        const p = c.attributes.position, col = new Float32Array(p.count * 3);
+        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.42 * v; col[i * 3 + 1] = 0.28 * v; col[i * 3 + 2] = 0.16 * v; }
+        c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
+      })();
+      const twig = (() => { const t = new THREE.CylinderGeometry(0.018, 0.03, 1.0, 5); t.rotateZ(Math.PI / 2); t.translate(0, 0.02, 0); return t; })();
+      const stone = (() => {
+        const st = new THREE.IcosahedronGeometry(0.5, 1), p = st.attributes.position;
+        for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.6, p.getZ(i) * k); }
+        st.computeVertexNormals(); st.translate(0, 0.12, 0); return st;
+      })();
+      this.clutter = [
+        makeClutter(scene, cone, { spacing: 0.9 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
+        makeClutter(scene, twig, { spacing: 1.6 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.6, color: 0x5a4632, flat: true, seed: 5 }),
+        makeClutter(scene, stone, { spacing: 2.2 / Math.sqrt(q), radius: 40, smin: 0.12, smax: 0.55, color: 0x8a8278, roughness: 0.85, mode: 'stone', seed: 9 }),
+      ];
     }
   }
 
@@ -1019,6 +1089,11 @@ export class Vegetation {
       } else if (pz < -700) {
         if (r() < under * 1.2) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.7 + r() * 0.7, r() < 0.7 ? 3 + Math.floor(r() * 2) : Math.floor(r() * 3));
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
+      // saplings and young firs filling the gaps between the big trees
+      if (sp.forest > 0.3 && cl.jungle < 0.4 && cl.desert < 0.3 && (pz < -700 || cl.snow > 0.4) && r() < 0.05 * sp.forest) {
+        this.trees.add(px, h - 0.1, pz, r() * 6.28, 0.22 + r() * 0.3, r() < 0.6 ? pick(G.fir) : pick(G.pine));
+        continue;
+      }
       // fallen logs under forest
       if (sp.forest > 0.35 && cl.jungle < 0.5 && r() < 0.018 * sp.forest) this.logs.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 0.5, Math.floor(r() * 3));
       if (r() < (0.006 + (1 - n.y) * 0.05) * boulders) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.4 + r() * 2.2, Math.floor(r() * 4));

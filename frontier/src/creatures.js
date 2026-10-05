@@ -604,18 +604,21 @@ export class Quadruped {
       mm.castShadow = true; bones.neck.add(mm);
       // tail: tapered strands
       // tail: a dock plus fanned, curved hair cards with alpha strands
-      const hairTex = hairTexture(C.mane);
-      const hairM = std({ map: hairTex, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.75 });
+      // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
+      // instead of a solid black wedge
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.3).getHex());
+      const hairM = std({ map: hairTex, alphaTest: 0.32, side: THREE.DoubleSide, roughness: 0.55 });
       const tcards = [];
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 6 - 0.5) * 1.2;
-        const len = 0.85 + r() * 0.25;
-        const c = new THREE.PlaneGeometry(0.2, len, 1, 6);
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 15 - 0.5) * 1.7 + (r() - 0.5) * 0.2;
+        const len = 0.7 + r() * 0.45;
+        const c = new THREE.PlaneGeometry(0.12 + r() * 0.04, len, 1, 7);
         c.translate(0, -len / 2, 0);
         const cp = c.attributes.position;
-        for (let k = 0; k < cp.count; k++) { const y = -cp.getY(k); cp.setZ(k, -Math.sin(Math.min(y, 0.5) * 2.2) * 0.16 + y * 0.05); cp.setX(k, cp.getX(k) * (1 + y * 0.6)); }
+        for (let k = 0; k < cp.count; k++) { const y = -cp.getY(k); cp.setZ(k, -Math.sin(Math.min(y, 0.5) * 2.2) * 0.16 + y * 0.05); cp.setX(k, cp.getX(k) * (1 + y * 0.9)); }
+        c.rotateZ((r() - 0.5) * 0.25);
         c.rotateY(a);
-        c.translate(0, -0.02, -0.03);
+        c.translate((r() - 0.5) * 0.04, -0.02 - r() * 0.04, -0.03 - r() * 0.03);
         tcards.push(c);
       }
       const tm = mesh(mergeGeometriesSafe(tcards), hairM); bones.tail.add(tm);

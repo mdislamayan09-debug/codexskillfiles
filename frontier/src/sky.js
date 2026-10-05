@@ -99,7 +99,8 @@ export class Sky {
     this.time = 17.6; // hours — golden hour
     // regional weather, eased toward the climate under the camera: storm (snowy north), humid (jungle, bayou),
     // dry (desert)
-    this.weather = { storm: 0, humid: 0, dry: 0 };
+    // storm = dark low cloud; blizzard = fog and snowfall (usually equal, but a storm can clear)
+    this.weather = { storm: 0, humid: 0, dry: 0, blizzard: 0 };
     this.lastEnvStorm = -1;
     this.timeScale = 1 / 60; // hours per real second (1 day = 24 min)
     this.uniforms = {
@@ -226,7 +227,7 @@ export class Sky {
   }
 
   setWeather(target, k) {
-    for (const key of ['storm', 'humid', 'dry']) this.weather[key] += (target[key] - this.weather[key]) * Math.min(1, k);
+    for (const key of ['storm', 'humid', 'dry', 'blizzard']) this.weather[key] += ((target[key] ?? target.storm) - this.weather[key]) * Math.min(1, k);
   }
 
   update(dt, focus) {
@@ -260,7 +261,7 @@ export class Sky {
     this.sun.target.position.copy(f);
     this.sun.position.sub(focus).add(f);
     const W = this.weather;
-    this.sun.intensity *= 1 - 0.88 * W.storm;
+    this.sun.intensity *= 1 - (0.62 + 0.33 * W.blizzard) * W.storm;
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
@@ -275,10 +276,12 @@ export class Sky {
     U.uFogSunColor.value.setRGB(1.0, 0.62 + 0.3 * warm, 0.36 + 0.5 * warm).multiplyScalar(day * 0.75 + 0.02);
     U.uFogDensity.value = 0.0009 + 0.0006 * dusk + 0.0004 * night;
     // weather: blue-grey snow haze, warm green humidity, crisp dry desert air
-    U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), W.storm * 0.85);
+    U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= 1 + 2.4 * W.storm + 0.9 * W.humid - 0.4 * W.dry;
+    U.uFogDensity.value *= 1 + 5.5 * W.blizzard + 0.6 * W.storm + 0.9 * W.humid - 0.4 * W.dry;
+    // storm fog fills the valleys to the ridgelines; fair weather keeps it low
+    U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
 
     // environment map refresh
     if (Math.abs(this.time - this.lastEnvTime) > 0.08 || Math.abs(W.storm - this.lastEnvStorm) > 0.04) {
