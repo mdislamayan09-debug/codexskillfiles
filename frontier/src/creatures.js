@@ -121,7 +121,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 
 // ===================================================================================== HUMANS
 export const OUTFITS = {
-  arthur: { coat: 0x3a302a, shirt: 0x6a7a8e, vest: 0x5a4632, pants: 0x3a3430, hat: 0x2e2620, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null },
+  arthur: { coat: 0x5c544c, shirt: 0x6a7a8e, vest: 0x5a4632, pants: 0x4a423a, hat: 0x2e2620, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null },
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -467,6 +467,7 @@ function quadPrims(kind, QB) {
   } else {
     add(RC([0, 1.42, 0.62], [0, 1.9, 0.96], deer ? 0.17 : 0.23, deer ? 0.09 : 0.12), QL.coat, 'neck', 0.1);
     add(RC([0, 1.62, 0.55], [0, 2.0, 0.9], deer ? 0.08 : 0.11, 0.07), QL.coat, 'neck', 0.08); // crest
+    if (!deer) add(RC([0, 1.7, 0.5], [0, 2.07, 0.92], 0.055, 0.04), QL.mane, 'neck', 0.02, { labelBias: 0.01 }); // mane ridge
   }
   // head (angled down-forward)
   const H = sheep ? [0, 1.55, 0.95] : [0, 1.98, 1.06];
@@ -584,10 +585,10 @@ export class Quadruped {
     if (kind === 'horse') {
       // mane: hair cards along the crest, falling to the off side
       const cards = [];
-      for (let i = 0; i < 14; i++) {
-        const t = i / 13;
-        const p = V(0, 1.66 + t * 0.36, 0.52 + t * 0.4);
-        const g2 = new THREE.PlaneGeometry(0.15, 0.36 - t * 0.1, 1, 3);
+      for (let i = 0; i < 22; i++) {
+        const t = i / 21;
+        const p = V(0, 1.68 + t * 0.36, 0.5 + t * 0.42);
+        const g2 = new THREE.PlaneGeometry(0.19, 0.5 - t * 0.16, 1, 4);
         g2.translate(0, -0.1, 0);
         const gp = g2.attributes.position;
         for (let k = 0; k < gp.count; k++) gp.setZ(k, gp.getZ(k) + (gp.getY(k) + 0.1) * (gp.getY(k) + 0.1) * -0.6);
@@ -597,7 +598,7 @@ export class Quadruped {
       }
       const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.12, 1.1);
       cards.push(forelock);
-      const maneHair = std({ map: hairTexture(C.mane), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.75, color: C.mane === 0xd0ccc4 ? 0xffffff : 0xcccccc });
+      const maneHair = std({ map: hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, color: 0xffffff });
       const mm = new THREE.Mesh(mergeGeometriesSafe(cards), maneHair);
       mm.position.set(-bones.neck.userData.rest.x, -bones.neck.userData.rest.y, -bones.neck.userData.rest.z);
       mm.castShadow = true; bones.neck.add(mm);

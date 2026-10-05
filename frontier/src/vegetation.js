@@ -116,7 +116,7 @@ function leafAO(geo, radial = false) {
     if (radial) d = Math.hypot(x, z) / Math.max(0.5, (1 - (y - bb.min.y) / (2 * e.y)) * Math.max(e.x, e.z) + 0.3);
     else d = Math.hypot((x - c.x) / e.x, (y - c.y) / e.y, (z - c.z) / e.z);
     const top = (y - bb.min.y) / (2 * e.y);
-    const ao = (0.25 + 0.75 * THREE.MathUtils.smoothstep(d, 0.15, 0.95)) * (0.72 + 0.28 * top);
+    const ao = (0.25 + 0.75 * THREE.MathUtils.smoothstep(d, 0.15, 0.95)) * (0.82 + 0.12 * top);
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -470,7 +470,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float h0 = heightAt(xz);
       vec3 nrm = normalAt(xz);
       float slope = 1.0 - nrm.y;
-      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r)) * (1.0 - smoothstep(0.38, 0.7, sp.a));
+      float edgeN = (vnoise(xz * 0.9) - 0.5) * 0.35 + (vnoise(xz * 3.1) - 0.5) * 0.12;
+      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(240.0, 280.0, h0);
       dens *= 1.0 - 0.6*smoothstep(0.3, 0.8, sp.b);
@@ -584,7 +585,7 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xd6dcc4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.85, color, vertexColors: true, envMapIntensity: 0.55 }), 1, leafExtra);
+    const leafMat = (map, color = 0xc4ccb0) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t));

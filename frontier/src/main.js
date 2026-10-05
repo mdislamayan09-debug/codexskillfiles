@@ -425,6 +425,15 @@ async function init() {
     }
     if (player.aiming) { const h = npcs.raycast(player.aimRay(), 200); G.reticleEnemy = h && h.actor.kind === 'outlaw'; } else G.reticleEnemy = false;
 
+    // ripples for whoever is standing or moving in water near the camera
+    {
+      const rip = [];
+      const add = (pos, k) => { if (rip.length < 6 && world.heightAt(pos.x, pos.z) < -0.05 && pos.distanceTo(camera.position) < 120) rip.push([pos.x, pos.z, k]); };
+      add(player.hpos, 0.45 + Math.min(player.hspeed, 8) * 0.07);
+      if (!player.mounted) add(player.pos, 0.35 + player.speed * 0.08);
+      for (const a of npcs.actors) { if (rip.length >= 6) break; if (!a.dead) add(a.pos, 0.3 + a.speed * 0.08); }
+      water.setRipples(rip);
+    }
     water.update(camera);
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });

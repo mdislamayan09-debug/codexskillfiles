@@ -18,7 +18,7 @@ export class Water {
 
     const geo = new THREE.PlaneGeometry(1, 1, 1, 1).rotateX(-Math.PI / 2);
     this.material = new THREE.ShaderMaterial({
-      uniforms: { ...U, uRefl: { value: this.rt.texture }, uTexMat: { value: this.textureMatrix }, uHasRefl: { value: reflections ? 1 : 0 } },
+      uniforms: { ...U, uRefl: { value: this.rt.texture }, uTexMat: { value: this.textureMatrix }, uHasRefl: { value: reflections ? 1 : 0 }, uRipples: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) } },
       vertexShader: /* glsl */ `
         uniform mat4 uTexMat;
         varying vec3 vW; varying vec4 vProj;
@@ -31,7 +31,7 @@ export class Water {
       fragmentShader: /* glsl */ `
         ${GLSL_COMMON}
         ${GLSL_FOG_PARS}
-        uniform sampler2D uRefl; uniform float uHasRefl;
+        uniform sampler2D uRefl; uniform float uHasRefl; uniform vec4 uRipples[6];
         varying vec3 vW; varying vec4 vProj;
         float waves(vec2 p){
           float t = uTime;
@@ -49,6 +49,17 @@ export class Water {
           float w0 = waves(p), wx = waves(p+vec2(e,0.0)), wz = waves(p+vec2(0.0,e));
           float amp = mix(0.55, 0.18, swampy) * smoothstep(400.0, 30.0, camD) + 0.05;
           vec3 N = normalize(vec3((w0-wx)/e*amp, 1.0, (w0-wz)/e*amp));
+          // ripple rings where legs and bodies break the surface
+          float ripFoam = 0.0;
+          for (int i = 0; i < 6; i++) {
+            vec4 rp = uRipples[i];
+            if (rp.z <= 0.0) continue;
+            vec2 dv = p - rp.xy; float d = length(dv);
+            float ring = sin(d * 15.0 - uTime * 6.5) * exp(-d * 1.4) * rp.z;
+            N.xz += dv / max(d, 1e-3) * ring * 0.35;
+            ripFoam += smoothstep(1.1, 0.25, d) * rp.z * (0.6 + 0.4 * vnoise(p * 9.0 + uTime));
+          }
+          N = normalize(N);
           vec3 V = normalize(cameraPosition - vW);
           float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
           vec3 sun = normalize(uSunDir);
@@ -67,7 +78,7 @@ export class Water {
           float spec = pow(max(dot(reflect(-sun, N), V), 0.0), 600.0);
           col += uSunColor * spec * 3.0;
           // shoreline foam / scum
-          float foam = smoothstep(0.35, 0.0, depth) * (0.5 + 0.5 * vnoise(p * 3.0 + uTime*0.3));
+          float foam = smoothstep(0.35, 0.0, depth) * (0.5 + 0.5 * vnoise(p * 3.0 + uTime*0.3)) + min(ripFoam, 1.0) * 0.7;
           col = mix(col, vec3(0.5, 0.47, 0.4) * (0.2 + 0.4*dot(uSunColor, vec3(0.3))), foam * 0.5);
           // algae patches in the bayou
           float algae = swampy * smoothstep(0.55, 0.75, fbm2(p*0.12)) * 0.75;
@@ -85,6 +96,11 @@ export class Water {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2;
     scene.add(this.mesh);
+  }
+
+  setRipples(list) {
+    const arr = this.material.uniforms.uRipples.value;
+    for (let i = 0; i < arr.length; i++) { const r = list[i]; if (r) arr[i].set(r[0], r[1], r[2], 0); else arr[i].set(0, 0, 0, 0); }
   }
 
   update(camera, skipLayers = []) {
