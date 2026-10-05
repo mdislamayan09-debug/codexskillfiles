@@ -266,7 +266,7 @@ export class Town {
       const posts = Math.max(2, Math.round(w / 3) + 1);
       for (let i = 0; i < posts; i++) {
         const px = -w / 2 + (i / (posts - 1)) * w;
-        add(M.bare, box(0.2, 3.2, 0.2, px, 2.0, pd + 0.1));
+        add(M.trim, box(0.2, 3.2, 0.2, px, 2.0, pd + 0.1));
       }
       if (!balcony) {
         const pr = box(w + 0.6, 0.12, pd + 0.4, 0, 3.7, pd / 2 + 0.2);
@@ -277,7 +277,7 @@ export class Town {
         add(M.bare2, box(w + 0.6, 0.2, pd + 0.4, 0, 3.7, pd / 2 + 0.2));
         add(M.trim, box(w + 0.6, 0.12, 0.12, 0, 4.75, pd + 0.4));
         for (let i = 0; i <= Math.round(w / 0.5); i++) add(M.bare, box(0.06, 0.95, 0.06, -w / 2 + i * 0.5, 4.25, pd + 0.4));
-        for (let i = 0; i < posts; i++) add(M.bare, box(0.16, 2.4, 0.16, -w / 2 + (i / (posts - 1)) * w, 6.0, pd + 0.4));
+        for (let i = 0; i < posts; i++) add(M.trim, box(0.16, 2.4, 0.16, -w / 2 + (i / (posts - 1)) * w, 6.0, pd + 0.4));
         add(M.tin, box(w + 0.8, 0.12, pd + 0.6, 0, 7.25, pd / 2 + 0.2));
       }
       // steps
