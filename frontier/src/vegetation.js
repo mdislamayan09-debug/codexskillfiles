@@ -56,15 +56,19 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       float up = abs(fn.y);
       float sk = smoothstep(0.35, 0.8, cl.r) * smoothstep(0.4, 0.85, up + 0.3 * (hash12(floor(vWPos.xz * 3.0 + vWPos.y * 2.0)) - 0.5));
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.9);
+      #ifdef FROST_ALL
+      // hoarfrost furs every twig of the dry brush in the cold country
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.5);
+      #endif
     }
   }`;
-function windMaterial(mat, flutter = 0, extra = {}, { autumn = false } = {}) {
+function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null } = {}) {
   return patchMaterial(mat, {
     sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -87,7 +91,10 @@ const LEAF_EMISSIVE = /* glsl */ `
     vec3 vdir = normalize(vWPos - cameraPosition);
     float back = pow(max(dot(vdir, normalize(uSunDir)), 0.0), 3.0);
     // light through a leaf comes out yellow-green, not white
-    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * 0.26;
+    #ifndef LEAF_TRANS
+    #define LEAF_TRANS 0.18
+    #endif
+    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS;
   }
 `;
 
@@ -205,9 +212,9 @@ function buildPine(seed, kind = 'pine') {
   const rnd = mulberry32(seed);
   const wood = [], leaves = [];
   const height = kind === 'tall' ? 26 + rnd() * 9 : kind === 'fir' ? 11 + rnd() * 7 : 14 + rnd() * 9;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height - 1.2, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.05, 8));
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height - 2.4, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.06, 8));
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
-  const base = kind === 'tall' ? height * (0.3 + rnd() * 0.1) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
+  const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
     // dead lower branch stubs on the bare trunk
     for (let i = 0; i < 9; i++) {
@@ -216,17 +223,24 @@ function buildPine(seed, kind = 'pine') {
     }
   }
   const spread = kind === 'tall' ? 3.3 : kind === 'fir' ? 3.1 : 3.4;
+  const tall = kind === 'tall';
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
-    const r = (1 - t) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.35 : 0.5) + (kind === 'tall' ? 0.35 * t : 0);
-    const n = 8 + Math.floor(rnd() * 3);
+    // forest giants: a ragged columnar crown — missing whorls, uneven limbs — rather than a perfect cone
+    if (tall && t < 0.85 && rnd() < 0.22) continue;
+    const r = tall
+      ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
+      : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
+    const n = tall ? 4 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + rnd() * 0.7 + w;
+      const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
+      const lr = tall ? r * (0.6 + rnd() * 0.65) : r;
       // cross cards: one lying along the branch, one standing on its edge, so the
       // silhouette reads from the side and from above
       for (const vert of [false, true]) {
+        const r = lr;
         const g = new THREE.PlaneGeometry(r * 0.95, r * (vert ? 0.34 : 0.5));
         g.translate(r * 0.5, 0, 0);
         if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.4);
@@ -244,11 +258,24 @@ function buildPine(seed, kind = 'pine') {
       }
     }
   }
-  // top tuft: a short leader wrapped in needles, no bare pole
-  for (let i = 0; i < 4; i++) {
-    const g = new THREE.PlaneGeometry(1.3, 2.6);
-    g.rotateY((i / 4) * Math.PI);
-    g.translate(0, height - 1.2, 0);
+  // top tuft: a ring of short up-swept shoots around a needled leader, so the crown ends in a
+  // dense point rather than a bare pole with a blob on it
+  for (let i = 0; i < 7; i++) {
+    const L = 1.1 + rnd() * 0.5, y = height - 2.4 + (i / 7) * 1.6;
+    const g = new THREE.PlaneGeometry(L, L * 0.5);
+    g.translate(L * 0.5, 0, 0);
+    g.rotateX((rnd() - 0.5) * 0.6);
+    g.rotateZ(0.75 + (i / 7) * 0.45);
+    g.rotateY((i / 7) * Math.PI * 2 * 1.6 + rnd());
+    g.translate(0, y, 0);
+    leaves.push(g);
+  }
+  for (let i = 0; i < 2; i++) {
+    const g = new THREE.PlaneGeometry(1.5, 0.6);
+    g.translate(0.75, 0, 0);
+    g.rotateZ(Math.PI / 2);
+    g.rotateY(i * Math.PI / 2);
+    g.translate(0, height - 1.3, 0);
     leaves.push(g);
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => (y / height) ** 2 * 0.5);
@@ -792,6 +819,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(vGCol, mix(srgbV(vec3(240,196,110)), srgbV(vec3(222,160,86)), aOff.z) * 1.35, gcl.b * 0.85); // autumn gold
       vGCol = mix(vGCol, mix(srgbV(vec3(120,165,80)), srgbV(vec3(100,150,70)), aOff.w) * 1.2, gcl.g);           // jungle
       vGCol = mix(vGCol, srgbV(vec3(232,214,168)) * 1.3, gcl.a);                                                 // desert straw
+      vGCol = mix(vGCol, mix(srgbV(vec3(112,140,66)), srgbV(vec3(138,156,80)), aOff.w) * 1.25 * (0.75 + 0.5 * midV), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85); // shaded pine-belt grass stays green
       vGCol = mix(vGCol, srgbV(vec3(236,236,232)) * 1.4, snowG * 0.75);                                          // frosted
       vGY = y;
       vGFar = smoothstep(9.0, 48.0, dist);
@@ -860,7 +888,8 @@ function rockMaterial(surf = {}) {
     onShader: (sh) => { sh.uniforms.tRockA = { value: surf.rock || null }; },
     fragColor: /* glsl */ `
       #include <color_fragment>
-      vec3 wn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
+      // smooth world normal: snow and moss follow the rounded form, not individual triangles
+      vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
       float n1 = fbm2(vWPos.xz*0.8 + vWPos.y*0.6);
       float n2 = vnoise(vec2(vWPos.x+vWPos.z, vWPos.y)*3.0);
       vec3 base = mix(srgbR(vec3(118,112,104)), srgbR(vec3(92,86,80)), n1);
@@ -894,7 +923,7 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xc4ccb0, autumn = false) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { autumn });
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { autumn, trans });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -906,7 +935,7 @@ export class Vegetation {
         { geometry: b.leaves, material: oakMats[i % 3], depth: windDepthMaterial(lt, 1) },
       ] });
     }
-    const pineMat = leafMat(pineTex, 0xc8ccb4);
+    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05);
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
@@ -984,11 +1013,16 @@ export class Vegetation {
       }
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(lv), (x, y) => y * 0.3)), material: bigMat, depth: windDepthMaterial(bigT, 1) }] });
     }
-    const twigT = twigTexture(), twigMat = leafMat(twigT, 0xffffff);
+    const twigT = twigTexture();
+    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: true });
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(990 + i), tw = [];
       for (let k = 0; k < 5; k++) { const g = new THREE.PlaneGeometry(1.1 + rnd() * 0.5, 1.0 + rnd() * 0.4); g.translate(0, 0.45, 0); g.rotateY((k / 5) * Math.PI + rnd() * 0.4); tw.push(g); }
-      bushBuilds.push({ parts: [{ geometry: setSway(mergeGeometries(tw), (x, y) => y * 0.2), material: twigMat, castShadow: false }] });
+      // vertex colours: lighter toward the tips (the material reads them; without them the brush renders black)
+      const tg = setSway(mergeGeometries(tw), (x, y) => y * 0.2), tp = tg.attributes.position, tc = new Float32Array(tp.count * 3);
+      for (let k = 0; k < tp.count; k++) tc[k * 3] = tc[k * 3 + 1] = tc[k * 3 + 2] = 0.7 + 0.3 * Math.min(1, tp.getY(k) / 0.95);
+      tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+      bushBuilds.push({ parts: [{ geometry: tg, material: twigMat, castShadow: false }] });
     }
     this.bushes = new ScatterLayer(scene, bushBuilds, 6000, 140 * Math.sqrt(quality));
     // fallen logs on forest floors
@@ -1051,8 +1085,16 @@ export class Vegetation {
       if (h < 0.4 || h > 980 || sp.road > 0.1) { r(); r(); continue; }
       const cl = w.climateAt(px, pz);
       const n = w.normalAt(px, pz);
-      const boulders = (pz < -700 ? 2.2 : 1) + cl.snow;
-      if (n.y < 0.75) { if (r() < 0.012 * boulders) this.rocks.add(px, h - 0.3, pz, r() * 6.28, 1 + r() * 3.5, Math.floor(r() * 4)); continue; }
+      // boulder fields: talus and erratics gather in clusters rather than dotting the ground evenly
+      const field = cl.snow > 0.3 ? THREE.MathUtils.smoothstep(w.n2.noise(px / 70 + 3.1, pz / 70 - 7.7), 0.15, 0.55) : 0;
+      const boulders = ((pz < -700 ? 2.2 : 1) + cl.snow) * (1 + 7 * field);
+      // firs cling to steeper ground in the mountains than broadleaf trees do lower down
+      const steep = cl.snow > 0.4 ? 0.62 : 0.75;
+      if (n.y < steep) { if (r() < 0.012 * boulders) { const sc = 1 + r() * 3.5; this.rocks.add(px, h - 0.3 - sc * 0.55 * (1 - n.y), pz, r() * 6.28, sc, Math.floor(r() * 4)); } continue; } // sunk into the slope, not perched on it
+      if (cl.snow > 0.4 && n.y < 0.75 && !blocked(px, pz) && r() < sp.forest * 0.5) {
+        this.trees.add(px, h - 0.3, pz, r() * 6.28, 0.7 + r() * 0.5, r() < 0.7 ? pick(G.fir) : pick(G.tall));
+        continue;
+      }
       const swamp = w.splatAt(px, pz).wet > 0.3 && px > 500 && pz > 600 && cl.jungle < 0.5;
       // desert: saguaro and scrub instead of forest
       if (cl.desert > 0.5) {
@@ -1086,9 +1128,15 @@ export class Vegetation {
       if (cl.jungle > 0.4) {
         if (r() < under * 2.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.1, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
       } else if (cl.snow > 0.5) {
-        if (r() < 0.05) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.5 + r() * 0.6, 7 + Math.floor(r() * 2));
+        // dry alpine brush poking through the snow in clumps
+        const brush = THREE.MathUtils.smoothstep(w.n.noise(px / 45 - 2.2, pz / 45 + 5.3), 0.1, 0.6);
+        const nb = r() < 0.04 + 0.5 * brush ? 1 + Math.floor(r() * 3 * brush) : 0;
+        for (let b = 0; b < nb; b++) {
+          const bx = px + (r() - 0.5) * 5, bz = pz + (r() - 0.5) * 5;
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, 7 + Math.floor(r() * 2));
+        }
       } else if (pz < -700) {
-        if (r() < under * 1.2) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.7 + r() * 0.7, r() < 0.7 ? 3 + Math.floor(r() * 2) : Math.floor(r() * 3));
+        if (r() < under * 1.2) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.7 + r() * 0.7, r() < 0.85 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
       // saplings and young firs filling the gaps between the big trees
       if (sp.forest > 0.3 && cl.jungle < 0.4 && cl.desert < 0.3 && (pz < -700 || cl.snow > 0.4) && r() < 0.05 * sp.forest) {

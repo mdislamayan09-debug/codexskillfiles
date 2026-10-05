@@ -96,7 +96,8 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   float fh = uFogFalloff;
   float ry = rd.y; if (abs(ry) < 1e-3) ry = 1e-3;
   float amount = (uFogDensity / fh) * exp(-camH * fh) * (1.0 - exp(-dist * ry * fh)) / ry;
-  amount = clamp(amount, 0.0, 1e3);
+  // valleys far below the layer base would otherwise fill exponentially to an opaque white sheet
+  amount = clamp(min(amount, uFogDensity * dist * 3.0), 0.0, 1e3);
   // a ceiling keeps far ranges as layered silhouettes instead of a white-out
   float fogF = min(1.0 - exp(-amount), 0.9);
   float mu = dot(rd, uSunDir);

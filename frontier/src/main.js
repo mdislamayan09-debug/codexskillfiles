@@ -240,18 +240,19 @@ async function init() {
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22] }; },
-    snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.6, 2.6, -6.5], lookRel: [0, 2.2, 16], weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
+    snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 2.5, -5.4], lookRel: [-0.9, 1.6, 18], weather: 'snow' }; },
+    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
   G.findVista = () => {
-    const tx = -700, tz = -1750;  // far down-valley: out past the mouth over the pine belt
+    // up-valley, over the cabin and the braided creek toward the head of the valley and the peaks beyond it
+    const tx = -1420, tz = -3800;
     const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
     let best = null, bs = -1e9;
-    for (let r = 60; r <= 300; r += 20) for (let da = -0.9; da <= 0.9; da += 0.15) {
+    for (let r = 80; r <= 520; r += 20) for (let da = -0.9; da <= 0.9; da += 0.15) {
       const a = toT + Math.PI + da; // behind the cabin, looking past it
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 2.6;
@@ -265,14 +266,23 @@ async function init() {
         }
       }
       if (!clear) continue;
+      // nothing rising into the frame on either side of the view: a lookout, not a ledge beside a cliff
+      const va = Math.atan2(tx - cx, tz - cz);
+      let blocked = 0;
+      for (let a = -0.55; a <= 0.55; a += 0.11) for (let d = 15; d <= 240; d += 15) {
+        if (world.heightAt(cx + Math.sin(va + a) * d, cz + Math.cos(va + a) * d) > ch - 3 - d * 0.03) blocked += Math.abs(a) < 0.3 ? 10 : 1;
+      }
+      if (blocked > 6) continue;
       const above = ch - world.heightAt(CABIN.x, CABIN.z);
-      const score = -Math.abs(above - 45) - Math.abs(da) * 30 - r * 0.05;
+      const score = -Math.abs(above - 120) - Math.abs(da) * 30 - Math.abs(r - 320) * 0.06 - blocked * 4;
       if (score > bs) { bs = score; best = { cx, cz }; }
     }
     best = best || { cx: CABIN.x + 120, cz: CABIN.z - 60 };
     // aim between the cabin and the valley floor beyond it
     // aim far down the valley so the horizon and storm sky fill the top of the frame, cabin below
-    return { ...best, tx, tz, th: 40 };
+    // pitch down a few degrees so the horizon sits about a third of the way down the frame, cabin below centre
+    const ch = world.heightAt(best.cx, best.cz) + 3.2, dist = Math.hypot(tx - best.cx, tz - best.cz);
+    return { ...best, tx, tz, th: ch - 0.17 * dist - world.heightAt(tx, tz) };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -285,11 +295,22 @@ async function init() {
   // the point along a road deepest inside forest (trees close on both sides)
   G.denseOnRoad = (ri, reverse = false) => {
     let best = G.onRoad(ri, 0.5, reverse), bs = -1;
-    for (let t = 0.15; t < 0.9; t += 0.02) {
+    for (let t = 0.15; t < 0.9; t += 0.01) {
       const [x, z, yaw] = G.onRoad(ri, t, reverse);
-      let f = 0;
-      for (let k = 0; k < 12; k++) { const a = k * 0.5236; f += world.splatAt(x + Math.cos(a) * 30, z + Math.sin(a) * 30).forest; }
-      if (f > bs) { bs = f; best = [x, z, yaw]; }
+      let f = 0, lo = 1e9, hi = -1e9;
+      for (let k = 0; k < 12; k++) {
+        const a = k * 0.5236;
+        for (const rr of [18, 40]) {
+          const px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr;
+          f += world.splatAt(px, pz).forest;
+          const h = world.heightAt(px, pz); lo = Math.min(lo, h); hi = Math.max(hi, h);
+        }
+      }
+      // deep in the trees on level ground: no crest with the view opening out over the canopy
+      const fwd = [Math.sin(yaw), Math.cos(yaw)];
+      for (const d of [25, 50, 80]) f += 2 * world.splatAt(x + fwd[0] * d + fwd[1] * 12, z + fwd[1] * d - fwd[0] * 12).forest + 2 * world.splatAt(x + fwd[0] * d - fwd[1] * 12, z + fwd[1] * d + fwd[0] * 12).forest;
+      const score = f - 0.35 * Math.max(0, hi - lo - 6);
+      if (score > bs) { bs = score; best = [x, z, yaw]; }
     }
     return best;
   };
@@ -308,6 +329,16 @@ async function init() {
       }
     }
     const [ax, az] = v[v.length - 2]; return [ax, az, 0];
+  };
+  G.clearTreesNear = (x, z, r) => {
+    const L = veg.trees, cx = Math.floor(x / L.cell), cz = Math.floor(z / L.cell), gone = new Set();
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const k = (cx + dx) + ',' + (cz + dz), list = L.grid.get(k);
+      if (!list) continue;
+      L.grid.set(k, list.filter((it) => { const keep = Math.hypot(it.x - x, it.z - z) >= r; if (!keep) gone.add(it); return keep; }));
+    }
+    if (gone.size) { L.items = L.items.filter((it) => !gone.has(it)); veg.update(camera.position, true); }
+    return gone.size;
   };
   G.treesNear = (x, z, r) => {
     let n = 0;
@@ -363,9 +394,13 @@ async function init() {
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
       G.fgPlaced = true;
       const c = G.camOverride.pos, l = G.camOverride.look;
+      // clear the lookout itself: no tree trunks or boughs right in front of the lens
+      G.clearTreesNear(c.x, c.z, 28);
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
-      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff; veg.rocks.add(x, world.heightAt(x, z) - 0.4 * scale, z, f * 1.3, scale, v); };
-      put(4.5, -3.2, 2.6, 0); put(6.0, 2.8, 2.1, 1); put(3.2, 0.6, 1.3, 2); put(7.5, -6.5, 3.2, 3); put(5.5, 6.8, 1.7, 2);
+      const g0 = world.heightAt(c.x, c.z);
+      // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
+      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff, gh = world.heightAt(x, z); if (gh > g0 - 1.5) veg.rocks.add(x, gh - 0.45 * scale, z, f * 1.3, scale, v); };
+      put(4.2, -3.8, 1.5, 0); put(5.8, 3.4, 1.2, 1); put(3.0, 0.5, 0.8, 2); put(7.5, -6.8, 2.0, 3); put(5.2, 6.4, 1.0, 2);
       for (let i = 0; i < 9; i++) { const x = c.x + d.x * (2.5 + i * 0.7) + rt.x * (-4 + i), z = c.z + d.z * (2.5 + i * 0.7) + rt.z * (-4 + i); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
@@ -514,7 +549,9 @@ async function init() {
       if (player.mounted && player.hspeed > 0.5 && (player.snowDepth || 0) > 0.3) snowTrail.add(player.hpos.x, player.hpos.z);
       // the fog layer rests on the ground beneath the camera (low points win: it settles into valleys)
       let gmin = world.heightAt(camera.position.x, camera.position.z);
-      for (let k = 0; k < 8; k++) { const a = k * 0.785; gmin = Math.min(gmin, world.heightAt(camera.position.x + Math.cos(a) * 220, camera.position.z + Math.sin(a) * 220)); }
+      // two rings: the near one keeps forest haze around the rider, the far one lets the layer settle onto a valley
+      // floor far below a lookout, so the valley holds haze instead of an opaque white bowl
+      for (const rr of [220, 800]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; gmin = Math.min(gmin, world.heightAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr)); }
       const fb = Math.max(0, gmin - 10);
       U.uFogBase.value += (fb - U.uFogBase.value) * (G.frame < 3 ? 1 : Math.min(1, rdt * 0.5));
     }

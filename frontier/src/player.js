@@ -9,7 +9,9 @@ const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2;
 export class Player {
   constructor({ world, town, veg, scene, camera, input }) {
     Object.assign(this, { world, town, veg, scene, camera, input });
-    this.rider = new Human('arthur', 7);
+    // two rigs: the everyday outfit and a cold-weather one he changes into up in the snow
+    this.outfits = { arthur: new Human('arthur', 7), winter: new Human('winter', 7) };
+    this.rider = this.outfits.arthur;
     this.horse = new Quadruped('horse', 11, 'bay'); // a dark bay, like the reference rides
     scene.add(this.horse.root);
     this.pos = new THREE.Vector3();
@@ -26,6 +28,16 @@ export class Player {
     this.whistled = false;
     this.footstepT = 0;
     this.onStep = null;
+    this.attachRider();
+  }
+
+  setOutfit(name) {
+    const next = this.outfits[name];
+    if (!next || next === this.rider) return;
+    const prev = this.rider;
+    prev.root.parent?.remove(prev.root);
+    next.root.rotation.copy(prev.root.rotation);
+    this.rider = next;
     this.attachRider();
   }
 
@@ -97,7 +109,9 @@ export class Player {
     // horse pose
     this.horse.root.position.copy(this.hpos);
     // hooves sink into deep snow up to the fetlocks
-    this.snowDepth = THREE.MathUtils.smoothstep(W.climateAt(this.hpos.x, this.hpos.z).snow, 0.45, 0.8);
+    const coldK = W.climateAt(this.hpos.x, this.hpos.z).snow;
+    this.snowDepth = THREE.MathUtils.smoothstep(coldK, 0.45, 0.8);
+    if (coldK > 0.55) this.setOutfit('winter'); else if (coldK < 0.4) this.setOutfit('arthur');
     this.horse.root.position.y -= 0.24 * this.snowDepth;
     this.horse.root.rotation.y = this.hyaw;
     // pitch horse to terrain slope

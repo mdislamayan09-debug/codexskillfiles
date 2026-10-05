@@ -55,8 +55,8 @@ function buildBones(spec) {
 }
 
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
-const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8'; // coat (index 3) is worn leather
-const ROUGH_QUAD = '0.6, 0.58, 0.35, 0.5, 0.72, 0.65, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
+const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8, 0.95, 0.95'; // coat (index 3) is worn leather
+const ROUGH_QUAD = '0.6, 0.58, 0.35, 0.5, 0.72, 0.65, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
 function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.7, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.55, 0.42, 0.3), envMapIntensity: 1.5 })
@@ -72,6 +72,12 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         float n2 = vnoise(vec2(vRest.x * 400.0 + vRest.z*300.0, vRest.y * 60.0));
         diffuseColor.rgb *= 0.9 + 0.12 * n1 + 0.06 * n2;
         ${extraFrag}
+        // a dusting of snow settles on shoulders, hats and backs out in the cold country
+        {
+          vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
+          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * smoothstep(0.35, 0.8, vnoise(vRest.xz * 22.0 + vRest.y * 9.0));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.4);
+        }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
       }`,
@@ -82,8 +88,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         .replace('#include <roughnessmap_fragment>', `
           float roughnessFactor = roughness;
           {
-            const float RT[13] = float[13](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
-            roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 12)];
+            const float RT[15] = float[15](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
+            roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 14)];
           }`)
         .replace('#include <normal_fragment_maps>', `
           #include <normal_fragment_maps>
@@ -97,6 +103,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
+                 else if (lab == 13 || lab == 14) hgt = vnoise(vec2(vRest.x * 260.0 + vRest.z * 190.0, vRest.y * 70.0)) * 0.0024 + vnoise(vRest.xy * 900.0 + vRest.z * 700.0) * 0.0008; // fur
                  else if (lab == 5 || lab == 8 || lab == 10) hgt = vnoise(vRest.xy * 140.0 + vRest.z * 90.0) * 0.0008;`}
             vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition);
             float hx = dFdx(hgt), hy = dFdy(hgt);
@@ -121,6 +128,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 
 // ===================================================================================== HUMANS
 export const OUTFITS = {
+  // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
+  winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xa48c6c, furHat: true, furHatColor: 0x6a5238, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
   arthur: { coat: 0x5e432c, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
@@ -128,7 +137,7 @@ export const OUTFITS = {
   lady: { coat: null, shirt: 0x7a4a5a, vest: 0x5a3a48, pants: 0x5a3a48, hat: null, boots: 0x1e1612, gloves: null, bandana: null, dress: true },
   worker: { coat: null, shirt: 0x9a8a70, vest: null, pants: 0x50463a, hat: 0x8a7a5a, boots: 0x30261c, gloves: null, bandana: 0x3e4a5a },
 };
-const L = { skin: 0, shirt: 1, vest: 2, coat: 3, pants: 4, boots: 5, hat: 6, hair: 7, belt: 8, bandana: 9, gloves: 10, lips: 11 };
+const L = { skin: 0, shirt: 1, vest: 2, coat: 3, pants: 4, boots: 5, hat: 6, hair: 7, belt: 8, bandana: 9, gloves: 10, lips: 11, fur: 13, furHat: 14 };
 const SKIN = [0xc4977a, 0xb38262, 0x9a6a4c, 0x7a5038, 0xd4aa8c];
 const HAIR = [0x2a2018, 0x3e2e1e, 0x1a1612, 0x5a4a3a];
 
@@ -157,6 +166,13 @@ function humanPrims(o) {
   add(EL([0, 1.0, 0.0], [0.168, 0.032, 0.124]), L.belt, 'hips', 0.006);
   add(BX([0, 1.0, 0.123], [0.03, 0.022, 0.006], 0.004), L.belt, 'hips', 0.004); // buckle
   // coat: shoulders + flared skirt
+  if (o.winter) {
+    // heavy shearling: bulkier body, longer skirt, wide fur collar
+    add(EL([0, 1.31, -0.005], [0.228, 0.215, 0.158]), L.coat, 'spine', 0.035);
+    add(RC([0, 1.12, -0.012], [0, 0.68, -0.03], 0.2, 0.235), L.coat, 'hips', 0.035);
+    add(EL([0, 1.535, -0.025], [0.16, 0.062, 0.125]), L.fur, 'spine', 0.03);
+    add(EL([0, 1.49, 0.07], [0.09, 0.07, 0.04]), L.fur, 'spine', 0.03); // lapels
+  }
   if (o.coat) {
     add(EL([0, 1.33, -0.005], [0.205, 0.19, 0.135]), L.coat, 'spine', 0.03);
     add(RC([-0.17, 1.47, -0.02], [0.17, 1.47, -0.02], 0.085, 0.085), L.coat, 'spine', 0.03);
@@ -166,7 +182,7 @@ function humanPrims(o) {
   if (o.dress) add(RC([0, 1.02, 0], [0, 0.1, 0], 0.17, 0.38), L.pants, 'hips', 0.06);
   // neck & head
   add(RC([0, 1.5, -0.01], [0, 1.68, 0.0], 0.058, 0.052), L.skin, 'neck', 0.03);
-  if (o.bandana) add(EL([0, 1.56, 0.0], [0.075, 0.035, 0.07]), L.bandana, 'neck', 0.01);
+  if (o.bandana) add(EL([0, 1.56, 0.0], o.winter ? [0.088, 0.05, 0.083] : [0.075, 0.035, 0.07]), L.bandana, 'neck', 0.01);
   add(EL([0, 1.785, -0.008], [0.083, 0.102, 0.098]), L.skin, 'head', 0.03);
   add(EL([0, 1.735, 0.032], [0.072, 0.085, 0.075]), L.skin, 'head', 0.03);
   add(EL([0, 1.685, 0.042], [0.062, 0.042, 0.058]), L.skin, 'head', 0.025); // jaw
@@ -181,6 +197,12 @@ function humanPrims(o) {
   }
   add(EL([0, 1.705, 0.098], [0.022, 0.007, 0.008]), L.lips, 'head', 0.006);
   add(EL([0, 1.81, -0.022], [0.088, 0.088, 0.096]), L.hair, 'head', 0.012); // hair cap
+  if (o.furHat) {
+    // trapper hat: a deep fur crown with ear flaps
+    add(RC([0, 1.8, -0.014], [0, 1.885, -0.014], 0.112, 0.106), L.furHat, 'head', 0.03);
+    add(EL([0, 1.9, -0.014], [0.102, 0.045, 0.104]), L.furHat, 'head', 0.035);
+    for (const s of [-1, 1]) add(EL([s * 0.094, 1.76, -0.02], [0.032, 0.058, 0.058]), L.furHat, 'head', 0.02);
+  }
   if (o.hat) {
     add(RC([0, 1.835, -0.008], [0, 1.95, -0.008], 0.098, 0.09), L.hat, 'head', 0.01);
     const crease = EL([0, 1.985, 0.0], [0.03, 0.04, 0.085]); crease.sub = true; crease.label = L.hat; P.push(crease);
@@ -198,6 +220,7 @@ function humanPrims(o) {
     add(RC([s * 0.2, 0.87, 0.012], [s * 0.198, 0.818, 0.022], 0.016, 0.012), hand, 'wr' + S, 0.012);
     add(RC([s * 0.187, 0.925, 0.03], [s * 0.192, 0.875, 0.05], 0.012, 0.01), hand, 'wr' + S, 0.01);
     add(RC([s * 0.2, 0.965, -0.01], [s * 0.2, 0.935, -0.006], 0.036, 0.032), hand, 'wr' + S, 0.012); // wrist/cuff
+    if (o.winter) add(RC([s * 0.2, 1.0, -0.012], [s * 0.2, 0.965, -0.01], 0.058, 0.056), L.fur, 'el' + S, 0.012);
   }
   // legs
   for (const s of [-1, 1]) {
@@ -223,7 +246,7 @@ function humanTemplate(outfit) {
   const p = geo.attributes.position, lab = geo.attributes.aLabel;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    if (o.coat && lab.getX(i) === L.coat && z > 0.06 && Math.abs(x) < 0.06 + (1.45 - y) * 0.06 && y > 1.02 && y < 1.5) lab.setX(i, o.vest ? L.vest : L.shirt);
+    if (o.coat && !o.winter && lab.getX(i) === L.coat && z > 0.06 && Math.abs(x) < 0.06 + (1.45 - y) * 0.06 && y > 1.02 && y < 1.5) lab.setX(i, o.vest ? L.vest : L.shirt);
     if (lab.getX(i) === L.skin && y < 1.725 && y > 1.64 && z > -0.01 && outfit !== 'lady') lab.setX(i, 12); // beard / stubble slot
     if (lab.getX(i) === L.skin && Math.abs(x) > 0.07 && y > 1.72 && y < 1.8 && z < 0.02 && z > -0.06 && outfit !== 'lady') lab.setX(i, L.hair); // sideburns
   }
@@ -244,7 +267,9 @@ export class Human {
     pal[L.pants] = hex(o.pants); pal[L.boots] = hex(o.boots); pal[L.hat] = hex(o.hat || 0x333333); pal[L.hair] = hair;
     pal[L.belt] = hex(0x3e2a1a); pal[L.bandana] = hex(o.bandana || 0x444444); pal[L.gloves] = hex(o.gloves || 0x5a3e28);
     pal[L.lips] = skin.map((v, i) => v * [0.8, 0.6, 0.6][i]);
-    pal[12] = outfit === 'arthur' || r() < 0.6 ? skin.map((v, i) => v * 0.3 + hair[i] * 0.75) : skin.map((v) => v * 0.85); // beard / stubble
+    pal[L.fur] = hex(o.fur || 0xb8a284);
+    pal[L.furHat] = hex(o.furHatColor || 0x6e5640);
+    pal[12] = outfit === 'arthur' || outfit === 'winter' || r() < 0.6 ? skin.map((v, i) => v * 0.3 + hair[i] * 0.75) : skin.map((v) => v * 0.85); // beard / stubble
     // per-instance colour attribute over a shared sculpted geometry
     const g = new THREE.BufferGeometry();
     for (const k of ['position', 'normal', 'skinIndex', 'skinWeight', 'aRest', 'aLabel']) g.setAttribute(k, tpl.geo.attributes[k]);
@@ -319,7 +344,7 @@ export class Human {
     const grip = new THREE.BoxGeometry(0.03, 0.08, 0.04); grip.rotateZ(-0.3); grip.translate(0.2, -0.01, 0.03);
     bones.hips.add(mesh(grip, std({ color: 0x5a3a24 })));
     // satchel strap for the hero
-    if (outfit === 'arthur') {
+    if (outfit === 'arthur' || outfit === 'winter') {
       const strap = new THREE.TorusGeometry(0.2, 0.012, 4, 24, Math.PI * 0.9);
       strap.rotateY(Math.PI / 2); strap.rotateX(0.5); strap.translate(0, 0.33, 0.0);
       bones.spine.add(mesh(strap, leather));

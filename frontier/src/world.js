@@ -35,7 +35,10 @@ export const REGIONS = [
 
 // Frostwater Valley: a glacial U-valley in the snowy range, running down to the river gorge.
 export const FROST_VALLEY = [[-1500, -3950], [-1280, -3560], [-1040, -3160], [-870, -2800], [-770, -2500], [-720, -2250]];
-const FROST_FLOOR = [560, 470, 380, 300, 220, 150]; // floor height at each valley point
+const FROST_FLOOR = [345, 305, 266, 228, 190, 150]; // floor height at each valley point: a gentle glacial grade
+// the valley opens out as it descends: a tight glacial trough at the head, a broad forested floor at the mouth.
+// Valley distances are divided by this, so every profile below is written for the narrow head.
+export const valleyWiden = (t) => 1 + 1.3 * smoothstep(0.1, 0.85, t);
 
 // River: from the gorge below Frostwater Valley through the pines and the Heartlands, the bayou, to the sea.
 export const RIVER = [
@@ -159,6 +162,23 @@ export class World {
       // the frozen creek and its braided side channels
       h -= 1.2 * smoothstep(5, 2, d.vd);
     }
+    // Crags: high range faces break into stepped cliff bands — near-vertical granite risers with
+    // ledges between them where snow collects — instead of smooth white slopes
+    if (mt > 0.05) {
+      // on open high ground above the tree line; in Frostwater Valley on the walls (never the floor)
+      const inV = d && d.vd < 700 ? smoothstep(700, 500, d.vd) : 0;
+      const gate = lerp(smoothstep(260, 520, h), smoothstep(85, 190, d ? d.vd : 1e9), inV);
+      // fades out on the summits, where steps would chip the ridgelines into teeth
+      let cw = mt * gate * lerp(1, 0.6, inV) * smoothstep(0.3, 0.55, n3.fbm(x / 700 - 4.2, z / 700 + 8.8, 3) + 0.5) * (1 - smoothstep(780, 940, h));
+      if (cw > 0.01) {
+        const S = 16 + 14 * (0.5 + 0.5 * n2.fbm(x / 400 + 1.9, z / 400, 2));
+        const t = h / S + 0.9 * n.fbm(x / 160 + 6.1, z / 160 - 2.4, 3);
+        const f = Math.floor(t), r = t - f;
+        // flat ledge for most of the step, then a steep riser
+        const rr = smoothstep(0.68, 0.96, r);
+        h += cw * (f + rr - t) * S * 0.7;
+      }
+    }
     // Desert: terraced red mesas over sand flats
     if (R.desert > 0) {
       const m = n2.fbm(x / 1100 + 20, z / 1100 - 4, 4) + 0.035 * n.fbm(x / 90, z / 90, 3);
@@ -231,7 +251,7 @@ export class World {
     const N = (j1 - j0) * RES;
     const rd = new Float32Array(N).fill(1e9), roadD = new Float32Array(N).fill(1e9);
     const vd = new Float32Array(N).fill(1e9), vt = new Float32Array(N);
-    const stamp = (pts, maxD, arr, tArr, lens, total, scale = 1) => {
+    const stamp = (pts, maxD, arr, tArr, lens, total, scale = 1, widen = null) => {
       for (let s = 0; s < pts.length - 1; s++) {
         const ax = pts[s][0], az = pts[s][1], bx = pts[s + 1][0], bz = pts[s + 1][1];
         const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
@@ -245,16 +265,17 @@ export class World {
             const px = -HALF + i * CELL;
             const t = clamp(((px - ax) * dx + (pz - az) * dz) / L2, 0, 1);
             const qx = ax + dx * t - px, qz = az + dz * t - pz;
-            const dd = Math.sqrt(qx * qx + qz * qz) * scale;
+            const tn = tArr ? (lens[s] + t * (lens[s + 1] - lens[s])) / total : 0;
+            const dd = Math.sqrt(qx * qx + qz * qz) * scale / (widen ? widen(tn) : 1);
             const k = row + i;
-            if (dd < arr[k]) { arr[k] = dd; if (tArr) tArr[k] = (lens[s] + t * (lens[s + 1] - lens[s])) / total; }
+            if (dd < arr[k]) { arr[k] = dd; if (tArr) tArr[k] = tn; }
           }
         }
       }
     };
     stamp(this.river, 700, rd);
     this.roads.forEach((r, ri) => stamp(r, 24, roadD, null, null, null, ROAD_SCALE[ri] || 1));
-    stamp(this.valley, 720, vd, vt, this.valleyLen, this.valleyTotal);
+    stamp(this.valley, 720 * valleyWiden(1), vd, vt, this.valleyLen, this.valleyTotal, 1, valleyWiden);
     return { rd, roadD, vd, vt };
   }
 
@@ -294,6 +315,8 @@ export class World {
           const wallBand = smoothstep(85, 150, vd) * smoothstep(430, 300, vd);
           f = Math.max(f, snowLat * wallBand * smoothstep(0.3, 0.48, forest.fbm(x / 240 + 2.2, z / 240, 3) * 0.5 + 0.5) * 0.92 * smoothstep(2.5, 6.5, o.roadD));
           f *= 1 - 0.7 * snowLat * smoothstep(110, 50, vd);
+          // stands of spruce out on the floor, with open snow meadows between them
+          f = Math.max(f, snowLat * 0.85 * smoothstep(0.5, 0.62, forest.fbm(x / 170 - 6.6, z / 170 + 2.9, 3) * 0.5 + 0.5) * smoothstep(12, 30, vd) * smoothstep(2.5, 6.5, o.roadD));
         }
         splat[k * 4 + 0] = o.road * 255;
         splat[k * 4 + 1] = o.wet * 255;
@@ -316,8 +339,9 @@ export class World {
       const [ax, az] = this.valley[s], [bx, bz] = this.valley[s + 1];
       const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
       const t = clamp(((CABIN.x - ax) * dx + (CABIN.z - az) * dz) / L2, 0, 1);
-      const dd = Math.hypot(ax + dx * t - CABIN.x, az + dz * t - CABIN.z);
-      if (dd < best) { best = dd; bt = (this.valleyLen[s] + t * (this.valleyLen[s + 1] - this.valleyLen[s])) / this.valleyTotal; }
+      const tn = (this.valleyLen[s] + t * (this.valleyLen[s + 1] - this.valleyLen[s])) / this.valleyTotal;
+      const dd = Math.hypot(ax + dx * t - CABIN.x, az + dz * t - CABIN.z) / valleyWiden(tn);
+      if (dd < best) { best = dd; bt = tn; }
     }
     D.vd = best; D.vt = bt;
     this.cabinH = null;
@@ -399,9 +423,10 @@ export class World {
         const k = j * RES + i, h = H[k];
         const m = smoothstep(45, 140, h) * 0.75;
         if (m <= 0 || i < 2 || j < 2 || i > RES - 3 || j > RES - 3) { tmp[k] = h; continue; }
+        // a light 3x3 pass: removes single-cell spikes but keeps the cliff bands sharp
         let sum = 0;
-        for (let dj = -2; dj <= 2; dj++) { const r = k + dj * RES; sum += H[r - 2] + H[r - 1] + H[r] + H[r + 1] + H[r + 2]; }
-        tmp[k] = lerp(h, sum / 25, m * 0.8);
+        for (let dj = -1; dj <= 1; dj++) { const r = k + dj * RES; sum += H[r - 1] + H[r] + H[r + 1]; }
+        tmp[k] = lerp(h, sum / 9, m * 0.8);
       }
       H.set(tmp);
     }
