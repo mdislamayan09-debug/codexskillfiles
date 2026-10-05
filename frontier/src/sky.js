@@ -171,7 +171,7 @@ export class Sky {
       this.sun.position.copy(focus).addScaledVector(s, 600);
     } else {
       this.sun.color.setRGB(0.55, 0.65, 0.95);
-      this.sun.intensity = 0.9 * night;
+      this.sun.intensity = 0.65 * night;
       const m = s.clone().negate(); m.y = Math.max(m.y, 0.25);
       this.sun.position.copy(focus).addScaledVector(m.normalize(), 600);
     }

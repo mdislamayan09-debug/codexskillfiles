@@ -73,7 +73,7 @@ const GradeShader = {
       col = mix(col, col*col*(3.0-2.0*col), 0.28);
       col = pow(max(col, 0.0), vec3(1.0)) * 1.02 + vec3(0.012, 0.01, 0.006);
       // night: blue shift
-      col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.35, uNight * 0.6);
+      col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse
       if (uDeadEye > 0.0) {
         float g = dot(col, vec3(0.3,0.59,0.11));

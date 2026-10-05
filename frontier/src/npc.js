@@ -57,7 +57,7 @@ export class NPCs {
     });
     // the gang's horses picketed at the hideout
     for (let i = 0; i < 3; i++) {
-      const x = CAMP.x - 14 + i * 2.2, z = CAMP.z + 9 + i * 0.6;
+      const x = CAMP.x + 13 + i * 0.6, z = CAMP.z - 9 + i * 2.2;
       const a = this.add(new Quadruped('horse', 760 + i, ['black', 'chestnut', 'grey'][i]), 'tied', x, z, 0.3 + i * 0.2);
       a.timer = r() * 10;
     }
