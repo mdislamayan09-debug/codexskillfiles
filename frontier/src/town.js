@@ -39,8 +39,8 @@ function gableRoof(w, d, rise, overhang = 0.5) {
   const slope = Math.hypot(hd, rise);
   const left = new THREE.BoxGeometry(w + overhang * 2, t, slope);
   const ang = Math.atan2(rise, hd);
-  const lp = left.clone(); lp.rotateX(ang); lp.translate(0, rise / 2, -hd / 2);
-  const rp = left.clone(); rp.rotateX(-ang); rp.translate(0, rise / 2, hd / 2);
+  const lp = left.clone(); lp.rotateX(-ang); lp.translate(0, rise / 2, -hd / 2);
+  const rp = left.clone(); rp.rotateX(ang); rp.translate(0, rise / 2, hd / 2);
   for (const g of [lp, rp]) {
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w + overhang * 2) / 3, uv.getY(i) * slope / 3);

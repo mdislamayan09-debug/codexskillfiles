@@ -498,6 +498,9 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       #include <color_fragment>
       diffuseColor.rgb *= vGCol;
       diffuseColor.rgb *= mix(0.55, 1.0, smoothstep(0.0, 0.6, vGY)); // root occlusion
+      // keep thin blades from dissolving in lower mips (alpha-test coverage preservation)
+      float mipL = max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 512.0));
+      diffuseColor.a = clamp(diffuseColor.a * (1.0 + mipL * 0.45), 0.0, 1.0);
     `,
     onShader: (shader) => {
       shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `
