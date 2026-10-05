@@ -480,7 +480,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
-      float hgt = mix(0.35, 0.85, smoothstep(0.3, 0.75, field)) * (0.65 + 0.5*aOff.w) * (0.9 + 0.3*dry);
+      float hgt = mix(0.24, 0.62, smoothstep(0.3, 0.75, field)) * (0.65 + 0.5*aOff.w) * (0.9 + 0.3*dry);
       hgt *= alive * fade;
       float ang = aOff.z * 37.0 + aOff.w * 11.0;
       float ca = cos(ang), sa = sin(ang);
