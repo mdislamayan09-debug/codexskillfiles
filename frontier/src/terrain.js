@@ -303,7 +303,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
 export class Terrain {
   constructor(world, scene, surf = null, quality = 1) {
     this.surf = surf;
-    this.lodScale = quality > 1 ? 1.45 : 1;
+    this.lodScale = quality >= 2 ? 2.0 : quality > 1 ? 1.45 : 1;
     this.world = world;
     this.meshes = [];
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
@@ -346,7 +346,10 @@ export class Terrain {
         // distant forests read as a canopy mass (impostors thin out with distance)
         {
           float fo = splatAt(vWPos.xz).b;
-          float canopyK = smoothstep(0.3, 0.65, fo) * smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD));
+          vec4 ccl0 = climateAt(vWPos.xz);
+          // under snow-country spruce the ground is shade and needles, not open snow: the stands close up sooner
+          float canopyK = smoothstep(0.3, 0.65, fo) * mix(smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD)),
+                                                          smoothstep(30.0, 200.0, camD) * 0.92, smoothstep(0.4, 0.8, ccl0.r));
           float cfp = length(fwidth(vWPos.xz));
           vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), mix(0.47, fbm2(vWPos.xz/18.0), smoothstep(14.0, 5.0, cfp)))
                       * mix(0.95, 0.7 + 0.5*vnoise(vWPos.xz/4.0), smoothstep(5.0, 1.5, cfp));

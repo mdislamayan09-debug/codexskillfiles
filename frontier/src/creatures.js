@@ -61,6 +61,9 @@ function leatherTexture(r) {
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
+// sculpt resolution: finer surface nets on capable machines (smoother faces, folds and muscle)
+let DETAIL = 1;
+export function setCreatureDetail(q) { DETAIL = q >= 2 ? 1.45 : q > 1 ? 1.2 : 1; }
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
 const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }));
 function mesh(geo, mat, cast = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; return m; }
@@ -287,7 +290,7 @@ function humanTemplate(outfit) {
   if (humanCache.has(outfit)) return humanCache.get(outfit);
   const o = OUTFITS[outfit];
   const prims = humanPrims(o);
-  const geo = sculpt(prims, { cell: 0.0115, pad: 0.03 });
+  const geo = sculpt(prims, { cell: 0.0115 / DETAIL, pad: 0.03 });
   labelAndSkin(geo, prims, { boneCount: HUMAN_BONES.length, sharpness: 0.018 });
   // open coat front reveals the vest/shirt; stubble on the jaw
   const p = geo.attributes.position, lab = geo.attributes.aLabel;
@@ -585,7 +588,7 @@ function quadTemplate(kind) {
   const BS = quadBones(kind);
   const QB = Object.fromEntries(BS.map((b, i) => [b.name, i]));
   const prims = quadPrims(kind, QB);
-  const geo = sculpt(prims, { cell: SPECIES[kind].cell, pad: 0.04 });
+  const geo = sculpt(prims, { cell: SPECIES[kind].cell / DETAIL, pad: 0.04 });
   labelAndSkin(geo, prims, { boneCount: BS.length, sharpness: 0.035 });
   quadCache.set(kind, { geo, BS });
   return quadCache.get(kind);

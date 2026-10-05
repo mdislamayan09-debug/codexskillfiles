@@ -51,7 +51,7 @@ float cloudDen(vec3 p, float cov){
   float weather = texture(tCloud, vec3(p.xz / 26000.0, 0.37)).b;
   vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
   // a storm closes the gaps into a continuous, lumpy deck
-  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.32 * uStorm, 0.0, 1.0);
+  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.22 * uStorm, 0.0, 1.0);
   // flat dark bases, towering rounded tops
   float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
   float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
@@ -113,7 +113,7 @@ export class Sky {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
-      defines: { CLOUD_STEPS: quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
+      defines: { CLOUD_STEPS: quality >= 2 ? 64 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
@@ -158,7 +158,7 @@ export class Sky {
             ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
             ambBot *= 1.0 - 0.6 * uStorm;
             ambTop *= 1.0 - 0.12 * uStorm;
-            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.8 * uStorm), ambTop, ambBot, uCloudCover);
+            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.55 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
             vec3 hz = stormSky(skyColor(d, s));

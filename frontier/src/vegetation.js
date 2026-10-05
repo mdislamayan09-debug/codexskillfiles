@@ -1048,6 +1048,7 @@ export class Vegetation {
     const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3), material: rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
 
+    this.quality = quality;
     this.scatter();
     this.dressHomesteads();
 
@@ -1146,6 +1147,12 @@ export class Vegetation {
         if (sp.forest < 0.2 && cl.jungle < 0.4 && !swamp && cl.snow < 0.45 && pz > -700) v = pick(G.oak); // lone meadow oaks
         const s = cl.snow > 0.45 ? 0.5 + r() * r() * 1.1 + r() * 0.3 : 0.8 + r() * 0.5;   // spruce stands of mixed ages
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
+        // closed-canopy stands on capable machines: a second, younger tree in every dense cell
+        if ((this.quality || 1) >= 1.5 && sp.forest > 0.55 && !blocked(px, pz)) {
+          const qx = x + ((px - x + cell * 0.5) % cell), qz = z + ((pz - z + cell * 0.5) % cell);
+          const qh = w.heightAt(qx, qz);
+          if (w.normalAt(qx, qz).y > 0.62 && w.splatAt(qx, qz).road < 0.1) this.trees.add(qx, qh - 0.2, qz, (px + pz) % 6.28, s * (0.55 + 0.35 * ((px * 7.31) % 1 + 1) % 1), v);
+        }
         continue;
       }
       if (blocked(px, pz, -20)) continue;

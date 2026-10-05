@@ -1,6 +1,7 @@
 // Dust & Redemption — bootstrap, game rules and main loop.
 import './style.css';
 import * as THREE from 'three';
+import { setCreatureDetail } from './creatures.js';
 import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution, loadRealTerrain } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
@@ -18,7 +19,9 @@ import { Input } from './input.js';
 import { Post } from './post.js';
 
 const params = new URLSearchParams(location.search);
-const QUALITY = { low: 0.45, med: 0.75, high: 1, ultra: 1.5 }[params.get('q') || 'high'] ?? 1;
+// cinematic (the default) is tuned for an Apple-silicon laptop and favours image quality over frame rate;
+// high/med/low remain for older machines
+const QUALITY = { low: 0.45, med: 0.75, high: 1, ultra: 1.5, cinematic: 2 }[params.get('q') || 'cinematic'] ?? 2;
 const CAPTURE = params.has('capture');
 
 const canvas = document.getElementById('game');
@@ -52,7 +55,8 @@ async function init() {
   setLoad(0.02, 'Surveying the territory…');
   await Promise.all([document.fonts.load('40px Rye'), document.fonts.load('40px "IM Fell English"'), document.fonts.load('40px "IM Fell English SC"')]).catch(() => {});
   // heightmap detail per preset: 3.2 m (high), 2.7 m (ultra), 4 m (low/med) over the 8 km map
-  setWorldResolution(QUALITY > 1 ? 3072 : QUALITY >= 1 ? 2560 : 2048);
+  setWorldResolution(QUALITY >= 2 ? 4096 : QUALITY > 1 ? 3072 : QUALITY >= 1 ? 2560 : 2048);
+  setCreatureDetail(QUALITY);
   U.uRes.value = RES;
   await loadRealTerrain();
   const world = new World(1899);
@@ -76,7 +80,7 @@ async function init() {
   if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
-  const snowfall = new Snowfall(scene, QUALITY > 1 ? 22000 : 15000);
+  const snowfall = new Snowfall(scene, QUALITY >= 2 ? 32000 : QUALITY > 1 ? 22000 : 15000);
   const snowTrail = new SnowTrail(scene, world);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));
   // lily pads drifting on shallow bayou water

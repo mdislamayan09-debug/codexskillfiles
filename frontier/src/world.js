@@ -150,6 +150,15 @@ export class World {
     return smoothstep(-1550, -1950, z) * smoothstep(4070, 3720, Math.abs(x));
   }
 
+  // slope (1 - normal.y) of the real ground
+  realSlope(x, z) {
+    const e = REAL.meta.cell;
+    const a = this.realAt(x - e, z), b = this.realAt(x + e, z), c = this.realAt(x, z - e), d = this.realAt(x, z + e);
+    if (a === null || b === null || c === null || d === null) return 0;
+    const gx = (b - a) / (2 * e), gz = (d - c) / (2 * e);
+    return 1 - 1 / Math.sqrt(gx * gx + gz * gz + 1);
+  }
+
   riverWidth(x, z) {
     return 16 + 10 * (0.5 + 0.5 * this.n2.noise(x / 400, z / 400)) + smoothstep(600, 1300, z) * 12;
   }
@@ -250,7 +259,16 @@ export class World {
         else {
           // the map's north boundary: the real ground climbs into a closing ridge rather than ending at a cut
           const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3));
-          h = lerp(h, r + rise + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
+          let rb = r;
+          const sl = this.realSlope(x, z);
+          const cw = smoothstep(0.22, 0.42, sl) * smoothstep(0.35, 0.6, n3.fbm(x / 500 + 2.2, z / 500 - 7.1, 3) + 0.5);
+          if (cw > 0.01) {
+            const S = 11 + 8 * (0.5 + 0.5 * n2.fbm(x / 300 + 4.4, z / 300, 2));
+            const t = r / S + 0.7 * n.fbm(x / 120 - 1.3, z / 120 + 6.6, 3);
+            const fl = Math.floor(t), fr = t - fl;
+            rb += cw * (fl + smoothstep(0.62, 0.95, fr) - t) * S * 0.55;
+          }
+          h = lerp(h, rb + rise + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
           // the creek winds down the real valley floor
           if (d && d.vd < 8) h -= 1.0 * smoothstep(4, 1.5, d.vd) * realW;
         }
@@ -397,6 +415,22 @@ export class World {
           f *= 1 - 0.95 * snowLat * smoothstep(110, 50, vd);
           // stands of spruce out on the floor, with open snow meadows between them
           f = Math.max(f, snowLat * 0.85 * smoothstep(0.5, 0.62, forest.fbm(x / 170 - 6.6, z / 170 + 2.9, 3) * 0.5 + 0.5) * smoothstep(12, 30, vd) * smoothstep(2.5, 6.5, o.roadD));
+        }
+        // Real ground: a subalpine forest as it grows there — continuous spruce-fir on the valley walls below the
+        // tree line, thinning into krummholz above it, broken by avalanche chutes, cliffs and wet meadows on the floor
+        if (REAL) {
+          const rw = this.realWeight(x, z);
+          if (rw > 0 && this.realAt(x, z) !== null) {
+            const sl = this.realSlope(x, z);
+            const vd = D.vd[k];
+            let fr = smoothstep(820, 640, h + 60 * n2.fbm(x / 180, z / 180, 3));     // tree line, ragged
+            fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
+            fr *= smoothstep(0.32, 0.46, forest.fbm(x / 210 + 8.1, z / 210 - 5.5, 3) * 0.5 + 0.5 + 0.15);   // clearings
+            fr *= 1 - 0.85 * smoothstep(0.62, 0.7, n.noise(x / 60 + z / 900, z / 380) * 0.5 + 0.5) * smoothstep(0.25, 0.4, sl); // chutes
+            fr *= 0.35 + 0.65 * smoothstep(40, 110, vd);                                // open meadow along the creek
+            fr *= smoothstep(2.5, 6.5, o.roadD);
+            f = lerp(f, Math.min(1, fr * 1.05), rw);
+          }
         }
         splat[k * 4 + 0] = o.road * 255;
         splat[k * 4 + 1] = o.wet * 255;
