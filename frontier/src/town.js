@@ -120,6 +120,9 @@ export class Town {
     const winTex = windowTexture();
     M.window = std({ map: winTex, emissive: 0xffa040, emissiveMap: winTex, emissiveIntensity: 0, roughness: 0.3 });
     M.window.userData.noShadow = true;
+    M.lampGlass = std({ color: 0x2a1c10, emissive: 0xffa848, emissiveIntensity: 0, roughness: 0.2 });
+    M.lampGlass.userData.noShadow = true;
+    this.lampMat = M.lampGlass;
     this.windowMat = M.window;
     this.bucket = new Bucket();
 
@@ -297,7 +300,10 @@ export class Town {
       for (const s of [-1, 1]) {
         const lx = x + 6, lz = s * 7.2, ly = this.h(lx, lz);
         B.add(M.trim, cyl(0.09, 0.07, 3.6, lx, ly, lz));
-        B.add(M.iron, box(0.35, 0.45, 0.35, lx, ly + 3.8, lz));
+        B.add(M.iron, box(0.38, 0.06, 0.38, lx, ly + 4.05, lz));
+        B.add(M.iron, box(0.3, 0.06, 0.3, lx, ly + 3.56, lz));
+        B.add(M.lampGlass, box(0.26, 0.42, 0.26, lx, ly + 3.8, lz));
+        B.add(M.iron, new THREE.ConeGeometry(0.26, 0.2, 4).rotateY(Math.PI / 4).translate(lx, ly + 4.18, lz));
         this.lights.push(new THREE.Vector3(lx, ly + 3.8, lz));
       }
     }
@@ -572,6 +578,7 @@ export class Town {
   update(dt, night) {
     for (const w of this.windmills) w.rotation.z += dt * 1.6;
     this.windowMat.emissiveIntensity = night * 2.2;
+    this.lampMat.emissiveIntensity = night * 9;
   }
 
   collide(pos, radius) {

@@ -219,7 +219,7 @@ async function init() {
     vista: () => ({ time: 17.8, player: [-60, 280, -0.2], cam: [-60, null, 330, 30], look: [40, null, -700, 120] }),
     gallop: () => ({ time: 17.6, player: [-380, -2, Math.PI / 2], camRel: [-2.6, 2.2, -6.5], lookRel: [0, 1.8, 3], gallop: true }),
     camp: () => ({ time: 20.4, player: [CAMP.x - 18, CAMP.z + 14, 2.2], cam: [CAMP.x - 14, null, CAMP.z + 16, 2.2], look: [CAMP.x, null, CAMP.z, 1] }),
-    night: () => ({ time: 21.5, player: [-20, 4, Math.PI / 2], cam: [-40, null, 6, 2.5], look: [60, null, -4, 4] }),
+    night: () => ({ time: 21.5, player: [-20, 2, Math.PI / 2], cam: [-46, null, -1, 2.4], look: [60, null, -3, 4] }),
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
   };
