@@ -92,7 +92,35 @@ plateaued: since round 3 the critic names the same three gaps every round — ma
 flat material response (no texture-level wear or breakup), and thin ground/vegetation detail. A seating bug the
 camp close-up exposed (outlaws hovering beside the logs) is fixed after capture.
 
-## Where it stands (historical note from round 4 below; still accurate after round 7)
+### Round 8: blind critic 0 / 8 (vista "clearly", the rest landslides)
+The "ultra realistic 4K" pass:
+- **Photographic CC0 surfaces.** Terrain, boulders, town timber, foundations and water now sample ambientCG
+  scans (albedo plus normal maps) with two scales mixed by noise to hide tiling. The scans are grass, dirt,
+  gravel, pebble riverbed, triplanar rock (including a cliff-scale sample for distant faces), snow, planks,
+  weathered wood and stone, plus scanned water normals.
+- **Raymarched cumulus sky.** A 3D Perlin-Worley noise volume drives a cloud slab with sun self-shadowing,
+  a two-lobe phase function and aerial perspective. This replaces the painted 2D clouds.
+- **Grass.** Distant clumps settle to their mean colour, so the "dark lettuce" mottling is gone. The ranch
+  pasture is grazed short, and the clumps are brightened to sit on the ground instead of reading as a dark mat.
+- **`?q=ultra` preset.** Up to 2x pixel ratio, an 8192 shadow map, farther terrain detail, denser grass and
+  sharper reflections.
+
+| piece | margin | biggest gap named by the critic | builder response (after capture) |
+| --- | --- | --- | --- |
+| ranch | landslide | flat tiled lawn, props on a blockout grid | open: terrain undulation, clutter, wear at post bases |
+| vista | clearly | mid-distance forest renders as grey-white speckle | fixed: terrain noise finer than a pixel fades to its mean, and far impostors take the canopy terrain's shading |
+| ride | landslide | mannequin rider: one material, no face, no seat contact | open: needs authored character art |
+| swamp | landslide | flat shadowless light, no humidity | open |
+| gallop | landslide | rocking-horse pose, white blotches on the ground | dust puffs broken up with noise; gait still open |
+| forest | landslide | "broccoli" card canopies, no sky holes | leaf translucency toned to yellow-green; canopy rebuild still open |
+| town | landslide | flat tiling close-up surfaces, grey window quads, polka-dot rust | open (scanned boardwalk landed this round) |
+| camp | landslide | fire is a white blown-out light; outlaw in mid-air | flames kept orange below the clip point; camp shot no longer alerts the gang, so outlaws stay on the logs |
+
+The critic also flagged the test set. The repo only has five RDR2 bar frames, so three bar frames serve two
+pieces each, and three pairs (vista, gallop, camp) don't compare like with like. Better-matched reference
+frames would make future verdicts sharper.
+
+## Where it stands (historical note from round 4 below; still accurate after round 8)
 After four rounds the build has not beaten the bar. Every round closed visible gaps: the critic's notes moved from
 "black screen / floating specks / mannequins in an empty field" to fine-grained material, foliage and character
 detail. Town has stopped being a landslide since round 2. The remaining distance is mostly hand-authored art
