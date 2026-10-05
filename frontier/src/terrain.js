@@ -57,7 +57,7 @@ const BEGIN_NORMAL = /* glsl */ `
 `;
 
 export const TERRAIN_FRAG_HEAD = /* glsl */ `
-uniform sampler2D tGrass, tDirt, tRock, tSnow, tMud, tGravel, nGrass, nDirt, nRock, nMud;
+uniform sampler2D tGrass, tDirt, tRock, tSnow, tBed, tGravel, nGrass, nDirt, nRock, nBed;
 vec3 srgb(vec3 c){ return pow(c/255.0, vec3(2.2)); }
 float lumi(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 float gTRough = 0.9;
@@ -96,7 +96,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 lush = mix(srgb(vec3(70,92,38)), srgb(vec3(96,112,44)), mid);
   vec3 dry = mix(srgb(vec3(146,128,72)), srgb(vec3(122,116,64)), mid);
   vec3 grass = mix(lush, dry, smoothstep(0.42, 0.68, macro + 0.15*patchy));
-  grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.35, 2.2), 0.8 * D);
+  grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.4, 1.6), 0.8 * D);
   grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3);
   vec3 forestFloor = mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy);
   forestFloor *= mix(0.8 + 0.3*micro, clamp(lumi(dA.rgb) / 0.12, 0.4, 2.0), 0.8 * D);
@@ -111,9 +111,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 mN = vec3(0.0, 0.0, 1.0);
   float shore = smoothstep(2.4, 0.4, wp.y);
   if (max(wet * 0.55, shore) > 0.02 || town > 0.5) {
-    vec4 mA = tex2(tMud, xz, 2.4, 6.3);
-    mud = mix(mud, mA.rgb * 0.62, 0.8 * D);
-    mN = unpackN(texture(nMud, xz / 2.4));
+    // wet mud: the dirt scan darkened and smoothed over by water
+    mud = mix(mud, dA.rgb * vec3(0.5, 0.46, 0.4), 0.8 * D);
+    mN = dN * vec3(0.4, 0.4, 1.0);
   }
   float rockAmt = smoothstep(0.28, 0.45, slope + (mid-0.5)*0.25);
   rockAmt = max(rockAmt, smoothstep(200.0, 280.0, wp.y + mid*60.0) * smoothstep(0.1, 0.22, slope));
@@ -158,6 +158,14 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   rough = mix(rough, 0.08, puddle);
   float sh = max(wet*0.55, shore)*(1.0-rr);
   c = mix(c, mud, sh); tn = mix(tn, mN, sh);
+  // river and lake beds: rounded pebbles under the shallows (not in the bayou)
+  float bed = smoothstep(0.3, -0.7, wp.y) * (1.0 - smoothstep(500.0, 900.0, xz.x) * smoothstep(650.0, 1000.0, xz.y));
+  if (bed > 0.01) {
+    vec4 bA = tex2(tBed, xz, 1.7, 4.4);
+    c = mix(c, bA.rgb * vec3(0.72, 0.7, 0.62), bed * 0.9);
+    tn = mix(tn, unpackN(texture(nBed, xz / 1.7)), bed);
+    rough = mix(rough, 0.5, bed);
+  }
   rough = mix(rough, 0.45, shore);
   c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6);
   c = mix(c, rock, rockAmt); tn = mix(tn, rN, rockAmt);
@@ -227,7 +235,7 @@ export class Terrain {
       onShader: (shader) => {
         shader.uniforms.uChunk = { value: CHUNK };
         const S = this.surf || {};
-        for (const [u, k] of [['tGrass', 'grass'], ['tDirt', 'dirt'], ['tRock', 'rock'], ['tSnow', 'snow'], ['tMud', 'mud'], ['tGravel', 'gravel'], ['nGrass', 'grassN'], ['nDirt', 'dirtN'], ['nRock', 'rockN'], ['nMud', 'mudN']]) shader.uniforms[u] = { value: S[k] || null };
+        for (const [u, k] of [['tGrass', 'grass'], ['tDirt', 'dirt'], ['tRock', 'rock'], ['tSnow', 'snow'], ['tBed', 'riverbed'], ['tGravel', 'gravel'], ['nGrass', 'grassN'], ['nDirt', 'dirtN'], ['nRock', 'rockN'], ['nBed', 'riverbedN']]) shader.uniforms[u] = { value: S[k] || null };
         this.shaders.push(shader);
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = gTRough;')

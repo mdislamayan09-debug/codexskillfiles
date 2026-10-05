@@ -54,7 +54,7 @@ async function init() {
   U.uHeight.value = world.heightTex;
   U.uSplat.value = world.splatTex;
   setLoad(0.55, 'Painting the sky…'); await tick();
-  const sky = new Sky(scene, renderer);
+  const sky = new Sky(scene, renderer, QUALITY);
   setLoad(0.57, 'Loading photographic surfaces…'); await tick();
   const surf = await loadSurfaces(renderer);
   const terrain = new Terrain(world, scene, surf, QUALITY);

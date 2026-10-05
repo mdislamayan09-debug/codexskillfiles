@@ -129,8 +129,8 @@ export function plankTexture(seed = 7, paint = null, vertical = false) {
       g.fillStyle = `rgba(${paint},0.86)`;
       g.fillRect(0, b * bw + 1, 512, bw - 2);
       // peeling: long thin flakes along the grain
-      for (let k = 0; k < 18; k++) {
-        g.fillStyle = `rgba(${wood},${0.5 + r() * 0.4})`;
+      for (let k = 0; k < 11; k++) {
+        g.fillStyle = `rgba(${wood},${0.22 + r() * 0.38})`;
         const x = r() * 512, y = b * bw + 2 + r() * (bw - 4);
         g.beginPath(); g.ellipse(x, y, 6 + r() * 34, 0.8 + r() * 1.8, 0, 0, 7); g.fill();
       }

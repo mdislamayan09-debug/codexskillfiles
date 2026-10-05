@@ -1,6 +1,7 @@
 // Sky dome (analytic scattering + painted cumulus), sun/moon, time of day and image-based light.
 import * as THREE from 'three';
 import { U } from './shared.js';
+import { makeCloudNoise } from './cloudnoise.js';
 
 const SKY_GLSL = /* glsl */ `
 uniform vec3 uSunDir;
@@ -8,6 +9,7 @@ uniform float uTime;
 uniform float uNight;
 uniform float uCloudCover;
 uniform vec2 uCloudOffset;
+uniform highp sampler3D tCloud;
 varying vec3 vDir;
 
 float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -36,10 +38,61 @@ vec3 skyColor(vec3 d, vec3 s){
   col += mie * mix(vec3(1.0, 0.55, 0.25), vec3(1.0, 0.92, 0.8), day) * smoothstep(-0.15, 0.05, sunH);
   return col;
 }
+
+// ---- raymarched cumulus slab (Perlin-Worley shape eroded by Worley detail)
+const float CB = 1500.0, CT = 2900.0;
+float remap(float v, float a, float b, float c, float d){ return c + (clamp(v, a, b) - a) / (b - a) * (d - c); }
+float cloudDen(vec3 p, float cov){
+  float h = (p.y - CB) / (CT - CB);
+  if (h < 0.0 || h > 1.0) return 0.0;
+  float weather = texture(tCloud, vec3(p.xz / 26000.0, 0.37)).b;
+  vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
+  float c = clamp(cov * (0.3 + 0.9 * weather), 0.0, 1.0);
+  // flat dark bases, towering rounded tops
+  float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
+  float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
+  if (d <= 0.0) return 0.0;
+  float det = texture(tCloud, p / 1100.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
+  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * 0.55, 1.0, 0.0, 1.0);
+  return d * c;
+}
+float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }
+// returns in-scattered light (rgb) and transmittance (a)
+vec4 marchClouds(vec3 d, vec3 s, vec3 sunC, vec3 ambTop, vec3 ambBot, float cov){
+  float t0 = CB / d.y, t1 = min(CT / d.y, t0 + 11000.0);
+  if (t0 > 60000.0) return vec4(0.0, 0.0, 0.0, 1.0);
+  const int N = CLOUD_STEPS;
+  float dt = (t1 - t0) / float(N);
+  float t = t0 + dt * h12(gl_FragCoord.xy + fract(uTime * 7.31) * 61.0);
+  vec3 off = vec3(uCloudOffset.x, 0.0, uCloudOffset.y) * 4000.0;
+  float mu = dot(d, s);
+  float ph = mix(hgPhase(0.55, mu), hgPhase(-0.25, mu), 0.35);
+  vec3 L = vec3(0.0); float T = 1.0;
+  for (int i = 0; i < N; i++) {
+    vec3 p = d * t + off;
+    float den = cloudDen(p, cov);
+    if (den > 0.003) {
+      float ld = 0.0;
+      for (int j = 1; j <= 4; j++) { float o = 70.0 * float(j*j); ld += cloudDen(p + s * o, cov) * 70.0 * float(2*j - 1); }
+      float sig = 0.0045;
+      // two-lobe transmittance fakes multiple scattering in thick cloud
+      float Tl = max(exp(-ld * sig), 0.14 * exp(-ld * sig * 0.3));
+      float powder = 1.0 - exp(-den * 1800.0 * sig);
+      float h = (p.y - CB) / (CT - CB);
+      vec3 S = sunC * Tl * ph * mix(0.6, 1.0, powder) + mix(ambBot, ambTop, smoothstep(0.0, 0.9, h));
+      float a = exp(-den * sig * dt);
+      L += T * S * (1.0 - a);
+      T *= a;
+      if (T < 0.03) break;
+    }
+    t += dt;
+  }
+  return vec4(L, T);
+}
 `;
 
 export class Sky {
-  constructor(scene, renderer) {
+  constructor(scene, renderer, quality = 1) {
     this.scene = scene;
     this.renderer = renderer;
     this.time = 17.6; // hours — golden hour
@@ -47,9 +100,11 @@ export class Sky {
     this.uniforms = {
       uSunDir: U.uSunDir, uTime: U.uTime, uNight: U.uNight,
       uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() },
+      tCloud: { value: Sky.cloudTexture() },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
+      defines: { CLOUD_STEPS: quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
@@ -79,24 +134,22 @@ export class Sky {
             col += smoothstep(0.9993, 0.9996, md) * vec3(2.2, 2.3, 2.5) * night;
             col += pow(max(md,0.0), 300.0) * vec3(0.08, 0.1, 0.14) * night;
           }
-          // clouds on a curved plane
+          // clouds: raymarched cumulus slab
           if (d.y > 0.0) {
             vec2 uv = d.xz / (d.y + 0.08) * 1.4 + uCloudOffset;
-            vec2 w = vec2(fbm(uv*0.6 + uTime*0.003), fbm(uv*0.6 + 5.2));
-            float base = fbm(uv*0.9 + w*1.4);
-            float cov = uCloudCover;
-            float dens = smoothstep(1.0 - cov, 1.0 - cov + 0.32, base);
-            // light march toward sun
-            vec2 toSun = normalize(s.xz + 1e-4) * 0.06;
-            float dl = smoothstep(1.0 - cov, 1.0 - cov + 0.32, fbm((uv + toSun)*0.9 + w*1.4));
-            float shade = clamp(1.0 - (dl - dens*0.55)*1.6, 0.0, 1.0);
             vec3 sunC = mix(vec3(1.0, 0.5, 0.25), vec3(1.0, 0.95, 0.88), smoothstep(0.0, 0.35, s.y));
-            vec3 lit = mix(vec3(0.42, 0.45, 0.52)*day + vec3(0.02,0.025,0.04), sunC * (1.25*day + 0.04), shade);
-            // silver lining near sun
-            lit += pow(max(mu,0.0), 6.0) * sunC * (1.0 - dens) * 2.2 * day;
-            lit = mix(lit, skyColor(d, s)*1.05, 0.25);
-            float fade = smoothstep(0.0, 0.18, d.y);
-            col = mix(col, lit, dens * fade * 0.96);
+            vec3 zen = skyColor(vec3(0.0, 1.0, 0.0), s);
+            vec3 hor = skyColor(normalize(vec3(d.x, 0.05, d.z)), s);
+            vec3 ambTop = zen * 0.62 + hor * 0.14 + vec3(0.006, 0.008, 0.014);
+            vec3 ambBot = mix(hor, vec3(0.30, 0.27, 0.2) * day, 0.5) * 0.16 + vec3(0.003, 0.004, 0.008);
+            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02), ambTop, ambBot, uCloudCover);
+            // aerial perspective: far clouds melt into the horizon haze
+            float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
+            vec3 hz = skyColor(d, s);
+            cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
+            float fade = smoothstep(0.0, 0.05, d.y);
+            float dens = (1.0 - cl.a) * fade;
+            col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
             // high cirrus
             float ci = fbm(vec2(uv.x*0.25, uv.y*1.6) + 20.0 + uTime*0.002);
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.62, 0.9, ci) * 0.3 * fade * (1.0 - dens));
@@ -111,7 +164,8 @@ export class Sky {
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.scale.setScalar(9000);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = -1;
+    // drawn after the opaque world so the cloud march only runs where sky is actually visible
+    this.mesh.renderOrder = 1000;
     scene.add(this.mesh);
 
     // sky-only scene used to generate the environment map
@@ -142,6 +196,17 @@ export class Sky {
     scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbcd2ff, 0x4a4028, 0.4);
     scene.add(this.hemi);
+  }
+
+  static cloudTexture() {
+    const N = 64;
+    const t = new THREE.Data3DTexture(makeCloudNoise(N), N, N, N);
+    t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType;
+    t.minFilter = t.magFilter = THREE.LinearFilter;
+    t.wrapS = t.wrapT = t.wrapR = THREE.RepeatWrapping;
+    t.generateMipmaps = false;
+    t.needsUpdate = true;
+    return t;
   }
 
   sunDirection(t, out = new THREE.Vector3()) {

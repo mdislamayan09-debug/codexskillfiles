@@ -144,8 +144,8 @@ export class Town {
         }`,
     });
     const M = (this.mats = {
-      bare: std({ map: surf.planks || plankTexture(1), normalMap: surf.planksN || null, color: 0xc2b6a2 }),
-      bare2: std({ map: surf.planks || plankTexture(2, null, true), normalMap: surf.planksN || null, color: 0xa89a86 }),
+      bare: std({ map: surf.planks || plankTexture(1), normalMap: surf.planksN || null, color: surf.planks ? 0xbcc4c6 : 0xc2b6a2 }),
+      bare2: std({ map: surf.planks || plankTexture(2, null, true), normalMap: surf.planksN || null, color: surf.planks ? 0xa4aaab : 0xa89a86 }),
       red: std({ map: plankTexture(3, [140, 58, 44]) }),
       redV: std({ map: plankTexture(13, [134, 54, 40], true) }),
       bareV: std({ map: plankTexture(14, null, true) }),

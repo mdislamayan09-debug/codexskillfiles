@@ -455,10 +455,12 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       attribute vec4 aOff;
       varying vec3 vGCol;
       varying float vGY;
+      varying float vGFar;
       #define TILE ${tile.toFixed(2)}
       #define RADIUS ${radius.toFixed(2)}
       #define INNER ${innerCut.toFixed(2)}
       #define CSIZE ${size.toFixed(3)}
+      #define RANCH_XZ vec2(${RANCH.x.toFixed(1)}, ${RANCH.z.toFixed(1)})
       vec3 srgbV(vec3 c){ return pow(c/255.0, vec3(2.2)); }
     `,
     vertexBody: /* glsl */ `
@@ -481,6 +483,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
       float hgt = mix(0.18, 0.66, smoothstep(0.25, 0.8, field)) * (0.55 + 0.7*aOff.w) * (0.85 + 0.35*dry) * (0.7 + 0.6 * fbm2(xz / 9.0));
+      hgt *= mix(0.42, 1.0, smoothstep(55.0, 110.0, length(xz - RANCH_XZ))); // grazed ranch pasture
       hgt *= alive * fade;
       float ang = aOff.z * 37.0 + aOff.w * 11.0;
       float ca = cos(ang), sa = sin(ang);
@@ -503,15 +506,19 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(lush, dryc, max(dry, dryPatch * 0.85)) * 1.1 * (0.68 + 0.62 * midV);
       vGCol = mix(vGCol, vGCol * vec3(1.08, 0.98, 0.78), smoothstep(0.6, 0.8, fbm2(xz / 18.0)) * 0.5);
       vGY = y;
+      vGFar = smoothstep(9.0, 48.0, dist);
     `,
     beginNormal: /* glsl */ `
       vec3 objectNormal = vec3(0.0, 1.0, 0.0);
     `,
-    fragHead: 'varying vec3 vGCol; varying float vGY;',
+    fragHead: 'varying vec3 vGCol; varying float vGY; varying float vGFar;',
     fragColor: /* glsl */ `
       #include <color_fragment>
+      // past ~10 m the dark blade roots average into mottled "lettuce"; settle toward the
+      // clump's mean colour so the field reads as one soft sward, like the terrain under it
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.23, 0.28, 0.07), vGFar * 0.6);
       diffuseColor.rgb *= vGCol;
-      diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.5, vGY)); // root occlusion
+      diffuseColor.rgb *= mix(mix(0.7, 1.0, smoothstep(0.0, 0.5, vGY)), 1.0, vGFar * 0.7); // root occlusion
       // keep thin blades from dissolving in lower mips (alpha-test coverage preservation)
       float mipL = max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 512.0));
       diffuseColor.a = clamp(diffuseColor.a * (1.0 + mipL * 0.45), 0.0, 1.0);
