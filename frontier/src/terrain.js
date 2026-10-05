@@ -82,8 +82,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float slope = 1.0 - n.y;
   float macro = fbm2(xz/380.0);
   float mid = fbm2(xz/45.0 + 7.0);
-  float micro = vnoise(xz*1.7) * 0.5 + vnoise(xz*6.3)*0.5;
-  float patchy = fbm2(xz/11.0 + 3.0);
+  // metres per pixel: noise finer than the pixel footprint fades to its mean instead of aliasing into speckle
+  float fp = length(fwidth(xz));
+  float micro = mix(0.5, vnoise(xz*1.7) * 0.5 + vnoise(xz*6.3)*0.5, smoothstep(1.2, 0.3, fp));
+  float patchy = mix(0.45, fbm2(xz/11.0 + 3.0), smoothstep(9.0, 3.0, fp));
   float D = smoothstep(420.0, 60.0, length(wp - cameraPosition)); // 1 near, 0 far
 
   // --- photographic samples (skipped where they can't contribute)
@@ -97,7 +99,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 dry = mix(srgb(vec3(146,128,72)), srgb(vec3(122,116,64)), mid);
   vec3 grass = mix(lush, dry, smoothstep(0.42, 0.68, macro + 0.15*patchy));
   grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.4, 1.6), 0.8 * D);
-  grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3);
+  grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3 * smoothstep(2.5, 0.8, fp));
   vec3 forestFloor = mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy);
   forestFloor *= mix(0.8 + 0.3*micro, clamp(lumi(dA.rgb) / 0.12, 0.4, 2.0), 0.8 * D);
   // dirt and roads straight from the scans (slightly graded toward the palette)
@@ -227,7 +229,9 @@ export class Terrain {
         {
           float fo = splatAt(vWPos.xz).b;
           float canopyK = smoothstep(0.3, 0.65, fo) * smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD));
-          vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), fbm2(vWPos.xz/18.0)) * (0.7 + 0.5*vnoise(vWPos.xz/4.0));
+          float cfp = length(fwidth(vWPos.xz));
+          vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), mix(0.47, fbm2(vWPos.xz/18.0), smoothstep(14.0, 5.0, cfp)))
+                      * mix(0.95, 0.7 + 0.5*vnoise(vWPos.xz/4.0), smoothstep(5.0, 1.5, cfp));
           canopy = mix(canopy, srgb(vec3(30,40,30)), smoothstep(80.0, 200.0, vWPos.y) * 0.6);
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);

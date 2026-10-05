@@ -40,6 +40,9 @@ export class Particles {
       fragmentShader: /* glsl */ `
         ${GLSL_FOG_PARS}
         varying vec4 vCol; varying float vAdd; varying vec3 vW;
+        float ph(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float pn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+          return mix(mix(ph(i), ph(i+vec2(1,0)), f.x), mix(ph(i+vec2(0,1)), ph(i+vec2(1,1)), f.x), f.y); }
         void main(){
           vec2 c = gl_PointCoord - 0.5;
           float d = length(c);
@@ -47,6 +50,10 @@ export class Particles {
           a *= a;
           vec3 col = vCol.rgb;
           if (vAdd < 0.5) {
+            // billowed, ragged puffs instead of clean discs (seed drifts slowly with the particle)
+            vec2 sd = vW.xz * 0.37 + vW.y * 0.53;
+            float n = pn(c * 4.5 + sd) * 0.62 + pn(c * 10.0 - sd * 1.7) * 0.38;
+            a *= smoothstep(0.2, 0.8, n + 0.42 - d * 1.1);
             // lit smoke/dust: sun + sky
             col *= (uSunColor * 0.22 + uFogColor * 0.6);
             col = applyAtmosphere(col, vW);
@@ -135,7 +142,8 @@ export class Campfire {
           float w = (1.0 - uv.y) * 0.42 + 0.04;
           float body = smoothstep(w, w * 0.25, abs(uv.x - 0.5 + (turb - 0.5) * 0.25 * uv.y));
           body *= smoothstep(1.0, 0.25, uv.y + turb * 0.35) * smoothstep(0.0, 0.08, uv.y);
-          vec3 col = mix(vec3(6.0, 1.4, 0.25), vec3(9.0, 6.5, 2.4), smoothstep(0.3, 0.9, body) * (1.0 - uv.y));
+          // orange-yellow, kept below the bloom/clip point so the core never burns out to white
+          vec3 col = mix(vec3(1.8, 0.45, 0.08), vec3(2.6, 1.4, 0.38), smoothstep(0.3, 0.9, body) * (1.0 - uv.y));
           gl_FragColor = vec4(col * body, body);
         }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -158,7 +166,7 @@ export class Campfire {
     if (!near) return;
     if (Math.random() < dt * 40) this.particles.emit(this.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5)),
       new THREE.Vector3((Math.random() - 0.5) * 0.2, 1.0 + Math.random(), (Math.random() - 0.5) * 0.2),
-      { color: [6, 2.2, 0.5], alpha: 0.9, size: 0.45, life: 0.55, grow: -1.2, drag: 1, add: 1 });
+      { color: [2.4, 0.85, 0.18], alpha: 0.6, size: 0.45, life: 0.55, grow: -1.2, drag: 1, add: 1 });
     if (Math.random() < dt * 6) this.particles.emit(this.pos.clone().add(new THREE.Vector3(0, 0.3, 0)), new THREE.Vector3((Math.random() - 0.5) * 0.4, 2.2 + Math.random(), (Math.random() - 0.5) * 0.4),
       { color: [8, 3, 0.6], alpha: 1, size: 0.05, life: 1.8, grow: 0, drag: 0.3, add: 1 });
     if (Math.random() < dt * 14) this.particles.emit(this.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.0, (Math.random() - 0.5) * 0.3)), new THREE.Vector3((Math.random() - 0.5) * 0.2, 1.0 + Math.random() * 0.4, (Math.random() - 0.5) * 0.2),

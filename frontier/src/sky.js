@@ -151,8 +151,8 @@ export class Sky {
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
             // high cirrus
-            float ci = fbm(vec2(uv.x*0.25, uv.y*1.6) + 20.0 + uTime*0.002);
-            col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.62, 0.9, ci) * 0.3 * fade * (1.0 - dens));
+            float ci = fbm(vec2(uv.x*0.45, uv.y*1.1) + 20.0 + uTime*0.002);
+            col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
           gl_FragColor = vec4(col, 1.0);
         }`,
