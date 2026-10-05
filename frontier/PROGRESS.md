@@ -44,3 +44,15 @@ horseback shot, train-robbery ride, forest hunt, Strawberry establishing shot.
 
 Cross-cutting fixes: grass rebuilt as alpha clump cards (~30 painted blades + seed heads per card),
 foliage self-occlusion via vertex AO, distant forest canopy tint on terrain, impostor fade beyond 1.5 km.
+
+### Round 2 — blind critic: 0 / 8 (town no longer a landslide)
+| piece | winner | margin | biggest gap named by the critic | builder response (round 3) |
+| --- | --- | --- | --- | --- |
+| ranch | RDR2 | landslide | barns are plain one-colour boxes | clapboard siding rewrite, inverted roofs fixed, pasture grass restored |
+| vista | RDR2 | landslide | land lit flat-grey under a pink sky, no long shadows | **heightfield sun shadows** (22-step march toward the sun) on terrain/grass/trees/impostors, ambient tied to sun height |
+| ride | RDR2 | landslide | faceless rider, shiny horse, slab tack | brows/beard/sideburns, matte coat (roughness 0.7), woven blanket texture, bedroll straps |
+| swamp | RDR2 | landslide | camera buried in giant reeds | water shots frame from the open-water side |
+| gallop | RDR2 | landslide | featureless brown road, horse not moving | narrower roads with grassy crown, side-on gallop with pre-warmed dust trail |
+| forest | RDR2 | landslide | pines read as flat palm fronds | 2× denser, smaller branch cards with stronger core occlusion, warmer needles |
+| town | RDR2 | clearly | boxes in one brick texture | weathered clapboard, glowing street lanterns, street clutter |
+| camp | RDR2 | landslide | fire doesn't light the scene, tents glow white | outlaws sit at the fire, picket line, bedrolls/crates, canvas tents |
