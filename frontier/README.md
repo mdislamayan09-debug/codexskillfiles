@@ -45,9 +45,10 @@ full-detail radius for trees and bushes, and higher-resolution water reflections
 
 - **Terrain**: a 1536² float heightfield generated on load (domain-warped ridged mountains, river and lake
   carving, town plateaus, road beds). It is rendered as GPU-displaced, instanced chunk LOD with skirts, and a
-  per-pixel splat shader handles grass, dry grass, forest floor, roads with ruts, mud, strata rock and snow.
-- **Sky and light**: analytic scattering sky with painted domain-warped cumulus and cirrus, sun disc, stars
-  and moon. Sun and moon lights follow the time of day, with a PMREM environment re-baked as it changes.
+  per-pixel splat shader blends scanned grass, dirt, gravel, pebble riverbed, triplanar rock and snow (albedo
+  plus normal maps, two scales mixed by noise to hide tiling) with roads, wheel ruts, puddles and wet mud.
+- **Sky and light**: analytic scattering sky with raymarched cumulus (a 3D Perlin-Worley noise volume, sun
+  self-shadowing, silver lining and aerial perspective), cirrus, sun disc, stars and moon. Sun and moon lights follow the time of day, with a PMREM environment re-baked as it changes.
   Height fog with sun in-scattering and aerial perspective is patched into every material.
 - **Vegetation**: wind-animated instanced grass blades (two rings, trampled by the player), procedural oaks,
   pines and moss-hung cypress with spherical foliage normals and leaf translucency, real-time baked billboard

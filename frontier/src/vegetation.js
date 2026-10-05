@@ -60,7 +60,8 @@ const LEAF_EMISSIVE = /* glsl */ `
   {
     vec3 vdir = normalize(vWPos - cameraPosition);
     float back = pow(max(dot(vdir, normalize(uSunDir)), 0.0), 3.0);
-    totalEmissiveRadiance += diffuseColor.rgb * uSunColor * gSunVis * back * 0.35;
+    // light through a leaf comes out yellow-green, not white
+    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * 0.26;
   }
 `;
 
@@ -780,6 +781,16 @@ export class Vegetation {
           float ndl = max(dot(N, normalize(uSunDir)), 0.0);
           float ao = 0.55 + 0.45 * smoothstep(-0.6, 0.8, q.y);
           vec3 col = alb * (uSunColor * ndl * 0.13 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.24 * ao + vec3(0.005));
+          // far trees take on the shading of the canopy-tinted terrain they sink into, so the fade band
+          // reads as forest texture rather than pale or black specks
+          float farK = smoothstep(620.0, 1050.0, length(cameraPosition - vW));
+          if (farK > 0.0) {
+            vec3 cAlb = mix(pow(vec3(34.0, 46.0, 26.0) / 255.0, vec3(2.2)), pow(vec3(52.0, 62.0, 32.0) / 255.0, vec3(2.2)), fbm2(vW.xz / 18.0));
+            vec3 nT = normalAt(vW.xz);
+            float ndlT = max(dot(nT, normalize(uSunDir)), 0.0);
+            vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.32 * ao);
+            col = mix(col, litT, farK * 0.85);
+          }
           col = applyAtmosphere(col, vW);
           gl_FragColor = vec4(col, 1.0);
         }`,

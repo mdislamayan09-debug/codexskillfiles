@@ -124,6 +124,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   if (rockAmt > 0.01) {
     vec4 rA = triplanar(tRock, wp, n, 5.5);
     rock *= mix(0.75 + 0.4*micro, clamp(lumi(rA.rgb) / 0.13, 0.35, 2.2), 0.85 * max(D, 0.35));
+    // the same scan at cliff scale so distant faces keep veins and ledges instead of smooth grey
+    vec4 rB = triplanar(tRock, wp, n, 140.0);
+    rock *= mix(1.0, clamp(lumi(rB.rgb) / 0.13, 0.45, 1.7), 0.7 * (1.0 - D));
     rN = unpackN(triplanar(nRock, wp, n, 5.5));
   } else rock *= 0.75 + 0.4*micro;
   vec3 snow = srgb(vec3(232,236,242));
