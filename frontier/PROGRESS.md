@@ -186,3 +186,38 @@ What the round-11 critic still names, in order:
 4. Sparse ground dressing.
 5. A blown-out sun bloom.
 6. Evenly spaced identical trees.
+
+### Rounds 15–19: scores 3–4 out of 10, best "clearly" (snowride in round 17; vista in round 15)
+- Foliage was the hidden culprit behind "frosted" pines. Card foliage has one normal on both faces, so seen from
+  below it took full sky light, and at grazing angles Fresnel mirrored the bright sky. Fixed with matte leaves,
+  shaded undersides and darkening for backlit boughs.
+- Pines now has a forest grade, sunbeams between the trunks, fern-lined verges, and a set-dressed mossy log and
+  boulder.
+- The storm sky had faded its far clouds into clear-sky blue; it now uses the storm grade.
+- Mist banks and distance haze in cold storms.
+- Clustered spruce stands instead of an even pepper of trees.
+- Animal tracks in the snow.
+- The rider has a readable hat brim, coat wear and folds, and an elbows-out riding pose; the horse's tail is
+  made of locks.
+
+### Round 20+: real ground (scores 3, 3, 4 in round 21)
+The user said, rightly, that the frames were nowhere near the references. The biggest structural gap was
+procedural mountains: noise ranges read as cones, fins and stretched heightmaps. The snowy north is now real ground:
+- **Source.** A window of Kawuneeche Valley, Rocky Mountain National Park: USGS 3DEP via AWS Terrain Tiles, z14.
+- **Scale.** Baked by `scripts/bake_dem.py` at 0.55x horizontal and 0.95x vertical.
+- **Wiring.** The valley floor, creek, cabin bench, road and river head are traced from the real ground.
+- **Blending.** It blends into the generated pine belt to the south and climbs into a closing ridge at the north edge.
+- **Terrain shader.** Curvature strips wind-scoured ribs to rock, and snow sheds from slopes steeper than about 33°.
+
+The vista went from stylised spikes to recognisable alpine terrain. In round 21 the critic still names, in order:
+1. The rider and horse read as placeholders.
+2. Cliff bands and sharp ridgelines are missing. The real valley walls at the ride spot are gentle and forested.
+3. Trees need clustering and density.
+4. Storm-cloud skies.
+5. The grade.
+6. Foreground framing.
+
+What's limiting the remaining distance:
+- **Characters and vegetation need real art.** RDR2's look comes from scanned and hand-authored assets. The CC0
+  scan libraries (Poly Haven, ambientCG) are blocked by this environment's network policy, so characters and
+  foliage are still procedural.
