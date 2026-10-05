@@ -291,7 +291,7 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= (1 + 2.3 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
+    U.uFogDensity.value *= (1 + 0.2 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
     this.uniforms.uHaze.value.copy(U.uFogColor.value);
