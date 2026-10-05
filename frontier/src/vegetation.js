@@ -447,7 +447,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
   g.instanceCount = n * n;
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
   CLUMP_TEX = CLUMP_TEX || grassClumpTexture();
-  const mat = new THREE.MeshStandardMaterial({ map: CLUMP_TEX, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ map: CLUMP_TEX, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, metalness: 0, envMapIntensity: 0.45 });
   patchMaterial(mat, {
     noFlip: true,
     sunShadow: true,
@@ -497,7 +497,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       transformed.y = h0 + y * hgt * (1.0 - 0.25*min(length(lean),1.0)*bend) - 0.02;
       vec3 lush = mix(srgbV(vec3(150,170,110)), srgbV(vec3(190,196,130)), aOff.w);
       vec3 dryc = mix(srgbV(vec3(235,205,140)), srgbV(vec3(210,190,130)), aOff.z);
-      vGCol = mix(lush, dryc, dry) * 1.25;
+      vGCol = mix(lush, dryc, dry) * 1.1;
       vGY = y;
     `,
     beginNormal: /* glsl */ `
