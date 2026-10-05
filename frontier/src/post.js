@@ -79,7 +79,7 @@ const GradeShader = {
         col = mix(col, c2 - 0.012, uForest * 0.55);
       }
       // storm: cold, blue-grey and low-saturation
-      col = mix(col, sat(col, 0.55) * vec3(0.88, 0.96, 1.1), uStorm * 0.7);
+      col = mix(col, sat(col, 0.6) * vec3(0.84, 0.95, 1.15), uStorm * 0.75);
       // night: blue shift
       col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse

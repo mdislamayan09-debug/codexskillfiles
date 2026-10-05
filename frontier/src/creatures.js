@@ -104,6 +104,10 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             // worn leather and felt: broad mottling, rubbed-light high points, seams and stitching lines
             float m = fbm2(vRest.xy * 7.0 + vRest.z * 5.0);
             diffuseColor.rgb *= 0.74 + 0.5 * m;
+            // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
+            float wear = smoothstep(1.3, 1.5, vRest.y) * (0.6 + 0.4 * fbm2(vRest.xz * 4.0));
+            float folds = (sin(vRest.x * 55.0 + fbm2(vRest.xy * 3.0) * 4.0) * 0.5 + 0.5) * smoothstep(1.35, 1.0, vRest.y);
+            diffuseColor.rgb *= (1.0 + 0.35 * wear * float(lb == 3)) * (1.0 - 0.3 * folds * float(lb == 3));
             float seam = smoothstep(0.006, 0.0, abs(vRest.x)) * step(vRest.z, -0.04) * step(vRest.y, 1.45);  // centre back
             seam = max(seam, smoothstep(0.007, 0.0, abs(vRest.y - 1.43)) * step(vRest.z, -0.02));           // yoke
             seam = max(seam, smoothstep(0.006, 0.0, abs(abs(vRest.x) - 0.185)) * step(vRest.y, 1.3));       // side seams
@@ -247,7 +251,7 @@ function humanPrims(o) {
     for (const s of [-1, 1]) add(EL([s * 0.094, 1.76, -0.02], [0.032, 0.058, 0.058]), L.furHat, 'head', 0.02);
   }
   if (o.hat) {
-    add(RC([0, 1.835, -0.008], [0, 1.95, -0.008], 0.098, 0.09), L.hat, 'head', 0.01);
+    add(RC([0, 1.835, -0.008], [0, 1.925, -0.008], 0.1, 0.092), L.hat, 'head', 0.01);
     const crease = EL([0, 1.985, 0.0], [0.03, 0.04, 0.085]); crease.sub = true; crease.label = L.hat; P.push(crease);
     for (const s of [-1, 1]) { const pinch = EL([s * 0.05, 1.96, 0.075], [0.02, 0.05, 0.02]); pinch.sub = true; pinch.label = L.hat; P.push(pinch); }
   }
@@ -360,7 +364,7 @@ export class Human {
     bones.hips.add(mesh(mergeGeometriesSafe(loops), brass, false));
     // hat brim (thin, crisp — not sculpted)
     if (o.hat) {
-      const brim = new THREE.RingGeometry(0.085, 0.21, 32, 3);
+      const brim = new THREE.RingGeometry(0.085, 0.235, 32, 3);
       brim.rotateX(-Math.PI / 2);
       const bp = brim.attributes.position;
       // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
@@ -369,7 +373,7 @@ export class Human {
       brim.computeVertexNormals();
       const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
       const bm = mesh(brim, hatM); bm.position.copy(at(bones.head, 0, 1.838, -0.008)); bones.head.add(bm);
-      const edge = new THREE.TorusGeometry(0.21, 0.004, 4, 40); edge.rotateX(Math.PI / 2);
+      const edge = new THREE.TorusGeometry(0.235, 0.005, 4, 40); edge.rotateX(Math.PI / 2);
       const ep = edge.attributes.position;
       for (let i = 0; i < ep.count; i++) ep.setY(i, ep.getY(i) + brimY(ep.getX(i), ep.getZ(i)));
       const em = mesh(edge, hatM); em.position.copy(bm.position); bones.head.add(em);
@@ -442,7 +446,8 @@ export class Human {
       this.hips.position.y = H0 + Math.sin(horsePhase * Math.PI * 2 * (gait > 2 ? 1 : 2)) * (0.01 + 0.025 * gait);
       this.spine.rotation.x = 0.06 * gait + Math.cos(horsePhase * Math.PI * 2) * 0.02 * gait;
       for (const l of Lg) { l.hp.rotation.x = -1.2; l.hp.rotation.z = l.s * 0.42; l.kn.rotation.x = 1.4; l.an.rotation.x = -0.25; }
-      for (const a of A) { a.sh.rotation.x = -0.5; a.sh.rotation.z = -a.s * 0.12; a.el.rotation.x = -1.0; a.wr.rotation.x = 0.15; }
+      // elbows out a little and hands low over the horn: the arms read beside the body from behind
+      for (const a of A) { a.sh.rotation.x = -0.42; a.sh.rotation.z = a.s * 0.2; a.el.rotation.x = -1.15; a.wr.rotation.x = 0.2; }
     } else {
       this.hips.position.y = H0 - Math.abs(Math.sin(t * 2)) * 0.02 * Math.min(speed, 3) + breathe * 0.2;
       const stride = Math.min(1, speed / 2) * 0.55 + Math.max(0, speed - 2) * 0.08;

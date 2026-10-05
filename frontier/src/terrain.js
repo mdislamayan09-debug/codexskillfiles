@@ -255,6 +255,16 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
+    // animal tracks: lines of prints wandering across the open snow (deer, a fox, a horse gone before)
+    if (fp < 0.25) {
+      float tl = fbm2(xz / 34.0 + 9.3);
+      float onTrack = smoothstep(0.012, 0.0, abs(tl - 0.5)) + smoothstep(0.01, 0.0, abs(fbm2(xz / 52.0 - 4.1) - 0.47));
+      vec2 cellp = floor(xz / 0.75);
+      float prt = step(0.45, hash12(cellp)) * smoothstep(0.32, 0.12, length(fract(xz / 0.75) - 0.5));
+      float pr = clamp(onTrack, 0.0, 1.0) * prt * snowAmt * smoothstep(0.25, 0.08, fp);
+      c *= 1.0 - 0.22 * pr;
+      c = mix(c, c * vec3(0.86, 0.92, 1.05), pr);
+    }
   }
   // frozen falls: blue-white ice streaks hanging down cold cliff faces
   if (snowC > 0.3 && slope > 0.4) {

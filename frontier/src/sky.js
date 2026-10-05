@@ -165,7 +165,7 @@ export class Sky {
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
-            cl.rgb *= mix(1.0, mix(0.62, 0.95, far), uStorm * (1.0 - uBlizzard));
+            cl.rgb *= mix(1.0, mix(0.62, 0.95, far), uStorm * (1.0 - 0.45 * uBlizzard));
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
@@ -174,7 +174,7 @@ export class Sky {
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
           // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
-          col = mix(col, uHaze * 1.3, uBlizzard * 0.7 * smoothstep(-0.2, 0.3, d.y + 0.1));
+          col = mix(col, uHaze * 1.3, uBlizzard * 0.75 * (1.0 - smoothstep(0.04, 0.42, d.y)));
           gl_FragColor = vec4(col, 1.0);
         }`,
       side: THREE.BackSide,
@@ -291,7 +291,7 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= (1 + 3.2 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
+    U.uFogDensity.value *= (1 + 2.3 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
     this.uniforms.uHaze.value.copy(U.uFogColor.value);

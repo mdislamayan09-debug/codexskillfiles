@@ -272,7 +272,7 @@ async function init() {
       for (let b = -0.6; b <= 0.6; b += 0.1) for (let d = 15; d <= 200; d += 15) {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 4 - d * 0.12) blocked += Math.abs(b) < 0.3 ? 6 : 2;
       }
-      const score = -Math.abs(above - 75) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 210) * 0.1 - blocked * 3;
+      const score = -Math.abs(above - 62) * 0.8 - Math.abs(da) * 25 - Math.abs(r - 170) * 0.12 - blocked * 3;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, dist: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), dist: 250 }; }
@@ -645,7 +645,7 @@ async function init() {
     water.update(camera);
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
-    post.render(rdt, { storm: sky.weather.blizzard, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 0.8 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: sky.weather.blizzard, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;
