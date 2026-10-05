@@ -88,6 +88,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 c = grass; rough = 0.92;
   c = mix(c, forestFloor, smoothstep(0.25, 0.75, forest));
   float dirtAmt = smoothstep(0.55, 0.95, patchy + 0.25*town) * (0.35 + 0.65*town);
+  dirtAmt = max(dirtAmt, smoothstep(0.55, 0.9, town) * (0.82 + 0.18 * micro));
   c = mix(c, dirt, dirtAmt);
   float rr = smoothstep(0.35, 0.75, road + (micro-0.5)*0.25);
   c = mix(c, roadC, rr);
