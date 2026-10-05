@@ -468,7 +468,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float h0 = heightAt(xz);
       vec3 nrm = normalAt(xz);
       float slope = 1.0 - nrm.y;
-      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r)) * (1.0 - smoothstep(0.25, 0.6, sp.a));
+      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r)) * (1.0 - smoothstep(0.38, 0.7, sp.a));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(240.0, 280.0, h0);
       dens *= 1.0 - 0.6*smoothstep(0.3, 0.8, sp.b);

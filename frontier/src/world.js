@@ -137,7 +137,7 @@ export class World {
     if (out) {
       out.road = smoothstep(5.5, 2.8, roadD + 1.5 * n2.noise(x / 9, z / 9));
       out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld));
-      out.town = Math.max(town, rnd * 0.8, cc);
+      out.town = Math.max(town, rnd * 0.32, cc);
       out.north = north;
       out.swamp = sw;
       out.roadD = roadD;
