@@ -55,7 +55,9 @@ function buildBones(spec) {
 }
 
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
-function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false) {
+const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.88, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8';
+const ROUGH_QUAD = '0.6, 0.58, 0.35, 0.5, 0.72, 0.65, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
+function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.7, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.55, 0.42, 0.3), envMapIntensity: 1.5 })
     : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0, envMapIntensity: 1.5 });
@@ -75,6 +77,34 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false) {
       }`,
     onShader: (s) => {
       Object.entries(uniforms).forEach(([k, u]) => (s.uniforms[k] = u));
+      const quad = kind !== 'human';
+      s.fragmentShader = s.fragmentShader
+        .replace('#include <roughnessmap_fragment>', `
+          float roughnessFactor = roughness;
+          {
+            const float RT[13] = float[13](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
+            roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 12)];
+          }`)
+        .replace('#include <normal_fragment_maps>', `
+          #include <normal_fragment_maps>
+          {
+            // procedural surface relief in rest space: cloth folds and weave on people,
+            // muscle and hair flow on animals (derivative bump, no textures needed)
+            int lab = int(vLab + 0.5);
+            float hgt = 0.0;
+            ${quad
+              ? 'hgt = vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 60.0, vRest.y * 25.0 + vRest.x * 30.0)) * 0.0012;'
+              : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
+                 if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
+                 else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
+                 else if (lab == 5 || lab == 8 || lab == 10) hgt = vnoise(vRest.xy * 140.0 + vRest.z * 90.0) * 0.0008;`}
+            vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition);
+            float hx = dFdx(hgt), hy = dFdy(hgt);
+            vec3 r1 = cross(dpdy, normal), r2 = cross(normal, dpdx);
+            float det = dot(dpdx, r1);
+            vec3 grad = sign(det) * (hx * r1 + hy * r2);
+            normal = normalize(abs(det) * normal - grad);
+          }`);
       // sun rim + sky fill: backlit riders keep their silhouette like on a film set
       s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', `
         #include <emissivemap_fragment>
@@ -243,10 +273,23 @@ export class Human {
     const leather = std({ color: 0x3e2a1a, roughness: 0.6 });
     const metal = std({ color: 0x8a8580, metalness: 0.85, roughness: 0.35 });
     // eyes
+    const sclera = std({ color: 0xd8d0c4, roughness: 0.18 }), iris = std({ color: 0x2e2218, roughness: 0.1 });
     for (const s of [-1, 1]) {
-      const e = mesh(new THREE.SphereGeometry(0.0125, 10, 8), std({ color: 0x241a14, roughness: 0.15 }), false);
-      e.position.copy(at(bones.head, s * 0.033, 1.763, 0.083)); bones.head.add(e);
+      const e = mesh(new THREE.SphereGeometry(0.0125, 12, 10), sclera, false);
+      e.position.copy(at(bones.head, s * 0.033, 1.763, 0.082)); bones.head.add(e);
+      const ir = mesh(new THREE.SphereGeometry(0.0062, 10, 8), iris, false);
+      ir.position.copy(at(bones.head, s * 0.032, 1.763, 0.0925)); bones.head.add(ir);
     }
+    // cartridge loops around the gunbelt
+    const brass = std({ color: 0xb08a48, metalness: 0.8, roughness: 0.35 });
+    const loops = [];
+    for (let i = 0; i < 18; i++) {
+      const a = -Math.PI * 0.95 + (i / 17) * Math.PI * 0.9 - Math.PI * 0.05;
+      const g = new THREE.CylinderGeometry(0.0055, 0.0055, 0.03, 5);
+      g.translate(Math.cos(a) * 0.172, 0.022, -Math.sin(a) * 0.128);
+      loops.push(g);
+    }
+    bones.hips.add(mesh(mergeGeometriesSafe(loops), brass, false));
     // hat brim (thin, crisp — not sculpted)
     if (o.hat) {
       const brim = new THREE.RingGeometry(0.085, 0.195, 32, 3);
@@ -513,7 +556,7 @@ export class Quadruped {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.86, 0.82), bl);
       }
       diffuseColor.rgb *= 0.92 + 0.08 * sin(rp.z * 60.0 + rp.y * 20.0) * body; // hair flow
-    `, uni, kind === 'horse');
+    `, uni, kind === 'horse', kind);
     mat.roughness = kind === 'sheep' ? 1 : 0.7;
     const root = (this.root = new THREE.Group());
     const { bones, list } = buildBones(tpl.BS);
@@ -626,6 +669,12 @@ export class Quadruped {
       body.add(mesh(stir, std({ color: 0x3a3632, metalness: 0.6 })));
       const fender = new THREE.BoxGeometry(0.02, 0.4, 0.18); fender.translate(s * 0.36, 1.45, 0.02); body.add(mesh(fender, leather));
     }
+    // rifle in a leather scabbard slung forward along the off-side shoulder
+    const scab = new THREE.CylinderGeometry(0.035, 0.05, 0.8, 8);
+    scab.rotateX(Math.PI / 2 - 0.55); scab.translate(0.37, 1.42, 0.38);
+    body.add(mesh(scab, leather));
+    const stock = new THREE.BoxGeometry(0.045, 0.09, 0.26); stock.rotateX(-0.55); stock.translate(0.37, 1.66, 0.0);
+    body.add(mesh(stock, std({ color: 0x5a3820, roughness: 0.5 })));
     const rope = new THREE.TorusGeometry(0.12, 0.018, 6, 16); rope.rotateY(Math.PI / 2); rope.translate(0.24, 1.73, 0.22);
     body.add(mesh(rope, std({ color: 0x9a845a })));
     // bridle + reins on the head

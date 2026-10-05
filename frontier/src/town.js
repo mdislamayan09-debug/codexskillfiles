@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { patchMaterial, U } from './shared.js';
 import { plankTexture, shingleTexture, tinTexture, signTexture, windowTexture } from './textures.js';
-import { TOWN, RANCH, CHURCH, CAMP, ROADS } from './world.js';
+import { TOWN, RANCH, CHURCH, CAMP, ROADS, RES, CELL, HALF } from './world.js';
 import { mulberry32 } from './noise.js';
 
 const TEX_M = 2.4; // metres per plank texture repeat
@@ -16,6 +16,31 @@ function canvasTexture() {
   for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(70,55,35,${r() * 0.18})`; g.beginPath(); g.ellipse(r() * 256, r() * 256, 10 + r() * 40, 6 + r() * 24, 0, 0, 7); g.fill(); }
   g.fillStyle = 'rgba(60,45,30,0.35)'; g.fillRect(0, 236, 256, 20); // mud line at the hem
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+
+// Period handbill: wanted poster / reward / notice on yellowed paper
+function posterTexture(kind, seed) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 356; const g = c.getContext('2d');
+  const r = mulberry32(seed + 40);
+  g.fillStyle = '#d9c9a0'; g.fillRect(0, 0, 256, 356);
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(90,70,40,${r() * 0.08})`; g.fillRect(r() * 256, r() * 356, 2 + r() * 6, 1 + r() * 3); }
+  const grd = g.createRadialGradient(128, 178, 80, 128, 178, 220); grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(90,60,25,0.45)');
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 356);
+  g.fillStyle = '#2a1c12'; g.textAlign = 'center';
+  g.font = '44px "Rye", Georgia, serif'; g.fillText(kind, 128, 58);
+  if (kind === 'WANTED') {
+    g.font = '18px "IM Fell English SC", Georgia, serif'; g.fillText('DEAD OR ALIVE', 128, 84);
+    g.fillStyle = '#8a7a5a'; g.fillRect(58, 98, 140, 150);
+    g.fillStyle = '#3a2a1a'; g.beginPath(); g.ellipse(128, 160, 34, 42, 0, 0, 7); g.fill(); g.fillRect(84, 196, 88, 52);
+    g.fillRect(80, 120, 96, 14); g.fillRect(98, 100, 60, 22);
+    g.font = '30px "Rye", Georgia, serif'; g.fillStyle = '#2a1c12'; g.fillText('$' + (200 + seed * 150), 128, 290);
+    g.font = '15px "IM Fell English", Georgia, serif'; g.fillText('for the Cutter Gang', 128, 318);
+  } else {
+    g.font = '15px "IM Fell English", Georgia, serif';
+    const lines = kind === 'REWARD' ? ['Stolen from Hale\'s Ranch', 'one chestnut mare', 'white blaze, brand H', '', '$25 on return'] : ['Town Meeting', 'Saturday at the church', 'all citizens of', 'Copper Hollow', 'are called'];
+    lines.forEach((l, i) => g.fillText(l, 128, 110 + i * 34));
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
 // Box with world-scaled UVs
@@ -146,6 +171,7 @@ export class Town {
     M.lampGlass.userData.noShadow = true;
     this.lampMat = M.lampGlass;
     this.windowMat = M.window;
+    this.posterMats = ['WANTED', 'REWARD', 'NOTICE'].map((t, i) => std({ map: posterTexture(t, i), roughness: 0.95 }));
     this.bucket = new Bucket();
 
     this.buildMainStreet();
@@ -153,6 +179,7 @@ export class Town {
     this.buildRanch();
     this.buildCamp();
     this.buildTelegraph();
+    this.wearGround();
     this.meshes = this.bucket.build(scene);
     for (const s of this.signs) scene.add(s);
   }
@@ -204,6 +231,20 @@ export class Town {
     // door
     add(M.dark, plane(1.7, 2.6, 0, 1.6, fz + 0.235));
     add(M.trim, box(2.2, 0.2, 0.2, 0, 3.0, fz + 0.27));
+    // handbills tacked up beside the door, and a lantern on the porch post
+    const pr = mulberry32(Math.floor(Math.abs(cx * 13 + cz * 7)) + 1);
+    for (let k = 0; k < 2; k++) {
+      if (pr() < 0.45) continue;
+      const px = (k ? 1 : -1) * (1.25 + pr() * 0.5);
+      const pm = this.posterMats[Math.floor(pr() * this.posterMats.length)];
+      const g = plane(0.46, 0.64, px, 1.75 + pr() * 0.3, fz + 0.245);
+      g.rotateZ((pr() - 0.5) * 0.08);
+      add(pm, g);
+    }
+    if (porch) {
+      add(M.iron, box(0.05, 0.3, 0.05, 1.5, 3.35, 3.45));
+      add(M.lampGlass, box(0.16, 0.24, 0.16, 1.5, 3.08, 3.45));
+    }
     if (name === 'SALOON') {
       // batwing doors
       add(M.bare, box(0.8, 1.0, 0.05, -0.42, 1.7, fz + 0.4));
@@ -273,6 +314,44 @@ export class Town {
     this.colliders.push({ minx: Math.min(c0.x, c1.x), maxx: Math.max(c0.x, c1.x), minz: Math.min(c0.z, c1.z), maxz: Math.max(c0.z, c1.z) });
     // lantern by the door
     this.interactables.push({ type: 'door', name, pos: new THREE.Vector3(0, 0, 3).applyMatrix4(mtx) });
+  }
+
+  // Write worn ground into the splat map: dirt skirts round every footprint and trodden paths at the ranch.
+  wearGround() {
+    const W = this.world, S = W.splat;
+    const stamp = (x, z, rad, amt) => {
+      const i0 = Math.max(0, Math.floor((x - rad + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x + rad + HALF) / CELL));
+      const j0 = Math.max(0, Math.floor((z - rad + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z + rad + HALF) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const px = -HALF + i * CELL, pz = -HALF + j * CELL;
+        const d = Math.hypot(px - x, pz - z) / rad;
+        if (d >= 1) continue;
+        const k = (j * RES + i) * 4 + 3;
+        const v = amt * (1 - d * d) * 255 * (0.8 + 0.2 * Math.sin(px * 1.7 + pz * 2.3));
+        if (v > S[k]) S[k] = v;
+      }
+    };
+    for (const c of this.colliders) {
+      const pad = 1.8;
+      for (let x = c.minx - pad; x <= c.maxx + pad; x += 1.5) { stamp(x, c.minz - pad * 0.5, 2.2, 0.75); stamp(x, c.maxz + pad * 0.5, 2.2, 0.75); }
+      for (let z = c.minz - pad; z <= c.maxz + pad; z += 1.5) { stamp(c.minx - pad * 0.5, z, 2.2, 0.75); stamp(c.maxx + pad * 0.5, z, 2.2, 0.75); }
+    }
+    const { x, z } = RANCH;
+    const paths = [
+      [[x - 20, z - 16], [x - 16, z - 9], [x - 12, z + 8], [x - 10, z + 30], [x - 40, z + 44], [x - 70, z + 60]],
+      [[x - 48, z - 14], [x - 34, z - 13], [x - 20, z - 16]],
+      [[x + 36, z - 20], [x + 46, z - 12], [x + 44, z + 12], [x + 30, z + 40], [x - 10, z + 30]],
+      [[x - 40, z + 4], [x - 26, z + 2], [x - 16, z - 9]],
+    ];
+    for (const p of paths) for (let i = 0; i < p.length - 1; i++) {
+      const [ax, az] = p[i], [bx, bz] = p[i + 1];
+      const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.8);
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, wob = Math.sin((ax + t * (bx - ax)) * 0.3) * 0.6;
+        stamp(ax + (bx - ax) * t + wob, az + (bz - az) * t, 1.5, 0.85);
+      }
+    }
+    W.splatTex.needsUpdate = true;
   }
 
   barrelGeo(x, y, z) {

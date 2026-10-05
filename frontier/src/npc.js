@@ -41,7 +41,7 @@ export class NPCs {
     const r = (this.rnd = mulberry32(4242));
     // townsfolk walking the boardwalks
     const outfits = ['rancher', 'gent', 'lady', 'worker', 'gent', 'lady', 'rancher'];
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 30; i++) {
       const h = new Human(outfits[i % outfits.length], 50 + i);
       const side = r() < 0.5 ? -1 : 1;
       const x = -110 + r() * 220, z = side * (r() < 0.6 ? 9.6 + r() * 1.2 : 3 + r() * 2.5);

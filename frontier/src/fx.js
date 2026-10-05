@@ -110,11 +110,12 @@ export class Campfire {
   constructor(scene, pos, particles) {
     this.pos = pos.clone();
     this.particles = particles;
-    this.light = new THREE.PointLight(0xff8030, 380, 38, 1.55);
+    this.light = new THREE.PointLight(0xff7a2c, 420, 18, 2);
     this.light.position.copy(pos).add(new THREE.Vector3(0, 0.7, 0));
     this.light.castShadow = true;
     this.light.shadow.mapSize.set(512, 512);
     this.light.shadow.bias = -0.002;
+    this.light.shadow.radius = 4;
     this.light.shadow.camera.near = 0.2;
     this.light.shadow.camera.far = 24;
     scene.add(this.light);
@@ -152,7 +153,7 @@ export class Campfire {
   update(dt, near) {
     this.t += dt;
     this.light.castShadow = near && this.light.position.distanceTo(this.lastCam || this.light.position) < 70;
-    this.light.intensity = 340 + Math.sin(this.t * 13) * 40 + Math.sin(this.t * 31) * 25 + Math.random() * 25;
+    this.light.intensity = 380 + Math.sin(this.t * 13) * 45 + Math.sin(this.t * 31) * 30 + Math.random() * 30;
     this.flame.scale.y = 0.9 + Math.sin(this.t * 9) * 0.08 + Math.random() * 0.05;
     if (!near) return;
     if (Math.random() < dt * 40) this.particles.emit(this.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5)),

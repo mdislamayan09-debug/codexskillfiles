@@ -58,8 +58,8 @@ export class Water {
           vec3 skyFallback = mix(uFogColor * 0.9, uFogSunColor, pow(max(dot(reflect(-V,N), sun),0.0), 4.0));
           refl = mix(skyFallback, refl, uHasRefl);
           // body colour
-          vec3 deep = mix(vec3(0.016, 0.03, 0.024), vec3(0.028, 0.03, 0.01), swampy);
-          vec3 shallow = mix(vec3(0.09, 0.095, 0.06), vec3(0.075, 0.066, 0.03), swampy);
+          vec3 deep = mix(vec3(0.016, 0.03, 0.024), vec3(0.03, 0.022, 0.01), swampy);
+          vec3 shallow = mix(vec3(0.09, 0.095, 0.06), vec3(0.085, 0.065, 0.035), swampy);
           float dk = 1.0 - exp(-depth * 1.1);
           vec3 body = mix(shallow, deep, dk) * (0.3 + 0.7 * dot(uSunColor, vec3(0.3)));
           vec3 col = mix(body, refl * mix(1.0, 0.8, swampy), clamp(fres * mix(1.0, 0.8, swampy) + 0.03, 0.0, 1.0));
@@ -72,7 +72,7 @@ export class Water {
           // algae patches in the bayou
           float algae = swampy * smoothstep(0.55, 0.75, fbm2(p*0.12)) * 0.75;
           col = mix(col, vec3(0.06, 0.08, 0.02) * (0.4 + dot(uSunColor, vec3(0.3))), algae);
-          float alpha = clamp(smoothstep(0.0, 0.35, depth) * 0.96 + fres * 0.3 + algae, 0.0, 1.0);
+          float alpha = clamp(smoothstep(0.0, 0.9, depth) * 0.95 + fres * 0.35 + algae, 0.0, 1.0);
           col = applyAtmosphere(col, vW);
           gl_FragColor = vec4(col, alpha);
         }`,

@@ -91,8 +91,10 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   float amount = (uFogDensity / fh) * exp(-camH * fh) * (1.0 - exp(-dist * ry * fh)) / ry;
   amount = clamp(amount, 0.0, 1e3);
   float fogF = 1.0 - exp(-amount);
-  float sunAmt = pow(max(dot(rd, uSunDir), 0.0), 6.0);
-  vec3 fogCol = mix(uFogColor, uFogSunColor, sunAmt);
+  float mu = dot(rd, uSunDir);
+  float sunAmt = pow(max(mu, 0.0), 3.0);
+  vec3 cool = uFogColor * vec3(0.84, 0.9, 1.14);
+  vec3 fogCol = mix(mix(cool, uFogColor, 0.5 + 0.5 * mu), uFogSunColor, sunAmt);
   // Extinction tints far colours blue-grey before full fog (aerial perspective)
   vec3 ext = exp(-dist * vec3(0.00011, 0.00007, 0.00004) * (1.0 - uNight*0.5));
   col = col * ext + fogCol * (1.0 - ext) * 0.35;
