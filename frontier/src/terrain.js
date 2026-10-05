@@ -93,7 +93,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 dN = unpackN(texture(nDirt, xz / 2.2));
 
   // grass: keep the art-directed palette, take luminance detail from the scan
-  vec3 lush = mix(srgb(vec3(70,92,38)), srgb(vec3(96,112,44)), mid);
+  vec3 lush = mix(srgb(vec3(72,86,44)), srgb(vec3(98,106,52)), mid);
   vec3 dry = mix(srgb(vec3(146,128,72)), srgb(vec3(122,116,64)), mid);
   vec3 grass = mix(lush, dry, smoothstep(0.42, 0.68, macro + 0.15*patchy));
   grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.4, 1.6), 0.8 * D);

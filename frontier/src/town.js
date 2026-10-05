@@ -644,7 +644,8 @@ export class Town {
     B.add(M.iron, this.barrelGeo(x + 5, this.h(x + 5, z + 2) + 0.45, z + 2));
     // logs to sit on
     for (let i = 0; i < 3; i++) {
-      const a = i * 2.1; const lg = new THREE.CylinderGeometry(0.22, 0.22, 2.4, 8); lg.rotateZ(Math.PI / 2); lg.rotateY(a);
+      // tangential to the fire ring, so the outlaw seated at its middle sits across it facing the flames
+      const a = i * 2.1; const lg = new THREE.CylinderGeometry(0.22, 0.22, 2.4, 8); lg.rotateZ(Math.PI / 2); lg.rotateY(-a + Math.PI / 2);
       lg.translate(x + Math.cos(a) * 3, y + 0.22, z + Math.sin(a) * 3); B.add(M.bare, lg);
     }
     // crates & lockbox

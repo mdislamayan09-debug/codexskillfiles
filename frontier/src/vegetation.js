@@ -504,7 +504,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec3 dryc = mix(srgbV(vec3(235,205,140)), srgbV(vec3(210,190,130)), aOff.z);
       float midV = fbm2(xz / 34.0 + 9.0);
       float dryPatch = smoothstep(0.5, 0.72, fbm2(xz / 58.0 - 4.0));
-      vGCol = mix(lush, dryc, max(dry, dryPatch * 0.85)) * 1.1 * (0.68 + 0.62 * midV);
+      // brighter than the ground's own albedo: the clumps lose a lot to self-occlusion and GTAO
+      vGCol = mix(lush, dryc, max(dry, dryPatch * 0.85)) * 1.45 * (0.68 + 0.62 * midV);
       vGCol = mix(vGCol, vGCol * vec3(1.08, 0.98, 0.78), smoothstep(0.6, 0.8, fbm2(xz / 18.0)) * 0.5);
       vGY = y;
       vGFar = smoothstep(9.0, 48.0, dist);
@@ -519,7 +520,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       // clump's mean colour so the field reads as one soft sward, like the terrain under it
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.23, 0.28, 0.07), vGFar * 0.6);
       diffuseColor.rgb *= vGCol;
-      diffuseColor.rgb *= mix(mix(0.7, 1.0, smoothstep(0.0, 0.5, vGY)), 1.0, vGFar * 0.7); // root occlusion
+      diffuseColor.rgb *= mix(mix(0.78, 1.0, smoothstep(0.0, 0.5, vGY)), 1.0, vGFar * 0.7); // root occlusion
       // keep thin blades from dissolving in lower mips (alpha-test coverage preservation)
       float mipL = max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 512.0));
       diffuseColor.a = clamp(diffuseColor.a * (1.0 + mipL * 0.45), 0.0, 1.0);
