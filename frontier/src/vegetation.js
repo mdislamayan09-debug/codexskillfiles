@@ -46,8 +46,8 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
     if (cl.b > 0.02) {
       float th = hash12(floor(${pos}.xz * 0.37) + 7.0);
       vec3 tint = th < 0.3 ? vec3(1.0, 0.42, 0.1) : th < 0.55 ? vec3(0.95, 0.72, 0.16) : th < 0.75 ? vec3(0.8, 0.22, 0.08) : vec3(0.0);
-      float l = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-      vec3 autumnC = l * tint * 2.5 * (0.8 + 0.4 * hash12(floor(vWPos.xz * 1.5 + vWPos.y)));
+      float l = min(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)), 0.22);
+      vec3 autumnC = l * tint * 2.9 * (0.8 + 0.4 * hash12(floor(vWPos.xz * 1.5 + vWPos.y)));
       diffuseColor.rgb = mix(diffuseColor.rgb, autumnC, cl.b * step(th, 0.75));
     }
     #endif
@@ -205,9 +205,9 @@ function buildPine(seed, kind = 'pine') {
   const rnd = mulberry32(seed);
   const wood = [], leaves = [];
   const height = kind === 'tall' ? 26 + rnd() * 9 : kind === 'fir' ? 11 + rnd() * 7 : 14 + rnd() * 9;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height, 0), (kind === 'tall' ? 0.6 : 0.38) + rnd() * 0.12, 0.04, 8));
-  const whorls = kind === 'tall' ? 24 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
-  const base = kind === 'tall' ? height * (0.4 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.04, 8));
+  const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
+  const base = kind === 'tall' ? height * (0.3 + rnd() * 0.1) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
     // dead lower branch stubs on the bare trunk
     for (let i = 0; i < 9; i++) {
@@ -215,7 +215,7 @@ function buildPine(seed, kind = 'pine') {
       wood.push(branchGeo(new THREE.Vector3(0, y, 0), new THREE.Vector3(Math.cos(a) * L, y - 0.2 - rnd() * 0.4, Math.sin(a) * L), 0.06, 0.02, 4));
     }
   }
-  const spread = kind === 'tall' ? 2.5 : kind === 'fir' ? 3.1 : 3.4;
+  const spread = kind === 'tall' ? 3.3 : kind === 'fir' ? 3.1 : 3.4;
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
@@ -313,9 +313,9 @@ function buildJungleTree(seed) {
     fin.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0], 2));
     wood.push(fin);
   }
-  const trunkTop = new THREE.Vector3((rnd() - 0.5) * 0.8, height * 0.72, (rnd() - 0.5) * 0.8);
+  const trunkTop = new THREE.Vector3((rnd() - 0.5) * 0.8, height * 0.6, (rnd() - 0.5) * 0.8);
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), trunkTop, 0.62 + rnd() * 0.15, 0.4, 10));
-  const crownY = height * 0.8;
+  const crownY = height * 0.72;
   const tips = [];
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + rnd() * 0.6, L = 4 + rnd() * 3;
@@ -330,13 +330,13 @@ function buildJungleTree(seed) {
   }
   const canopyC = new THREE.Vector3(0, crownY - 2, 0);
   // a broad, flattened umbrella crown in two layers
-  for (const t of tips) for (let k = 0; k < 5; k++) {
-    const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 4, (rnd() - 0.3) * 1.6, (rnd() - 0.5) * 4));
-    leaves.push(cardGeo(3.4 + rnd() * 1.2, c, canopyC, rnd, 0.7, 1.2));
+  for (const t of tips) for (let k = 0; k < 9; k++) {
+    const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 5, (rnd() - 0.45) * 3.2, (rnd() - 0.5) * 5));
+    leaves.push(cardGeo(4.2 + rnd() * 1.6, c, canopyC, rnd, 0.75, 0.9));
   }
-  for (let k = 0; k < 10; k++) {
-    const a = rnd() * 6.28, rr = Math.sqrt(rnd()) * 5;
-    leaves.push(cardGeo(3.8, new THREE.Vector3(Math.cos(a) * rr, crownY + 0.8 + rnd(), Math.sin(a) * rr), canopyC, rnd, 0.7, 1.2));
+  for (let k = 0; k < 22; k++) {
+    const a = rnd() * 6.28, rr = Math.sqrt(rnd()) * 6.5;
+    leaves.push(cardGeo(4.6, new THREE.Vector3(Math.cos(a) * rr, crownY + (rnd() - 0.3) * 3.5, Math.sin(a) * rr), canopyC, rnd, 0.75, 0.9));
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => Math.max(0, y - 4) / height * 0.4);
   const leafG = leafAO(setSway(mergeGeometries(leaves), (x, y) => Math.max(0, y - 4) / height));
@@ -680,6 +680,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       varying vec3 vGCol;
       varying float vGY;
       varying float vGFar;
+      varying float vGDry;
       #define TILE ${tile.toFixed(2)}
       #define RADIUS ${radius.toFixed(2)}
       #define INNER ${innerCut.toFixed(2)}
@@ -703,8 +704,9 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.6*smoothstep(0.3, 0.8, sp.b);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
-      dens *= 1.0 - snowG * 0.82;   // a few frosted tufts poke through the snow
+      dens *= 1.0 - snowG;          // buried under snow
       dens *= 1.0 - 0.72 * gcl.a;   // desert: sparse bunch grass
+      dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       float field = fbm2(xz/26.0);
       dens *= smoothstep(0.02, 0.28, field + 0.12);
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
@@ -741,13 +743,16 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(vGCol, srgbV(vec3(236,236,232)) * 1.4, snowG * 0.75);                                          // frosted
       vGY = y;
       vGFar = smoothstep(9.0, 48.0, dist);
+      vGDry = max(gcl.a, gcl.b * 0.6);
     `,
     beginNormal: /* glsl */ `
       vec3 objectNormal = vec3(0.0, 1.0, 0.0);
     `,
-    fragHead: 'varying vec3 vGCol; varying float vGY; varying float vGFar;',
+    fragHead: 'varying vec3 vGCol; varying float vGY; varying float vGFar; varying float vGDry;',
     fragColor: /* glsl */ `
       #include <color_fragment>
+      // sun-cured blades: the green texture goes to straw in the desert and autumn
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.35, 1.1, 0.7), vGDry);
       // past ~10 m the dark blade roots average into mottled "lettuce"; settle toward the
       // clump's mean colour so the field reads as one soft sward, like the terrain under it
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.23, 0.28, 0.07), vGFar * 0.6);
@@ -981,8 +986,8 @@ export class Vegetation {
       // desert: saguaro and scrub instead of forest
       if (cl.desert > 0.5) {
         if (blocked(px, pz)) continue;
-        if (r() < 0.0045 * cl.desert) this.trees.add(px, h - 0.2, pz, r() * 6.28, 0.8 + r() * 0.5, pick(G.cactus));
-        else if (r() < 0.03) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.6 + r() * 0.7, 7 + Math.floor(r() * 2));
+        if (r() < 0.012 * cl.desert) this.trees.add(px, h - 0.2, pz, r() * 6.28, 0.8 + r() * 0.5, pick(G.cactus));
+        else if (r() < 0.06) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.6 + r() * 0.7, 7 + Math.floor(r() * 2));
         if (r() < 0.004) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.5 + r() * 2.0, Math.floor(r() * 4));
         continue;
       }
@@ -1008,7 +1013,7 @@ export class Vegetation {
       // ground cover by biome
       const under = 0.05 + sp.forest * 0.45;
       if (cl.jungle > 0.4) {
-        if (r() < under * 1.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 0.9, r() < 0.55 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
+        if (r() < under * 2.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.1, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
       } else if (cl.snow > 0.5) {
         if (r() < 0.05) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.5 + r() * 0.6, 7 + Math.floor(r() * 2));
       } else if (pz < -700) {

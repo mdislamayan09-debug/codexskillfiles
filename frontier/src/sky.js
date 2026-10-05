@@ -260,7 +260,7 @@ export class Sky {
     this.sun.target.position.copy(f);
     this.sun.position.sub(focus).add(f);
     const W = this.weather;
-    this.sun.intensity *= 1 - 0.72 * W.storm;
+    this.sun.intensity *= 1 - 0.88 * W.storm;
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);

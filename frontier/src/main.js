@@ -237,12 +237,40 @@ async function init() {
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
-    pines: () => { const [x, z, yaw] = G.onRoad(PINE_TRAIL, 0.42); return { time: 8.2, player: [x, z, yaw], camRel: [0.7, 2.5, -5.8], lookRel: [0, 1.9, 14] }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL); return { time: 8.2, player: [x, z, yaw], camRel: [0.7, 2.5, -5.8], lookRel: [0, 1.9, 14] }; },
     snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.6, 2.6, -6.5], lookRel: [0, 2.2, 16], weather: 'snow' }; },
-    snowvista: () => ({ time: 15.4, player: [CABIN.x - 30, CABIN.z - 40, 0], cam: [CABIN.x + 75, null, CABIN.z - 95, 3.2], look: [CABIN.x - 420, null, CABIN.z + 900, -60] }),
+    snowvista: () => { const v = G.findVista(); return { time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 2.6], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
+  };
+  // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
+  G.findVista = () => {
+    const tx = -760, tz = -2380;  // down-valley, toward the valley mouth
+    const toT = Math.atan2(tx - CABIN.x, tz - CABIN.z);
+    let best = null, bs = -1e9;
+    for (let r = 60; r <= 300; r += 20) for (let da = -0.9; da <= 0.9; da += 0.15) {
+      const a = toT + Math.PI + da; // behind the cabin, looking past it
+      const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
+      const ch = world.heightAt(cx, cz) + 2.6;
+      if (ch < world.heightAt(CABIN.x, CABIN.z) + 25) continue;
+      // line of sight to the cabin and 1.5 km down-valley must clear the ground
+      let clear = 1;
+      for (const [px, pz, ph] of [[CABIN.x, CABIN.z, world.heightAt(CABIN.x, CABIN.z) + 3], [tx, tz, world.heightAt(tx, tz) + 20]]) {
+        for (let k = 1; k < 40; k++) {
+          const t = k / 40, x = cx + (px - cx) * t, z = cz + (pz - cz) * t, y = ch + (ph - ch) * t;
+          if (world.heightAt(x, z) > y - 1.5) { clear = 0; break; }
+        }
+      }
+      if (!clear) continue;
+      const above = ch - world.heightAt(CABIN.x, CABIN.z);
+      const score = -Math.abs(above - 45) - Math.abs(da) * 30 - r * 0.05;
+      if (score > bs) { bs = score; best = { cx, cz }; }
+    }
+    best = best || { cx: CABIN.x + 120, cz: CABIN.z - 60 };
+    // aim between the cabin and the valley floor beyond it
+    // aim far down the valley so the horizon and storm sky fill the top of the frame, cabin below
+    return { ...best, tx, tz, th: 60 };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -252,11 +280,38 @@ async function init() {
     const dx = (bx - ax) * (reverse ? -1 : 1), dz = (bz - az) * (reverse ? -1 : 1);
     return [ax, az, Math.atan2(dx, dz)];
   };
+  // the point along a road deepest inside forest (trees close on both sides)
+  G.denseOnRoad = (ri) => {
+    let best = G.onRoad(ri, 0.5), bs = -1;
+    for (let t = 0.15; t < 0.9; t += 0.02) {
+      const [x, z, yaw] = G.onRoad(ri, t);
+      let f = 0;
+      for (let k = 0; k < 12; k++) { const a = k * 0.5236; f += world.splatAt(x + Math.cos(a) * 30, z + Math.sin(a) * 30).forest; }
+      if (f > bs) { bs = f; best = [x, z, yaw]; }
+    }
+    return best;
+  };
   // a point on the Frostwater Valley floor, heading up-valley
   G.alongValley = (t) => {
-    const v = world.valley, i = Math.min(v.length - 2, Math.floor((1 - t) * (v.length - 1)));
-    const [ax, az] = v[i + 1], [bx, bz] = v[i];
-    return [ax + 12, az, Math.atan2(bx - ax, bz - az)];
+    const v = world.valley;
+    // walk up-valley from t until the rider and the camera behind them have no trees in the way
+    for (let tt = t; tt < 0.95; tt += 0.01) {
+      const i = Math.min(v.length - 2, Math.floor((1 - tt) * (v.length - 1)));
+      const [ax, az] = v[i + 1], [bx, bz] = v[i];
+      const yaw = Math.atan2(bx - ax, bz - az);
+      for (const side of [12, -12, 25, -25]) {
+        const x = ax + Math.cos(yaw) * side, z = az - Math.sin(yaw) * side;
+        const cx = x - Math.sin(yaw) * 6.5, cz = z - Math.cos(yaw) * 6.5;
+        if (G.treesNear(x, z, 6) === 0 && G.treesNear(cx, cz, 5) === 0 && G.treesNear(x + Math.sin(yaw) * 12, z + Math.cos(yaw) * 12, 4) === 0) return [x, z, yaw];
+      }
+    }
+    const [ax, az] = v[v.length - 2]; return [ax, az, 0];
+  };
+  G.treesNear = (x, z, r) => {
+    let n = 0;
+    const L = veg.trees, cx = Math.floor(x / L.cell), cz = Math.floor(z / L.cell);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (const it of L.grid.get((cx + dx) + ',' + (cz + dz)) || []) if (Math.hypot(it.x - x, it.z - z) < r + 3 * it.s) n++;
+    return n;
   };
   G.findForest = (x0, z0) => {
     let best = [x0, z0], bs = -1;

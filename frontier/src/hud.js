@@ -1,5 +1,5 @@
 // HUD: cores, minimap/compass, weapon & ammo, prompts, feed, region banners, parchment map, menus.
-import { HALF, WORLD_SIZE, RES, TOWN, CAMP, RANCH, CHURCH, LAKE, SWAMP } from './world.js';
+import { HALF, WORLD_SIZE, RES, TOWN, CAMP, RANCH, CHURCH, LAKE, SWAMP, CABIN, REGIONS } from './world.js';
 
 const ICONS = {
   heart: '<path d="M12 21s-7-4.6-9.3-9C1 8.6 3 5 6.5 5c2 0 3.5 1.2 5.5 3.2C14 6.2 15.5 5 17.5 5 21 5 23 8.6 21.3 12 19 16.4 12 21 12 21z"/>',
@@ -81,10 +81,13 @@ export class HUD {
       const sp = W.splatAt(x, z);
       // parchment palette
       let r = 214, gg = 196, b = 156;
-      const elev = Math.min(1, Math.max(0, h / 400));
+      const elev = Math.min(1, Math.max(0, h / 900));
       r -= elev * 50; gg -= elev * 50; b -= elev * 40;
       if (sp.forest > 0.3) { r -= 34 * sp.forest; gg -= 18 * sp.forest; b -= 34 * sp.forest; }
-      if (h > 280) { r += 30; gg += 32; b += 40; }
+      // climate washes, inked like a hand-tinted survey map
+      const cl = W.climateAt(x, z);
+      r += 22 * cl.autumn - 10 * cl.jungle + 18 * cl.desert; gg += 4 * cl.autumn + 6 * cl.jungle - 4 * cl.desert; b -= 20 * cl.autumn + 8 * cl.jungle + 18 * cl.desert;
+      if (cl.snow > 0.5) { const sn = (cl.snow - 0.5) * 2; r += 36 * sn; gg += 42 * sn; b += 58 * sn; }
       r *= 0.55 + shade * 0.6; gg *= 0.55 + shade * 0.6; b *= 0.55 + shade * 0.6;
       if (h < 0) { const d = Math.min(1, -h / 4); r = 120 - 30 * d; gg = 132 - 25 * d; b = 128 - 15 * d; }
       if (sp.road > 0.4) { r = 120; gg = 86; b = 56; }
@@ -115,7 +118,9 @@ export class HUD {
     lab("Hale's Ranch", RANCH.x, RANCH.z + 80, 0.9);
     lab('Lake Ardent', LAKE.x, LAKE.z, 1.1);
     lab('Bluewater Bayou', SWAMP.x, SWAMP.z, 1.1);
-    lab('THE GRANITE TEETH', 0, -1500, 1.8);
+    icon(CABIN.x, CABIN.z, '#3a2614'); lab("Trapper's Cabin", CABIN.x, CABIN.z - 70, 0.9);
+    for (const R of REGIONS) lab(R.name.toUpperCase(), R.x, R.z, 1.6);
+    lab('Frostwater Valley', -1050, -3150, 0.9);
     lab('Dawson River', -480, -500, 0.9);
   }
 
@@ -125,10 +130,15 @@ export class HUD {
     if (d(RANCH) < 110) return ["Hale's Ranch", 'Cedar Valley'];
     if (d(CAMP) < 120) return ['Cutter Hideout', 'Pine Ridge'];
     if (d(LAKE) < 330) return ['Lake Ardent', 'Cedar Valley'];
-    if (pos.x > 600 && pos.z > 650) return ['Bluewater Bayou', 'Lemoine Parish'];
-    if (pos.z < -800) return ['The Granite Teeth', 'Colorado Territory'];
-    if (pos.z < -300) return ['Pine Ridge', 'Cedar Valley'];
-    return ['The Heartlands', 'Cedar Valley'];
+    if (d(CABIN) < 150) return ["Trapper's Cabin", 'Grizzly Peaks'];
+    const r = this.world.regionAt(pos.x, pos.z), cl = this.world.climateAt(pos.x, pos.z);
+    if (cl.snow > 0.6) return [pos.x < -500 && pos.z < -2300 ? 'Frostwater Valley' : 'Grizzly Peaks', 'Ambarino Territory'];
+    if (cl.jungle > 0.5) return ['Palmetto Coast', 'Isla Verde'];
+    if (cl.desert > 0.5) return ['Sundown Mesa', 'New Austin'];
+    if (cl.autumn > 0.5) return ['Ember Hills', 'West Elizabeth'];
+    if (pos.x > 600 && pos.z > 650 && pos.z < 1900) return ['Bluewater Bayou', 'Lemoine Parish'];
+    if (pos.z < -700) return ['Big Pines', 'Ambarino Territory'];
+    return [r.name, 'Cedar Valley'];
   }
 
   banner(a, b) {

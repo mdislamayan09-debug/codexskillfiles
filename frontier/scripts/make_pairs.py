@@ -9,10 +9,13 @@ PAIRS = {
     'ranch': 'bar_valentine_heartlands', 'vista': 'bar_valentine_heartlands',
     'ride': 'bar_swamp_ride', 'swamp': 'bar_swamp_ride', 'gallop': 'bar_train_ride',
     'forest': 'bar_forest_hunt', 'town': 'bar_strawberry', 'camp': 'bar_forest_hunt',
+    # world v2: the user's reference frames (3:2, cropped to 16:9 below)
+    'pines': 'bar_ref_forest', 'snowride': 'bar_ref_snowride', 'snowvista': 'bar_ref_snowvista',
 }
 CROP = {  # trim postcard borders / torn edges so the frame itself is not a tell
     'bar_valentine_heartlands': (0.05, 0.11, 0.95, 0.93), 'bar_swamp_ride': (0.06, 0.06, 0.94, 0.94),
     'bar_strawberry': (0.05, 0.08, 0.95, 0.93), 'bar_train_ride': (0.05, 0.06, 0.95, 0.94), 'bar_forest_hunt': (0.04, 0.05, 0.96, 0.95),
+    'bar_ref_forest': (0, 0.078, 1, 0.922), 'bar_ref_snowride': (0, 0.078, 1, 0.922), 'bar_ref_snowvista': (0, 0.078, 1, 0.922),
 }
 shots, bars, out = map(Path, sys.argv[1:4])
 out.mkdir(parents=True, exist_ok=True)

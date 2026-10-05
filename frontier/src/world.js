@@ -278,10 +278,12 @@ export class World {
         let f = smoothstep(0.05, 0.45, forest.fbm(x / 520, z / 520, 4) + 0.7 * o.pine * (1 - 0.55 * snowLat) + 0.45 * o.swamp
           + 0.6 * o.jungle + 0.3 * o.autumn - 0.8 * o.desert - 0.35 * o.prairie);
         f *= 1 - o.town;
-        f *= smoothstep(4, 14, o.roadD);
+        f *= smoothstep(2.5, 6.5, o.roadD); // trees crowd right up to trails
         f *= smoothstep(0.2, 1.4, h);
         f *= smoothstep(1000, 780, h);
         f *= 1 - 0.5 * snowLat * smoothstep(300, 600, h);
+        // in the cold north trees gather in groves rather than dotting every slope
+        f *= 1 - snowLat * (1 - smoothstep(0.42, 0.62, forest.fbm(x / 260 + 4.4, z / 260 - 1.3, 3) * 0.5 + 0.5));
         splat[k * 4 + 0] = o.road * 255;
         splat[k * 4 + 1] = o.wet * 255;
         splat[k * 4 + 2] = f * 255;

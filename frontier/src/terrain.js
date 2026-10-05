@@ -159,8 +159,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   } else rock *= 0.75 + 0.4*micro;
   // desert mesas: banded red sandstone
   if (des > 0.01) {
-    float band = smoothstep(0.25, 0.75, fract(wp.y / 6.5 + 0.35 * vnoise(xz / 45.0)));
-    vec3 red = mix(srgb(vec3(168,92,56)), srgb(vec3(196,132,84)), band) * (0.85 + 0.3 * fbm2(vec2(xz.x + xz.y, wp.y * 4.0) / 11.0));
+    // strata of irregular thickness that wander along the cliff, streaked by runoff
+    float sy = wp.y / 7.5 + 1.1 * fbm2(xz / 70.0) + 0.25 * vnoise(xz / 9.0);
+    float band = smoothstep(0.2, 0.8, fract(sy)) * 0.6 + 0.4 * smoothstep(0.35, 0.65, fract(sy * 2.7 + 0.3));
+    float streak = smoothstep(0.45, 0.75, vnoise(vec2((xz.x + xz.y) * 0.35, wp.y * 0.015)));
+    vec3 red = mix(srgb(vec3(160,88,54)), srgb(vec3(200,138,90)), band) * (0.85 + 0.3 * fbm2(vec2(xz.x + xz.y, wp.y * 4.0) / 11.0)) * (1.0 - 0.28 * streak);
     rock = mix(rock, red * clamp(lumi(rock) / 0.09, 0.5, 1.5), des);
   }
   // cold granite reads darker and bluer under snow, like wet rock in a storm
@@ -171,6 +174,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   snow = mix(snow, snowT * 1.15, 0.6);
   // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
   float snowAmt = smoothstep(0.3, 0.7, snowC + 0.35 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(0.5, 0.8, slope + 0.2 * (vnoise(xz / 3.0) - 0.5)));
+  // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
+  float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
+  snowAmt *= 1.0 - 0.75 * scour * smoothstep(0.3, 0.6, snowC);
+  rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
   vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
   vec3 sN = texN(L_SAND, xz, 3.0);
@@ -228,9 +235,16 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   rough = mix(rough, 0.82, rockAmt);
   c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), texN(L_SNOW, xz, 4.0), 0.5), snowAmt);
   rough = mix(rough, 0.6, snowAmt);
+  // frozen falls: blue-white ice streaks hanging down cold cliff faces
+  if (snowC > 0.3 && slope > 0.4) {
+    float fallN = vnoise(vec2((xz.x + xz.y) * 0.09, wp.y * 0.004)) * 0.7 + vnoise(vec2((xz.x - xz.y) * 0.31, wp.y * 0.02)) * 0.3;
+    float icefall = smoothstep(0.3, 0.7, snowC) * smoothstep(0.45, 0.75, slope) * smoothstep(0.6, 0.72, fallN);
+    c = mix(c, srgb(vec3(196,214,226)) * (0.8 + 0.3 * vnoise(vec2((xz.x + xz.y) * 1.3, wp.y * 0.3))), icefall * 0.9);
+    rough = mix(rough, 0.25, icefall);
+  }
   // the frozen creek in Frostwater Valley
   float ice = smoothstep(0.45, 0.85, wet) * smoothstep(0.5, 0.8, snowC);
-  c = mix(c, srgb(vec3(150,182,198)) * (0.85 + 0.25 * vnoise(xz * 0.6)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
+  c = mix(c, mix(snow, srgb(vec3(150,170,182)), 0.55 + 0.25 * vnoise(xz * 0.6)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));
   return c;
