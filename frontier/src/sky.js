@@ -176,7 +176,7 @@ export class Sky {
       this.sun.position.copy(focus).addScaledVector(m.normalize(), 600);
     }
     // snap shadow camera to texels to avoid shimmering
-    const texel = (2 * 150) / 4096;
+    const texel = (2 * 150) / this.sun.shadow.mapSize.x;
     const f = focus.clone();
     f.x = Math.round(f.x / texel) * texel; f.z = Math.round(f.z / texel) * texel;
     this.sun.target.position.copy(f);

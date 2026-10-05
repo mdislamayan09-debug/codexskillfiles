@@ -1,7 +1,7 @@
 // Photographic CC0 surface library (see public/textures/CREDITS.md).
 import * as THREE from 'three';
 
-const NAMES = ['grass', 'dirt', 'rock', 'snow', 'mud', 'sand', 'gravel', 'planks', 'riverbed'];
+const NAMES = ['grass', 'dirt', 'rock', 'snow', 'mud', 'sand', 'gravel', 'planks', 'riverbed', 'wood', 'stone'];
 
 export async function loadSurfaces(renderer) {
   const loader = new THREE.TextureLoader();

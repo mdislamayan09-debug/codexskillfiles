@@ -48,9 +48,12 @@ function box(w, h, d, x = 0, y = 0, z = 0, ry = 0) {
   const g = new THREE.BoxGeometry(w, h, d);
   const uv = g.attributes.uv;
   const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  // posts and battens run the grain along their length
+  const tall = h > 3 * Math.max(w, d);
   for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
     const i = f * 4 + k;
-    uv.setXY(i, uv.getX(i) * dims[f][0] / TEX_M, uv.getY(i) * dims[f][1] / TEX_M);
+    const u = uv.getX(i) * dims[f][0] / TEX_M, v = uv.getY(i) * dims[f][1] / TEX_M;
+    if (tall && f !== 2 && f !== 3) uv.setXY(i, v, u); else uv.setXY(i, u, v);
   }
   if (ry) g.rotateY(ry);
   g.translate(x, y, z);
@@ -155,10 +158,10 @@ export class Town {
       shingle: std({ map: shingleTexture(1) }),
       shingleDark: std({ map: shingleTexture(2, [70, 64, 58]) }),
       tin: std({ map: tinTexture(1), metalness: 0.4, roughness: 0.6 }),
-      trim: std({ color: 0x3b2c20 }),
+      trim: std(surf.wood ? { map: surf.wood, normalMap: surf.woodN, color: 0x857a70 } : { color: 0x3b2c20 }),
       dark: std({ color: 0x171310 }),
       iron: std({ color: 0x2a2826, metalness: 0.7, roughness: 0.5 }),
-      stone: std({ color: 0x7d766c }),
+      stone: std(surf.stone ? { map: surf.stone, normalMap: surf.stoneN, color: 0xe2dcd2 } : { color: 0x7d766c }),
       hay: std({ color: 0xb59a52, roughness: 1 }),
       canvas: std({ map: canvasTexture(), color: 0x9c907a, roughness: 1, side: THREE.DoubleSide }),
       rope: std({ color: 0x6e5a3e }),

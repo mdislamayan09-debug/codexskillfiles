@@ -1,7 +1,8 @@
 # Dust & Redemption
 
 An open-world western for the browser, built with Three.js and aimed at the look of Red Dead Redemption 2.
-Everything is procedural: no downloaded models or textures, only code and three web fonts.
+Models, animation and most materials are procedural. Ground, rock, timber and water surfaces use scanned CC0
+photographic textures from ambientCG (see `public/textures/CREDITS.md`). Fonts are three web fonts.
 
 Ride a horse across 16 km² of frontier: rolling Heartlands grass, oak meadows, pine ridges, a river valley,
 a lake, a cypress bayou and a snow-capped range. The world includes the frontier town of Copper Hollow, a
@@ -17,7 +18,9 @@ npm run dev            # http://localhost:5173
 npm run build && npm run preview
 ```
 
-Quality presets: `?q=low`, `?q=med`, `?q=high` (default).
+Quality presets: `?q=low`, `?q=med`, `?q=high` (default), `?q=ultra`. Ultra renders at up to 2× pixel ratio
+(native 4K on a 4K display), with an 8192² sun shadow map, terrain detail pushed 45% farther, 1.5× grass density, a wider
+full-detail radius for trees and bushes, and higher-resolution water reflections.
 
 ## Controls
 
