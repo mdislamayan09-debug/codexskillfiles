@@ -142,7 +142,7 @@ export class Terrain {
         float b0 = fbm2(bx*1.3), b1 = fbm2((bx+vec2(e,0.0))*1.3), b2 = fbm2((bx+vec2(0.0,e))*1.3);
         float camD = length(vWPos - cameraPosition);
         float bumpS = 0.9 * smoothstep(120.0, 10.0, camD);
-        nW = normalize(nW + vec3(b0-b1, 0.0, b0-b2) * bumpS * 4.0);
+        nW = normalize(nW + vec3(b0-b1, 0.0, b0-b2) * bumpS * 1.8);
         float tr;
         diffuseColor.rgb = terrainAlbedo(vWPos, nW, tr);
         // distant forests read as a canopy mass (impostors thin out with distance)
