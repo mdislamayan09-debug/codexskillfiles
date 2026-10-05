@@ -86,7 +86,13 @@ The critic still picks the RDR2 frame every time. Its round-4 gaps, and what has
 | town | street too empty and clean | open (more clutter and NPC density) |
 | camp | fire floods the whole clearing | open (tighter falloff, soft shadows) |
 
-## Where it stands
+### Round 7 — blind critic: 0 / 8 (town "clearly", the rest landslides)
+Mountains now show eroded rock relief and the camp shot is the most dramatic frame yet, but the verdicts have
+plateaued: since round 3 the critic names the same three gaps every round — mannequin-grade people and horses,
+flat material response (no texture-level wear or breakup), and thin ground/vegetation detail. A seating bug the
+camp close-up exposed (outlaws hovering beside the logs) is fixed after capture.
+
+## Where it stands (historical note from round 4 below; still accurate after round 7)
 After four rounds the build has not beaten the bar. Every round closed visible gaps: the critic's notes moved from
 "black screen / floating specks / mannequins in an empty field" to fine-grained material, foliage and character
 detail. Town has stopped being a landslide since round 2. The remaining distance is mostly hand-authored art
