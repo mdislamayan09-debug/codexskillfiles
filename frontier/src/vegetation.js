@@ -765,7 +765,7 @@ export class Vegetation {
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
           float ndl = max(dot(N, normalize(uSunDir)), 0.0);
           float ao = 0.55 + 0.45 * smoothstep(-0.6, 0.8, q.y);
-          vec3 col = alb * (uSunColor * ndl * 0.32 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.55 * ao + vec3(0.01));
+          vec3 col = alb * (uSunColor * ndl * 0.13 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.24 * ao + vec3(0.005));
           col = applyAtmosphere(col, vW);
           gl_FragColor = vec4(col, 1.0);
         }`,
