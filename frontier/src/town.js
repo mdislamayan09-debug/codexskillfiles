@@ -45,7 +45,7 @@ function plane(w, h, x, y, z, ry = 0) {
 // Gable roof prism along local x (ridge along x)
 function gableRoof(w, d, rise, overhang = 0.5) {
   const hw = w / 2 + overhang, hd = d / 2 + overhang;
-  const t = 0.12;
+  const t = 0.2;
   const slope = Math.hypot(hd, rise);
   const left = new THREE.BoxGeometry(w + overhang * 2, t, slope);
   const ang = Math.atan2(rise, hd);
@@ -104,11 +104,23 @@ export class Town {
     this.campfires = [];
     this.hitches = [];
     this.interactables = [];
-    const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o }));
+    // every town surface darkens toward the ground (splash-back grime + contact occlusion)
+    const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o }), {
+      fragColor: /* glsl */ `
+        #include <color_fragment>
+        {
+          float above = vWPos.y - heightAt(vWPos.xz);
+          float grime = smoothstep(0.0, 1.4, above);
+          diffuseColor.rgb *= mix(0.5, 1.0, grime) * mix(vec3(0.92, 0.88, 0.8), vec3(1.0), grime);
+          diffuseColor.rgb *= 0.9 + 0.2 * vnoise(vWPos.xy * 0.7 + vWPos.z * 0.3);
+        }`,
+    });
     const M = (this.mats = {
       bare: std({ map: plankTexture(1) }),
       bare2: std({ map: plankTexture(2, null, true) }),
       red: std({ map: plankTexture(3, [140, 58, 44]) }),
+      redV: std({ map: plankTexture(13, [134, 54, 40], true) }),
+      bareV: std({ map: plankTexture(14, null, true) }),
       teal: std({ map: plankTexture(4, [84, 104, 96]) }),
       cream: std({ map: plankTexture(5, [186, 174, 146]) }),
       blue: std({ map: plankTexture(6, [92, 104, 120]) }),
@@ -417,10 +429,16 @@ export class Town {
     const y = this.h(x, z);
     const m = new THREE.Matrix4().makeRotationY(ry).setPosition(x, y, z);
     B.add(M.stone, box(w + 0.3, 0.5, d + 0.3, 0, 0, 0), m);
-    B.add(M[paint], box(w, h, d, 0, h / 2 + 0.25, 0), m);
+    const wallM = paint === 'red' ? M.redV : paint === 'bare' ? M.bareV : M[paint];
+    B.add(wallM, box(w, h, d, 0, h / 2 + 0.25, 0), m);
+    // battens every 0.6 m on the gable walls and long sides
+    for (let bx = -w / 2 + 0.3; bx < w / 2; bx += 0.6) for (const sz of [-1, 1]) B.add(M.trim, box(0.06, h, 0.04, bx, h / 2 + 0.25, sz * (d / 2 + 0.02)), m);
+    for (let bz = -d / 2 + 0.3; bz < d / 2; bz += 0.6) for (const sx of [-1, 1]) B.add(M.trim, box(0.04, h, 0.06, sx * (w / 2 + 0.02), h / 2 + 0.25, bz), m);
+    // corner boards and a fascia under the eaves
+    for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.add(M.white, box(0.16, h, 0.16, cx * (w / 2 + 0.03), h / 2 + 0.25, cz * (d / 2 + 0.03)), m);
     const rise = w * 0.38;
     for (const g of gableRoof(d, w, rise, 0.6)) { g.rotateY(Math.PI / 2); g.translate(0, h + 0.25, 0); B.add(M.shingleDark, g, m); }
-    for (const g of gableEnds(d, w, rise)) { g.rotateY(Math.PI / 2); g.translate(0, h + 0.25, 0); B.add(M[paint], g, m); }
+    for (const g of gableEnds(d, w, rise)) { g.rotateY(Math.PI / 2); g.translate(0, h + 0.25, 0); B.add(wallM, g, m); }
     // big doors with white X bracing
     B.add(M.dark, plane(w * 0.42, h * 0.8, 0, h * 0.4 + 0.25, d / 2 + 0.02), m);
     B.add(M.white, box(w * 0.44, 0.14, 0.06, 0, h * 0.8 + 0.25, d / 2 + 0.05), m);

@@ -56,3 +56,18 @@ foliage self-occlusion via vertex AO, distant forest canopy tint on terrain, imp
 | forest | RDR2 | landslide | pines read as flat palm fronds | 2× denser, smaller branch cards with stronger core occlusion, warmer needles |
 | town | RDR2 | clearly | boxes in one brick texture | weathered clapboard, glowing street lanterns, street clutter |
 | camp | RDR2 | landslide | fire doesn't light the scene, tents glow white | outlaws sit at the fire, picket line, bedrolls/crates, canvas tents |
+
+### Round 3 — blind critic: 0 / 8 (town "clearly", the rest landslides)
+Fixed between rounds 2 and 3: the impostor shader had silently failed to compile since round 2 (undeclared `uCols`),
+so no distant trees drew; impostors also brightened non-premultiplied texels to white. Both are fixed.
+
+| piece | biggest gap named by the critic | builder response (round 4) |
+| --- | --- | --- |
+| ranch | dark tiled grass field, plain barn boxes | brighter matte grass; board-and-batten barns with corner boards and thicker roofs |
+| vista | distant trees alias into speckle | impostors fade 850–1250 m and hand off to the terrain canopy tint; no more white impostors |
+| ride | mannequin rider, plastic horse, no mane | sky fill (envMapIntensity 1.5) on characters, sheen coat (MeshPhysicalMaterial), larger hair-card mane |
+| swamp | horse legs cut the water with a hard edge | coats and clothes darken below the waterline |
+| gallop | crushed to black, no key light | front-lit open-road framing, exposure 0.95 → 1.12 |
+| forest | no atmospheric depth | fog thickens among trees (×3.2) and in early morning (×2.8) |
+| town | empty, green street | packed-dirt plateau; grime gradient and contact darkening at the base of every town surface |
+| camp | fire lights nothing | fire light 160 → 380 cd, 38 m reach; picket line moved out of frame |

@@ -374,11 +374,18 @@ async function init() {
     U.uPlayerPos.value.copy(focus);
     const wind = U.uWind.value; const wa = Math.sin(U.uTime.value * 0.02) * 0.6 + 0.4; wind.set(Math.cos(wa), Math.sin(wa));
     U.uWindStrength.value = 0.8 + Math.sin(U.uTime.value * 0.11) * 0.3;
+    // local mist: denser among trees and in the early morning
+    {
+      const fo = world.splatAt(camera.position.x, camera.position.z).forest;
+      const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
+      G.mistK = 1 + fo * 2.2 + morning * 1.8;
+    }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
     shadowFocus.y = world.heightAt(shadowFocus.x, shadowFocus.z);
     sky.update(!G.freezeTime && G.started ? dt : 0, shadowFocus);
     sky.mesh.position.copy(camera.position);
+    U.uFogDensity.value *= G.mistK || 1;
     town.update(dt, U.uNight.value);
     veg.update(camera.position);
     terrain.update(camera);

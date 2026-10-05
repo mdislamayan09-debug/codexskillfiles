@@ -55,8 +55,10 @@ function buildBones(spec) {
 }
 
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
-function skinnedMaterial(extraFrag = '', uniforms = {}) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0 });
+function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false) {
+  const m = physical
+    ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.7, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.55, 0.42, 0.3), envMapIntensity: 1.5 })
+    : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0, envMapIntensity: 1.5 });
   return patchMaterial(m, {
     vertexHead: 'attribute vec3 aRest; attribute float aLabel; varying vec3 vRest; varying float vLab;',
     vertexReplace: [['#include <uv_vertex>', '#include <uv_vertex>\n vRest = aRest; vLab = aLabel;']],
@@ -68,6 +70,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}) {
         float n2 = vnoise(vec2(vRest.x * 400.0 + vRest.z*300.0, vRest.y * 60.0));
         diffuseColor.rgb *= 0.9 + 0.12 * n1 + 0.06 * n2;
         ${extraFrag}
+        // wet / darkened below the waterline
+        diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
       }`,
     onShader: (s) => {
       Object.entries(uniforms).forEach(([k, u]) => (s.uniforms[k] = u));
@@ -509,7 +513,7 @@ export class Quadruped {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.86, 0.82), bl);
       }
       diffuseColor.rgb *= 0.92 + 0.08 * sin(rp.z * 60.0 + rp.y * 20.0) * body; // hair flow
-    `, uni);
+    `, uni, kind === 'horse');
     mat.roughness = kind === 'sheep' ? 1 : 0.7;
     const root = (this.root = new THREE.Group());
     const { bones, list } = buildBones(tpl.BS);
@@ -540,7 +544,7 @@ export class Quadruped {
       for (let i = 0; i < 14; i++) {
         const t = i / 13;
         const p = V(0, 1.66 + t * 0.36, 0.52 + t * 0.4);
-        const g2 = new THREE.PlaneGeometry(0.09, 0.26 - t * 0.08, 1, 3);
+        const g2 = new THREE.PlaneGeometry(0.15, 0.36 - t * 0.1, 1, 3);
         g2.translate(0, -0.1, 0);
         const gp = g2.attributes.position;
         for (let k = 0; k < gp.count; k++) gp.setZ(k, gp.getZ(k) + (gp.getY(k) + 0.1) * (gp.getY(k) + 0.1) * -0.6);
@@ -550,7 +554,8 @@ export class Quadruped {
       }
       const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.12, 1.1);
       cards.push(forelock);
-      const mm = new THREE.Mesh(mergeGeometriesSafe(cards).translate(0, 0, 0), maneM);
+      const maneHair = std({ map: hairTexture(C.mane), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.75, color: C.mane === 0xd0ccc4 ? 0xffffff : 0xcccccc });
+      const mm = new THREE.Mesh(mergeGeometriesSafe(cards), maneHair);
       mm.position.set(-bones.neck.userData.rest.x, -bones.neck.userData.rest.y, -bones.neck.userData.rest.z);
       mm.castShadow = true; bones.neck.add(mm);
       // tail: tapered strands
