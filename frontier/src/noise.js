@@ -53,7 +53,9 @@ export class Simplex2 {
   ridged(x, y, oct = 5) {
     let a = 0.5, f = 1, s = 0, w = 1;
     for (let o = 0; o < oct; o++) {
-      let n = 1 - Math.abs(this.noise(x * f, y * f));
+      // a rounded crest (soft abs) rather than a knife edge: eroded ridges, not blades
+      const v = this.noise(x * f, y * f), k = o < 2 ? 0.09 : 0.04;
+      let n = 1 - Math.sqrt(v * v + k * k) + k;
       n *= n; n *= w; w = Math.min(1, n * 2);
       s += n * a; a *= 0.5; f *= 2.03;
     }

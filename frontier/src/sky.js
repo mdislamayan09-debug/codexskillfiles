@@ -10,6 +10,7 @@ uniform float uNight;
 uniform float uCloudCover;
 uniform float uStorm;
 uniform float uBlizzard;
+uniform vec3 uHaze;
 uniform vec2 uCloudOffset;
 uniform highp sampler3D tCloud;
 varying vec3 vDir;
@@ -107,7 +108,7 @@ export class Sky {
     this.timeScale = 1 / 60; // hours per real second (1 day = 24 min)
     this.uniforms = {
       uSunDir: U.uSunDir, uTime: U.uTime, uNight: U.uNight,
-      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 }, uBlizzard: { value: 0 },
+      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 }, uBlizzard: { value: 0 }, uHaze: { value: new THREE.Color() },
       tCloud: { value: Sky.cloudTexture() },
     };
     const mat = new THREE.ShaderMaterial({
@@ -172,6 +173,8 @@ export class Sky {
             float ci = fbm(vec2(uv.x*0.45, uv.y*1.1) + 20.0 + uTime*0.002);
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
+          // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
+          col = mix(col, uHaze * 1.3, uBlizzard * 0.7 * smoothstep(-0.2, 0.3, d.y + 0.1));
           gl_FragColor = vec4(col, 1.0);
         }`,
       side: THREE.BackSide,
@@ -288,9 +291,10 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= (1 + 5.5 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
+    U.uFogDensity.value *= (1 + 3.2 * W.blizzard + 0.9 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
+    this.uniforms.uHaze.value.copy(U.uFogColor.value);
 
     // environment map refresh
     if (Math.abs(this.time - this.lastEnvTime) > 0.08 || Math.abs(W.storm - this.lastEnvStorm) > 0.04) {

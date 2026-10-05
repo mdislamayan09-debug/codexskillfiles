@@ -157,7 +157,8 @@ export class World {
       // buttresses and cliff bands on the walls, strongest mid-slope, so rock breaks through the snow
       const cb = n.ridged(x / 150 + 9.1, z / 150 - 3.3, 3);
       wall += wv * (1 - wv) * 4 * (50 * cb - 19);
-      wall += 28 * smoothstep(0.42, 0.58, n2.fbm(x / 85, z / 85 + 3.7, 2)) * smoothstep(0.15, 0.4, wv);
+      // broad benches (a narrow step contour would leave free-standing fins)
+      wall += 22 * smoothstep(0.3, 0.7, n2.fbm(x / 190, z / 190 + 3.7, 2) + 0.5) * smoothstep(0.15, 0.4, wv);
       h = lerp(h, Math.min(h, wall), smoothstep(700, 380, d.vd));
       // the frozen creek and its braided side channels
       h -= 1.2 * smoothstep(5, 2, d.vd);
@@ -169,7 +170,7 @@ export class World {
       const inV = d && d.vd < 700 ? smoothstep(700, 500, d.vd) : 0;
       const gate = lerp(smoothstep(260, 520, h), smoothstep(85, 190, d ? d.vd : 1e9), inV);
       // fades out on the summits, where steps would chip the ridgelines into teeth
-      let cw = mt * gate * lerp(1, 0.35, inV) * smoothstep(0.3, 0.55, n3.fbm(x / 700 - 4.2, z / 700 + 8.8, 3) + 0.5) * (1 - smoothstep(780, 940, h));
+      let cw = mt * gate * lerp(1, 0.0, inV) * smoothstep(0.3, 0.55, n3.fbm(x / 700 - 4.2, z / 700 + 8.8, 3) + 0.5) * (1 - smoothstep(780, 940, h));
       if (cw > 0.01) {
         const S = 16 + 14 * (0.5 + 0.5 * n2.fbm(x / 400 + 1.9, z / 400, 2));
         const t = h / S + 0.9 * n.fbm(x / 160 + 6.1, z / 160 - 2.4, 3);

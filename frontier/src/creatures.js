@@ -8,18 +8,25 @@ import { mulberry32 } from './noise.js';
 import { mergeByMaterial, sweep } from './characters.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-function hairTexture(col) {
+function hairTexture(col, strands = 260, wispy = false) {
   const c = document.createElement('canvas'); c.width = 128; c.height = 512;
   const g = c.getContext('2d');
   const base = new THREE.Color(col);
   const r = mulberry32(5);
-  for (let i = 0; i < 260; i++) {
-    const x = 6 + r() * 116, l = 0.6 + r() * 0.8;
+  for (let i = 0; i < strands; i++) {
+    const x = 6 + r() * 116, l = 0.55 + r() * 0.9;
     g.strokeStyle = `rgba(${Math.min(255, base.r * 255 * l + 10)},${Math.min(255, base.g * 255 * l + 8)},${Math.min(255, base.b * 255 * l + 6)},${0.6 + r() * 0.4})`;
     g.lineWidth = 1 + r() * 2;
     g.beginPath(); g.moveTo(x, 0);
-    g.bezierCurveTo(x + (r() - 0.5) * 30, 170, x + (r() - 0.5) * 40, 340, x + (r() - 0.5) * 50, 300 + r() * 212);
+    g.bezierCurveTo(x + (r() - 0.5) * 30, 170, x + (r() - 0.5) * 40, 340, x + (r() - 0.5) * 50, (wispy ? 220 : 300) + r() * (wispy ? 292 : 212));
     g.stroke();
+  }
+  if (wispy) {
+    // thin the ends out into separate locks
+    g.globalCompositeOperation = 'destination-out';
+    const fade = g.createLinearGradient(0, 300, 0, 512); fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,0.75)');
+    g.fillStyle = fade; g.fillRect(0, 300, 128, 212);
+    g.globalCompositeOperation = 'source-over';
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
@@ -90,12 +97,28 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         float n1 = vnoise(vRest.xy * 90.0 + vRest.z * 37.0);
         float n2 = vnoise(vec2(vRest.x * 400.0 + vRest.z*300.0, vRest.y * 60.0));
         diffuseColor.rgb *= 0.9 + 0.12 * n1 + 0.06 * n2;
+        ${kind === 'human' ? `
+        {
+          int lb = int(vLab + 0.5);
+          if (lb == 3 || lb == 2 || lb == 6) {
+            // worn leather and felt: broad mottling, rubbed-light high points, seams and stitching lines
+            float m = fbm2(vRest.xy * 7.0 + vRest.z * 5.0);
+            diffuseColor.rgb *= 0.74 + 0.5 * m;
+            float seam = smoothstep(0.006, 0.0, abs(vRest.x)) * step(vRest.z, -0.04) * step(vRest.y, 1.45);  // centre back
+            seam = max(seam, smoothstep(0.007, 0.0, abs(vRest.y - 1.43)) * step(vRest.z, -0.02));           // yoke
+            seam = max(seam, smoothstep(0.006, 0.0, abs(abs(vRest.x) - 0.185)) * step(vRest.y, 1.3));       // side seams
+            diffuseColor.rgb *= 1.0 - 0.45 * seam * float(lb == 3);
+            // creases bunch where the coat folds over the saddle
+            float crease = (sin(vRest.y * 140.0 + vnoise(vRest.xz * 30.0) * 5.0) * 0.5 + 0.5) * smoothstep(1.12, 0.95, vRest.y) * smoothstep(0.7, 0.85, vRest.y);
+            diffuseColor.rgb *= 1.0 - 0.25 * crease * float(lb == 3);
+          }
+        }` : ''}
         ${extraFrag}
         // a dusting of snow settles on shoulders, hats and backs out in the cold country
         {
           vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
-          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * smoothstep(0.35, 0.8, vnoise(vRest.xz * 22.0 + vRest.y * 9.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.4);
+          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.6, 0.95, wn.y) * (0.5 + 0.5 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.28);
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
@@ -149,7 +172,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xa48c6c, furHat: true, furHatColor: 0x6a5238, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x5e432c, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x4c3422, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -464,7 +487,7 @@ const SPECIES = {
   sheep: { scale: 0.55, coat: 'sheep', cell: 0.024 },
 };
 const COATS = {
-  bay: { coat: 0x5a3018, points: 0x16100c, mane: 0x120c08, belly: 0x6a3a20, pinto: 0 },
+  bay: { coat: 0x432616, points: 0x16100c, mane: 0x120c08, belly: 0x51301c, pinto: 0 },
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
@@ -650,17 +673,18 @@ export class Quadruped {
       // tail: a dock plus fanned, curved hair cards with alpha strands
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.3).getHex());
-      const hairM = std({ map: hairTex, alphaTest: 0.32, side: THREE.DoubleSide, roughness: 0.55 });
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x6a4a32), 0.45).getHex(), 150, true);
+      const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.45 });
       const tcards = [];
-      for (let i = 0; i < 16; i++) {
-        const a = (i / 15 - 0.5) * 1.7 + (r() - 0.5) * 0.2;
-        const len = 0.7 + r() * 0.45;
-        const c = new THREE.PlaneGeometry(0.12 + r() * 0.04, len, 1, 7);
+      // a hanging switch of narrow locks: full at the dock, separating into wisps toward the hocks
+      for (let i = 0; i < 26; i++) {
+        const a = (i / 25 - 0.5) * 1.1 + (r() - 0.5) * 0.25;
+        const len = 0.85 + r() * 0.4;
+        const c = new THREE.PlaneGeometry(0.075 + r() * 0.035, len, 1, 8);
         c.translate(0, -len / 2, 0);
         const cp = c.attributes.position;
-        for (let k = 0; k < cp.count; k++) { const y = -cp.getY(k); cp.setZ(k, -Math.sin(Math.min(y, 0.5) * 2.2) * 0.16 + y * 0.05); cp.setX(k, cp.getX(k) * (1 + y * 0.9)); }
-        c.rotateZ((r() - 0.5) * 0.25);
+        for (let k = 0; k < cp.count; k++) { const y = -cp.getY(k); cp.setZ(k, -Math.sin(Math.min(y, 0.45) * 2.4) * 0.15 + y * 0.03); cp.setX(k, cp.getX(k) * (1 + y * 0.5)); }
+        c.rotateZ((r() - 0.5) * 0.18);
         c.rotateY(a);
         c.translate((r() - 0.5) * 0.04, -0.02 - r() * 0.04, -0.03 - r() * 0.03);
         tcards.push(c);

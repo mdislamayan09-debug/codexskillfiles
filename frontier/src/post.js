@@ -126,7 +126,7 @@ export class Post {
       this.composer.addPass(this.gtao);
     }
     if (bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.18, 0.5, 2.2);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.13, 0.5, 2.4);
       this.composer.addPass(this.bloom);
     }
     this.composer.addPass(new OutputPass());

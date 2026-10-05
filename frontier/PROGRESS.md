@@ -141,3 +141,48 @@ The porch-framed town shot is the closest yet. Remaining gaps the critic repeats
 characters, flat atmosphere, no material breakdown, cone mountains, empty foregrounds. Builder response (round 7):
 far-field rock relief on steep high ground (gullies and strata in the shader), stronger pasture hue/height
 variation with muddier paths, camera pushed into the outlaw camp, denser lit smoke.
+
+## World v2: the user's three reference frames
+
+From round 9 the bar is the three frames the user supplied: a ride along a pine-forest trail, a ride up a
+snowy valley in a blizzard, and a lookout over a snowy valley with a cabin. Each pair is judged blind.
+
+### Round 9: blind critic 0 / 3 (all landslides)
+- **pines:** flat, empty floor; a trail 6–8 m wide; flat light with no haze; a mannequin rider.
+- **snowride:** a white sheet that doesn't react to the horse; heightmap-looking mountains; sparse scatter.
+- **snowvista:** a stretched heightmap wall; blotchy snow; poor composition with no horizon.
+
+### Rounds 10–11: blind critic 0 / 3 (all landslides; scores 3, 3, 2 out of 10)
+Builder work between them:
+- **Crags.** Range faces step into cliff bands with snow ledges. A noise-modulated terrace keeps risers
+  steep and benches flat, so the snow-by-slope shader exposes dark granite.
+- **Valley.** Frostwater Valley was rebuilt from a narrow slot into a broad glacial trough that flattens
+  and widens toward its mouth. Spruce stands with meadows between them.
+- **Winter rider.** The rider changes into a shearling coat with fur trim, a trapper hat and a scarf in
+  the cold. Snow dusts the shoulders and the horse's back.
+- **Snow-country scatter.**
+  - Firs climb steeper slopes.
+  - Snow-capped boulders gather in fields and are sunk into the slope.
+  - Frosted dry brush grows in clumps. It used to render black because its vertex colours were missing.
+- **Atmosphere.**
+  - Fog no longer fills valleys below the layer base with an opaque white bowl.
+  - Aerial perspective is stronger.
+  - Mist banks lie along cold valley floors in storms.
+  - The storm sky had been fading its clouds into clear-sky blue; it now uses the storm grade.
+- **Forest.**
+  - The camera is deep in the trees on level ground.
+  - Forest giants have ragged columnar crowns.
+  - Backlit boughs darken instead of glowing pale.
+  - Green grass, fern beds and fallen logs fill the floor.
+- **Tooling.**
+  - `scripts/probe.mjs`: set a shot, evaluate JS against the game, save the frame.
+  - `scripts/glcheck.mjs`: name the programs behind rejected GL draws. It showed the long-standing sampler
+    warning is harmless: it is a frame-0 warm-up pass only.
+
+What the round-11 critic still names, in order:
+1. Too little aerial perspective and valley fog.
+2. Spiky, faceted peaks, plus blade-like fins on the valley walls.
+3. The rider and horse: the tail reads as a black slab.
+4. Sparse ground dressing.
+5. A blown-out sun bloom.
+6. Evenly spaced identical trees.

@@ -123,10 +123,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // forest floor: needle and leaf litter, tinted per biome
   vec4 lA = texA(L_LITTER, xz, 1.8, 4.6);
   vec3 lN = texN(L_LITTER, xz, 1.8);
-  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.92, 0.7, 0.5), pineK);
+  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.8, 0.68, 0.54), pineK);   // grey-brown needle duff, not orange
   litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
   litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
   vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
+  // moss and low green growth in damp hollows of the pine floor
+  forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.58, 0.75, fbm2(xz / 9.0 + 12.0)) * pineK * 0.7);
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
@@ -167,7 +169,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     rock = mix(rock, red * clamp(lumi(rock) / 0.09, 0.5, 1.5), des);
   }
   // cold granite reads darker and bluer under snow, like wet rock in a storm
-  rock = mix(rock, rock * vec3(0.62, 0.66, 0.74), snowC);
+  rock = mix(rock, rock * vec3(0.5, 0.54, 0.62), snowC);
 
   vec3 snow = srgb(vec3(232,236,242));
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
@@ -175,7 +177,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
   // snow follows the slope: it holds on ledges and benches (where the relief normal flattens) and sheds off
   // steep faces, instead of lying in noise-shaped blotches
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(0.3, 0.5, slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(0.3, 0.22, snowC), mix(0.5, 0.42, snowC), slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters

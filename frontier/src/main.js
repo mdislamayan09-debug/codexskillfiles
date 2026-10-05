@@ -274,7 +274,7 @@ async function init() {
       }
       if (blocked > 6) continue;
       const above = ch - world.heightAt(CABIN.x, CABIN.z);
-      const score = -Math.abs(above - 120) - Math.abs(da) * 30 - Math.abs(r - 320) * 0.06 - blocked * 4;
+      const score = -Math.abs(above - 110) - Math.abs(da) * 30 - Math.abs(r - 300) * 0.06 - blocked * 4;
       if (score > bs) { bs = score; best = { cx, cz }; }
     }
     best = best || { cx: CABIN.x + 120, cz: CABIN.z - 60 };
@@ -340,6 +340,13 @@ async function init() {
     if (gone.size) { L.items = L.items.filter((it) => !gone.has(it)); veg.update(camera.position, true); }
     return gone.size;
   };
+  G.clearTreesAlong = (ax, az, bx, bz, w, upto = 1) => {
+    const L = veg.trees, dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+    const near = (it) => { const t = Math.max(0, Math.min(upto, ((it.x - ax) * dx + (it.z - az) * dz) / L2)); return Math.hypot(ax + dx * t - it.x, az + dz * t - it.z) < w + 2 * it.s; };
+    for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !near(it)));
+    L.items = L.items.filter((it) => !near(it));
+    veg.update(camera.position, true);
+  };
   G.treesNear = (x, z, r) => {
     let n = 0;
     const L = veg.trees, cx = Math.floor(x / L.cell), cz = Math.floor(z / L.cell);
@@ -395,8 +402,9 @@ async function init() {
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
       G.fgPlaced = true;
       const c = G.camOverride.pos, l = G.camOverride.look;
-      // clear the lookout itself: no tree trunks or boughs right in front of the lens
-      G.clearTreesNear(c.x, c.z, 28);
+      // clear the lookout itself, and a sightline down to the cabin, as a location artist would
+      G.clearTreesNear(c.x, c.z, 40);
+      G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 14, 0.85);
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
       const g0 = world.heightAt(c.x, c.z);
       // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
