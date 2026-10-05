@@ -23,6 +23,18 @@ function hairTexture(col) {
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+// Woven saddle blanket with a stepped diamond band
+function blanketTexture(r) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const pal = [['#7a2418', '#d8c8a0', '#1e1a18'], ['#2a3a5a', '#c8b890', '#7a2418'], ['#5a4a2a', '#e0d0a8', '#3a5a6a']][Math.floor(r() * 3)];
+  g.fillStyle = pal[0]; g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 32) { g.fillStyle = pal[2]; g.fillRect(0, y + 2, 256, 4); }
+  g.fillStyle = pal[1];
+  for (let k = 0; k < 4; k++) { const cx = 32 + k * 64; for (let s = 0; s < 6; s++) g.fillRect(cx - 24 + s * 4, 128 - s * 8, 48 - s * 8, 16 * 0 + 8), g.fillRect(cx - 24 + s * 4, 120 + s * 8, 48 - s * 8, 8); }
+  for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.12})`; g.fillRect(r() * 256, r() * 256, 2, 1); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
 const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }));
 function mesh(geo, mat, cast = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; return m; }
@@ -126,7 +138,8 @@ function humanPrims(o) {
   add(EL([0, 1.685, 0.042], [0.062, 0.042, 0.058]), L.skin, 'head', 0.025); // jaw
   add(EL([0, 1.665, 0.074], [0.03, 0.024, 0.022]), L.skin, 'head', 0.015); // chin
   add(RC([0, 1.768, 0.094], [0, 1.728, 0.112], 0.011, 0.016), L.skin, 'head', 0.012); // nose
-  add(RC([-0.045, 1.783, 0.083], [0.045, 1.783, 0.083], 0.014, 0.014), L.skin, 'head', 0.015); // brow
+  add(RC([-0.045, 1.783, 0.083], [0.045, 1.783, 0.083], 0.014, 0.014), L.skin, 'head', 0.015); // brow ridge
+  for (const s of [-1, 1]) add(RC([s * 0.018, 1.787, 0.094], [s * 0.05, 1.789, 0.087], 0.006, 0.005), L.hair, 'head', 0.004); // eyebrows
   for (const s of [-1, 1]) {
     add(EL([s * 0.05, 1.745, 0.07], [0.022, 0.016, 0.018]), L.skin, 'head', 0.015); // cheekbones
     add(EL([s * 0.086, 1.752, -0.005], [0.014, 0.028, 0.02]), L.skin, 'head', 0.008); // ears
@@ -177,7 +190,8 @@ function humanTemplate(outfit) {
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     if (o.coat && lab.getX(i) === L.coat && z > 0.06 && Math.abs(x) < 0.06 + (1.45 - y) * 0.06 && y > 1.02 && y < 1.5) lab.setX(i, o.vest ? L.vest : L.shirt);
-    if (lab.getX(i) === L.skin && y < 1.72 && y > 1.64 && z > 0.0 && outfit !== 'lady') lab.setX(i, 12); // stubble slot
+    if (lab.getX(i) === L.skin && y < 1.725 && y > 1.64 && z > -0.01 && outfit !== 'lady') lab.setX(i, 12); // beard / stubble slot
+    if (lab.getX(i) === L.skin && Math.abs(x) > 0.07 && y > 1.72 && y < 1.8 && z < 0.02 && z > -0.06 && outfit !== 'lady') lab.setX(i, L.hair); // sideburns
   }
   humanCache.set(outfit, { geo, prims });
   return humanCache.get(outfit);
@@ -196,7 +210,7 @@ export class Human {
     pal[L.pants] = hex(o.pants); pal[L.boots] = hex(o.boots); pal[L.hat] = hex(o.hat || 0x333333); pal[L.hair] = hair;
     pal[L.belt] = hex(0x3e2a1a); pal[L.bandana] = hex(o.bandana || 0x444444); pal[L.gloves] = hex(o.gloves || 0x5a3e28);
     pal[L.lips] = skin.map((v, i) => v * [0.8, 0.6, 0.6][i]);
-    pal[12] = r() < 0.65 ? skin.map((v, i) => v * 0.55 + hair[i] * 0.35) : skin; // stubble / beard
+    pal[12] = outfit === 'arthur' || r() < 0.6 ? skin.map((v, i) => v * 0.3 + hair[i] * 0.75) : skin.map((v) => v * 0.85); // beard / stubble
     // per-instance colour attribute over a shared sculpted geometry
     const g = new THREE.BufferGeometry();
     for (const k of ['position', 'normal', 'skinIndex', 'skinWeight', 'aRest', 'aLabel']) g.setAttribute(k, tpl.geo.attributes[k]);
@@ -308,7 +322,13 @@ export class Human {
       this.spine.rotation.x = 0; this.gun.visible = false;
       return;
     }
-    if (mode === 'ride') {
+    if (mode === 'sit') {
+      this.hips.position.y = 0.46 + breathe * 0.1;
+      this.spine.rotation.x = 0.18;
+      for (const l of Lg) { l.hp.rotation.x = -1.45; l.hp.rotation.z = l.s * 0.12; l.kn.rotation.x = 1.5; l.an.rotation.x = 0.0; }
+      for (const a of A) { a.sh.rotation.x = -0.75; a.sh.rotation.z = a.s * 0.15; a.el.rotation.x = -0.6; a.wr.rotation.x = 0.1; }
+      this.head.rotation.x = 0.15;
+    } else if (mode === 'ride') {
       this.hips.position.y = H0 + Math.sin(horsePhase * Math.PI * 2 * (gait > 2 ? 1 : 2)) * (0.01 + 0.025 * gait);
       this.spine.rotation.x = 0.06 * gait + Math.cos(horsePhase * Math.PI * 2) * 0.02 * gait;
       for (const l of Lg) { l.hp.rotation.x = -1.2; l.hp.rotation.z = l.s * 0.42; l.kn.rotation.x = 1.4; l.an.rotation.x = -0.25; }
@@ -490,7 +510,7 @@ export class Quadruped {
       }
       diffuseColor.rgb *= 0.92 + 0.08 * sin(rp.z * 60.0 + rp.y * 20.0) * body; // hair flow
     `, uni);
-    mat.roughness = kind === 'sheep' ? 1 : 0.55;
+    mat.roughness = kind === 'sheep' ? 1 : 0.7;
     const root = (this.root = new THREE.Group());
     const { bones, list } = buildBones(tpl.BS);
     root.add(bones.root);
@@ -577,7 +597,7 @@ export class Quadruped {
   addTack(bones, r, at) {
     const body = bones.body;
     const leather = std({ color: 0x4a2c18, roughness: 0.5 });
-    const blanket = std({ color: [0x7a2a20, 0x2a3a5a, 0x6a5a2a][Math.floor(r() * 3)], roughness: 0.95 });
+    const blanket = std({ map: blanketTexture(r), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
     for (let i = 0; i < bp.count; i++) { const x = bp.getX(i); bp.setY(i, bp.getY(i) - x * x * 1.9); }
@@ -592,6 +612,7 @@ export class Quadruped {
     const cant = new THREE.TorusGeometry(0.16, 0.03, 6, 12, Math.PI); cant.translate(0, 1.78, -0.36); body.add(mesh(cant, leather));
     const roll = new THREE.CylinderGeometry(0.12, 0.12, 0.75, 12); roll.rotateZ(Math.PI / 2); roll.translate(0, 1.83, -0.52);
     body.add(mesh(roll, std({ color: 0x5a5a48, roughness: 1 })));
+    for (const sx of [-0.22, 0.22]) { const st = new THREE.TorusGeometry(0.125, 0.012, 5, 16); st.rotateY(Math.PI / 2); st.translate(sx, 1.83, -0.52); body.add(mesh(st, leather)); }
     for (const s of [-1, 1]) {
       const bag = sweep([{ p: V(s * 0.41, 1.53, -0.62), rx: 0.06, ry: 0.13 }, { p: V(s * 0.42, 1.53, -0.45), rx: 0.07, ry: 0.15 }, { p: V(s * 0.41, 1.53, -0.3), rx: 0.06, ry: 0.13 }], 8);
       body.add(mesh(bag, leather));

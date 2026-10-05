@@ -201,7 +201,7 @@ export class Sky {
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
-      this.scene.environmentIntensity = 0.75 + 0.2 * day;
+      this.scene.environmentIntensity = 0.5 + 0.3 * day * Math.min(1, Math.max(0, sunH * 3));
     }
     this.mesh.position.copy(focus);
   }

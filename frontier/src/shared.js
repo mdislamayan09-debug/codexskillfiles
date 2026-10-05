@@ -63,6 +63,21 @@ uniform vec3 uFogSunColor;
 uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform float uNight;
+float gSunVis = 1.0;
+// Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
+float terrainSunShadow(vec3 wp){
+  vec3 L = normalize(uSunDir);
+  if (L.y < 0.0) return 1.0;
+  float vis = 1.0; float t = 2.5;
+  for (int i = 0; i < 22; i++){
+    vec3 p = wp + L * t;
+    float d = p.y - heightAt(p.xz);
+    vis = min(vis, clamp(d / (t * 0.05 + 0.4) + 0.35, 0.0, 1.0));
+    if (vis <= 0.0 || p.y > 700.0) break;
+    t *= 1.33;
+  }
+  return vis;
+}
 vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 ray = wpos - cameraPosition;
   float dist = length(ray);
@@ -84,7 +99,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
 
 // Patch any built-in three.js material: swap the standard fog for height-fog with sun scattering,
 // expose world position, and share uniforms.
-export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHead = '', fragColor = null, beginNormal = null, onShader = null, vertexReplace = null, noFlip = false } = {}) {
+export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHead = '', fragColor = null, beginNormal = null, onShader = null, vertexReplace = null, noFlip = false, sunShadow = false } = {}) {
   mat.fog = false;
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (shader, renderer) => {
@@ -110,12 +125,18 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
       .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FOG_PARS}\nvarying vec3 vWPos;\n${fragHead}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n gl_FragColor.rgb = applyAtmosphere(gl_FragColor.rgb, vWPos);`);
     if (fragColor) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', fragColor);
+    if (sunShadow) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n gSunVis = terrainSunShadow(vWPos);')
+        .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace(
+          'getDirectionalLightInfo( directionalLight, directLight );', 'getDirectionalLightInfo( directionalLight, directLight ); directLight.color *= gSunVis;'));
+    }
     if (noFlip) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;');
     if (onShader) onShader(shader, renderer);
     if (prev) prev(shader, renderer);
   };
   // make program cache key distinct per patch
-  const key = (noFlip ? 'nf' : '') + (vertexBody || '') + (fragColor || '') + (vertexHead || '') + (fragHead || '') + (beginNormal || '');
+  const key = (sunShadow ? 'ss' : '') + (noFlip ? 'nf' : '') + (vertexBody || '') + (fragColor || '') + (vertexHead || '') + (fragHead || '') + (beginNormal || '');
   let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
   mat.customProgramCacheKey = () => 'p' + h;
   return mat;

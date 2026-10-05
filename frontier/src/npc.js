@@ -55,6 +55,12 @@ export class NPCs {
       const a = this.add(new Quadruped('horse', 700 + i, hcoats[i % hcoats.length]), 'tied', h.pos.x + (r() - 0.5) * 1.5, h.pos.z, h.yaw + (r() - 0.5) * 0.3);
       a.timer = r() * 10;
     });
+    // the gang's horses picketed at the hideout
+    for (let i = 0; i < 3; i++) {
+      const x = CAMP.x - 14 + i * 2.2, z = CAMP.z + 9 + i * 0.6;
+      const a = this.add(new Quadruped('horse', 760 + i, ['black', 'chestnut', 'grey'][i]), 'tied', x, z, 0.3 + i * 0.2);
+      a.timer = r() * 10;
+    }
     // ranch hands
     for (let i = 0; i < 3; i++) {
       const a = this.add(new Human('worker', 80 + i), 'towns', RANCH.x - 15 + i * 9, RANCH.z + 30, r() * 6);
@@ -86,9 +92,12 @@ export class NPCs {
     // outlaws
     this.outlaws = [];
     for (let i = 0; i < 7; i++) {
-      const ang = (i / 7) * Math.PI * 2;
-      const x = CAMP.x + Math.cos(ang) * (3.5 + r() * 4), z = CAMP.z + Math.sin(ang) * (3.5 + r() * 4);
-      const a = this.add(new Human('outlaw', 600 + i), 'outlaw', x, z, ang + Math.PI);
+      const ang = (i / 7) * Math.PI * 2 + 0.2;
+      const sit = i % 2 === 0;
+      const rad = sit ? 2.9 : 5 + r() * 3;
+      const x = CAMP.x + Math.cos(ang) * rad, z = CAMP.z + Math.sin(ang) * rad;
+      const a = this.add(new Human('outlaw', 600 + i), 'outlaw', x, z, Math.atan2(CAMP.x - x, CAMP.z - z));
+      a.sitting = sit;
       a.fireT = 1 + r() * 2;
       a.cover = null;
       this.outlaws.push(a);
@@ -190,7 +199,7 @@ export class NPCs {
       const h = this.world.heightAt(a.pos.x, a.pos.z);
       if (h < -0.8) { a.yaw += Math.PI * 0.8; }
       this.place(a);
-      if (a.model instanceof Human) a.model.animate(dt, { speed: a.speed, aim: a.aiming ? 1 : 0, aimPitch: 0 });
+      if (a.model instanceof Human) a.model.animate(dt, { speed: a.speed, aim: a.aiming ? 1 : 0, aimPitch: 0, mode: a.sitting && a.state !== 'combat' ? 'sit' : 'ground' });
       else a.model.animate(dt, a.speed, a.turn || 0);
     }
   }

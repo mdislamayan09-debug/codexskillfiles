@@ -118,8 +118,8 @@ export class Post {
       // normal pass would see flat geometry); normals are reconstructed from depth.
       this.gtao.setGBuffer(rt.depthTexture);
       this.gtao.output = GTAOPass.OUTPUT.Default;
-      this.gtao.blendIntensity = 0.85;
-      this.gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.5, scale: 1.0, samples: 12 });
+      this.gtao.blendIntensity = 1.0;
+      this.gtao.updateGtaoMaterial({ radius: 1.4, distanceExponent: 1.6, thickness: 2.0, scale: 1.1, samples: 12 });
       this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
       this.composer.addPass(this.gtao);
     }

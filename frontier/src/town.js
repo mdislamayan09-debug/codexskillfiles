@@ -8,6 +8,16 @@ import { mulberry32 } from './noise.js';
 
 const TEX_M = 2.4; // metres per plank texture repeat
 
+function canvasTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  const r = mulberry32(3);
+  g.fillStyle = '#d8ccb0'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 256; i += 2) { g.fillStyle = `rgba(90,80,60,${0.05 + r() * 0.05})`; g.fillRect(0, i, 256, 1); g.fillRect(i, 0, 1, 256); }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(70,55,35,${r() * 0.18})`; g.beginPath(); g.ellipse(r() * 256, r() * 256, 10 + r() * 40, 6 + r() * 24, 0, 0, 7); g.fill(); }
+  g.fillStyle = 'rgba(60,45,30,0.35)'; g.fillRect(0, 236, 256, 20); // mud line at the hem
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+
 // Box with world-scaled UVs
 function box(w, h, d, x = 0, y = 0, z = 0, ry = 0) {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -113,7 +123,7 @@ export class Town {
       iron: std({ color: 0x2a2826, metalness: 0.7, roughness: 0.5 }),
       stone: std({ color: 0x7d766c }),
       hay: std({ color: 0xb59a52, roughness: 1 }),
-      canvas: std({ color: 0xcfc3a5, roughness: 1, side: THREE.DoubleSide }),
+      canvas: std({ map: canvasTexture(), color: 0x9c907a, roughness: 1, side: THREE.DoubleSide }),
       rope: std({ color: 0x6e5a3e }),
       water: std({ color: 0x2a3330, roughness: 0.15 }),
     });
@@ -520,6 +530,14 @@ export class Town {
     }
     for (let i = 0; i < 4; i++) { const l = box(1.4, 0.14, 0.14, 0, 0, 0); l.rotateY(i * 0.8); l.translate(x, y + 0.15, z); B.add(M.trim, l); }
     this.campfires.push(new THREE.Vector3(x, y + 0.3, z));
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.25 + 0.6, d = 4.6 + r() * 1.5;
+      const bx = x + Math.cos(a) * d, bz = z + Math.sin(a) * d, by = this.h(bx, bz);
+      const roll = new THREE.CylinderGeometry(0.18, 0.18, 1.9, 10, 1); roll.rotateZ(Math.PI / 2); roll.scale(1, 0.55, 1); roll.rotateY(-a);
+      roll.translate(bx, by + 0.1, bz); B.add(M.canvas, roll);
+    }
+    for (let i = 0; i < 4; i++) B.add(M.bare2, box(0.7, 0.55, 0.5, x - 6 + i * 0.8, this.h(x - 6, z - 5) + 0.27, z - 5 - (i % 2) * 0.6, i * 0.3));
+    B.add(M.iron, this.barrelGeo(x + 5, this.h(x + 5, z + 2) + 0.45, z + 2));
     // logs to sit on
     for (let i = 0; i < 3; i++) {
       const a = i * 2.1; const lg = new THREE.CylinderGeometry(0.22, 0.22, 2.4, 8); lg.rotateZ(Math.PI / 2); lg.rotateY(a);

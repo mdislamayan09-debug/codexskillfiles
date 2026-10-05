@@ -129,6 +129,7 @@ export class Terrain {
     this.meshes = [];
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
     patchMaterial(mat, {
+      sunShadow: true,
       vertexHead: VERT_HEAD,
       vertexBody: VERT_BODY,
       beginNormal: BEGIN_NORMAL,

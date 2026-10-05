@@ -217,7 +217,7 @@ async function init() {
     town: () => ({ time: 17.2, player: [70, 2, -Math.PI / 2], cam: [95, null, 3, 2.2], look: [-60, null, -2, 3] }),
     forest: () => { const f = G.findForest(-200, -650); return { time: 8.4, player: [f[0], f[1], 0.4], camRel: [-3.2, 1.5, -4.2], lookRel: [0, 1.6, 0] }; },
     vista: () => ({ time: 17.8, player: [-60, 280, -0.2], cam: [-60, null, 330, 30], look: [40, null, -700, 120] }),
-    gallop: () => ({ time: 17.6, player: [-380, -2, Math.PI / 2], camRel: [-2.6, 2.2, -6.5], lookRel: [0, 1.8, 3], gallop: true }),
+    gallop: () => ({ time: 17.5, player: [-380, -2, Math.PI / 2], camRel: [-6.5, 1.7, 2.5], lookRel: [0, 1.6, 0.6], gallop: true }),
     camp: () => ({ time: 20.4, player: [CAMP.x - 18, CAMP.z + 14, 2.2], cam: [CAMP.x - 14, null, CAMP.z + 16, 2.2], look: [CAMP.x, null, CAMP.z, 1] }),
     night: () => ({ time: 21.5, player: [-20, 2, Math.PI / 2], cam: [-46, null, -1, 2.4], look: [60, null, -3, 4] }),
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
@@ -270,6 +270,15 @@ async function init() {
     document.getElementById('title').classList.remove('show');
     document.getElementById('loading').classList.add('done');
     veg.update(player.hpos, true);
+    if (s.gallop) {
+      // pre-warm the dust trail a galloping horse would already have kicked up
+      const back = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      for (let i = 0; i < 70; i++) {
+        const t = Math.random() * 14;
+        const p = player.hpos.clone().addScaledVector(back, 0.8 + t).add(new THREE.Vector3((Math.random() - 0.5) * 1.5, 0.2 + Math.random() * t * 0.12, (Math.random() - 0.5) * 1.5));
+        particles.emit(p, new THREE.Vector3(0, 0.3, 0), { color: [0.72, 0.62, 0.48], alpha: 0.5 * (1 - t / 16), size: 0.9 + t * 0.12, life: 2.2, grow: 0.6, drag: 1 });
+      }
+    }
     G.started = true;
     G.frame = 0;
     G.hold = false;

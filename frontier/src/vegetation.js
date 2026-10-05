@@ -36,6 +36,7 @@ const WIND_BODY = /* glsl */ `
 
 function windMaterial(mat, flutter = 0, extra = {}) {
   return patchMaterial(mat, {
+    sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
@@ -59,7 +60,7 @@ const LEAF_EMISSIVE = /* glsl */ `
   {
     vec3 vdir = normalize(vWPos - cameraPosition);
     float back = pow(max(dot(vdir, normalize(uSunDir)), 0.0), 3.0);
-    totalEmissiveRadiance += diffuseColor.rgb * uSunColor * back * 0.35;
+    totalEmissiveRadiance += diffuseColor.rgb * uSunColor * gSunVis * back * 0.35;
   }
 `;
 
@@ -115,7 +116,7 @@ function leafAO(geo, radial = false) {
     if (radial) d = Math.hypot(x, z) / Math.max(0.5, (1 - (y - bb.min.y) / (2 * e.y)) * Math.max(e.x, e.z) + 0.3);
     else d = Math.hypot((x - c.x) / e.x, (y - c.y) / e.y, (z - c.z) / e.z);
     const top = (y - bb.min.y) / (2 * e.y);
-    const ao = (0.35 + 0.65 * THREE.MathUtils.smoothstep(d, 0.15, 0.95)) * (0.75 + 0.25 * top);
+    const ao = (0.25 + 0.75 * THREE.MathUtils.smoothstep(d, 0.15, 0.95)) * (0.72 + 0.28 * top);
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -177,21 +178,21 @@ function buildPine(seed) {
   const wood = [], leaves = [];
   const height = 14 + rnd() * 9;
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height, 0), 0.38 + rnd() * 0.12, 0.04, 8));
-  const whorls = 14 + Math.floor(rnd() * 5);
+  const whorls = 20 + Math.floor(rnd() * 6);
   const base = 2.5 + rnd() * 1.5;
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
     const r = (1 - t) * (3.4 + rnd() * 0.6) + 0.5;
-    const n = 6 + Math.floor(rnd() * 3);
+    const n = 8 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * 0.7 + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25;
       // cross cards: one lying along the branch, one standing on its edge, so the
       // silhouette reads from the side and from above
       for (const vert of [false, true]) {
-        const g = new THREE.PlaneGeometry(r * 1.15, r * (vert ? 0.42 : 0.6));
-        g.translate(r * 0.55, 0, 0);
+        const g = new THREE.PlaneGeometry(r * 0.95, r * (vert ? 0.34 : 0.5));
+        g.translate(r * 0.5, 0, 0);
         if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.4);
         else g.rotateX((rnd() - 0.5) * 0.3);
         g.rotateZ(-droop);
@@ -449,6 +450,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
   const mat = new THREE.MeshStandardMaterial({ map: CLUMP_TEX, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
   patchMaterial(mat, {
     noFlip: true,
+    sunShadow: true,
     vertexHead: /* glsl */ `
       attribute vec4 aOff;
       varying vec3 vGCol;
@@ -516,7 +518,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
         {
           vec3 vdir = normalize(vWPos - cameraPosition);
           float back = pow(max(dot(vdir, normalize(uSunDir)), 0.0), 4.0);
-          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * back * 0.5 * vGY;
+          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * gSunVis * back * 0.5 * vGY;
         }`);
     },
   });
@@ -741,6 +743,7 @@ export class Vegetation {
         }`,
       fragmentShader: /* glsl */ `
         uniform sampler2D uAtlas;
+        ${GLSL_COMMON}
         ${GLSL_FOG_PARS}
         varying vec2 vUv; varying vec3 vW; varying float vFade; varying float vVar;
         float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); return mod(q.x*4.0+q.y*2.0 + q.y*q.x, 4.0)/4.0 + 0.125; }
@@ -756,7 +759,7 @@ export class Vegetation {
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
           float ndl = max(dot(N, normalize(uSunDir)), 0.0);
           float ao = 0.55 + 0.45 * smoothstep(-0.6, 0.8, q.y);
-          vec3 col = alb * (uSunColor * ndl * 0.32 + uFogColor * 0.55 * ao + vec3(0.01));
+          vec3 col = alb * (uSunColor * ndl * 0.32 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.55 * ao + vec3(0.01));
           col = applyAtmosphere(col, vW);
           gl_FragColor = vec4(col, 1.0);
         }`,

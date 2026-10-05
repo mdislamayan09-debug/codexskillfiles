@@ -47,6 +47,7 @@ await page.keyboard.press('KeyH'); await frames(6);
 await page.evaluate(() => { const p = window.__game.player; p.hpos.copy(p.pos).add({ x: 1, y: 0, z: 0 }); });
 await page.keyboard.press('KeyE'); await frames(2);
 check((await state()).mounted, 'E mounts the horse when close');
-await page.screenshot({ path: 'shots/playtest.png' });
+await page.evaluate(() => (window.__game.hold = true));
+await page.screenshot({ path: process.env.OUT_PNG || '/tmp/playtest.png', timeout: 300000 });
 check(errors.length === 0, `no runtime errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
 await browser.close();
