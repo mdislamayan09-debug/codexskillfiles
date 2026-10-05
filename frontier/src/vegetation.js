@@ -554,10 +554,11 @@ function rockGeometry(seed) {
   return g;
 }
 
-function rockMaterial() {
+function rockMaterial(surf = {}) {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0 });
   return patchMaterial(m, {
-    fragHead: 'vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }',
+    fragHead: 'uniform sampler2D tRockA; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }',
+    onShader: (sh) => { sh.uniforms.tRockA = { value: surf.rock || null }; },
     fragColor: /* glsl */ `
       #include <color_fragment>
       vec3 wn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
@@ -565,7 +566,12 @@ function rockMaterial() {
       float n2 = vnoise(vec2(vWPos.x+vWPos.z, vWPos.y)*3.0);
       vec3 base = mix(srgbR(vec3(118,112,104)), srgbR(vec3(92,86,80)), n1);
       base = mix(base, srgbR(vec3(130,112,90)), smoothstep(0.6, 0.8, vnoise(vec2(vWPos.y*1.5, vWPos.x*0.2))) * 0.6);
-      base *= 0.75 + 0.4*n2;
+      {
+        vec3 w = pow(abs(wn), vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 ra = texture(tRockA, vWPos.zy / 2.2).rgb * w.x + texture(tRockA, vWPos.xz / 2.2).rgb * w.y + texture(tRockA, vWPos.xy / 2.2).rgb * w.z;
+        base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2);
+      }
+      base *= 0.85 + 0.2*n2;
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6);
       base = mix(base, srgbR(vec3(74,86,40)), moss*0.85);
       diffuseColor.rgb = base;
@@ -575,7 +581,7 @@ function rockMaterial() {
 
 // ---------------------------------------------------------------------------- main class
 export class Vegetation {
-  constructor(world, scene, renderer, quality = 1) {
+  constructor(world, scene, renderer, quality = 1, surf = {}) {
     this.world = world;
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
@@ -631,7 +637,7 @@ export class Vegetation {
     this.bushes = new ScatterLayer(scene, bushBuilds, 6000, 140 * Math.sqrt(quality));
 
     // rocks
-    const rMat = rockMaterial();
+    const rMat = rockMaterial(surf);
     const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3), material: rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
 

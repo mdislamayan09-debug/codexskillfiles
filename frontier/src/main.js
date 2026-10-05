@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { World, TOWN, CAMP, RANCH, CHURCH } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
+import { loadSurfaces } from './assets.js';
 import { Sky } from './sky.js';
 import { Vegetation } from './vegetation.js';
 import { Water } from './water.js';
@@ -17,12 +18,12 @@ import { Input } from './input.js';
 import { Post } from './post.js';
 
 const params = new URLSearchParams(location.search);
-const QUALITY = { low: 0.45, med: 0.75, high: 1 }[params.get('q') || 'high'] ?? 1;
+const QUALITY = { low: 0.45, med: 0.75, high: 1, ultra: 1.5 }[params.get('q') || 'high'] ?? 1;
 const CAPTURE = params.has('capture');
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: CAPTURE });
-renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY >= 1 ? 1.5 : 1));
+renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY > 1 ? 2 : QUALITY >= 1 ? 1.5 : 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -54,14 +55,17 @@ async function init() {
   U.uSplat.value = world.splatTex;
   setLoad(0.55, 'Painting the sky…'); await tick();
   const sky = new Sky(scene, renderer);
-  const terrain = new Terrain(world, scene);
+  setLoad(0.57, 'Loading photographic surfaces…'); await tick();
+  const surf = await loadSurfaces(renderer);
+  const terrain = new Terrain(world, scene, surf, QUALITY);
   setLoad(0.6, 'Raising Copper Hollow…'); await tick();
-  const town = new Town(world, scene);
+  const town = new Town(world, scene, surf);
   setLoad(0.7, 'Planting forests…'); await tick();
-  const veg = new Vegetation(world, scene, renderer, QUALITY);
+  const veg = new Vegetation(world, scene, renderer, QUALITY, surf);
   for (const g of veg.grass) g.layers.set(1);
   setLoad(0.82, 'Filling the rivers…'); await tick();
-  const water = new Water(scene, renderer, { reflections: QUALITY >= 0.7, resScale: QUALITY >= 1 ? 0.5 : 0.35 });
+  const water = new Water(scene, renderer, { reflections: QUALITY >= 0.7, resScale: QUALITY > 1 ? 0.75 : QUALITY >= 1 ? 0.5 : 0.35, normals: surf.water });
+  if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));

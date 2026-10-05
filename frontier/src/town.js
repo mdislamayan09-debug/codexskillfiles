@@ -119,7 +119,7 @@ class Bucket {
 }
 
 export class Town {
-  constructor(world, scene) {
+  constructor(world, scene, surf = {}) {
     this.world = world;
     this.scene = scene;
     this.colliders = [];
@@ -141,8 +141,8 @@ export class Town {
         }`,
     });
     const M = (this.mats = {
-      bare: std({ map: plankTexture(1) }),
-      bare2: std({ map: plankTexture(2, null, true) }),
+      bare: std({ map: surf.planks || plankTexture(1), normalMap: surf.planksN || null, color: 0xc2b6a2 }),
+      bare2: std({ map: surf.planks || plankTexture(2, null, true), normalMap: surf.planksN || null, color: 0xa89a86 }),
       red: std({ map: plankTexture(3, [140, 58, 44]) }),
       redV: std({ map: plankTexture(13, [134, 54, 40], true) }),
       bareV: std({ map: plankTexture(14, null, true) }),
@@ -164,6 +164,10 @@ export class Town {
       rope: std({ color: 0x6e5a3e }),
       water: std({ color: 0x2a3330, roughness: 0.15 }),
     });
+    // scanned plank relief on every painted clapboard surface too
+    if (surf.planksN) for (const k of ['red', 'redV', 'bareV', 'teal', 'cream', 'blue', 'ochre', 'green', 'white']) {
+      if (M[k]) { M[k].normalMap = surf.planksN; M[k].normalScale = new THREE.Vector2(0.7, 0.7); M[k].needsUpdate = true; }
+    }
     const winTex = windowTexture();
     M.window = std({ map: winTex, emissive: 0xffa040, emissiveMap: winTex, emissiveIntensity: 0, roughness: 0.3 });
     M.window.userData.noShadow = true;

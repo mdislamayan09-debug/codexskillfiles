@@ -5,7 +5,7 @@ import { U, GLSL_COMMON, GLSL_FOG_PARS } from './shared.js';
 import { WATER_LEVEL } from './world.js';
 
 export class Water {
-  constructor(scene, renderer, { reflections = true, resScale = 0.5 } = {}) {
+  constructor(scene, renderer, { reflections = true, resScale = 0.5, normals = null } = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.reflections = reflections;
@@ -18,7 +18,7 @@ export class Water {
 
     const geo = new THREE.PlaneGeometry(1, 1, 1, 1).rotateX(-Math.PI / 2);
     this.material = new THREE.ShaderMaterial({
-      uniforms: { ...U, uRefl: { value: this.rt.texture }, uTexMat: { value: this.textureMatrix }, uHasRefl: { value: reflections ? 1 : 0 }, uRipples: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) } },
+      uniforms: { ...U, uRefl: { value: this.rt.texture }, uTexMat: { value: this.textureMatrix }, uHasRefl: { value: reflections ? 1 : 0 }, tWaterN: { value: normals }, uRipples: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) } },
       vertexShader: /* glsl */ `
         uniform mat4 uTexMat;
         varying vec3 vW; varying vec4 vProj;
@@ -31,7 +31,7 @@ export class Water {
       fragmentShader: /* glsl */ `
         ${GLSL_COMMON}
         ${GLSL_FOG_PARS}
-        uniform sampler2D uRefl; uniform float uHasRefl; uniform vec4 uRipples[6];
+        uniform sampler2D uRefl; uniform sampler2D tWaterN; uniform float uHasRefl; uniform vec4 uRipples[6];
         varying vec3 vW; varying vec4 vProj;
         float waves(vec2 p){
           float t = uTime;
@@ -49,6 +49,13 @@ export class Water {
           float w0 = waves(p), wx = waves(p+vec2(e,0.0)), wz = waves(p+vec2(0.0,e));
           float amp = mix(0.55, 0.18, swampy) * smoothstep(400.0, 30.0, camD) + 0.05;
           vec3 N = normalize(vec3((w0-wx)/e*amp, 1.0, (w0-wz)/e*amp));
+          {
+            // two scrolling layers of scanned ripple normals for close-up detail
+            vec3 a1 = texture(tWaterN, p / 7.0 + vec2(uTime * 0.021, uTime * 0.013)).xzy * 2.0 - 1.0;
+            vec3 a2 = texture(tWaterN, p / 17.0 - vec2(uTime * 0.012, -uTime * 0.017)).xzy * 2.0 - 1.0;
+            float k = mix(0.55, 0.2, swampy) * smoothstep(250.0, 10.0, camD);
+            N = normalize(N + vec3(a1.x + a2.x, 0.0, a1.z + a2.z) * k);
+          }
           // ripple rings where legs and bodies break the surface
           float ripFoam = 0.0;
           for (int i = 0; i < 6; i++) {
