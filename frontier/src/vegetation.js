@@ -62,13 +62,13 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       #endif
     }
   }`;
-function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null } = {}) {
+function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null } = {}) {
   return patchMaterial(mat, {
     sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -94,6 +94,11 @@ const LEAF_EMISSIVE = /* glsl */ `
     #ifndef LEAF_TRANS
     #define LEAF_TRANS 0.18
     #endif
+    #ifndef BACKLIT_DARK
+    #define BACKLIT_DARK 0.22
+    #endif
+    // seen against the sun a bough is mostly its own shadow: card normals alone would light the near side
+    diffuseColor.rgb *= 1.0 - BACKLIT_DARK * pow(max(dot(vdir, normalize(uSunDir)), 0.0), 1.5) * smoothstep(-0.05, 0.15, uSunDir.y);
     totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS;
   }
 `;
@@ -923,7 +928,7 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { autumn, trans });
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { autumn, trans, backDark });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -935,7 +940,7 @@ export class Vegetation {
         { geometry: b.leaves, material: oakMats[i % 3], depth: windDepthMaterial(lt, 1) },
       ] });
     }
-    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05);
+    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05, 0.6);
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
@@ -1092,7 +1097,7 @@ export class Vegetation {
       const steep = cl.snow > 0.4 ? 0.62 : 0.75;
       if (n.y < steep) { if (r() < 0.012 * boulders) { const sc = 1 + r() * 3.5; this.rocks.add(px, h - 0.3 - sc * 0.55 * (1 - n.y), pz, r() * 6.28, sc, Math.floor(r() * 4)); } continue; } // sunk into the slope, not perched on it
       if (cl.snow > 0.4 && n.y < 0.75 && !blocked(px, pz) && r() < sp.forest * 0.5) {
-        this.trees.add(px, h - 0.3, pz, r() * 6.28, 0.7 + r() * 0.5, r() < 0.7 ? pick(G.fir) : pick(G.tall));
+        this.trees.add(px, h - 0.3, pz, r() * 6.28, 0.6 + r() * 0.7, pick(G.fir));
         continue;
       }
       const swamp = w.splatAt(px, pz).wet > 0.3 && px > 500 && pz > 600 && cl.jungle < 0.5;
@@ -1104,7 +1109,7 @@ export class Vegetation {
         if (r() < 0.004) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.5 + r() * 2.0, Math.floor(r() * 4));
         continue;
       }
-      let p = sp.forest * 0.6 + 0.012;
+      let p = sp.forest * (cl.snow > 0.45 ? 0.85 : 0.6) + 0.012;
       if (blocked(px, pz)) p = 0;
       if (r() < p) {
         let v;
@@ -1112,7 +1117,7 @@ export class Vegetation {
         if (beach) v = pick(G.palm);
         else if (cl.jungle > 0.45) v = r() < 0.28 ? pick(G.palm) : pick(G.jungle);
         else if (swamp) v = pick(G.cypress);
-        else if (cl.snow > 0.45) v = r() < 0.75 ? pick(G.fir) : pick(G.tall);
+        else if (cl.snow > 0.45) v = pick(G.fir);
         else if (pz < -700) v = r() < 0.6 ? pick(G.tall) : r() < 0.7 ? pick(G.pine) : pick(G.fir);
         else if (cl.autumn > 0.4) v = r() < 0.78 ? pick(G.oak) : pick(G.pine);
         else if (h > 70) v = pick(G.pine);
@@ -1136,7 +1141,13 @@ export class Vegetation {
           this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, 7 + Math.floor(r() * 2));
         }
       } else if (pz < -700) {
-        if (r() < under * 1.2) this.bushes.add(px, h - 0.05, pz, r() * 6.28, 0.7 + r() * 0.7, r() < 0.85 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
+        // undergrowth in patches: fern beds and scrub where light gets through, bare litter elsewhere
+        const patch = THREE.MathUtils.smoothstep(w.n.noise(px / 30 + 1.7, pz / 30 - 4.4), -0.2, 0.5);
+        const nb = r() < under * (0.6 + 2.4 * patch) ? 1 + Math.floor(r() * 3 * patch) : 0;
+        for (let b = 0; b < nb; b++) {
+          const bx = px + (r() - 0.5) * 6, bz = pz + (r() - 0.5) * 6;
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, 0.6 + r() * 0.8, r() < 0.8 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
+        }
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
       // saplings and young firs filling the gaps between the big trees
       if (sp.forest > 0.3 && cl.jungle < 0.4 && cl.desert < 0.3 && (pz < -700 || cl.snow > 0.4) && r() < 0.05 * sp.forest) {
@@ -1144,7 +1155,7 @@ export class Vegetation {
         continue;
       }
       // fallen logs under forest
-      if (sp.forest > 0.35 && cl.jungle < 0.5 && r() < 0.018 * sp.forest) this.logs.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 0.5, Math.floor(r() * 3));
+      if (sp.forest > 0.35 && cl.jungle < 0.5 && cl.snow < 0.4 && r() < (pz < -700 ? 0.04 : 0.018) * sp.forest) this.logs.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 0.5, Math.floor(r() * 3));
       if (r() < (0.006 + (1 - n.y) * 0.05) * boulders) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.4 + r() * 2.2, Math.floor(r() * 4));
     }
   }

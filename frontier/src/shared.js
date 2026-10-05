@@ -16,6 +16,7 @@ export const U = {
   uFogDensity: { value: 0.0009 },
   uFogFalloff: { value: 0.022 },
   uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
+  uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
   uWind: { value: new THREE.Vector2(1, 0.3) },
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
@@ -86,7 +87,12 @@ uniform vec3 uFogSunColor;
 uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform float uFogBase;
+uniform float uMist;
 uniform float uNight;
+// self-contained value noise (this block is also included by shaders that do not pull in GLSL_COMMON)
+float mistH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float mistN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(mistH(i), mistH(i+vec2(1,0)), f.x), mix(mistH(i+vec2(0,1)), mistH(i+vec2(1,1)), f.x), f.y); }
 vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 ray = wpos - cameraPosition;
   float dist = length(ray);
@@ -105,9 +111,17 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 cool = uFogColor * vec3(0.84, 0.9, 1.14);
   vec3 fogCol = mix(mix(cool, uFogColor, 0.5 + 0.5 * mu), uFogSunColor, sunAmt);
   // Extinction tints far colours blue-grey before full fog (aerial perspective)
-  vec3 ext = exp(-dist * vec3(0.00011, 0.00007, 0.00004) * (1.0 - uNight*0.5));
-  col = col * ext + fogCol * (1.0 - ext) * 0.55;
-  return mix(col, fogCol, fogF);
+  vec3 ext = exp(-dist * vec3(0.00019, 0.00013, 0.00008) * (1.0 - uNight*0.5));
+  col = col * ext + fogCol * (1.0 - ext) * 0.72;
+  col = mix(col, fogCol, fogF);
+  // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
+  if (uMist > 0.0) {
+    float above = wpos.y - uFogBase;
+    float bank = smoothstep(70.0, 5.0, above) * (0.35 + 0.65 * smoothstep(0.35, 0.7, mistN(wpos.xz / 420.0)));
+    float m = uMist * bank * (1.0 - exp(-dist / 1100.0));
+    col = mix(col, mix(uFogColor * 1.15, fogCol, 0.4), clamp(m, 0.0, 0.85));
+  }
+  return col;
 }
 `;
 

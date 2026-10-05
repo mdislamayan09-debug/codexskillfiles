@@ -9,6 +9,7 @@ uniform float uTime;
 uniform float uNight;
 uniform float uCloudCover;
 uniform float uStorm;
+uniform float uBlizzard;
 uniform vec2 uCloudOffset;
 uniform highp sampler3D tCloud;
 varying vec3 vDir;
@@ -76,7 +77,7 @@ vec4 marchClouds(vec3 d, vec3 s, vec3 sunC, vec3 ambTop, vec3 ambBot, float cov)
     if (den > 0.003) {
       float ld = 0.0;
       for (int j = 1; j <= 4; j++) { float o = 70.0 * float(j*j); ld += cloudDen(p + s * o, cov) * 70.0 * float(2*j - 1); }
-      float sig = 0.0045;
+      float sig = 0.0045 * (1.0 + 1.6 * uStorm);   // storm decks are thick and opaque
       // two-lobe transmittance fakes multiple scattering in thick cloud
       float Tl = max(exp(-ld * sig), 0.14 * exp(-ld * sig * 0.3));
       float powder = 1.0 - exp(-den * 1800.0 * sig);
@@ -106,7 +107,7 @@ export class Sky {
     this.timeScale = 1 / 60; // hours per real second (1 day = 24 min)
     this.uniforms = {
       uSunDir: U.uSunDir, uTime: U.uTime, uNight: U.uNight,
-      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 },
+      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 }, uBlizzard: { value: 0 },
       tCloud: { value: Sky.cloudTexture() },
     };
     const mat = new THREE.ShaderMaterial({
@@ -116,12 +117,14 @@ export class Sky {
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
       fragmentShader: SKY_GLSL + /* glsl */ `
+        // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
+        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.78, 0.84, 0.94) * (0.62 + 0.45 * uBlizzard), min(uStorm * 1.05, 1.0)); }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
           vec3 col = skyColor(d, s);
           // storm: a low, flat, blue-grey overcast
-          col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.87, 0.98) * 0.7, uStorm * 0.85);
+          col = stormSky(col);
           float day = smoothstep(-0.12, 0.25, s.y);
           // sun disc
           float mu = dot(d, s);
@@ -157,10 +160,11 @@ export class Sky {
             vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.8 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
-            vec3 hz = skyColor(d, s);
+            vec3 hz = stormSky(skyColor(d, s));
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
-            cl.rgb *= mix(1.0, mix(0.5, 0.85, far), uStorm);
+            // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
+            cl.rgb *= mix(1.0, mix(0.5, 0.85, far), uStorm * (1.0 - uBlizzard));
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
@@ -265,8 +269,9 @@ export class Sky {
     this.sun.target.position.copy(f);
     this.sun.position.sub(focus).add(f);
     const W = this.weather;
-    this.sun.intensity *= 1 - (0.62 + 0.33 * W.blizzard) * W.storm;
+    this.sun.intensity *= 1 - (0.62 + 0.08 * W.blizzard) * W.storm;
     this.uniforms.uStorm.value = W.storm;
+    this.uniforms.uBlizzard.value = W.blizzard;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 

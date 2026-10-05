@@ -35,6 +35,25 @@ function blanketTexture(r) {
   for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.12})`; g.fillRect(r() * 256, r() * 256, 2, 1); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+// Worn saddle leather: mottled tan-to-dark hide, grain creases, scuffs rubbed lighter
+function leatherTexture(r) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#5e3c22'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 90; i++) {
+    const x = r() * 256, y = r() * 256, rad = 10 + r() * 40, l = r();
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, l < 0.5 ? 'rgba(30,16,8,0.22)' : 'rgba(150,104,62,0.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  for (let i = 0; i < 160; i++) {
+    g.strokeStyle = r() < 0.6 ? `rgba(28,16,8,${0.15 + r() * 0.25})` : `rgba(170,128,84,${0.1 + r() * 0.2})`;
+    g.lineWidth = 0.6 + r() * 1.2;
+    const x = r() * 256, y = r() * 256, a = r() * 6.28, L = 4 + r() * 22;
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + 0.6) * L * 0.5, y + Math.sin(a + 0.6) * L * 0.5, x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
 const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }));
 function mesh(geo, mat, cast = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; return m; }
@@ -673,7 +692,7 @@ export class Quadruped {
 
   addTack(bones, r, at) {
     const body = bones.body;
-    const leather = std({ color: 0x4a2c18, roughness: 0.5 });
+    const leather = std({ map: leatherTexture(r), color: 0xb08a6a, roughness: 0.55 });
     const blanket = std({ map: blanketTexture(r), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
@@ -687,12 +706,18 @@ export class Quadruped {
     body.add(mesh(seat, leather));
     const horn = new THREE.CylinderGeometry(0.035, 0.025, 0.12, 8); horn.translate(0, 1.91, 0.27); body.add(mesh(horn, leather));
     const cant = new THREE.TorusGeometry(0.16, 0.03, 6, 12, Math.PI); cant.translate(0, 1.78, -0.36); body.add(mesh(cant, leather));
-    const roll = new THREE.CylinderGeometry(0.12, 0.12, 0.75, 12); roll.rotateZ(Math.PI / 2); roll.translate(0, 1.83, -0.52);
-    body.add(mesh(roll, std({ color: 0x5a5a48, roughness: 1 })));
+    // bedroll: a canvas-and-hide roll with the wool blanket showing in the ends
+    const roll = new THREE.CylinderGeometry(0.13, 0.13, 0.78, 14, 1, true); roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.84, -0.52);
+    body.add(mesh(roll, std({ map: leatherTexture(r), color: 0xd0b494, roughness: 0.9 })));
+    for (const sx of [-0.39, 0.39]) {
+      const end = new THREE.CircleGeometry(0.128, 14); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.84, -0.52);
+      body.add(mesh(end, std({ color: 0x6a2e20, roughness: 1 })));
+    }
     for (const sx of [-0.22, 0.22]) { const st = new THREE.TorusGeometry(0.125, 0.012, 5, 16); st.rotateY(Math.PI / 2); st.translate(sx, 1.83, -0.52); body.add(mesh(st, leather)); }
     for (const s of [-1, 1]) {
-      const bag = sweep([{ p: V(s * 0.41, 1.53, -0.62), rx: 0.06, ry: 0.13 }, { p: V(s * 0.42, 1.53, -0.45), rx: 0.07, ry: 0.15 }, { p: V(s * 0.41, 1.53, -0.3), rx: 0.06, ry: 0.13 }], 8);
+      const bag = sweep([{ p: V(s * 0.42, 1.52, -0.66), rx: 0.07, ry: 0.15 }, { p: V(s * 0.44, 1.5, -0.47), rx: 0.085, ry: 0.18 }, { p: V(s * 0.42, 1.52, -0.28), rx: 0.07, ry: 0.15 }], 8);
       body.add(mesh(bag, leather));
+      const flap = new THREE.BoxGeometry(0.03, 0.12, 0.36); flap.translate(s * 0.51, 1.6, -0.47); body.add(mesh(flap, leather));
       const strap = new THREE.BoxGeometry(0.02, 0.5, 0.05); strap.translate(s * 0.38, 1.43, 0.05); body.add(mesh(strap, leather));
       const stir = new THREE.TorusGeometry(0.06, 0.012, 4, 10); stir.translate(s * 0.42, 1.14, 0.05);
       body.add(mesh(stir, std({ color: 0x3a3632, metalness: 0.6 })));

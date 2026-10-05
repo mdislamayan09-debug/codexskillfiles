@@ -373,6 +373,7 @@ async function init() {
     sky.time = s.time; sky.lastEnvTime = -100;
     const [px, pz, yaw] = s.player;
     player.spawn(px, pz, yaw);
+    player.setOutfit(world.climateAt(px, pz).snow > 0.5 ? 'winter' : 'arthur');
     player.hspeed = s.gallop ? 13 : 0;
     G.forceGallop = !!s.gallop;
     G.camOverride = null;
@@ -554,6 +555,7 @@ async function init() {
       for (const rr of [220, 800]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; gmin = Math.min(gmin, world.heightAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr)); }
       const fb = Math.max(0, gmin - 10);
       U.uFogBase.value += (fb - U.uFogBase.value) * (G.frame < 3 ? 1 : Math.min(1, rdt * 0.5));
+      U.uMist.value = sky.weather.storm * (1 - sky.weather.blizzard) * THREE.MathUtils.smoothstep(cc.snow, 0.4, 0.8);
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);

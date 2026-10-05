@@ -11,6 +11,8 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+const errs = [];
+page.on('console', (m) => { if (m.type() === 'error' || /THREE\.WebGLProgram|ERROR:/.test(m.text())) errs.push(m.text().slice(0, 600)); });
 await page.goto(url, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 600000, polling: 1000 });
 await page.evaluate((s) => window.__game.setShot(s), shot);
@@ -23,4 +25,5 @@ await page.evaluate(() => (window.__game.hold = true));
 await page.waitForTimeout(300);
 const data = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
 fs.writeFileSync(out, Buffer.from(data.split(',')[1], 'base64'));
+if (errs.length) console.log('--- console errors ---\n' + [...new Set(errs)].slice(0, 8).join('\n'));
 await browser.close();

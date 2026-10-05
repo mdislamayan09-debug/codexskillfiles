@@ -6,7 +6,7 @@ import { WORLD_SIZE, HALF } from './world.js';
 const CHUNK = 128;
 const N_CHUNKS = WORLD_SIZE / CHUNK;
 const LODS = [64, 32, 16, 8, 4];
-const LOD_DIST = [200, 480, 1100, 2400, 1e9];
+const LOD_DIST = [240, 640, 1500, 3200, 1e9];
 
 function makeLodGeometry(seg, skirtDepth) {
   // positions: x,z in [0,1] grid; y = skirt flag
@@ -178,7 +178,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(0.3, 0.5, slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
+  // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
+  float outcrop = smoothstep(0.52, 0.66, fbm2(xz / 38.0 - 5.1) + 0.6 * slope) * smoothstep(0.12, 0.26, slope) * smoothstep(200.0, 320.0, wp.y);
+  scour = max(scour, outcrop);
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
+  snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
   vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
@@ -256,7 +260,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   }
   // the frozen creek in Frostwater Valley
   float cold = smoothstep(0.5, 0.8, snowC);
-  float openW = smoothstep(0.85, 0.97, wet) * cold;                 // dark meltwater in the main channel
+  // dark meltwater only in short open leads; most of the channel is iced and drifted over
+  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.58, 0.72, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   c = mix(c, mix(snow, srgb(vec3(150,170,182)), 0.55 + 0.25 * vnoise(xz * 0.6)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);
@@ -321,7 +326,8 @@ export class Terrain {
           float cn = mix(0.5, fbm2(vWPos.xz / 26.0 + 4.0), smoothstep(14.0, 5.0, cfp));
           canopy = mix(canopy, mix(srgb(vec3(26,50,20)), srgb(vec3(40,68,26)), cn), ccl.g);                       // jungle
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
-          canopy = mix(canopy, mix(canopy, srgb(vec3(196,204,212)), 0.5), smoothstep(0.4, 0.8, ccl.r));             // snow-laden firs
+          // snow-laden spruce still read as dark masses from afar, flecked with white
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.55, 0.85, vnoise(vWPos.xz / 3.0)) * smoothstep(5.0, 1.5, cfp) * 0.6 + 0.12), smoothstep(0.4, 0.8, ccl.r));
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }
