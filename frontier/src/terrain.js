@@ -91,6 +91,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   c = mix(c, dirt, dirtAmt);
   float rr = smoothstep(0.35, 0.75, road + (micro-0.5)*0.25);
   c = mix(c, roadC, rr);
+  // grassy crown down the middle of country tracks (centre of the road mask)
+  float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7));
+  c = mix(c, grass * 0.85, crown * 0.75);
   // wheel ruts
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
   // town street: twin wheel ruts per lane, hoof-churned mud and puddles
