@@ -213,7 +213,7 @@ async function init() {
   G.shots = {
     ranch: () => ({ time: 16.4, player: [RANCH.x - 22, RANCH.z + 46, Math.PI - 0.3], cam: [RANCH.x - 12, null, RANCH.z + 66, 7.5], look: [RANCH.x + 2, null, RANCH.z - 70, 14] }),
     ride: () => ({ time: 17.35, player: [-330, -140, -1.2], camRel: [3.6, 1.6, -0.6], lookRel: [0, 1.7, 0.3], sideShot: true }),
-    swamp: () => ({ time: 7.1, player: [940, 1090, 0.6], camRel: [4.2, 1.5, 0.5], lookRel: [0, 1.6, 0.2], water: true }),
+    swamp: () => { const f = G.findSwamp(); return { time: 7.3, player: [f[0], f[1], f[2]], camRel: [4.0, 1.5, 0.6], lookRel: [0, 1.6, 0.2], water: true }; },
     town: () => ({ time: 17.2, player: [70, 2, -Math.PI / 2], cam: [95, null, 3, 2.2], look: [-60, null, -2, 3] }),
     forest: () => { const f = G.findForest(-200, -650); return { time: 8.4, player: [f[0], f[1], 0.4], camRel: [-3.2, 1.5, -4.2], lookRel: [0, 1.6, 0] }; },
     vista: () => ({ time: 17.8, player: [-60, 280, -0.2], cam: [-60, null, 330, 30], look: [40, null, -700, 120] }),
@@ -229,6 +229,18 @@ async function init() {
       const x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r;
       const f = world.splatAt(x, z).forest * (world.heightAt(x, z) > 2 ? 1 : 0) * (world.normalAt(x, z).y > 0.85 ? 1 : 0);
       if (f > bs) { bs = f; best = [x, z]; }
+    }
+    return best;
+  };
+  // shallow bayou water (0.3–0.9 m) with the densest swamp forest around it
+  G.findSwamp = () => {
+    let best = [940, 1090, 0.6], bs = -1;
+    for (let z = 700; z < 1500; z += 9) for (let x = 650; x < 1900; x += 9) {
+      const h = world.heightAt(x, z);
+      if (h > -0.3 || h < -0.9) continue;
+      let f = 0;
+      for (let k = 0; k < 8; k++) { const a = k * 0.785; f += world.splatAt(x + Math.cos(a) * 18, z + Math.sin(a) * 18).forest; }
+      if (f > bs) { bs = f; best = [x, z, 0.6]; }
     }
     return best;
   };
