@@ -276,7 +276,7 @@ async function init() {
       for (let i = 0; i < 70; i++) {
         const t = Math.random() * 14;
         const p = player.hpos.clone().addScaledVector(back, 0.8 + t).add(new THREE.Vector3((Math.random() - 0.5) * 1.5, 0.2 + Math.random() * t * 0.12, (Math.random() - 0.5) * 1.5));
-        particles.emit(p, new THREE.Vector3(0, 0.3, 0), { color: [0.72, 0.62, 0.48], alpha: 0.5 * (1 - t / 16), size: 0.9 + t * 0.12, life: 2.2, grow: 0.6, drag: 1 });
+        particles.emit(p, new THREE.Vector3(0, 0.3, 0), { color: [0.55, 0.46, 0.36], alpha: 0.22 * (1 - t / 16), size: 0.7 + t * 0.08, life: 2.2, grow: 0.5, drag: 1 });
       }
     }
     G.started = true;

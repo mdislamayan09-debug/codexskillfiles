@@ -392,7 +392,7 @@ function grassClumpTexture() {
     const dry = r() < 0.3;
     const gr = g.createLinearGradient(0, 512, 0, 512 - h);
     if (dry) { gr.addColorStop(0, '#4a4826'); gr.addColorStop(0.5, '#a09058'); gr.addColorStop(1, '#c8b880'); }
-    else { gr.addColorStop(0, '#26321a'); gr.addColorStop(0.5, '#6e8040'); gr.addColorStop(1, '#a8b070'); }
+    else { gr.addColorStop(0, '#34441e'); gr.addColorStop(0.5, '#7e9046'); gr.addColorStop(1, '#b8c07a'); }
     g.fillStyle = gr;
     g.beginPath();
     g.moveTo(x0 - w, 512);
@@ -476,7 +476,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.6*smoothstep(0.3, 0.8, sp.b);
       float field = fbm2(xz/26.0);
       dens *= smoothstep(0.02, 0.28, field + 0.12);
-      float alive = step(aOff.z, dens);
+      float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
       float hgt = mix(0.35, 0.85, smoothstep(0.3, 0.75, field)) * (0.65 + 0.5*aOff.w) * (0.9 + 0.3*dry);
