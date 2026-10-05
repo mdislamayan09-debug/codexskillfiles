@@ -2,7 +2,7 @@
 // bushes, ferns and rocks. Everything is instanced and streamed around the camera.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { U, GLSL_COMMON, GLSL_FOG_PARS, patchMaterial } from './shared.js';
+import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
 import { leafCardTexture, pineCardTexture, barkTexture } from './textures.js';
@@ -743,8 +743,10 @@ export class Vegetation {
         }`,
       fragmentShader: /* glsl */ `
         uniform sampler2D uAtlas;
+        uniform float uCols;
         ${GLSL_COMMON}
         ${GLSL_FOG_PARS}
+        ${GLSL_SUNSHADOW}
         varying vec2 vUv; varying vec3 vW; varying float vFade; varying float vVar;
         float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); return mod(q.x*4.0+q.y*2.0 + q.y*q.x, 4.0)/4.0 + 0.125; }
         void main(){

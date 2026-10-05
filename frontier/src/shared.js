@@ -55,14 +55,7 @@ vec3 normalAt(vec2 xz){
 vec4 splatAt(vec2 xz){ return texture(uSplat, (xz + uWorldSize*0.5)/uWorldSize); }
 `;
 
-export const GLSL_FOG_PARS = /* glsl */ `
-uniform vec3 uSunDir;
-uniform vec3 uSunColor;
-uniform vec3 uFogColor;
-uniform vec3 uFogSunColor;
-uniform float uFogDensity;
-uniform float uFogFalloff;
-uniform float uNight;
+export const GLSL_SUNSHADOW = /* glsl */ `
 float gSunVis = 1.0;
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
 float terrainSunShadow(vec3 wp){
@@ -78,6 +71,16 @@ float terrainSunShadow(vec3 wp){
   }
   return vis;
 }
+`;
+
+export const GLSL_FOG_PARS = /* glsl */ `
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform vec3 uFogColor;
+uniform vec3 uFogSunColor;
+uniform float uFogDensity;
+uniform float uFogFalloff;
+uniform float uNight;
 vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 ray = wpos - cameraPosition;
   float dist = length(ray);
@@ -122,7 +125,7 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
         vWPos = (modelMatrix * wp4).xyz;
       }`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FOG_PARS}\nvarying vec3 vWPos;\n${fragHead}`)
+      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FOG_PARS}\n${GLSL_SUNSHADOW}\nvarying vec3 vWPos;\n${fragHead}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n gl_FragColor.rgb = applyAtmosphere(gl_FragColor.rgb, vWPos);`);
     if (fragColor) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', fragColor);
     if (sunShadow) {
