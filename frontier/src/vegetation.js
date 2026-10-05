@@ -68,7 +68,7 @@ function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = fa
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -97,6 +97,12 @@ const LEAF_EMISSIVE = /* glsl */ `
     #ifndef BACKLIT_DARK
     #define BACKLIT_DARK 0.22
     #endif
+    // cards keep one (outward, upward) normal on both sides; seen from underneath a bough is in its own shade,
+    // not lit by the sky above it
+    #ifndef UNDERSIDE_DARK
+    #define UNDERSIDE_DARK 0.35
+    #endif
+    diffuseColor.rgb *= 1.0 - UNDERSIDE_DARK * smoothstep(0.0, -0.5, dot(normalize(vNormal), normalize(vViewPosition)));
     // seen against the sun a bough is mostly its own shadow: card normals alone would light the near side
     diffuseColor.rgb *= 1.0 - BACKLIT_DARK * pow(max(dot(vdir, normalize(uSunDir)), 0.0), 1.5) * smoothstep(-0.05, 0.15, uSunDir.y);
     totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS;
@@ -923,7 +929,10 @@ export class Vegetation {
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(6, [74, 50, 36]), roughness: 0.95 }), 0);
-    const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE); } };
+    // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
+    // (Fresnel) and every bough reads frosted
+    const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularColor *= 0.25; material.specularF90 = 0.18;'); } };
     const oakTex = [leafCardTexture(11, 82), leafCardTexture(12, 70), leafCardTexture(13, 92)];
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
