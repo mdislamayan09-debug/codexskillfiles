@@ -119,7 +119,7 @@ export class Sky {
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
       fragmentShader: SKY_GLSL + /* glsl */ `
         // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
-        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.86, 0.95) * (0.8 + 0.3 * uBlizzard), min(uStorm * 1.05, 1.0)); }
+        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.86, 0.95) * (0.8 + 0.3 * uBlizzard) + vec3(0.045, 0.05, 0.06), min(uStorm * 1.05, 1.0)); }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
@@ -157,7 +157,7 @@ export class Sky {
             vec3 ambBot = mix(hor, vec3(0.30, 0.27, 0.2) * day, 0.5) * 0.16 + vec3(0.003, 0.004, 0.008);
             ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
             ambBot *= 1.0 - 0.6 * uStorm;
-            ambTop *= 1.0 - 0.35 * uStorm;
+            ambTop *= 1.0 - 0.12 * uStorm;
             vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.8 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);

@@ -89,6 +89,7 @@ vec3 triN(float l, vec3 wp, vec3 n, float s){
   vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
   return (texture(tNrm, vec3(wp.zy / s, l)).xyz * w.x + texture(tNrm, vec3(wp.xz / s, l)).xyz * w.y + texture(tNrm, vec3(wp.xy / s, l)).xyz * w.z) * 2.0 - 1.0;
 }
+vec3 gDbg = vec3(0.0);   // debug view: snow, rock, slope
 vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec2 xz = wp.xz;
   vec4 sp = splatAt(xz);
@@ -189,7 +190,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     lapS = l1 * 0.6 + l2 * 0.25;   // metres: negative on ribs and crests, positive in gullies
   }
   float ribs = smoothstep(0.15, 1.4, -lapS + 0.9 * (fbm2(xz / 30.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.25, snowC), 0.42, hiSnow), mix(mix(0.5, 0.46, snowC), 0.66, hiSnow), slope + 0.08 * (vnoise(xz / 2.0) - 0.5)));
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.17, snowC), 0.3, hiSnow), mix(mix(0.5, 0.35, snowC), 0.5, hiSnow), slope + 0.1 * (fbm2(xz / 9.0) - 0.5) + 0.06 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
@@ -198,7 +199,6 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.85 * ribs;
-  snowAmt = max(snowAmt, smoothstep(0.6, 3.0, lapS) * smoothstep(0.4, 0.75, snowC) * smoothstep(0.62, 0.45, slope));   // gully snow
   rockAmt = max(rockAmt, ribs * 0.9);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
@@ -295,6 +295,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   rough = mix(rough, 0.1, ice);
   c = mix(c, srgb(vec3(22,30,36)), openW); tn = mix(tn, vec3(0.0, 0.0, 1.0), openW); rough = mix(rough, 0.04, openW);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));
+  gDbg = vec3(snowAmt, rockAmt, slope * 2.0);
   return c;
 }
 `;
@@ -361,6 +362,9 @@ export class Terrain {
         }
         gTRough = tr;
         gTNormal = nW;
+        #ifdef TERRAIN_DEBUG
+        diffuseColor.rgb = gDbg;
+        #endif
       `,
       onShader: (shader) => {
         shader.uniforms.uChunk = { value: CHUNK };
