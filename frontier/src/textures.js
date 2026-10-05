@@ -238,18 +238,40 @@ export function signTexture(text, { bg = '#2b1d12', fg = '#e8d6a8', w = 1024, h 
   return tex(c);
 }
 
+// Six-over-six sash window: dark wavy glass, muntins, a curtain, dust in the corners.
+const WIN_FRAMES = (g, col) => {
+  g.fillStyle = col;
+  g.fillRect(0, 0, 128, 9); g.fillRect(0, 247, 128, 9); g.fillRect(0, 0, 9, 256); g.fillRect(119, 0, 9, 256);
+  g.fillRect(0, 122, 128, 12); // meeting rail between the sashes
+  for (const x of [44, 80]) g.fillRect(x, 0, 4, 256);
+  for (const y of [64, 188]) g.fillRect(0, y, 128, 4);
+};
 export function windowTexture() {
   const [c, g] = canvas(128, 256);
-  g.fillStyle = '#1b1712'; g.fillRect(0, 0, 128, 256);
-  const gr = g.createLinearGradient(0, 0, 128, 256);
-  gr.addColorStop(0, 'rgba(160,170,170,0.35)'); gr.addColorStop(0.5, 'rgba(40,45,45,0.1)'); gr.addColorStop(1, 'rgba(120,120,110,0.25)');
-  g.fillStyle = gr; g.fillRect(8, 8, 112, 240);
-  g.fillStyle = '#4a3a2a';
-  g.fillRect(0, 0, 128, 8); g.fillRect(0, 248, 128, 8); g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
-  g.fillRect(60, 0, 8, 256); g.fillRect(0, 124, 128, 8);
-  // curtain
-  g.fillStyle = 'rgba(150,120,90,0.55)'; g.fillRect(8, 8, 30, 116); g.fillRect(90, 8, 30, 116);
+  g.fillStyle = '#16130f'; g.fillRect(0, 0, 128, 256);
+  // old glass: faint uneven tint per pane, darker toward the room
+  const r = mulberry32(5);
+  for (let i = 0; i < 12; i++) {
+    const px = 9 + (i % 3) * 37, py = 9 + Math.floor(i / 3) * 61;
+    const gr = g.createLinearGradient(px, py, px + 30, py + 55);
+    gr.addColorStop(0, `rgba(${70 + r() * 30},${76 + r() * 30},${74 + r() * 26},0.35)`);
+    gr.addColorStop(1, 'rgba(20,22,22,0.1)');
+    g.fillStyle = gr; g.fillRect(px, py, 35, 55);
+  }
+  // curtain behind the lower sash
+  g.fillStyle = 'rgba(120,92,66,0.5)'; g.fillRect(9, 134, 26, 113); g.fillRect(96, 134, 23, 113);
+  WIN_FRAMES(g, '#4a3a2a');
+  // grime in the pane corners
+  g.fillStyle = 'rgba(90,80,60,0.18)';
+  for (let i = 0; i < 40; i++) g.fillRect(9 + r() * 110, 9 + r() * 238, 2 + r() * 6, 2 + r() * 6);
   return tex(c);
+}
+// roughness (green channel): glossy glass, matte painted frames
+export function windowRoughTexture() {
+  const [c, g] = canvas(128, 256);
+  g.fillStyle = 'rgb(0,22,0)'; g.fillRect(0, 0, 128, 256);
+  WIN_FRAMES(g, 'rgb(0,220,0)');
+  return tex(c, { srgb: false });
 }
 
 export function grassBladeTexture() {

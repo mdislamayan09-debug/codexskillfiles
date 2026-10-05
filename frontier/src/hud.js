@@ -50,6 +50,7 @@ export class HUD {
           <tr><td>V</td><td>Cinematic camera</td></tr>
           <tr><td>M</td><td>Map</td></tr>
           <tr><td>T</td><td>Wait one hour</td></tr>
+          <tr><td>P</td><td>Photo (saves a PNG)</td></tr>
           <tr><td>Space</td><td>Jump</td></tr>
           <tr><td>F1</td><td>This help</td></tr>
         </table>

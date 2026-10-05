@@ -21,6 +21,8 @@ npm run build && npm run preview
 Quality presets: `?q=low`, `?q=med`, `?q=high` (default), `?q=ultra`. Ultra renders at up to 2× pixel ratio
 (native 4K on a 4K display), with an 8192² sun shadow map, terrain detail pushed 45% farther, 1.5× grass density, a wider
 full-detail radius for trees and bushes, and higher-resolution water reflections.
+`?ss=2` forces a 2× render scale on any display, so a 1920×1080 window renders a 3840×2160 frame. Combine
+it with `?q=ultra` and press P for 4K stills, for example `?q=ultra&ss=2`.
 
 ## Controls
 
@@ -39,6 +41,7 @@ full-detail radius for trees and bushes, and higher-resolution water reflections
 | V | Cinematic travel camera (while riding) |
 | M | Map |
 | T | Wait one hour |
+| P | Photo: saves the current frame as a PNG at full render resolution (no HUD) |
 | F1 | Controls |
 
 ## What's in it

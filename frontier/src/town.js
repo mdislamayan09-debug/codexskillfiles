@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { patchMaterial, U } from './shared.js';
-import { plankTexture, shingleTexture, tinTexture, signTexture, windowTexture } from './textures.js';
+import { plankTexture, shingleTexture, tinTexture, signTexture, windowTexture, windowRoughTexture } from './textures.js';
 import { TOWN, RANCH, CHURCH, CAMP, ROADS, RES, CELL, HALF } from './world.js';
 import { mulberry32 } from './noise.js';
 
@@ -176,7 +176,8 @@ export class Town {
       if (M[k]) { M[k].normalMap = surf.planksN; M[k].normalScale = new THREE.Vector2(0.7, 0.7); M[k].needsUpdate = true; }
     }
     const winTex = windowTexture();
-    M.window = std({ map: winTex, emissive: 0xffa040, emissiveMap: winTex, emissiveIntensity: 0, roughness: 0.3 });
+    // glossy old glass reflects the sky and the street; frames stay matte
+    M.window = std({ map: winTex, emissive: 0xffa040, emissiveMap: winTex, emissiveIntensity: 0, roughness: 1, roughnessMap: windowRoughTexture(), envMapIntensity: 1.6 });
     M.window.userData.noShadow = true;
     M.lampGlass = std({ color: 0x2a1c10, emissive: 0xffa848, emissiveIntensity: 0, roughness: 0.2 });
     M.lampGlass.userData.noShadow = true;

@@ -31,7 +31,8 @@ console.log(`ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 for (const s of shots) {
   const t1 = Date.now();
   await page.evaluate((s) => window.__game.setShot(s), s);
-  await page.waitForFunction((n) => window.__game.frame >= n, frames, { timeout: 600000, polling: 500 });
+  // software-GL 4K frames can take many minutes each
+  await page.waitForFunction((n) => window.__game.frame >= n, frames, { timeout: W * H > 4e6 ? 3600000 : 600000, polling: 500 });
   const info = await page.evaluate(() => {
     const r = window.__game.renderer.info;
     return { calls: r.render.calls, triangles: r.render.triangles, geometries: r.memory.geometries, textures: r.memory.textures, programs: r.programs?.length };

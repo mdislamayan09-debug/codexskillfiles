@@ -23,7 +23,9 @@ const CAPTURE = params.has('capture');
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: CAPTURE });
-renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY > 1 ? 2 : QUALITY >= 1 ? 1.5 : 1));
+// ?ss=2 forces the render scale (supersampling): a 1920x1080 window renders a 3840x2160 frame
+const SS = Math.min(4, Math.max(0, parseFloat(params.get('ss')) || 0));
+renderer.setPixelRatio(SS || Math.min(devicePixelRatio, QUALITY > 1 ? 2 : QUALITY >= 1 ? 1.5 : 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -183,6 +185,7 @@ async function init() {
     if (k.hit('KeyV') && player.mounted) player.cinematicOn = !player.cinematicOn;
     if (k.hit('KeyM')) hud.el('#mapscreen').classList.toggle('show');
     if (k.hit('F1') || k.hit('Slash')) hud.el('#help').classList.toggle('show');
+    if (k.hit('KeyP')) G.snap = true;
     if (k.hit('KeyT')) { sky.time = (sky.time + 1) % 24; sky.lastEnvTime = -100; hud.feed('An hour passes…'); }
     if (k.hit('KeyR')) startReload();
     if (k.hit('KeyQ')) {
@@ -452,6 +455,19 @@ async function init() {
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     post.render(rdt, { deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    if (G.snap) {
+      // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
+      G.snap = false;
+      canvas.toBlob((b) => {
+        if (!b) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = `dust-and-redemption-${canvas.width}x${canvas.height}-${Date.now()}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      }, 'image/png');
+      hud.feed(`Photo saved <b>${canvas.width}×${canvas.height}</b>`);
+    }
     input.endFrame();
     G.frame++;
   }

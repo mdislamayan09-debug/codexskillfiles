@@ -789,7 +789,7 @@ export class Vegetation {
             vec3 cAlb = mix(pow(vec3(34.0, 46.0, 26.0) / 255.0, vec3(2.2)), pow(vec3(52.0, 62.0, 32.0) / 255.0, vec3(2.2)), fbm2(vW.xz / 18.0));
             vec3 nT = normalAt(vW.xz);
             float ndlT = max(dot(nT, normalize(uSunDir)), 0.0);
-            vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.32 * ao);
+            vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.2 * ao);
             col = mix(col, litT, farK * 0.85);
           }
           col = applyAtmosphere(col, vW);
