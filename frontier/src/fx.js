@@ -33,6 +33,8 @@ export class Particles {
         void main(){
           vCol = aCol; vAdd = aAdd; vW = position;
           vec4 mv = viewMatrix * vec4(position, 1.0);
+          // fade anything drifting right up against the lens (it would fill the frame as a blurry blob)
+          vCol.a *= smoothstep(0.5, 1.8, -mv.z);
           gl_Position = projectionMatrix * mv;
           gl_PointSize = aSize * uScale / max(-mv.z, 0.1);
           if (aCol.a <= 0.001) gl_Position = vec4(2.0,2.0,2.0,1.0);
