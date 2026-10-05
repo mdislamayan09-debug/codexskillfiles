@@ -591,7 +591,7 @@ export class Vegetation {
         { geometry: b.leaves, material: oakMats[i % 3], depth: windDepthMaterial(lt, 1) },
       ] });
     }
-    const pineMat = leafMat(pineTex, 0xd8e0d0);
+    const pineMat = leafMat(pineTex, 0xc8ccb4);
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [

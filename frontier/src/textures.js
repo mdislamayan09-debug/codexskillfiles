@@ -69,7 +69,7 @@ export function pineCardTexture(seed = 3) {
       const nl = (1 - t * 0.6) * 26 * (0.7 + r() * 0.5);
       for (const s of [-1, 1]) {
         const na = ang + s * (0.9 + r() * 0.4);
-        g.strokeStyle = hsl(118 + r() * 30, 30 + r() * 15, 12 + r() * 16);
+        g.strokeStyle = hsl(96 + r() * 26, 26 + r() * 14, 11 + r() * 14);
         g.lineWidth = 1.6;
         g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(na) * nl, py + Math.sin(na) * nl + 6); g.stroke();
       }
