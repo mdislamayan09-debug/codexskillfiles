@@ -149,7 +149,7 @@ export class Terrain {
         // distant forests read as a canopy mass (impostors thin out with distance)
         {
           float fo = splatAt(vWPos.xz).b;
-          float canopyK = smoothstep(0.3, 0.65, fo) * smoothstep(180.0, 420.0, camD);
+          float canopyK = smoothstep(0.3, 0.65, fo) * smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD));
           vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), fbm2(vWPos.xz/18.0)) * (0.7 + 0.5*vnoise(vWPos.xz/4.0));
           canopy = mix(canopy, srgb(vec3(30,40,30)), smoothstep(80.0, 200.0, vWPos.y) * 0.6);
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);

@@ -497,7 +497,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       transformed.y = h0 + y * hgt * (1.0 - 0.25*min(length(lean),1.0)*bend) - 0.02;
       vec3 lush = mix(srgbV(vec3(150,170,110)), srgbV(vec3(190,196,130)), aOff.w);
       vec3 dryc = mix(srgbV(vec3(235,205,140)), srgbV(vec3(210,190,130)), aOff.z);
-      vGCol = mix(lush, dryc, dry) * 0.85;
+      vGCol = mix(lush, dryc, dry) * 1.25;
       vGY = y;
     `,
     beginNormal: /* glsl */ `
@@ -507,7 +507,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
     fragColor: /* glsl */ `
       #include <color_fragment>
       diffuseColor.rgb *= vGCol;
-      diffuseColor.rgb *= mix(0.55, 1.0, smoothstep(0.0, 0.6, vGY)); // root occlusion
+      diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.5, vGY)); // root occlusion
       // keep thin blades from dissolving in lower mips (alpha-test coverage preservation)
       float mipL = max(0.0, log2(max(fwidth(vMapUv.x), fwidth(vMapUv.y)) * 512.0));
       diffuseColor.a = clamp(diffuseColor.a * (1.0 + mipL * 0.45), 0.0, 1.0);
@@ -731,7 +731,7 @@ export class Vegetation {
           vec3 toCam = cameraPosition - base; toCam.y = 0.0;
           float d = length(toCam);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
-          vFade = smoothstep(uNear - 25.0, uNear, d) * smoothstep(2600.0, 1500.0, d);
+          vFade = smoothstep(uNear - 25.0, uNear, d) * smoothstep(1250.0, 850.0, d);
           vec3 p = base + right * position.x * h + vec3(0.0, (position.y * h) - 0.5 * s, 0.0);
           // gentle sway of top
           p += right * sin(uTime*1.2 + base.x*0.03) * 0.15 * position.y * position.y;
