@@ -355,7 +355,7 @@ async function init() {
     npcs.update(dt, player);
     particles.update(dt);
     tracers.update(dt);
-    for (const c of campfires) c.update(dt, c.pos.distanceTo(camera.position) < 200);
+    for (const c of campfires) { c.lastCam = camera.position; c.update(dt, c.pos.distanceTo(camera.position) < 200); }
     // sunlit motes / insects drifting around the camera
     if (U.uNight.value < 0.6 && Math.random() < rdt * 6) {
       const p = camera.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, (Math.random() - 0.3) * 4, (Math.random() - 0.5) * 16));

@@ -116,6 +116,7 @@ export class Campfire {
     this.light.shadow.mapSize.set(512, 512);
     this.light.shadow.bias = -0.002;
     this.light.shadow.camera.near = 0.2;
+    this.light.shadow.camera.far = 24;
     scene.add(this.light);
     this.t = 0;
     // flame: crossed billboards with a procedural fire shader
@@ -150,6 +151,7 @@ export class Campfire {
   }
   update(dt, near) {
     this.t += dt;
+    this.light.castShadow = near && this.light.position.distanceTo(this.lastCam || this.light.position) < 70;
     this.light.intensity = 140 + Math.sin(this.t * 13) * 18 + Math.sin(this.t * 31) * 12 + Math.random() * 12;
     this.flame.scale.y = 0.9 + Math.sin(this.t * 9) * 0.08 + Math.random() * 0.05;
     if (!near) return;
