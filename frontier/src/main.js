@@ -256,7 +256,16 @@ async function init() {
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
       G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz) };
-    } else if (s.camRel) G.camOverride = { rel: s.camRel, lookRel: s.lookRel };
+    } else if (s.camRel) {
+      const rel = s.camRel.slice();
+      if (s.water) {
+        // put the camera over open water, on whichever side of the horse is deeper
+        const r = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+        const hp = world.heightAt(px + r.x * rel[0], pz + r.z * rel[0]), hm = world.heightAt(px - r.x * rel[0], pz - r.z * rel[0]);
+        if (hm < hp) rel[0] = -rel[0];
+      }
+      G.camOverride = { rel, lookRel: s.lookRel };
+    }
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');
     document.getElementById('loading').classList.add('done');
