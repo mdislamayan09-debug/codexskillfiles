@@ -907,7 +907,7 @@ function rockMaterial(surf = {}) {
       base *= 0.85 + 0.2*n2;
       vec4 rcl = climateAt(vWPos.xz);
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - rcl.r);
-      base = mix(base, srgbR(vec3(74,86,40)), moss*0.85);
+      base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
       float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.25, 0.65, wn.y + (n1 - 0.5) * 0.5);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -928,7 +928,7 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { autumn, trans, backDark });
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -940,7 +940,7 @@ export class Vegetation {
         { geometry: b.leaves, material: oakMats[i % 3], depth: windDepthMaterial(lt, 1) },
       ] });
     }
-    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05, 0.6);
+    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05, 0.6, 0.15);   // matte needles: no sky sheen
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [

@@ -404,8 +404,9 @@ async function init() {
     // ferns and scrub around them
     if (s.trailDress && !G.trailDressed) {
       G.trailDressed = true;
-      const f = [Math.sin(yaw), Math.cos(yaw)], rt = [Math.cos(yaw), -Math.sin(yaw)];
-      const at = (ahead, side) => [px + f[0] * ahead + rt[0] * side, pz + f[1] * ahead + rt[1] * side];
+      // (cos, -sin) points to the rider's left, so negative side offsets land on the right
+      const f = [Math.sin(yaw), Math.cos(yaw)], lt = [Math.cos(yaw), -Math.sin(yaw)];
+      const at = (ahead, side) => [px + f[0] * ahead - lt[0] * side, pz + f[1] * ahead - lt[1] * side];
       const [bx, bz] = at(9, -4.6); veg.rocks.add(bx, world.heightAt(bx, bz) - 0.5, bz, 1.1, 1.5, 1);
       const [lx, lz] = at(10.5, -6.5); veg.logs.add(lx, world.heightAt(lx, lz) - 0.05, lz, yaw + 1.25, 1.35, 0);
       const [rx, rz] = at(15, 5.2); veg.rocks.add(rx, world.heightAt(rx, rz) - 0.4, rz, 2.4, 1.1, 3);

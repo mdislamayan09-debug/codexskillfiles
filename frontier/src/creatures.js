@@ -141,7 +141,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             int lab = int(vLab + 0.5);
             float hgt = 0.0;
             ${quad
-              ? 'hgt = vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 60.0, vRest.y * 25.0 + vRest.x * 30.0)) * 0.0012;'
+              ? 'hgt = vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 60.0, vRest.y * 25.0 + vRest.x * 30.0)) * 0.0012 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -360,23 +360,18 @@ export class Human {
     bones.hips.add(mesh(mergeGeometriesSafe(loops), brass, false));
     // hat brim (thin, crisp — not sculpted)
     if (o.hat) {
-      const brim = new THREE.RingGeometry(0.085, 0.195, 32, 3);
+      const brim = new THREE.RingGeometry(0.085, 0.21, 32, 3);
       brim.rotateX(-Math.PI / 2);
       const bp = brim.attributes.position;
-      for (let i = 0; i < bp.count; i++) {
-        const x = bp.getX(i), z = bp.getZ(i), rr = Math.hypot(x, z);
-        const curl = Math.max(0, rr - 0.13) * 0.9 * Math.pow(Math.abs(x) / rr, 3);
-        bp.setY(i, curl - Math.abs(z) / rr * 0.16 * Math.max(0, rr - 0.11));
-      }
+      // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
+      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.9 * Math.pow(Math.abs(x) / rr, 3) + (z > 0 ? -z / rr * 0.16 : -z / rr * 0.05) * Math.max(0, rr - 0.11); };
+      for (let i = 0; i < bp.count; i++) bp.setY(i, brimY(bp.getX(i), bp.getZ(i)));
       brim.computeVertexNormals();
       const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
       const bm = mesh(brim, hatM); bm.position.copy(at(bones.head, 0, 1.838, -0.008)); bones.head.add(bm);
-      const edge = new THREE.TorusGeometry(0.195, 0.004, 4, 40); edge.rotateX(Math.PI / 2);
+      const edge = new THREE.TorusGeometry(0.21, 0.004, 4, 40); edge.rotateX(Math.PI / 2);
       const ep = edge.attributes.position;
-      for (let i = 0; i < ep.count; i++) {
-        const x = ep.getX(i), z = ep.getZ(i), rr = Math.hypot(x, z) || 1;
-        ep.setY(i, ep.getY(i) + Math.max(0, rr - 0.13) * 0.9 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.16 * Math.max(0, rr - 0.11));
-      }
+      for (let i = 0; i < ep.count; i++) ep.setY(i, ep.getY(i) + brimY(ep.getX(i), ep.getZ(i)));
       const em = mesh(edge, hatM); em.position.copy(bm.position); bones.head.add(em);
       const band = new THREE.CylinderGeometry(0.099, 0.1, 0.022, 24, 1, true);
       const bandM = mesh(band, leather); bandM.position.copy(at(bones.head, 0, 1.85, -0.008)); bones.head.add(bandM);
