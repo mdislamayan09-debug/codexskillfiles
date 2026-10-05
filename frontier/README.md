@@ -70,6 +70,12 @@ it with `?q=ultra` and press P for 4K stills, for example `?q=ultra&ss=2`.
   grain, vignette, Dead Eye sepia). The period HUD has cores, a parchment minimap and map, prompts, a feed and
   region banners. Audio is procedural (wind, birds, crickets, hooves, gunshots, plucked-guitar score).
 
+## 4K stills
+
+`shots/4k/` holds native 3840×2160 frames rendered on the ultra preset. They are in-engine captures in headless
+Chromium with software GL, with no upscaling and no paint-over. To make your own, run with `?q=ultra&ss=2` and
+press P, or use `CANVAS=1 node scripts/shoot.mjs "http://localhost:4173/?capture&q=ultra" town,vista 2 3840x2160`.
+
 ## Gauntlet loop
 
 This was built with a gauntlet loop: a builder, plus a separate blind critic comparing in-game captures against
