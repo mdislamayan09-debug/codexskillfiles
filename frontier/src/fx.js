@@ -220,3 +220,55 @@ export class Tracers {
     });
   }
 }
+
+// Falling snow: a box of flakes that wraps around the camera, animated entirely on the GPU.
+export class Snowfall {
+  constructor(scene, count = 9000) {
+    const seed = new Float32Array(count * 4);
+    for (let i = 0; i < seed.length; i++) seed[i] = Math.random();
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { ...U, uIntensity: { value: 0 }, uCam: { value: new THREE.Vector3() }, uScale: { value: 600 } },
+      vertexShader: /* glsl */ `
+        attribute vec4 aSeed;
+        uniform float uIntensity; uniform vec3 uCam; uniform float uScale; uniform float uTime; uniform vec2 uWind;
+        varying float vA;
+        void main(){
+          const vec3 BOX = vec3(56.0, 28.0, 56.0);
+          float fall = 0.9 + aSeed.w * 0.9;
+          vec3 p = aSeed.xyz * BOX;
+          p.y -= uTime * fall;
+          p.xz += uWind * uTime * (1.6 + aSeed.w) + vec2(sin(uTime * 0.9 + aSeed.w * 40.0), cos(uTime * 0.7 + aSeed.x * 30.0)) * 0.5;
+          p = mod(p - uCam + BOX * 0.5, BOX) + uCam - BOX * 0.5;
+          vec4 mv = viewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mv;
+          float d = -mv.z;
+          gl_PointSize = (0.03 + 0.03 * aSeed.x) * uScale / max(d, 0.3);
+          vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.4, 1.5, d) * smoothstep(28.0, 14.0, d);
+          if (vA <= 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uFogColor;
+        varying float vA;
+        void main(){
+          float r = length(gl_PointCoord - 0.5);
+          float a = smoothstep(0.5, 0.15, r) * vA;
+          gl_FragColor = vec4(mix(vec3(0.9, 0.93, 0.97), uFogColor * 1.6, 0.25), a * 0.85);
+        }`,
+      transparent: true, depthWrite: false,
+    });
+    this.points = new THREE.Points(g, this.mat);
+    this.points.frustumCulled = false;
+    this.points.renderOrder = 6;
+    scene.add(this.points);
+  }
+  setScale(h) { this.mat.uniforms.uScale.value = h * 0.9; }
+  update(camPos, intensity) {
+    this.mat.uniforms.uCam.value.copy(camPos);
+    this.mat.uniforms.uIntensity.value = intensity;
+    this.points.visible = intensity > 0.01;
+  }
+}

@@ -8,6 +8,7 @@ uniform vec3 uSunDir;
 uniform float uTime;
 uniform float uNight;
 uniform float uCloudCover;
+uniform float uStorm;
 uniform vec2 uCloudOffset;
 uniform highp sampler3D tCloud;
 varying vec3 vDir;
@@ -96,10 +97,14 @@ export class Sky {
     this.scene = scene;
     this.renderer = renderer;
     this.time = 17.6; // hours — golden hour
+    // regional weather, eased toward the climate under the camera: storm (snowy north), humid (jungle, bayou),
+    // dry (desert)
+    this.weather = { storm: 0, humid: 0, dry: 0 };
+    this.lastEnvStorm = -1;
     this.timeScale = 1 / 60; // hours per real second (1 day = 24 min)
     this.uniforms = {
       uSunDir: U.uSunDir, uTime: U.uTime, uNight: U.uNight,
-      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() },
+      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 },
       tCloud: { value: Sky.cloudTexture() },
     };
     const mat = new THREE.ShaderMaterial({
@@ -113,6 +118,8 @@ export class Sky {
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
           vec3 col = skyColor(d, s);
+          // storm: a low, flat, blue-grey overcast
+          col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.87, 0.98) * 0.8, uStorm * 0.8);
           float day = smoothstep(-0.12, 0.25, s.y);
           // sun disc
           float mu = dot(d, s);
@@ -142,7 +149,9 @@ export class Sky {
             vec3 hor = skyColor(normalize(vec3(d.x, 0.05, d.z)), s);
             vec3 ambTop = zen * 0.62 + hor * 0.14 + vec3(0.006, 0.008, 0.014);
             vec3 ambBot = mix(hor, vec3(0.30, 0.27, 0.2) * day, 0.5) * 0.16 + vec3(0.003, 0.004, 0.008);
-            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02), ambTop, ambBot, uCloudCover);
+            ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
+            ambBot *= 1.0 - 0.45 * uStorm;
+            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.8 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
             vec3 hz = skyColor(d, s);
@@ -216,6 +225,10 @@ export class Sky {
     return out.set(Math.cos(a), elev * 0.92, 0.38).normalize();
   }
 
+  setWeather(target, k) {
+    for (const key of ['storm', 'humid', 'dry']) this.weather[key] += (target[key] - this.weather[key]) * Math.min(1, k);
+  }
+
   update(dt, focus) {
     this.time = (this.time + dt * this.timeScale) % 24;
     const s = this.sunDirection(this.time, U.uSunDir.value);
@@ -246,6 +259,10 @@ export class Sky {
     f.x = Math.round(f.x / texel) * texel; f.z = Math.round(f.z / texel) * texel;
     this.sun.target.position.copy(f);
     this.sun.position.sub(focus).add(f);
+    const W = this.weather;
+    this.sun.intensity *= 1 - 0.72 * W.storm;
+    this.uniforms.uStorm.value = W.storm;
+    this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 
     this.hemi.intensity = 0.16 + 0.1 * day;
@@ -257,10 +274,15 @@ export class Sky {
     U.uFogColor.value.setRGB(0.5 * day + 0.02, 0.6 * day + 0.03, 0.72 * day + 0.06).lerp(new THREE.Color(0.75, 0.55, 0.42), dusk * 0.45 * day);
     U.uFogSunColor.value.setRGB(1.0, 0.62 + 0.3 * warm, 0.36 + 0.5 * warm).multiplyScalar(day * 0.75 + 0.02);
     U.uFogDensity.value = 0.0009 + 0.0006 * dusk + 0.0004 * night;
+    // weather: blue-grey snow haze, warm green humidity, crisp dry desert air
+    U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), W.storm * 0.85);
+    U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
+    U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
+    U.uFogDensity.value *= 1 + 2.4 * W.storm + 0.9 * W.humid - 0.4 * W.dry;
 
     // environment map refresh
-    if (Math.abs(this.time - this.lastEnvTime) > 0.08) {
-      this.lastEnvTime = this.time;
+    if (Math.abs(this.time - this.lastEnvTime) > 0.08 || Math.abs(W.storm - this.lastEnvStorm) > 0.04) {
+      this.lastEnvTime = this.time; this.lastEnvStorm = W.storm;
       this.envGround.material.color.setRGB(0.22 * day + 0.01, 0.2 * day + 0.01, 0.13 * day + 0.012);
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);
       if (this.envRT) this.envRT.dispose();

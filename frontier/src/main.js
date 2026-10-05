@@ -1,7 +1,7 @@
 // Dust & Redemption — bootstrap, game rules and main loop.
 import './style.css';
 import * as THREE from 'three';
-import { World, TOWN, CAMP, RANCH, CHURCH } from './world.js';
+import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
 import { loadSurfaces } from './assets.js';
@@ -11,7 +11,7 @@ import { Water } from './water.js';
 import { Town } from './town.js';
 import { Player } from './player.js';
 import { NPCs } from './npc.js';
-import { Particles, Campfire, Tracers } from './fx.js';
+import { Particles, Campfire, Tracers, Snowfall } from './fx.js';
 import { HUD } from './hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
@@ -51,10 +51,15 @@ const G = (window.__game = {
 async function init() {
   setLoad(0.02, 'Surveying the territory…');
   await Promise.all([document.fonts.load('40px Rye'), document.fonts.load('40px "IM Fell English"'), document.fonts.load('40px "IM Fell English SC"')]).catch(() => {});
+  // heightmap detail per preset: 3.2 m (high), 2.7 m (ultra), 4 m (low/med) over the 8 km map
+  setWorldResolution(QUALITY > 1 ? 3072 : QUALITY >= 1 ? 2560 : 2048);
+  U.uRes.value = RES;
   const world = new World(1899);
   await world.generate((p) => setLoad(0.02 + p * 0.5, 'Raising mountains and cutting rivers…'));
+  console.log(`world ${RES}² generated in ${Math.round(world.genMs)} ms`);
   U.uHeight.value = world.heightTex;
   U.uSplat.value = world.splatTex;
+  U.uClimate.value = world.climateTex;
   setLoad(0.55, 'Painting the sky…'); await tick();
   const sky = new Sky(scene, renderer, QUALITY);
   setLoad(0.57, 'Loading photographic surfaces…'); await tick();
@@ -70,6 +75,7 @@ async function init() {
   if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
+  const snowfall = new Snowfall(scene, QUALITY > 1 ? 14000 : 9000);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));
   // lily pads drifting on shallow bayou water
   {
@@ -230,6 +236,27 @@ async function init() {
     night: () => ({ time: 21.5, player: [-20, 2, Math.PI / 2], cam: [-46, null, -1, 2.4], look: [60, null, -3, 4] }),
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
+    // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
+    pines: () => { const [x, z, yaw] = G.onRoad(PINE_TRAIL, 0.42); return { time: 8.2, player: [x, z, yaw], camRel: [0.7, 2.5, -5.8], lookRel: [0, 1.9, 14] }; },
+    snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.6, 2.6, -6.5], lookRel: [0, 2.2, 16], weather: 'snow' }; },
+    snowvista: () => ({ time: 15.4, player: [CABIN.x - 30, CABIN.z - 40, 0], cam: [CABIN.x + 75, null, CABIN.z - 95, 3.2], look: [CABIN.x - 420, null, CABIN.z + 900, -60] }),
+    jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
+    autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
+    desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
+  };
+  // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
+  G.onRoad = (ri, t, reverse = false) => {
+    const pts = world.roads[ri];
+    const i = Math.min(pts.length - 2, Math.floor(t * (pts.length - 1)));
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+    const dx = (bx - ax) * (reverse ? -1 : 1), dz = (bz - az) * (reverse ? -1 : 1);
+    return [ax, az, Math.atan2(dx, dz)];
+  };
+  // a point on the Frostwater Valley floor, heading up-valley
+  G.alongValley = (t) => {
+    const v = world.valley, i = Math.min(v.length - 2, Math.floor((1 - t) * (v.length - 1)));
+    const [ax, az] = v[i + 1], [bx, bz] = v[i];
+    return [ax + 12, az, Math.atan2(bx - ax, bz - az)];
   };
   G.findForest = (x0, z0) => {
     let best = [x0, z0], bs = -1;
@@ -279,6 +306,13 @@ async function init() {
     document.getElementById('loading').classList.add('done');
     veg.update(player.hpos, true);
     // pre-warm campfire smoke columns that would already be hanging in the air
+    for (const cp of town.chimneys || []) {
+      for (let i = 0; i < 70; i++) {
+        const h = Math.random() * 14;
+        particles.emit(cp.clone().add(new THREE.Vector3(h * 0.35 + (Math.random() - 0.5) * (0.3 + h * 0.2), h, (Math.random() - 0.5) * (0.3 + h * 0.2))),
+          new THREE.Vector3(0.2, 0.5, 0), { color: [0.72, 0.72, 0.74], alpha: 0.3 * (1 - h / 16), size: 0.7 + h * 0.4, life: 6, grow: 0.25, drag: 0.4 });
+      }
+    }
     for (const c of campfires) {
       if (c.pos.distanceTo(player.hpos) > 120) continue;
       for (let i = 0; i < 45; i++) {
@@ -324,9 +358,9 @@ async function init() {
     camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
     post.setSize(innerWidth, innerHeight);
-    particles.setScale(innerHeight);
+    particles.setScale(innerHeight); snowfall.setScale(innerHeight);
   });
-  particles.setScale(innerHeight);
+  particles.setScale(innerHeight); snowfall.setScale(innerHeight);
   post.setSize(innerWidth, innerHeight);
 
   // ---------------------------------------------------------------- loop
@@ -397,6 +431,16 @@ async function init() {
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
       G.mistK = 1 + (fo * 1.6 + morning * 1.5) * low;
+      G.forestK = fo * low;
+      // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
+      const cc = world.climateAt(camera.position.x, camera.position.z);
+      const swampy = world.splatAt(camera.position.x, camera.position.z).wet * (camera.position.x > 500 && camera.position.z > 600 ? 1 : 0);
+      sky.setWeather({
+        storm: THREE.MathUtils.smoothstep(cc.snow, 0.35, 0.8),
+        humid: Math.max(cc.jungle, swampy * 0.7),
+        dry: cc.desert,
+      }, G.frame < 3 ? 1 : rdt * 0.2);
+      snowfall.update(camera.position, sky.weather.storm * (U.uNight.value < 0.9 ? 1 : 0.6));
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
@@ -411,6 +455,12 @@ async function init() {
     particles.update(dt);
     tracers.update(dt);
     for (const c of campfires) { c.lastCam = camera.position; c.update(dt, c.pos.distanceTo(camera.position) < 200); }
+    // chimney smoke from homesteads
+    for (const cp of town.chimneys || []) {
+      if (cp.distanceToSquared(camera.position) > 400 * 400 || Math.random() > dt * 9) continue;
+      particles.emit(cp.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3)),
+        new THREE.Vector3(U.uWind.value.x * 0.6, 1.1 + Math.random() * 0.4, U.uWind.value.y * 0.6), { color: [0.72, 0.72, 0.74], alpha: 0.32, size: 0.7, life: 9, grow: 0.55, drag: 0.25 });
+    }
     // sunlit motes / insects drifting around the camera
     if (U.uNight.value < 0.6 && Math.random() < rdt * 6) {
       const p = camera.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, (Math.random() - 0.3) * 4, (Math.random() - 0.5) * 16));
@@ -454,7 +504,7 @@ async function init() {
     water.update(camera);
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
-    post.render(rdt, { deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { shaftK: 1 + (G.forestK || 0) * 1.5 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;

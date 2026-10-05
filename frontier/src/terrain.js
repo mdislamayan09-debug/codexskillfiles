@@ -57,28 +57,45 @@ const BEGIN_NORMAL = /* glsl */ `
 `;
 
 export const TERRAIN_FRAG_HEAD = /* glsl */ `
-uniform sampler2D tGrass, tDirt, tRock, tSnow, tBed, tGravel, nGrass, nDirt, nRock, nBed;
+// ground scans packed as texture arrays (layer order matches TERRAIN_LAYERS in assets.js)
+uniform highp sampler2DArray tAlb;
+uniform highp sampler2DArray tNrm;
+#define L_GRASS 0.0
+#define L_DIRT 1.0
+#define L_ROCK 2.0
+#define L_SNOW 3.0
+#define L_BED 4.0
+#define L_GRAVEL 5.0
+#define L_SAND 6.0
+#define L_LITTER 7.0
 vec3 srgb(vec3 c){ return pow(c/255.0, vec3(2.2)); }
 float lumi(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 float gTRough = 0.9;
 vec3 gTNormal = vec3(0.0,1.0,0.0);
 vec3 gTN = vec3(0.0, 0.0, 1.0);   // blended tangent-space normal from the photo maps
 // two scales, blended by noise, so the 512 px scans never show a tiling grid
-vec4 tex2(sampler2D t, vec2 xz, float s1, float s2){
-  vec4 a = texture(t, xz / s1);
-  vec4 b = texture(t, xz / s2 + vec2(0.37, 0.71));
+vec4 texA(float l, vec2 xz, float s1, float s2){
+  vec4 a = texture(tAlb, vec3(xz / s1, l));
+  vec4 b = texture(tAlb, vec3(xz / s2 + vec2(0.37, 0.71), l));
   return mix(a, b, smoothstep(0.3, 0.7, vnoise(xz / 23.0)) * 0.65);
 }
+vec3 texN(float l, vec2 xz, float s){ return texture(tNrm, vec3(xz / s, l)).xyz * 2.0 - 1.0; }
 // triplanar for cliffs
-vec4 triplanar(sampler2D t, vec3 wp, vec3 n, float s){
+vec4 triA(float l, vec3 wp, vec3 n, float s){
   vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
-  return texture(t, wp.zy / s) * w.x + texture(t, wp.xz / s) * w.y + texture(t, wp.xy / s) * w.z;
+  return texture(tAlb, vec3(wp.zy / s, l)) * w.x + texture(tAlb, vec3(wp.xz / s, l)) * w.y + texture(tAlb, vec3(wp.xy / s, l)) * w.z;
 }
-vec3 unpackN(vec4 t){ return t.xyz * 2.0 - 1.0; }
+vec3 triN(float l, vec3 wp, vec3 n, float s){
+  vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
+  return (texture(tNrm, vec3(wp.zy / s, l)).xyz * w.x + texture(tNrm, vec3(wp.xz / s, l)).xyz * w.y + texture(tNrm, vec3(wp.xy / s, l)).xyz * w.z) * 2.0 - 1.0;
+}
 vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec2 xz = wp.xz;
   vec4 sp = splatAt(xz);
   float road = sp.r, wet = sp.g, forest = sp.b, town = sp.a;
+  vec4 cl = climateAt(xz);
+  float snowC = cl.r, jun = cl.g, aut = cl.b, des = cl.a;
+  float pineK = smoothstep(-700.0, -1300.0, wp.z) * (1.0 - snowC);   // needle litter on the pine belt
   float slope = 1.0 - n.y;
   float macro = fbm2(xz/380.0);
   float mid = fbm2(xz/45.0 + 7.0);
@@ -88,25 +105,34 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float patchy = mix(0.45, fbm2(xz/11.0 + 3.0), smoothstep(9.0, 3.0, fp));
   float D = smoothstep(420.0, 60.0, length(wp - cameraPosition)); // 1 near, 0 far
 
-  // --- photographic samples (skipped where they can't contribute)
-  vec4 gA = tex2(tGrass, xz, 2.6, 6.9);
-  vec4 dA = tex2(tDirt, xz, 2.2, 5.7);
-  vec3 gN = unpackN(texture(nGrass, xz / 2.6));
-  vec3 dN = unpackN(texture(nDirt, xz / 2.2));
+  vec4 gA = texA(L_GRASS, xz, 2.6, 6.9);
+  vec4 dA = texA(L_DIRT, xz, 2.2, 5.7);
+  vec3 gN = texN(L_GRASS, xz, 2.6);
+  vec3 dN = texN(L_DIRT, xz, 2.2);
 
-  // grass: keep the art-directed palette, take luminance detail from the scan
+  // grass: an art-directed palette per climate, with luminance detail from the scan
   vec3 lush = mix(srgb(vec3(72,86,44)), srgb(vec3(98,106,52)), mid);
   vec3 dry = mix(srgb(vec3(146,128,72)), srgb(vec3(122,116,64)), mid);
   vec3 grass = mix(lush, dry, smoothstep(0.42, 0.68, macro + 0.15*patchy));
+  grass = mix(grass, mix(srgb(vec3(88,96,58)), srgb(vec3(108,102,66)), mid), pineK * 0.6);      // high-country grass
+  grass = mix(grass, mix(srgb(vec3(150,114,56)), srgb(vec3(172,126,60)), mid) * (0.9 + 0.2 * patchy), aut); // autumn gold
+  grass = mix(grass, mix(srgb(vec3(42,70,25)), srgb(vec3(62,90,32)), mid), jun);                // jungle
   grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.4, 1.6), 0.8 * D);
-  grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3 * smoothstep(2.5, 0.8, fp));
-  vec3 forestFloor = mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy);
-  forestFloor *= mix(0.8 + 0.3*micro, clamp(lumi(dA.rgb) / 0.12, 0.4, 2.0), 0.8 * D);
+  grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3 * smoothstep(2.5, 0.8, fp) * (1.0 - jun));
+
+  // forest floor: needle and leaf litter, tinted per biome
+  vec4 lA = texA(L_LITTER, xz, 1.8, 4.6);
+  vec3 lN = texN(L_LITTER, xz, 1.8);
+  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.92, 0.7, 0.5), pineK);
+  litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
+  litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
+  vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
+  dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
   vec3 roadC = dirt * 1.08;
   if (road > 0.05) {
-    vec4 gv = tex2(tGravel, xz, 1.8, 4.3);
+    vec4 gv = texA(L_GRAVEL, xz, 1.8, 4.3);
     roadC = mix(roadC, gv.rgb * vec3(0.95, 0.88, 0.78), 0.35 * D);
   }
   vec3 mud = srgb(vec3(62,52,40)) * (0.85+0.25*micro);
@@ -124,27 +150,48 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   rock = mix(rock, srgb(vec3(124,104,84)), smoothstep(0.55,0.75,fbm2(vec2(xz.x/30.0, wp.y/6.0))));
   vec3 rN = vec3(0.0, 0.0, 1.0);
   if (rockAmt > 0.01) {
-    vec4 rA = triplanar(tRock, wp, n, 5.5);
+    vec4 rA = triA(L_ROCK, wp, n, 5.5);
     rock *= mix(0.75 + 0.4*micro, clamp(lumi(rA.rgb) / 0.13, 0.35, 2.2), 0.85 * max(D, 0.35));
     // the same scan at cliff scale so distant faces keep veins and ledges instead of smooth grey
-    vec4 rB = triplanar(tRock, wp, n, 140.0);
+    vec4 rB = triA(L_ROCK, wp, n, 140.0);
     rock *= mix(1.0, clamp(lumi(rB.rgb) / 0.13, 0.45, 1.7), 0.7 * (1.0 - D));
-    rN = unpackN(triplanar(nRock, wp, n, 5.5));
+    rN = triN(L_ROCK, wp, n, 5.5);
   } else rock *= 0.75 + 0.4*micro;
+  // desert mesas: banded red sandstone
+  if (des > 0.01) {
+    float band = smoothstep(0.25, 0.75, fract(wp.y / 6.5 + 0.35 * vnoise(xz / 45.0)));
+    vec3 red = mix(srgb(vec3(168,92,56)), srgb(vec3(196,132,84)), band) * (0.85 + 0.3 * fbm2(vec2(xz.x + xz.y, wp.y * 4.0) / 11.0));
+    rock = mix(rock, red * clamp(lumi(rock) / 0.09, 0.5, 1.5), des);
+  }
+  // cold granite reads darker and bluer under snow, like wet rock in a storm
+  rock = mix(rock, rock * vec3(0.62, 0.66, 0.74), snowC);
+
   vec3 snow = srgb(vec3(232,236,242));
-  float snowAmt = smoothstep(300.0, 360.0, wp.y + (mid-0.5)*120.0) * smoothstep(0.8, 0.5, slope);
-  if (snowAmt > 0.01) snow = mix(snow, tex2(tSnow, xz, 4.0, 9.7).rgb * 1.15, 0.6);
+  vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
+  snow = mix(snow, snowT * 1.15, 0.6);
+  // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.35 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(0.5, 0.8, slope + 0.2 * (vnoise(xz / 3.0) - 0.5)));
+  // desert sand and coastal beaches
+  vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
+  vec3 sN = texN(L_SAND, xz, 3.0);
+  vec3 sand = mix(srgb(vec3(196,168,124)), sA.rgb * vec3(1.06, 1.0, 0.92), 0.8 * D + 0.2);
+  sand = mix(sand, sand * vec3(1.08, 0.88, 0.72), des * 0.6);
+  float coastal = max(max(jun, des), max(smoothstep(2900.0, 3400.0, wp.z), smoothstep(3100.0, 3500.0, wp.x)));
+  float beach = smoothstep(3.2, 1.4, wp.y) * coastal * (1.0 - smoothstep(0.4, 0.7, wet));
 
   vec3 c = grass; rough = 0.92;
   vec3 tn = gN;
   float ff = smoothstep(0.25, 0.75, forest);
-  c = mix(c, forestFloor, ff); tn = mix(tn, dN, ff);
-  float dirtAmt = smoothstep(0.55, 0.95, patchy + 0.25*town) * (0.35 + 0.65*town);
+  c = mix(c, forestFloor, ff); tn = mix(tn, lN, ff);
+  // desert flats: sand with scattered dry scrub ground
+  float desG = des * (1.0 - 0.35 * smoothstep(0.55, 0.75, patchy));
+  c = mix(c, sand, desG); tn = mix(tn, sN, desG); rough = mix(rough, 0.95, desG);
+  float dirtAmt = smoothstep(0.55, 0.95, patchy + 0.25*town) * (0.35 + 0.65*town) * (1.0 - jun * 0.7) * (1.0 - des);
   dirtAmt = max(dirtAmt, smoothstep(0.55, 0.9, town) * (0.82 + 0.18 * micro));
   c = mix(c, dirt, dirtAmt); tn = mix(tn, dN, dirtAmt);
   float rr = smoothstep(0.35, 0.75, road + (micro-0.5)*0.25);
   c = mix(c, roadC, rr); tn = mix(tn, dN, rr);
-  float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7));
+  float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des);
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
   // town street: twin wheel ruts per lane, hoof-churned mud and puddles
@@ -161,22 +208,30 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   c = mix(c, mud * 0.55, puddle);
   tn = mix(tn, vec3(0.0, 0.0, 1.0), puddle);
   rough = mix(rough, 0.08, puddle);
-  float sh = max(wet*0.55, shore)*(1.0-rr);
+  float sh = max(wet*0.55, shore)*(1.0-rr) * (1.0 - beach) * (1.0 - snowC);
   c = mix(c, mud, sh); tn = mix(tn, mN, sh);
+  rough = mix(rough, 0.45, shore * (1.0 - beach));
   // river and lake beds: rounded pebbles under the shallows (not in the bayou)
-  float bed = smoothstep(0.3, -0.7, wp.y) * (1.0 - smoothstep(500.0, 900.0, xz.x) * smoothstep(650.0, 1000.0, xz.y));
+  float bed = smoothstep(0.3, -0.7, wp.y) * (1.0 - smoothstep(500.0, 900.0, xz.x) * smoothstep(650.0, 1000.0, xz.y)) * (1.0 - coastal);
   if (bed > 0.01) {
-    vec4 bA = tex2(tBed, xz, 1.7, 4.4);
+    vec4 bA = texA(L_BED, xz, 1.7, 4.4);
     c = mix(c, bA.rgb * vec3(0.72, 0.7, 0.62), bed * 0.9);
-    tn = mix(tn, unpackN(texture(nBed, xz / 1.7)), bed);
+    tn = mix(tn, texN(L_BED, xz, 1.7), bed);
     rough = mix(rough, 0.5, bed);
   }
-  rough = mix(rough, 0.45, shore);
-  c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6);
+  // beaches and sandy shallows along the coast
+  float sandK = max(beach, smoothstep(0.5, -1.0, wp.y) * coastal);
+  c = mix(c, sand * mix(1.0, 0.72, smoothstep(0.6, -0.4, wp.y)), sandK); tn = mix(tn, sN, sandK);
+  rough = mix(rough, mix(0.9, 0.35, smoothstep(1.0, 0.2, wp.y)), sandK);
+  c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6 * (1.0 - jun) * (1.0 - des) * (1.0 - aut));
   c = mix(c, rock, rockAmt); tn = mix(tn, rN, rockAmt);
   rough = mix(rough, 0.82, rockAmt);
-  c = mix(c, snow, snowAmt); tn = mix(tn, vec3(0.0, 0.0, 1.0), snowAmt * 0.6);
-  rough = mix(rough, 0.55, snowAmt);
+  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), texN(L_SNOW, xz, 4.0), 0.5), snowAmt);
+  rough = mix(rough, 0.6, snowAmt);
+  // the frozen creek in Frostwater Valley
+  float ice = smoothstep(0.45, 0.85, wet) * smoothstep(0.5, 0.8, snowC);
+  c = mix(c, srgb(vec3(150,182,198)) * (0.85 + 0.25 * vnoise(xz * 0.6)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
+  rough = mix(rough, 0.1, ice);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));
   return c;
 }
@@ -233,6 +288,11 @@ export class Terrain {
           vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), mix(0.47, fbm2(vWPos.xz/18.0), smoothstep(14.0, 5.0, cfp)))
                       * mix(0.95, 0.7 + 0.5*vnoise(vWPos.xz/4.0), smoothstep(5.0, 1.5, cfp));
           canopy = mix(canopy, srgb(vec3(30,40,30)), smoothstep(80.0, 200.0, vWPos.y) * 0.6);
+          vec4 ccl = climateAt(vWPos.xz);
+          float cn = mix(0.5, fbm2(vWPos.xz / 26.0 + 4.0), smoothstep(14.0, 5.0, cfp));
+          canopy = mix(canopy, mix(srgb(vec3(26,50,20)), srgb(vec3(40,68,26)), cn), ccl.g);                       // jungle
+          canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
+          canopy = mix(canopy, mix(canopy, srgb(vec3(196,204,212)), 0.5), smoothstep(0.4, 0.8, ccl.r));             // snow-laden firs
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }
@@ -242,7 +302,8 @@ export class Terrain {
       onShader: (shader) => {
         shader.uniforms.uChunk = { value: CHUNK };
         const S = this.surf || {};
-        for (const [u, k] of [['tGrass', 'grass'], ['tDirt', 'dirt'], ['tRock', 'rock'], ['tSnow', 'snow'], ['tBed', 'riverbed'], ['tGravel', 'gravel'], ['nGrass', 'grassN'], ['nDirt', 'dirtN'], ['nRock', 'rockN'], ['nBed', 'riverbedN']]) shader.uniforms[u] = { value: S[k] || null };
+        shader.uniforms.tAlb = { value: S.terrainAlb || null };
+        shader.uniforms.tNrm = { value: S.terrainNrm || null };
         this.shaders.push(shader);
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = gTRough;')

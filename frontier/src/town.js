@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { patchMaterial, U } from './shared.js';
 import { plankTexture, shingleTexture, tinTexture, signTexture, windowTexture, windowRoughTexture } from './textures.js';
-import { TOWN, RANCH, CHURCH, CAMP, ROADS, RES, CELL, HALF } from './world.js';
+import { TOWN, RANCH, CHURCH, CAMP, CABIN, ROADS, RES, CELL, HALF } from './world.js';
 import { mulberry32 } from './noise.js';
 
 const TEX_M = 2.4; // metres per plank texture repeat
@@ -145,6 +145,13 @@ export class Town {
           float az = abs(vWPos.z);
           float under = smoothstep(7.7, 8.3, az) * smoothstep(11.9, 11.5, az) * smoothstep(3.75, 3.4, above) * step(abs(vWPos.x), 132.0);
           diffuseColor.rgb *= mix(1.0, mix(0.5, 0.82, smoothstep(11.4, 8.2, az)), under);
+          // snow loading on roofs, sills and woodpiles in the cold north
+          vec4 tcl = climateAt(vWPos.xz);
+          if (tcl.r > 0.05) {
+            float upN = normalize(cross(dFdx(vWPos), dFdy(vWPos))).y;
+            float snowT = smoothstep(0.35, 0.8, tcl.r) * smoothstep(0.35, 0.75, abs(upN) + 0.2 * (vnoise(vWPos.xz * 2.0) - 0.5));
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.88, 0.93), snowT);
+          }
         }`,
     });
     const M = (this.mats = {
@@ -190,6 +197,7 @@ export class Town {
     this.buildChurch();
     this.buildRanch();
     this.buildCamp();
+    this.buildCabin();
     this.buildTelegraph();
     this.wearGround();
     this.meshes = this.bucket.build(scene);
@@ -613,6 +621,52 @@ export class Town {
     this.windmills.push(rotor);
     // trough
     B.add(M.bare, box(2.6, 0.6, 0.8, wx + 3, wy + 0.3, wz + 2));
+  }
+
+  // Trapper's cabin on its bench above Frostwater Valley: notched log walls, a snow-loaded roof, stone chimney,
+  // woodshed and woodpile. Faces west down into the valley.
+  buildCabin() {
+    const B = this.bucket, M = this.mats;
+    const { x, z } = CABIN;
+    const y = this.h(x, z) - 0.15;
+    const m = new THREE.Matrix4().makeRotationY(-Math.PI / 2 + 0.25).setPosition(x, y, z);
+    const W = 7.2, D = 5.6, H = 2.7, R = 0.17;
+    const logX = (len, yy, zz) => { const g = new THREE.CylinderGeometry(R, R * 1.06, len, 9); g.rotateZ(Math.PI / 2); g.translate(0, yy, zz); return g; };
+    const logZ = (len, yy, xx) => { const g = new THREE.CylinderGeometry(R, R * 1.06, len, 9); g.rotateX(Math.PI / 2); g.translate(xx, yy, 0); return g; };
+    // fieldstone sill
+    B.add(M.stone, box(W + 0.5, 0.45, D + 0.5, 0, 0.1, 0), m);
+    for (let i = 0; i < Math.round(H / (R * 1.9)); i++) {
+      const yy = 0.45 + R + i * R * 1.9;
+      const off = i % 2 ? R : 0;
+      // front wall gets a door gap
+      for (const zz of [-D / 2, D / 2]) {
+        if (zz > 0 && yy < 2.1) { B.add(M.trim, logX(W * 0.42 + 0.6, yy + off * 0, zz), new THREE.Matrix4().makeTranslation(-W * 0.29, 0, 0).premultiply(m)); B.add(M.trim, logX(W * 0.42 + 0.6, yy, zz), new THREE.Matrix4().makeTranslation(W * 0.29, 0, 0).premultiply(m)); }
+        else B.add(M.trim, logX(W + 0.7, yy + off, zz), m);
+      }
+      for (const xx of [-W / 2, W / 2]) B.add(M.trim, logZ(D + 0.7, yy + R - off, xx), m);
+    }
+    // gables, roof and a deep eave
+    const rise = 1.9;
+    for (const g of gableEnds(W, D, rise)) { g.translate(0, H + 0.45, 0); B.add(M.bare2, g, m); }
+    for (const g of gableRoof(W, D, rise, 0.75)) { g.translate(0, H + 0.45, 0); B.add(M.shingleDark, g, m); }
+    // door, window and the chimney
+    B.add(M.dark, box(1.0, 2.0, 0.12, 0, 1.45, D / 2 + 0.05), m);
+    B.add(M.window, plane(0.9, 0.9, -W * 0.3, 1.7, -D / 2 - 0.2, Math.PI), m);
+    B.add(M.window, plane(0.9, 0.9, W * 0.27, 1.7, D / 2 + 0.2, 0), m);
+    B.add(M.stone, box(1.0, H + rise + 1.6, 1.0, W / 2 + 0.45, (H + rise + 1.6) / 2 + 0.1, 0), m);
+    const cp = new THREE.Vector3(W / 2 + 0.45, H + rise + 2.0, 0).applyMatrix4(m);
+    this.chimneys = this.chimneys || [];
+    this.chimneys.push(cp);
+    // woodpile under the eave and a lean-to shed
+    for (let row = 0; row < 4; row++) for (let k = 0; k < 9; k++) {
+      const g = new THREE.CylinderGeometry(0.1, 0.1, 0.55, 7); g.rotateX(Math.PI / 2);
+      g.translate(-W / 2 + 0.6 + k * 0.21 + (row % 2) * 0.1, 0.55 + row * 0.19, -D / 2 - 0.55);
+      B.add(M.bare, g, m);
+    }
+    const shed = new THREE.Matrix4().makeTranslation(-W / 2 - 3.2, 0, 1.2).premultiply(m);
+    B.add(M.bare2, box(2.6, 2.0, 2.4, 0, 1.0, 0), shed);
+    for (const g of gableRoof(2.6, 2.4, 0.7, 0.35)) { g.translate(0, 2.0, 0); B.add(M.shingleDark, g, shed); }
+    this.interactables.push({ type: 'rest', name: "Trapper's Cabin", pos: new THREE.Vector3(x, y, z) });
   }
 
   buildCamp() {

@@ -156,6 +156,7 @@ export class Post {
     sh.uSunUV.value.set(s.x * 0.5 + 0.5, s.y * 0.5 + 0.5);
     sh.uSunVis.value = facing * onScreen * sunUp;
     sh.uSunColor.value.copy(U.uSunColor.value).multiplyScalar(0.25);
+    sh.uStrength.value = 0.35 * Math.max(0, state.shaftK ?? 1);
     // the RenderPass draws into whatever readBuffer is at frame start
     const depth = this.composer.readBuffer.depthTexture;
     sh.tDepth.value = depth;

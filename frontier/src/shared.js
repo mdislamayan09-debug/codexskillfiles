@@ -6,6 +6,7 @@ export const U = {
   uTime: { value: 0 },
   uHeight: { value: null },
   uSplat: { value: null },
+  uClimate: { value: null }, // r snow, g jungle, b autumn, a desert
   uWorldSize: { value: WORLD_SIZE },
   uRes: { value: RES },
   uSunDir: { value: new THREE.Vector3(0.4, 0.5, -0.3).normalize() },
@@ -23,6 +24,7 @@ export const U = {
 export const GLSL_COMMON = /* glsl */ `
 uniform sampler2D uHeight;
 uniform sampler2D uSplat;
+uniform sampler2D uClimate;
 uniform float uWorldSize;
 uniform float uRes;
 uniform float uTime;
@@ -53,6 +55,8 @@ vec3 normalAt(vec2 xz){
   return normalize(vec3(hl-hr, 2.0*e, hd-hu));
 }
 vec4 splatAt(vec2 xz){ return texture(uSplat, (xz + uWorldSize*0.5)/uWorldSize); }
+// climate weights: r snow cover, g jungle, b autumn, a desert
+vec4 climateAt(vec2 xz){ return texture(uClimate, (xz + uWorldSize*0.5)/uWorldSize); }
 `;
 
 export const GLSL_SUNSHADOW = /* glsl */ `
