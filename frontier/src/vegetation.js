@@ -133,6 +133,7 @@ function buildOak(seed) {
     const end = start.clone().addScaledVector(dir, len);
     wood.push(branchGeo(start, end, r, r * 0.68, depth > 1 ? 7 : 5));
     if (depth === 0 || r < 0.05) { tips.push(end); return; }
+    if (depth === 1) tips.push(start.clone().lerp(end, 0.6));
     const n = depth >= 3 ? 3 + Math.floor(rnd() * 2) : 2 + Math.floor(rnd() * 2);
     for (let i = 0; i < n; i++) {
       const d = dir.clone();
@@ -143,7 +144,7 @@ function buildOak(seed) {
     }
   };
   // trunk with slight lean
-  const trunkTop = new THREE.Vector3((rnd() - 0.5) * 0.6, height * 0.36, (rnd() - 0.5) * 0.6);
+  const trunkTop = new THREE.Vector3((rnd() - 0.5) * 0.6, height * 0.3, (rnd() - 0.5) * 0.6);
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), trunkTop, 0.5 + rnd() * 0.15, 0.36, 9));
   // root flare
   for (let i = 0; i < 5; i++) {
@@ -152,12 +153,19 @@ function buildOak(seed) {
   }
   grow(trunkTop, new THREE.Vector3(0, 1, 0), height * 0.26, 0.36, 3);
   // leaf clusters
-  const leafSize = 2.6 + rnd() * 0.8;
+  const leafSize = 3.0 + rnd() * 0.9;
   for (const t of tips) {
     for (let k = 0; k < 3; k++) {
-      const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 1.6, (rnd() - 0.3) * 1.2, (rnd() - 0.5) * 1.6));
+      const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 1.8, (rnd() - 0.35) * 1.3, (rnd() - 0.5) * 1.8));
       leaves.push(cardGeo(leafSize * (0.8 + rnd() * 0.5), c, canopyC, rnd));
     }
+  }
+  // fill the crown interior so it reads as a mass, not lollipops
+  const crownR = Math.max(...tips.map((t) => Math.hypot(t.x, t.z))) * 0.75 + 1;
+  for (let k = 0; k < 14; k++) {
+    const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * crownR;
+    const c = new THREE.Vector3(Math.cos(a) * rr, canopyC.y + (rnd() - 0.5) * height * 0.22, Math.sin(a) * rr);
+    leaves.push(cardGeo(leafSize * 1.1, c, canopyC, rnd));
   }
   const woodG = setSway(mergeGeometries(wood), (x, y) => Math.max(0, y - 2) / height * 0.6);
   const leafG = leafAO(setSway(mergeGeometries(leaves), (x, y) => Math.max(0, y - 2) / height));
@@ -382,8 +390,8 @@ function grassClumpTexture() {
     const w = 3 + r() * 4;
     const dry = r() < 0.3;
     const gr = g.createLinearGradient(0, 512, 0, 512 - h);
-    if (dry) { gr.addColorStop(0, '#5a5a2c'); gr.addColorStop(0.5, '#b8a868'); gr.addColorStop(1, '#e6d8a0'); }
-    else { gr.addColorStop(0, '#2c3a16'); gr.addColorStop(0.5, '#8a9c4a'); gr.addColorStop(1, '#d0d090'); }
+    if (dry) { gr.addColorStop(0, '#4a4826'); gr.addColorStop(0.5, '#a09058'); gr.addColorStop(1, '#c8b880'); }
+    else { gr.addColorStop(0, '#26321a'); gr.addColorStop(0.5, '#6e8040'); gr.addColorStop(1, '#a8b070'); }
     g.fillStyle = gr;
     g.beginPath();
     g.moveTo(x0 - w, 512);
