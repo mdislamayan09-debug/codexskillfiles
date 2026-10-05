@@ -141,6 +141,10 @@ export class Town {
           float grime = smoothstep(0.0, 1.4, above);
           diffuseColor.rgb *= mix(0.5, 1.0, grime) * mix(vec3(0.92, 0.88, 0.8), vec3(1.0), grime);
           diffuseColor.rgb *= 0.9 + 0.2 * vnoise(vWPos.xy * 0.7 + vWPos.z * 0.3);
+          // under the porch roofs along Main Street: sky light is mostly blocked, deepest against the wall
+          float az = abs(vWPos.z);
+          float under = smoothstep(7.7, 8.3, az) * smoothstep(11.9, 11.5, az) * smoothstep(3.75, 3.4, above) * step(abs(vWPos.x), 132.0);
+          diffuseColor.rgb *= mix(1.0, mix(0.5, 0.82, smoothstep(11.4, 8.2, az)), under);
         }`,
     });
     const M = (this.mats = {

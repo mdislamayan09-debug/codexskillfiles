@@ -179,17 +179,38 @@ export function shingleTexture(seed = 9, base = [92, 78, 64]) {
 }
 
 export function tinTexture(seed = 11) {
-  const [c, g] = canvas(256, 256);
+  const [c, g] = canvas(512, 512);
   const r = mulberry32(seed);
-  for (let x = 0; x < 256; x++) {
-    const v = 120 + Math.sin(x / 256 * Math.PI * 24) * 30;
-    g.fillStyle = `rgb(${v},${v - 4},${v - 10})`;
-    g.fillRect(x, 0, 1, 256);
+  const RIDGES = 24, P = 512 / RIDGES;
+  // galvanised sheet with corrugation shading
+  for (let x = 0; x < 512; x++) {
+    const v = 118 + Math.sin((x / 512) * Math.PI * 2 * RIDGES) * 26;
+    g.fillStyle = `rgb(${v},${v - 3},${v - 8})`;
+    g.fillRect(x, 0, 1, 512);
   }
-  for (let i = 0; i < 90; i++) {
-    g.fillStyle = `rgba(${120 + r() * 50},${60 + r() * 30},${30},${0.2 + r() * 0.4})`;
-    g.beginPath(); g.ellipse(r() * 256, r() * 256, 4 + r() * 30, 3 + r() * 20, 0, 0, 7); g.fill();
+  // broad, soft oxidation
+  for (let i = 0; i < 36; i++) {
+    const x = r() * 512, y = r() * 512, rad = 40 + r() * 110;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, `rgba(${104 + r() * 30},${66 + r() * 16},40,${0.06 + r() * 0.14})`);
+    gr.addColorStop(1, 'rgba(104,66,40,0)');
+    g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
+  // rust runs: bleed from the fastener rows and follow the valleys down the sheet
+  for (const y0 of [26, 282]) for (let k = 0; k < RIDGES; k++) {
+    const x = (k + 0.75) * P + (r() - 0.5) * 2;
+    g.fillStyle = 'rgba(58,40,28,0.85)';
+    g.beginPath(); g.arc(x, y0, 2.4, 0, 7); g.fill();
+    if (r() < 0.4) continue;
+    const len = 24 + r() * r() * 230, w = 3 + r() * 6;
+    const gr = g.createLinearGradient(0, y0, 0, y0 + len);
+    gr.addColorStop(0, `rgba(${128 + r() * 30},${60 + r() * 22},28,${0.5 + r() * 0.35})`);
+    gr.addColorStop(0.35, `rgba(${120 + r() * 24},${58 + r() * 16},28,${0.25 + r() * 0.2})`);
+    gr.addColorStop(1, 'rgba(118,60,30,0)');
+    g.fillStyle = gr; g.fillRect(x - w / 2, y0, w, len);
+  }
+  // sheet overlaps
+  for (const sx of [0, 171, 342]) { g.fillStyle = 'rgba(40,32,26,0.35)'; g.fillRect(sx, 0, 3, 512); }
   return tex(c, { repeat: true });
 }
 

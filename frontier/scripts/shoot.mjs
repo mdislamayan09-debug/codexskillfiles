@@ -1,5 +1,5 @@
 // Capture in-game screenshots for the gauntlet critic.
-// usage: node scripts/shoot.mjs [url] [shot,shot,...] [frames] [WxH]
+// usage: node scripts/shoot.mjs [url] [shot,shot,...] [frames] [WxH]   (CANVAS=1 reads the canvas instead of a page screenshot)
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -38,7 +38,14 @@ for (const s of shots) {
   });
   await page.evaluate(() => (window.__game.hold = true));
   await page.waitForTimeout(500);
-  await page.screenshot({ timeout: 300000, ...{ path: `${outDir}/${s}.png` } });
+  if (process.env.CANVAS) {
+    // read the WebGL canvas directly (capture mode preserves the drawing buffer); the compositor
+    // screenshot path is too slow for 4K frames in software GL
+    const url = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
+    fs.writeFileSync(`${outDir}/${s}.png`, Buffer.from(url.split(',')[1], 'base64'));
+  } else {
+    await page.screenshot({ timeout: 300000, path: `${outDir}/${s}.png` });
+  }
   console.log(`${s}: ${((Date.now() - t1) / 1000).toFixed(1)}s`, JSON.stringify(info));
 }
 const errs = logs.filter((l) => /error|warn/i.test(l));
