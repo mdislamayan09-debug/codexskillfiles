@@ -581,7 +581,7 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xffffff) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.75, color, vertexColors: true }), 1, leafExtra);
+    const leafMat = (map, color = 0xd6dcc4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.85, color, vertexColors: true, envMapIntensity: 0.55 }), 1, leafExtra);
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t));
