@@ -1,0 +1,291 @@
+// Procedural canvas textures: foliage cards, bark, planks, shingles, signage.
+import * as THREE from 'three';
+import { mulberry32 } from './noise.js';
+
+function canvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')];
+}
+function tex(c, { srgb = true, repeat = false, aniso = 8 } = {}) {
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = aniso;
+  t.generateMipmaps = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+}
+const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
+
+// Deciduous leaf cluster card (alpha)
+export function leafCardTexture(seed = 1, hue = 85) {
+  const [c, g] = canvas(512, 512);
+  const r = mulberry32(seed);
+  g.clearRect(0, 0, 512, 512);
+  // irregular sub-clusters joined by twigs
+  const clusters = [];
+  const n = 6 + Math.floor(r() * 4);
+  for (let i = 0; i < n; i++) {
+    const a = r() * Math.PI * 2, d = 40 + r() * 160;
+    clusters.push([256 + Math.cos(a) * d, 250 + Math.sin(a) * d * 0.85, 45 + r() * 55]);
+  }
+  g.strokeStyle = 'rgba(58,44,30,1)'; g.lineCap = 'round';
+  for (const [x, y] of clusters) {
+    g.lineWidth = 3 + r() * 3;
+    g.beginPath(); g.moveTo(256 + (r() - 0.5) * 40, 500);
+    g.quadraticCurveTo(256 + (x - 256) * 0.3, 380, x, y); g.stroke();
+  }
+  for (const [cx, cy, cr] of clusters) {
+    const count = Math.floor(cr * cr * 0.09);
+    for (let i = 0; i < count; i++) {
+      const a = r() * Math.PI * 2, rad = Math.pow(r(), 0.7) * cr;
+      const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad * 0.85;
+      const top = 1 - (y - (cy - cr)) / (2 * cr); // lighter on top (sky lit)
+      const l = 14 + top * 20 + (rad / cr) * 8 + r() * 10;
+      g.fillStyle = hsl(hue + (r() - 0.5) * 22, 24 + r() * 18, l * 0.85);
+      g.save(); g.translate(x, y); g.rotate(r() * Math.PI);
+      g.beginPath(); g.ellipse(0, 0, 6 + r() * 5, 3 + r() * 2.2, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    }
+  }
+  return tex(c);
+}
+
+// Pine branch card (alpha), drawn as a frond of needles
+export function pineCardTexture(seed = 3) {
+  const [c, g] = canvas(512, 256);
+  const r = mulberry32(seed);
+  g.clearRect(0, 0, 512, 256);
+  const frond = (x0, y0, len, ang, w) => {
+    g.strokeStyle = 'rgba(70,52,34,1)';
+    g.lineWidth = w;
+    const x1 = x0 + Math.cos(ang) * len, y1 = y0 + Math.sin(ang) * len;
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    const n = Math.floor(len / 3);
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t;
+      const nl = (1 - t * 0.6) * 26 * (0.7 + r() * 0.5);
+      for (const s of [-1, 1]) {
+        const na = ang + s * (0.9 + r() * 0.4);
+        g.strokeStyle = hsl(118 + r() * 30, 30 + r() * 15, 12 + r() * 16);
+        g.lineWidth = 1.6;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(na) * nl, py + Math.sin(na) * nl + 6); g.stroke();
+      }
+    }
+  };
+  frond(10, 128, 480, 0, 5);
+  for (let i = 0; i < 9; i++) frond(60 + i * 45, 128, 120 - i * 8, (r() > 0.5 ? 1 : -1) * (0.5 + r() * 0.4), 2.5);
+  return tex(c);
+}
+
+// Bark (tileable), returns { map, normal-ish via bumps baked into colour }
+export function barkTexture(seed = 5, base = [70, 58, 46]) {
+  const [c, g] = canvas(256, 512);
+  const r = mulberry32(seed);
+  g.fillStyle = `rgb(${base})`;
+  g.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 260; i++) {
+    const x = r() * 256, w = 2 + r() * 10;
+    const l = -30 + r() * 50;
+    g.fillStyle = `rgba(${base[0] + l},${base[1] + l},${base[2] + l},0.55)`;
+    g.fillRect(x, 0, w, 512);
+  }
+  for (let i = 0; i < 120; i++) {
+    g.fillStyle = 'rgba(20,15,10,0.5)';
+    const x = r() * 256, y = r() * 512;
+    g.fillRect(x, y, 1 + r() * 2, 20 + r() * 60);
+  }
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(90,110,60,${0.12 + r() * 0.2})`; // moss
+    g.beginPath(); g.ellipse(r() * 256, 380 + r() * 132, 10 + r() * 30, 8 + r() * 20, 0, 0, 7); g.fill();
+  }
+  return tex(c, { repeat: true });
+}
+
+// Weathered plank siding. paint: [r,g,b] or null for bare wood
+export function plankTexture(seed = 7, paint = null, vertical = false) {
+  const [c, g] = canvas(512, 512);
+  const r = mulberry32(seed);
+  const boards = 16;
+  const bw = 512 / boards;
+  for (let b = 0; b < boards; b++) {
+    const tone = -18 + r() * 30;
+    const wood = [112 + tone, 86 + tone, 60 + tone * 0.8];
+    g.fillStyle = `rgb(${wood})`;
+    g.fillRect(0, b * bw, 512, bw);
+    // grain
+    for (let k = 0; k < 40; k++) {
+      g.strokeStyle = `rgba(40,28,18,${0.06 + r() * 0.12})`;
+      g.lineWidth = 0.8 + r() * 1.5;
+      const y = b * bw + r() * bw;
+      g.beginPath(); g.moveTo(0, y);
+      for (let x = 0; x <= 512; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + k) * 1.5 + (r() - 0.5) * 1.5);
+      g.stroke();
+    }
+    // knots
+    for (let k = 0; k < 1; k++) {
+      if (r() < 0.7) continue;
+      g.fillStyle = 'rgba(50,32,20,0.6)';
+      g.beginPath(); g.ellipse(r() * 512, b * bw + bw / 2, 5 + r() * 6, 3 + r() * 3, 0, 0, 7); g.fill();
+    }
+    if (paint) {
+      // peeling paint
+      g.fillStyle = `rgba(${paint},0.88)`;
+      g.fillRect(0, b * bw + 1, 512, bw - 2);
+      for (let k = 0; k < 70; k++) {
+        g.fillStyle = `rgba(${wood},${0.6 + r() * 0.4})`;
+        const x = r() * 512, y = b * bw + r() * bw;
+        g.beginPath(); g.ellipse(x, y, 3 + r() * 26, 1 + r() * 4, 0, 0, 7); g.fill();
+      }
+      // grime gradient towards bottom of each board
+      const gr = g.createLinearGradient(0, b * bw, 0, b * bw + bw);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(30,20,10,0.25)');
+      g.fillStyle = gr; g.fillRect(0, b * bw, 512, bw);
+    }
+    // lap shadow under each board + highlight on its lower lip
+    const lg = g.createLinearGradient(0, b * bw, 0, b * bw + 6);
+    lg.addColorStop(0, 'rgba(10,6,3,0.75)'); lg.addColorStop(1, 'rgba(10,6,3,0)');
+    g.fillStyle = lg; g.fillRect(0, b * bw, 512, 6);
+    g.fillStyle = 'rgba(255,240,210,0.08)'; g.fillRect(0, b * bw + bw - 2, 512, 2);
+    // board butt joints, staggered
+
+  }
+  // overall weathering: soft grime toward the bottom of the texture tile
+  const wg = g.createLinearGradient(0, 0, 0, 512);
+  wg.addColorStop(0, 'rgba(20,14,8,0)'); wg.addColorStop(1, 'rgba(20,14,8,0.18)');
+  g.fillStyle = wg; g.fillRect(0, 0, 512, 512);
+  const t = tex(c, { repeat: true });
+  if (vertical) { t.rotation = Math.PI / 2; t.center.set(0.5, 0.5); }
+  return t;
+}
+
+export function shingleTexture(seed = 9, base = [92, 78, 64]) {
+  const [c, g] = canvas(512, 512);
+  const r = mulberry32(seed);
+  g.fillStyle = `rgb(${base.map((v) => v * 0.5)})`;
+  g.fillRect(0, 0, 512, 512);
+  const rows = 16, rh = 512 / rows;
+  for (let y = 0; y < rows; y++) {
+    let x = (y % 2) * -16;
+    while (x < 512) {
+      const w = 22 + r() * 22;
+      const l = -22 + r() * 30;
+      g.fillStyle = `rgb(${base[0] + l},${base[1] + l},${base[2] + l})`;
+      g.fillRect(x + 1, y * rh, w - 2, rh + 4);
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      g.fillRect(x + 1, y * rh + rh, w - 2, 3);
+      if (r() < 0.1) { g.fillStyle = 'rgba(80,95,50,0.35)'; g.fillRect(x, y * rh, w, rh); }
+      x += w;
+    }
+  }
+  return tex(c, { repeat: true });
+}
+
+export function tinTexture(seed = 11) {
+  const [c, g] = canvas(256, 256);
+  const r = mulberry32(seed);
+  for (let x = 0; x < 256; x++) {
+    const v = 120 + Math.sin(x / 256 * Math.PI * 24) * 30;
+    g.fillStyle = `rgb(${v},${v - 4},${v - 10})`;
+    g.fillRect(x, 0, 1, 256);
+  }
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = `rgba(${120 + r() * 50},${60 + r() * 30},${30},${0.2 + r() * 0.4})`;
+    g.beginPath(); g.ellipse(r() * 256, r() * 256, 4 + r() * 30, 3 + r() * 20, 0, 0, 7); g.fill();
+  }
+  return tex(c, { repeat: true });
+}
+
+// Hand-painted western sign
+export function signTexture(text, { bg = '#2b1d12', fg = '#e8d6a8', w = 1024, h = 192, font = 'Rye', border = true } = {}) {
+  const [c, g] = canvas(w, h);
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  const r = mulberry32(text.length * 77);
+  for (let i = 0; i < 400; i++) {
+    g.fillStyle = `rgba(255,255,255,${r() * 0.04})`;
+    g.fillRect(r() * w, r() * h, 2 + r() * 60, 1 + r() * 3);
+  }
+  if (border) { g.strokeStyle = fg; g.lineWidth = 6; g.strokeRect(14, 14, w - 28, h - 28); }
+  g.fillStyle = fg;
+  let size = Math.floor(h * 0.55);
+  g.font = `${size}px "${font}", Georgia, serif`;
+  while (g.measureText(text).width > w * 0.86 && size > 10) { size -= 2; g.font = `${size}px "${font}", Georgia, serif`; }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, w / 2, h / 2 + size * 0.06);
+  // wear
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = `rgba(30,20,12,${r() * 0.5})`;
+    g.fillRect(r() * w, r() * h, 1 + r() * 14, 1 + r() * 3);
+  }
+  return tex(c);
+}
+
+export function windowTexture() {
+  const [c, g] = canvas(128, 256);
+  g.fillStyle = '#1b1712'; g.fillRect(0, 0, 128, 256);
+  const gr = g.createLinearGradient(0, 0, 128, 256);
+  gr.addColorStop(0, 'rgba(160,170,170,0.35)'); gr.addColorStop(0.5, 'rgba(40,45,45,0.1)'); gr.addColorStop(1, 'rgba(120,120,110,0.25)');
+  g.fillStyle = gr; g.fillRect(8, 8, 112, 240);
+  g.fillStyle = '#4a3a2a';
+  g.fillRect(0, 0, 128, 8); g.fillRect(0, 248, 128, 8); g.fillRect(0, 0, 8, 256); g.fillRect(120, 0, 8, 256);
+  g.fillRect(60, 0, 8, 256); g.fillRect(0, 124, 128, 8);
+  // curtain
+  g.fillStyle = 'rgba(150,120,90,0.55)'; g.fillRect(8, 8, 30, 116); g.fillRect(90, 8, 30, 116);
+  return tex(c);
+}
+
+export function grassBladeTexture() {
+  const [c, g] = canvas(64, 256);
+  const gr = g.createLinearGradient(0, 256, 0, 0);
+  gr.addColorStop(0, '#2e3a18'); gr.addColorStop(0.6, '#6d7a36'); gr.addColorStop(1, '#b0a560');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 256);
+  return tex(c);
+}
+
+// Painted noise for horse/animal coats
+export function coatTexture(kind = 'bay', seed = 1) {
+  const [c, g] = canvas(512, 256);
+  const r = mulberry32(seed);
+  const pal = {
+    bay: ['#5a3420', '#4a2a18', '#2b1a10'],
+    pinto: ['#3a2418', '#2e1c12', '#1c120c'],
+    grey: ['#8e8a84', '#6e6a66', '#4e4a46'],
+    black: ['#1e1a18', '#141210', '#0a0908'],
+    chestnut: ['#8a4a26', '#723a1c', '#4a2410'],
+    deer: ['#8a6a48', '#6e5238', '#4a3624'],
+    sheep: ['#d8d0c0', '#c6bca8', '#a89c88'],
+    cow: ['#5a3a26', '#3e281a', '#2a1a10'],
+  }[kind] || ['#5a3420', '#4a2a18', '#2b1a10'];
+  g.fillStyle = pal[0]; g.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 600; i++) {
+    g.fillStyle = pal[1 + (r() < 0.3 ? 1 : 0)] + '30';
+    g.fillRect(r() * 512, r() * 256, 1 + r() * 3, 6 + r() * 20);
+  }
+  if (kind === 'pinto') {
+    g.fillStyle = '#ece6dc';
+    for (let i = 0; i < 5; i++) {
+      g.beginPath();
+      const x = r() * 512, y = 130 + r() * 110;
+      const pts = [];
+      for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2; const rr = 18 + r() * 38; pts.push([x + Math.cos(a) * rr * 1.5, y + Math.sin(a) * rr]); }
+      g.moveTo(pts[0][0], pts[0][1]);
+      for (let k = 1; k <= pts.length; k++) { const p = pts[k % pts.length], q = pts[(k + 1) % pts.length]; g.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); }
+      g.fill();
+    }
+  }
+  return tex(c);
+}
+
+export function noiseTexture(size = 256, seed = 1) {
+  const [c, g] = canvas(size, size);
+  const d = g.createImageData(size, size);
+  const r = mulberry32(seed);
+  for (let i = 0; i < size * size; i++) {
+    const v = r() * 255;
+    d.data[i * 4] = v; d.data[i * 4 + 1] = r() * 255; d.data[i * 4 + 2] = r() * 255; d.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(d, 0, 0);
+  return tex(c, { srgb: false, repeat: true });
+}
