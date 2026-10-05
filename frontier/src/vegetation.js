@@ -734,7 +734,8 @@ export class Vegetation {
           vec3 toCam = cameraPosition - base; toCam.y = 0.0;
           float d = length(toCam);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
-          vFade = smoothstep(uNear - 25.0, uNear, d) * smoothstep(1250.0, 850.0, d);
+          vFade = smoothstep(uNear - 25.0, uNear, d);
+          h *= smoothstep(1250.0, 900.0, d); // far trees sink smoothly into the canopy-tinted terrain
           vec3 p = base + right * position.x * h + vec3(0.0, (position.y * h) - 0.5 * s, 0.0);
           // gentle sway of top
           p += right * sin(uTime*1.2 + base.x*0.03) * 0.15 * position.y * position.y;
@@ -742,7 +743,7 @@ export class Vegetation {
           vUv = vec2((uv.x + variant) / uCols, (uv.y + row) * 0.5);
           vW = p; vVar = variant;
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
-          if (vFade <= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+          if (vFade <= 0.0 || h <= 0.05) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         }`,
       fragmentShader: /* glsl */ `
         uniform sampler2D uAtlas;

@@ -378,7 +378,8 @@ async function init() {
     {
       const fo = world.splatAt(camera.position.x, camera.position.z).forest;
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
-      G.mistK = 1 + fo * 2.2 + morning * 1.8;
+      const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
+      G.mistK = 1 + (fo * 1.6 + morning * 1.5) * low;
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
