@@ -71,3 +71,27 @@ so no distant trees drew; impostors also brightened non-premultiplied texels to 
 | forest | no atmospheric depth | fog thickens among trees (×3.2) and in early morning (×2.8) |
 | town | empty, green street | packed-dirt plateau; grime gradient and contact darkening at the base of every town surface |
 | camp | fire lights nothing | fire light 160 → 380 cd, 38 m reach; picket line moved out of frame |
+
+### Round 4 — blind critic: 0 / 8 (town "clearly", the rest landslides)
+The critic still picks the RDR2 frame every time. Its round-4 gaps, and what has already landed since that capture:
+
+| piece | biggest gap named by the critic | status |
+| --- | --- | --- |
+| ranch | uniform grass carpet, no worn paths or foundation skirts | field-scale grass colour/dryness variation landed; worn paths not yet |
+| vista | far forest reads as white speckle | fixed after capture: far impostors now shrink into the canopy tint instead of dithering |
+| ride | mannequin-grade rider and horse | open: needs hand-authored character art beyond SDF sculpting |
+| swamp | opaque pea-green water, hard bank line | open |
+| gallop | stair-stepped grass edge, blurry road | fixed after capture: soft ragged grass edges; road detail still open |
+| forest | cotton-ball canopies blowing out to white | leaf albedo/env toned down; canopy shading still open |
+| town | street too empty and clean | open (more clutter and NPC density) |
+| camp | fire floods the whole clearing | open (tighter falloff, soft shadows) |
+
+## Where it stands
+After four rounds the build has not beaten the bar. Every round closed visible gaps: the critic's notes moved from
+"black screen / floating specks / mannequins in an empty field" to fine-grained material, foliage and character
+detail. Town has stopped being a landslide since round 2. The remaining distance is mostly hand-authored art
+(textured characters with cloth and hair, photographed material sets, sculpted cliffs) that a procedural,
+code-only browser build can approach but not match.
+
+Next pieces to loop on, in the critic's order: characters, sun-tinted fog and shafts, terrain wear and paths,
+set-dressing density, foliage shading.
