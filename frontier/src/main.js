@@ -542,7 +542,8 @@ async function init() {
     // thing to ride toward in an otherwise empty white
     if (s.snowDress && !G.snowDressed) {
       G.snowDressed = true;
-      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x6c665e, roughness: 0.97 }),   // silver-grey, weathered { fragColor: `#include <color_fragment>
+      // silver-grey, weathered wood with snow lying on the upper faces
+      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x6c665e, roughness: 0.97 }), { fragColor: `#include <color_fragment>
         { vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix); diffuseColor.rgb = mix(diffuseColor.rgb * (0.75 + 0.5 * vnoise(vWPos.xy * 9.0 + vWPos.z * 3.0)), vec3(0.8, 0.84, 0.9), smoothstep(0.55, 0.9, wn.y)); }` });
       // laid out in the camera's frame (the lens is turned off the horse's heading): starting ahead and to the left,
       // angling away across the view toward the valley
