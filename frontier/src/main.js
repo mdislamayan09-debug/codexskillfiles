@@ -305,6 +305,15 @@ async function init() {
           peak = Math.max(peak, world.heightAt(qx, qz) - h);
         }
         if (outside) continue;
+        // a desert view all the way to the horizon: no jungle, snow or forest anywhere in the frame
+        let foreign = false;
+        for (const b of [-0.5, -0.25, 0, 0.25, 0.5]) for (let d = 800; d <= 6000 && !foreign; d += 400) {
+          const qx = x + Math.sin(a + b) * d, qz = z + Math.cos(a + b) * d;
+          if (Math.abs(qx) > 4096 || Math.abs(qz) > 4096) break;
+          const cq = world.climateAt(qx, qz);
+          if (cq.jungle > 0.25 || cq.snow > 0.3 || cq.autumn > 0.3 || (cq.desert < 0.3 && world.heightAt(qx, qz) > 150)) foreign = true;
+        }
+        if (foreign) continue;
         // nothing blocking the near view
         let block = 0; for (let d = 20; d < 400; d += 40) block = Math.max(block, world.heightAt(x + Math.sin(a) * d, z + Math.cos(a) * d) - h);
         // golden light on the faces: the low sun behind the camera, a little to one side
