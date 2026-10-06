@@ -254,13 +254,15 @@ async function init() {
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // a longer lens, as the reference: the homestead reads as a building and the ranges stack up behind it
-    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    vistahigh: () => { const v = G.findVista(true); return { fov: 46, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
+    snowvista: () => { const v = G.findVista(true); return { fov: 46, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
-  G.findVista = () => {
+  G.findVista = (hi = false) => {
     // A lookout above the cabin, looking straight over it and on down the valley: the cabin sits in the lower
     // third, the creek and the valley floor lead the eye away, the ranges and the storm fill the top
     const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
@@ -268,10 +270,13 @@ async function init() {
     const upDir = Math.atan2(vh[0] - CABIN.x, vh[1] - CABIN.z);
     let best = null, bs = -1e9;
     // high on the valley side, as in the reference: well above the cabin, so the floor opens out below the lens
-    for (let r = 150; r <= 420; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
+    // hi: a summit lookout far above the valley floor (the reference frame), looking up the long valley over the
+    // homestead into the ranges beyond the map
+    const R0 = hi ? 280 : 150, R1 = hi ? 900 : 420, A0 = hi ? 170 : 45, A1 = hi ? 520 : 220;
+    for (let r = R0; r <= R1; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
-      if (above < 45 || above > 220) continue;
+      if (above < A0 || above > A1) continue;
       const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
       // looking up-valley, toward the head of the valley and its peaks
       let dv = va - upDir; dv = Math.atan2(Math.sin(dv), Math.cos(dv));
@@ -290,12 +295,13 @@ async function init() {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
       }
       // close enough that the cabin reads as a building (the reference's sits ~4% of the frame wide)
-      const score = depth * 3 - blocked * 4 - Math.abs(above - 85) * 0.25 - Math.abs(r - 175) * 0.08;
+      const score = hi ? depth * 3 - blocked * 4 - Math.abs(above - 320) * 0.12 - Math.abs(r - 520) * 0.03
+                       : depth * 3 - blocked * 4 - Math.abs(above - 85) * 0.25 - Math.abs(r - 175) * 0.08;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
     // pitch so the cabin sits in the lower third with the valley and the sky above it
-    const pitch = Math.atan2(cabY - best.ch, best.cab) + 0.2;
+    const pitch = Math.atan2(cabY - best.ch, best.cab) + (hi ? 0.3 : 0.2);
     // turn the lens partway up the valley: the homestead lands on a third line and the valley recedes beside it
     let dv0 = upDir - best.va; dv0 = Math.atan2(Math.sin(dv0), Math.cos(dv0));
     const la = best.va + Math.sign(dv0 || 1) * Math.min(Math.abs(dv0) * 0.7 + 0.1, 0.24);
@@ -591,6 +597,11 @@ async function init() {
       put(9.0, -7.5, 3.2, 0); put(11.5, -4.0, 2.2, 1); put(8.0, 6.8, 2.6, 3); put(13.0, 9.5, 2.0, 2); put(7.0, -11.0, 3.6, 1); put(15.0, -10.0, 2.4, 2);
       // the lookout's own rock: a split granite outcrop filling the left edge and broken slabs along the lip below
       put(5.5, -9.5, 5.0, 3); put(4.2, 1.8, 1.6, 2); put(4.8, -2.8, 1.9, 3); put(6.2, 4.6, 1.4, 2);
+      // the summit ledge itself, right under the lens: broken granite slabs along the lower edge of the frame
+      for (const [f2, sd2, sc2, v2] of [[3.2, -5.5, 2.4, 3], [3.6, 5.8, 2.1, 2], [2.8, -1.2, 1.3, 2], [4.4, 2.6, 1.7, 3], [3.0, 9.0, 2.8, 3], [3.4, -9.5, 3.0, 2]]) {
+        const x = c.x + d.x * f2 + rt.x * sd2, z = c.z + d.z * f2 + rt.z * sd2;
+        veg.rocks.add(x, world.heightAt(x, z) - 0.3 * sc2, z, f2 * 2.1, sc2, v2);
+      }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the way
       // down the near ground, so it reads as a mountainside rather than a blank white wedge
       {

@@ -36,7 +36,7 @@ function ridged(x, z, o = 6) {
 
 export class Backdrop {
   constructor(world, scene, quality = 1) {
-    const SEG = quality >= 2 ? 2048 : 1024, RINGS = quality >= 2 ? 128 : 96, H0 = HALF - 40, R1 = 70000;
+    const SEG = quality >= 2 ? 2048 : 1024, RINGS = quality >= 2 ? 256 : 128, H0 = HALF - 40, R1 = 70000;
     const nV = SEG * (RINGS + 1);
     const pos = new Float32Array(nV * 3), col = new Float32Array(nV * 3);
     const info = new Float32Array(nV * 4);     // per vertex: north, desert, sea, hills weights (for the colour pass)
@@ -55,12 +55,13 @@ export class Backdrop {
       const autumn = sstep(-1500, -2200, ex) * sstep(-2000, -1600, ez) * sstep(1300, 900, ez);
       const hills = Math.max(0, 1 - north - desert - sea);
       for (let k = 0; k <= RINGS; k++) {
-        const s = H0 + (R1 - H0) * Math.pow(k / RINGS, 2.1);
+        const s = H0 + (R1 - H0) * Math.pow(k / RINGS, 2.4);   // dense near the map, where the ranges are seen up close
         const x = ux * s, z = uz * s, d = Math.max(0, s - HALF);
         // the snowy north: big ridged ranges, taller the further they stand
         const far = sstep(4000, 40000, d);
+        // (the finer ridged layers give the near ranges spurs, gullies and arêtes instead of smooth snow domes)
         const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far)
-          + ridged(x / 2400, z / 2400 + 7.7, 4) * 240;
+          + ridged(x / 2400, z / 2400 + 7.7, 4) * 380 + ridged(x / 900 - 2.2, z / 900, 3) * 140;
         // forested ridge country, rolling up into a far blue sierra
         const hillH = 110 + fbm(x / 6000 + 5.1, z / 6000, 5) * 520 + ridged(x / 2100, z / 2100, 4) * 150 + ridged(x / 11000, z / 11000, 5) * 900 * far;
         // canyon country: flat-topped mesas and buttes on a desert floor, sierras on the far horizon
