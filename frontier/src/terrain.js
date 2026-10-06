@@ -226,7 +226,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // (weighted to the broader scale and broken up hard: the fine scale alone lines every face with parallel
   // couloirs that read as a comb)
   float ribs = smoothstep(0.3, 1.8, -lapS + 1.4 * (fbm2(xz / 22.0) - 0.5) + 0.5 * (vnoise(xz / 7.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.17, snowC), 0.3, hiSnow), mix(mix(0.5, 0.35, snowC), 0.5, hiSnow), slope + 0.1 * (fbm2(xz / 9.0) - 0.5) + 0.06 * (vnoise(xz / 2.0) - 0.5)));
+  // (a narrow band, broken by noise: a steep face breaks from snow to rock along a crisp, ragged line)
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.22, snowC), 0.3, hiSnow), mix(mix(0.5, 0.31, snowC), 0.5, hiSnow), slope + 0.12 * (fbm2(xz / 9.0) - 0.5) + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
@@ -438,7 +439,10 @@ export class Terrain {
           float fo = splatAt(vWPos.xz).b;
           vec4 ccl0 = climateAt(vWPos.xz);
           // under snow-country spruce the ground is shade and needles, not open snow: the stands close up sooner
-          float canopyK = smoothstep(0.3, 0.65, fo) * mix(smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD)),
+          // the stand's edge is ragged at the scale of single crowns and fairly crisp (a soft gradient from forest to
+          // open ground reads as camouflage blotches from a distance)
+          float crownN = mix(0.5, vnoise(vWPos.xz / 5.5 + 2.7) * 0.7 + vnoise(vWPos.xz / 17.0) * 0.3, smoothstep(6.0, 2.0, length(fwidth(vWPos.xz))));
+          float canopyK = smoothstep(0.42, 0.52, fo + 0.3 * (crownN - 0.5)) * mix(smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD)),
                                                           smoothstep(30.0, 200.0, camD) * 0.92, max(smoothstep(0.4, 0.8, ccl0.r), smoothstep(0.3, 0.7, ccl0.g)));
           float cfp = length(fwidth(vWPos.xz));
           vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), mix(0.47, fbm2(vWPos.xz/18.0), smoothstep(14.0, 5.0, cfp)))

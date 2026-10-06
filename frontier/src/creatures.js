@@ -550,7 +550,10 @@ export class Human {
         crown.computeVertexNormals();
         const cm = mesh(crown, hatM); cm.position.copy(at(bones.head, 0, HA.hatY - 0.002, HA.hatZ)); bones.head.add(cm);
       }
-      const edge = new THREE.TorusGeometry(0.235, 0.005, 4, 40); edge.rotateX(Math.PI / 2);
+      // the brim has body: an underside a few millimetres below and a rolled, bound edge
+      const under = brim.clone(); under.translate(0, -0.007, 0);
+      const um = mesh(under, std({ color: new THREE.Color(o.hat).multiplyScalar(0.7), roughness: 0.95, side: THREE.DoubleSide })); um.position.copy(bm.position); bones.head.add(um);
+      const edge = new THREE.TorusGeometry(0.235, 0.0085, 5, 48); edge.rotateX(Math.PI / 2);
       const ep = edge.attributes.position;
       for (let i = 0; i < ep.count; i++) ep.setY(i, ep.getY(i) + brimY(ep.getX(i), ep.getZ(i)));
       const em = mesh(edge, hatM); em.position.copy(bm.position); bones.head.add(em);

@@ -60,6 +60,8 @@ float cloudDen(vec3 p, float cov){
   if (d <= 0.0) return 0.0;
   float det = texture(tCloud, p / 760.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
   d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * 0.68, 1.0, 0.0, 1.0);
+  // a finer erosion pass where the cloud is thin: crisp wisps and torn edges instead of a soft, magnified blur
+  if (d > 0.0 && d < 0.6) d = remap(d, texture(tCloud, p / 260.0 + vec3(uTime * 0.0006, 0.0, 0.0)).g * 0.32, 1.0, 0.0, 1.0);
   return d * c;
 }
 float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }

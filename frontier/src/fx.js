@@ -329,7 +329,8 @@ export class SnowTrail {
     const bx = -Math.sin(yaw), bz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
     for (let d = len; d >= 0; d -= 0.8) {
       const w = Math.sin(d * 0.11) * 1.2 + Math.sin(d * 0.37) * 0.25;
-      this.pts.push([x + bx * (d + 1.4) + rx * w, z + bz * (d + 1.4) + rz * w]);
+      // (running on under the horse to its front hooves, so the legs stand in the churned trough)
+      this.pts.push([x + bx * (d - 0.8) + rx * w * Math.min(1, d / 6), z + bz * (d - 0.8) + rz * w * Math.min(1, d / 6)]);
     }
     this.rebuild();
   }

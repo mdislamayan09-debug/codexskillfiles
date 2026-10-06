@@ -704,7 +704,7 @@ async function init() {
       for (const rr of [12, 30]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; fo = Math.max(fo, 0.85 * world.splatAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr).forest); }
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 0.6 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 0.35 + morning * 1.5) * low;   // (the forest haze read as milk: keep it to the shafts)
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -748,7 +748,7 @@ async function init() {
       // (the open, sun-shafted canopy is bright enough now: no extra lift in the woods; snow under a storm sky in clear
       // air reads brighter than the eye wants it, so stop down a little there)
       const W = sky.weather;
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard));
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard)) * (1 - 0.14 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);

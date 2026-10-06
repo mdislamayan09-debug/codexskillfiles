@@ -43,7 +43,7 @@ const ShaftShader = {
       acc /= float(N) * 0.5;
       float fall = exp(-dist * 2.2);
       // capped, so the sun's own gap does not swell into a white blob
-      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.9);
+      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.7);
       gl_FragColor = vec4(base.rgb + shafts, base.a);
     }`,
 };

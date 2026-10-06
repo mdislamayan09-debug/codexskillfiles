@@ -224,6 +224,23 @@ function buildOak(seed) {
   return { wood: woodG, leaves: leafG, height, radius: 6 };
 }
 
+// a dead snag: a weathered grey bole snapped off partway up, bristling with dead limb stubs
+function buildSnag(seed) {
+  const rnd = mulberry32(seed);
+  const height = 11 + rnd() * 10, r0 = 0.26 + rnd() * 0.1;
+  const top = new THREE.Vector3((rnd() - 0.5) * 0.8, height, (rnd() - 0.5) * 0.8);
+  const wood = [branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10), branchGeo(new THREE.Vector3(0, 1.4, 0), top, r0, r0 * 0.45, 9)];
+  // the jagged break
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28 + rnd(), rr = r0 * 0.4; const p0 = top.clone().add(new THREE.Vector3(Math.cos(a) * rr, -0.1, Math.sin(a) * rr)); wood.push(branchGeo(p0, p0.clone().add(new THREE.Vector3((rnd() - 0.5) * 0.1, 0.3 + rnd() * 0.7, (rnd() - 0.5) * 0.1)), 0.05, 0.006, 4)); }
+  for (let i = 0; i < 26; i++) {
+    const y = 3 + rnd() * (height - 4), a = rnd() * 6.28, L = 0.4 + rnd() * 1.6 * (1 - y / height);
+    const b0 = new THREE.Vector3(top.x * y / height, y, top.z * y / height);
+    wood.push(branchGeo(b0, b0.clone().add(new THREE.Vector3(Math.cos(a) * L, -0.15 - rnd() * 0.4, Math.sin(a) * L)), 0.05, 0.015, 4));
+  }
+  for (let i = 0; i < 4; i++) { const a = (i / 4) * 6.28 + rnd(); wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * r0 * 2.6, -0.25, Math.sin(a) * r0 * 2.6), new THREE.Vector3(Math.cos(a) * r0 * 0.3, 1.0, Math.sin(a) * r0 * 0.3), r0 * 0.22, r0 * 0.5, 5)); }
+  return { wood: setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), () => 0), height };
+}
+
 // kind: 'pine' (heartlands), 'tall' (forest giants, bare lower trunk), 'fir' (dense cone to the ground)
 function buildPine(seed, kind = 'pine') {
   const rnd = mulberry32(seed);
@@ -1058,12 +1075,15 @@ export class Vegetation {
       ] });
     }
     // world v2 biomes: forest giants, snow firs, palms, jungle canopy trees, saguaro
-    const G = (this.groups = { oak: [0, 1, 2, 3], pine: [4, 5, 6, 7], cypress: [8, 9], tall: [], fir: [], palm: [], jungle: [], cactus: [] });
+    const G = (this.groups = { oak: [0, 1, 2, 3], pine: [4, 5, 6, 7], cypress: [8, 9], tall: [], fir: [], palm: [], jungle: [], cactus: [], snag: [] });
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
     for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
       addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
     }
+    // dead snags, silver-grey and barkless
+    const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: 0xb4aca0, roughness: 0.95 }), 0);
+    for (let i = 0; i < 2; i++) { const b = buildSnag(1300 + i * 41); addB('snag', 'pine', b, [{ geometry: b.wood, material: snagMat }]); }
     // tree wells: under a snow-loaded spruce the boughs shelter a hollow of shaded, shallower snow round the trunk,
     // which seats every tree in the snowfield instead of leaving it standing on the white like a cut-out
     const wellTex = (() => {
@@ -1171,7 +1191,8 @@ export class Vegetation {
       const cone = (() => {
         const c = new THREE.ConeGeometry(0.045, 0.13, 7, 3); c.rotateZ(Math.PI / 2); c.translate(0, 0.035, 0);
         const p = c.attributes.position, col = new Float32Array(p.count * 3);
-        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.42 * v; col[i * 3 + 1] = 0.28 * v; col[i * 3 + 2] = 0.16 * v; }
+        // (vertex colours are linear: these are dark, weathered cone browns, not the pale chips they read as before)
+        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.16 * v; col[i * 3 + 1] = 0.1 * v; col[i * 3 + 2] = 0.055 * v; }
         c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
       })();
       const twig = (() => { const t = new THREE.CylinderGeometry(0.018, 0.03, 1.0, 5); t.rotateZ(Math.PI / 2); t.translate(0, 0.02, 0); return t; })();
@@ -1255,10 +1276,10 @@ export class Vegetation {
         if (beach) v = pick(G.palm);
         else if (cl.jungle > 0.45) v = r() < 0.28 ? pick(G.palm) : pick(G.jungle);
         else if (swamp) v = pick(G.cypress);
-        else if (cl.snow > 0.45) v = pick(G.fir);
+        else if (cl.snow > 0.45) v = r() < 0.03 ? pick(G.snag) : pick(G.fir);
         // the pine belt is open lodgepole/ponderosa forest: tall clear boles with high crowns, a few full-skirted
         // spruce and young firs among them
-        else if (pz < -700) v = r() < 0.8 ? pick(G.tall) : r() < 0.65 ? pick(G.pine) : pick(G.fir);
+        else if (pz < -700) v = r() < 0.04 ? pick(G.snag) : r() < 0.8 ? pick(G.tall) : r() < 0.65 ? pick(G.pine) : pick(G.fir);
         else if (cl.autumn > 0.4) v = r() < 0.78 ? pick(G.oak) : pick(G.pine);
         else if (h > 70) v = pick(G.pine);
         else v = r() < 0.75 ? pick(G.oak) : pick(G.pine);
