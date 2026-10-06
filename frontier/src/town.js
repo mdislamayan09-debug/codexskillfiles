@@ -625,11 +625,10 @@ export class Town {
 
   // Trapper's cabin on its bench above Frostwater Valley: notched log walls, a snow-loaded roof, stone chimney,
   // woodshed and woodpile. Faces west down into the valley.
-  buildCabin() {
-    const B = this.bucket, M = this.mats;
-    const { x, z } = CABIN;
+  buildCabin(x = CABIN.x, z = CABIN.z, rotY = -Math.PI / 2 + 0.25, B = this.bucket, rest = true) {
+    const M = this.mats;
     const y = this.h(x, z) - 0.15;
-    const m = new THREE.Matrix4().makeRotationY(-Math.PI / 2 + 0.25).setPosition(x, y, z);
+    const m = new THREE.Matrix4().makeRotationY(rotY).setPosition(x, y, z);
     const W = 7.2, D = 5.6, H = 2.7, R = 0.17;
     const logX = (len, yy, zz) => { const g = new THREE.CylinderGeometry(R, R * 1.06, len, 9); g.rotateZ(Math.PI / 2); g.translate(0, yy, zz); return g; };
     const logZ = (len, yy, xx) => { const g = new THREE.CylinderGeometry(R, R * 1.06, len, 9); g.rotateX(Math.PI / 2); g.translate(xx, yy, 0); return g; };
@@ -678,7 +677,42 @@ export class Town {
       B.add(M.bare, box(0.14, 1.2, 0.14, fx, 0.6, fz), m);
       if (k < 8) for (const yy of [0.55, 1.0]) B.add(M.bare, box(2.4, 0.09, 0.09, fx + 1.2, yy, fz), m);
     }
-    this.interactables.push({ type: 'rest', name: "Trapper's Cabin", pos: new THREE.Vector3(x, y, z) });
+    if (rest) this.interactables.push({ type: 'rest', name: "Trapper's Cabin", pos: new THREE.Vector3(x, y, z) });
+  }
+
+  // a second homestead set down after load on a yard levelled below a lookout: the cabin with its sheds, a
+  // weathered barn across the yard and a pole corral, built into their own meshes
+  addHomestead(x, z, rotY) {
+    const B = new Bucket(), keep = this.bucket, M = this.mats;
+    this.bucket = B;
+    this.buildCabin(x, z, rotY, B, false);
+    const m = new THREE.Matrix4().makeRotationY(rotY);
+    const at = (lx, lz) => new THREE.Vector3(lx, 0, lz).applyMatrix4(m).add(new THREE.Vector3(x, 0, z));
+    const bp = at(-17, -7);
+    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 9, 13, 4.8, 'bare');
+    // the corral: split poles on posts, round a trampled pen beside the barn
+    const cc = at(-15, 12), cm = new THREE.Matrix4().makeRotationY(rotY + 0.1).setPosition(cc.x, 0, cc.z);
+    const W = 16, D = 11, pts = [];
+    for (let k = 0; k <= 6; k++) pts.push([-W / 2 + (W * k) / 6, -D / 2]);
+    for (let k = 1; k <= 4; k++) pts.push([W / 2, -D / 2 + (D * k) / 4]);
+    for (let k = 1; k <= 6; k++) pts.push([W / 2 - (W * k) / 6, D / 2]);
+    for (let k = 1; k <= 4; k++) pts.push([-W / 2, D / 2 - (D * k) / 4]);
+    const wp = pts.map(([px, pz]) => new THREE.Vector3(px, 0, pz).applyMatrix4(cm));
+    for (let k = 0; k < wp.length; k++) {
+      const a = wp[k], b = wp[(k + 1) % wp.length], ya = this.h(a.x, a.z), yb = this.h(b.x, b.z);
+      B.add(M.bare, box(0.16, 1.5, 0.16, a.x, ya + 0.6, a.z));
+      if (k === 3) continue;   // the gate stands open
+      for (const hh of [0.55, 1.15]) {
+        const len = Math.hypot(b.x - a.x, b.z - a.z, yb - ya);
+        const g = box(len, 0.09, 0.09, 0, 0, 0);
+        g.rotateZ(Math.atan2(yb - ya, Math.hypot(b.x - a.x, b.z - a.z)));
+        g.rotateY(-Math.atan2(b.z - a.z, b.x - a.x));
+        g.translate((a.x + b.x) / 2, (ya + yb) / 2 + hh, (a.z + b.z) / 2);
+        B.add(M.bare, g);
+      }
+    }
+    this.bucket = keep;
+    this.meshes.push(...B.build(this.scene));
   }
 
   buildCamp() {

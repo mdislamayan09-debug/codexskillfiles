@@ -117,7 +117,7 @@ export class Sky {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
-      defines: { CLOUD_STEPS: quality >= 2 ? 64 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
+      defines: { CLOUD_STEPS: quality >= 2 ? 112 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,

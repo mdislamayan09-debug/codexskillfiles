@@ -133,18 +133,22 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // forest floor: needle and leaf litter, tinted per biome
   vec4 lA = texA(L_LITTER, xz, 1.8, 4.6);
   vec3 lN = texN(L_LITTER, xz, 1.8);
-  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.8, 0.68, 0.54), pineK);   // grey-brown needle duff, not orange
+  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(1.0, 0.86, 0.66), pineK);   // sun-dried tan needle duff, not orange
   litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
   litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
   vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
   // rainforest floor: ferns, mosses and seedlings over the litter, deep green
   forestFloor = mix(forestFloor, mix(srgb(vec3(34,54,22)), srgb(vec3(52,74,30)), patchy) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), jun * 0.75);
   // moss and low green growth in damp hollows of the pine floor
-  forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.58, 0.75, fbm2(xz / 9.0 + 12.0)) * pineK * 0.7);
+  forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.6, 0.78, fbm2(xz / 9.0 + 12.0)) * pineK * 0.45);
+  // the open pine floor is dry and pale (a dusty duff the low sun rakes across), brighter than a damp broadleaf floor
+  forestFloor *= 1.0 + 0.3 * pineK;
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
   vec3 roadC = dirt * 1.08;
+  // a dry, dusty tread through the pines, paler than the duff either side
+  roadC = mix(roadC, roadC * vec3(1.32, 1.2, 1.02), pineK);
   if (road > 0.05) {
     vec4 gv = texA(L_GRAVEL, xz, 1.8, 4.3);
     roadC = mix(roadC, gv.rgb * vec3(0.95, 0.88, 0.78), 0.35 * D);
@@ -229,9 +233,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // (a narrow band, broken by noise: a steep face breaks from snow to rock along a crisp, ragged line)
   float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.22, snowC), 0.3, hiSnow), mix(mix(0.5, 0.31, snowC), 0.5, hiSnow), slope + 0.12 * (fbm2(xz / 9.0) - 0.5) + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
-  float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
+  // (tighter: broad soft scours and outcrops read as camouflage blotches across a whole mountainside)
+  float scour = smoothstep(0.65, 0.74, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
-  float outcrop = smoothstep(0.52, 0.66, fbm2(xz / 38.0 - 5.1) + 0.6 * slope) * smoothstep(0.12, 0.26, slope) * smoothstep(200.0, 320.0, wp.y);
+  float outcrop = smoothstep(0.6, 0.68, fbm2(xz / 38.0 - 5.1) + 0.6 * slope) * smoothstep(0.12, 0.26, slope) * smoothstep(200.0, 320.0, wp.y);
   scour = max(scour, outcrop);
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
@@ -456,7 +461,7 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
           // (from afar the snow caught on every crown and lying between them averages to a cold mid grey)
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.25 + 0.3 * smoothstep(2.0, 8.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.17 + 0.25 * smoothstep(3.0, 10.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
           // grazing angles), strongest where the canopy is closed and crowns span a few pixels
           if (canopyK > 0.01) {
@@ -468,7 +473,7 @@ export class Terrain {
           }
           // snow-country spruce stand apart with snow lying between them: from afar the slope stays mostly white,
           // flecked dark (a closed dark canopy with white glades read as puddles of snow on black rock)
-          canopyK *= 1.0 - 0.45 * smoothstep(0.4, 0.8, ccl0.r);
+          canopyK *= 1.0 - 0.3 * smoothstep(0.4, 0.8, ccl0.r);
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }

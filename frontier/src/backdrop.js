@@ -59,9 +59,11 @@ export class Backdrop {
         const x = ux * s, z = uz * s, d = Math.max(0, s - HALF);
         // the snowy north: big ridged ranges, taller the further they stand
         const far = sstep(4000, 40000, d);
-        // (the finer ridged layers give the near ranges spurs, gullies and arêtes instead of smooth snow domes)
-        const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far)
-          + ridged(x / 2400, z / 2400 + 7.7, 4) * 380 + ridged(x / 900 - 2.2, z / 900, 3) * 140;
+        // (the finer ridged layers give the near ranges spurs, gullies and arêtes instead of smooth snow domes;
+        // the big massifs stay modest right at the map's edge so no single dome walls off the view up the valley,
+        // and step up range behind range into the distance)
+        const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far) * (0.45 + 0.55 * sstep(1200, 9000, d))
+          + ridged(x / 2400, z / 2400 + 7.7, 4) * 460 + ridged(x / 900 - 2.2, z / 900, 3) * 170;
         // forested ridge country, rolling up into a far blue sierra
         const hillH = 110 + fbm(x / 6000 + 5.1, z / 6000, 5) * 520 + ridged(x / 2100, z / 2100, 4) * 150 + ridged(x / 11000, z / 11000, 5) * 900 * far;
         // canyon country: flat-topped mesas and buttes on a desert floor, sierras on the far horizon
@@ -72,9 +74,9 @@ export class Backdrop {
         // north of the map the real valley carries on: a broad snowy floor winding away between the ranges
         // for twenty kilometres, so looking up-valley the eye travels into the haze rather than into a wall
         const dn = Math.max(0, -HALF - z);
-        const vx = -725 + 1100 * Math.sin(dn / 5200) * sstep(0, 4000, dn) - 700 * Math.sin(dn / 13000 + 1.2) * sstep(3000, 9000, dn);
-        const vw = 380 + 0.05 * dn;
-        const floor = 225 + dn * 0.011 + 30 * fbm(x / 1500, z / 1500, 3);
+        const vx = -725 + 520 * Math.sin(dn / 6000) * sstep(0, 5000, dn) - 800 * Math.sin(dn / 15000 + 1.2) * sstep(5000, 12000, dn);
+        const vw = 560 + 0.07 * dn;
+        const floor = 210 + dn * 0.01 + 30 * fbm(x / 1500, z / 1500, 3);
         const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 2800, Math.abs(x - vx));
         const regionH = north * snowV + desert * desertH + sea * seaH + hills * hillH;
         // carry the map's own edge heights out, then rise into the region's relief
@@ -133,7 +135,38 @@ export class Backdrop {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeBoundingSphere();
-    const mat = patchMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.94, metalness: 0, envMapIntensity: 0.6 }));
+    // per-pixel erosion relief: the mesh carries the ranges' form, the shader cuts gullies and ribs into the faces
+    // (faded out once a pixel spans them) and bares dark rock on the steep parts of that relief, so a distant face
+    // reads as snow couloirs between rock ribs rather than one smooth shaded dome
+    const mat = patchMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.94, metalness: 0, envMapIntensity: 0.6 }), {
+      onShader: (sh) => {
+        sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', /* glsl */ `#include <normal_fragment_maps>
+        {
+          float dist = length(vWPos - cameraPosition);
+          vec2 p = vWPos.xz;
+          vec3 wn = inverseTransformDirection(normal, viewMatrix);
+          vec2 g = vec2(0.0);
+          for (int o = 0; o < 3; o++) {
+            float sc = o == 0 ? 210.0 : o == 1 ? 70.0 : 26.0;
+            float fd = 1.0 - smoothstep(sc * 0.12, sc * 0.4, dist * 0.0012);
+            // stretched down the fall line: gullies run downhill, not in blobs
+            vec2 dn2 = normalize(wn.xz + 1e-4);
+            vec2 q = vec2(dot(p, vec2(dn2.y, -dn2.x)), dot(p, dn2) * 0.35) / sc + float(o) * 7.3;
+            float e = 0.3;
+            float gx = vnoise(q + vec2(e, 0.0)) - vnoise(q - vec2(e, 0.0));
+            float gz = vnoise(q + vec2(0.0, e)) - vnoise(q - vec2(0.0, e));
+            vec2 gl = vec2(gx, gz) / (2.0 * e) * fd * (o == 0 ? 1.0 : o == 1 ? 0.75 : 0.5);
+            g += vec2(dn2.y, -dn2.x) * gl.x + dn2 * gl.y * 0.35;
+          }
+          float steep = 1.0 - wn.y;
+          vec3 pn = normalize(wn - vec3(g.x, 0.0, g.y) * (0.25 + 1.6 * steep));
+          normal = normalize((viewMatrix * vec4(pn, 0.0)).xyz);
+          float snowy = smoothstep(0.3, 0.55, dot(diffuseColor.rgb, vec3(0.333)));
+          float rockT = smoothstep(0.8, 0.6, pn.y + 0.14 * (vnoise(p / 41.0) - 0.5));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.075, 0.075, 0.08), rockT * snowy * 0.9);
+        }`);
+      },
+    });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false; this.mesh.receiveShadow = false;

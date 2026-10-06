@@ -2,7 +2,7 @@
 import './style.css';
 import * as THREE from 'three';
 import { setCreatureDetail, loadHumanModel } from './creatures.js';
-import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution, loadRealTerrain } from './world.js';
+import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, HALF, setWorldResolution, loadRealTerrain } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
 import { Backdrop } from './backdrop.js';
@@ -18,7 +18,6 @@ import { HUD } from './hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { Post } from './post.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const params = new URLSearchParams(location.search);
 // cinematic (the default) is tuned for an Apple-silicon laptop and favours image quality over frame rate;
@@ -253,60 +252,121 @@ async function init() {
     snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: 'snow', snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
-    // a longer lens, as the reference: the homestead reads as a building and the ranges stack up behind it
-    vistahigh: () => { const v = G.findVista(true); return { fov: 46, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
-    snowvista: () => { const v = G.findVista(true); return { fov: 46, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { fov: 46, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
   };
-  // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
-  G.findVista = (hi = false) => {
-    // A lookout above the cabin, looking straight over it and on down the valley: the cabin sits in the lower
-    // third, the creek and the valley floor lead the eye away, the ranges and the storm fill the top
-    const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
-    const vh = world.valley[Math.floor(world.valley.length * 0.06)];
-    const upDir = Math.atan2(vh[0] - CABIN.x, vh[1] - CABIN.z);
-    let best = null, bs = -1e9;
-    // high on the valley side, as in the reference: well above the cabin, so the floor opens out below the lens
-    // hi: a summit lookout far above the valley floor (the reference frame), looking up the long valley over the
-    // homestead into the ranges beyond the map
-    const R0 = hi ? 280 : 150, R1 = hi ? 900 : 420, A0 = hi ? 170 : 45, A1 = hi ? 520 : 220;
-    for (let r = R0; r <= R1; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
-      const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
-      const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
-      if (above < A0 || above > A1) continue;
-      const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
-      // looking up-valley, toward the head of the valley and its peaks
-      let dv = va - upDir; dv = Math.atan2(Math.sin(dv), Math.cos(dv));
-      if (Math.abs(dv) > 0.75) continue;
-      let clear = true;
-      for (let k = 1; k < 30 && clear; k++) { const t = k / 30; if (world.heightAt(cx + (CABIN.x - cx) * t, cz + (CABIN.z - cz) * t) > ch + (cabY - ch) * t - 1.5) clear = false; }
-      if (!clear) continue;
-      // depth beyond the cabin: the valley floor stays well below the lens for a long way
-      let depth = 0;
-      for (let d = r + 150; d <= r + 3000; d += 150) for (const b of [-0.25, 0, 0.25]) {
-        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) < ch - 25) depth++;
+  // handles for the capture/probe tooling
+  G.dbg = { world, veg, sky, backdrop, scene, camera, U, THREE, CABIN };
+  // The summit lookout the reference is taken from: a ledge high on a valley side, the valley receding to the
+  // horizon through the middle of the frame, a homestead on a bench a few hundred metres below the lens. Searched
+  // over the snowy north by marching rays through a trial frame from every ledge.
+  G.findVista = () => {
+    if (G.vistaCache) return G.vistaCache;
+    const cam = new THREE.PerspectiveCamera(46, 16 / 9, 0.5, 1e5), rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
+    const E = HALF - 12, PITCH = -0.13;
+    const march = (o, r, max = 9000) => {
+      for (let t = 25; t < max; t += t < 400 ? 8 : 30) {
+        const x = o.x + r.x * t, z = o.z + r.z * t;
+        if (Math.abs(x) > E || Math.abs(z) > E) return t + 1500;   // out past the edge: the backdrop's far ranges
+        if (o.y + r.y * t < world.heightAt(x, z)) return t;
       }
-      // nothing near the lens rising into the frame
-      let blocked = 0;
-      for (let b = -0.5; b <= 0.51; b += 0.1) for (let d = 15; d <= Math.min(r, 160); d += 15) {
-        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
+      return 1e5;
+    };
+    const frame = (c) => { cam.position.set(c.cx, c.ch, c.cz); cam.lookAt(c.cx + Math.sin(c.az) * 1000, c.ch + Math.tan(PITCH) * 1000, c.cz + Math.cos(c.az) * 1000); cam.updateMatrixWorld(); };
+    // the valley floor's own line, to check the frame actually looks down onto it (not over a shoulder that hides it)
+    const VP = world.valley.filter((p) => p[1] < -1950).map((p) => [p[0], world.heightAt(p[0], p[1]) + 2, p[1]]);
+    const v3 = new THREE.Vector3();
+    const cands = [];
+    for (let cz = -3800; cz <= -1850; cz += 50) for (let cx = -2300; cx <= 1100; cx += 50) {
+      if (world.climateAt(cx, cz).snow < 0.6) continue;
+      const g0 = world.heightAt(cx, cz);
+      if (g0 < 330) continue;                                  // well above the valley floor
+      // looking north up the valley, into the ranges (south it opens onto the green lowlands)
+      for (let az = Math.PI - 0.85; az < Math.PI + 0.86; az += 0.105) {
+        const fx = Math.sin(az), fz = Math.cos(az);
+        // a ledge: the ground just ahead dips gently, so the lookout's own rock is in shot, then falls away
+        const lip = g0 - world.heightAt(cx + fx * 16, cz + fz * 16);
+        if (lip < -1 || lip > 9) continue;
+        const drop = g0 - Math.max(world.heightAt(cx + fx * 60, cz + fz * 60), world.heightAt(cx + fx * 90, cz + fz * 90));
+        if (drop < 22) continue;
+        const c = { cx, cz, ch: g0 + 3.2, az };
+        frame(c);
+        // open below the ledge: the lower middle of the frame looks down past it onto the valley, not onto the
+        // mountain's own shoulder a few tens of metres out
+        let open = true;
+        for (const sx of [-0.25, 0, 0.25]) { n2.set(sx, -0.42); rc.setFromCamera(n2, cam); if (march(rc.ray.origin, rc.ray.direction, 200) < 160) { open = false; break; } }
+        if (!open) continue;
+        let vis = 0;
+        for (const [px2, py2, pz2] of VP) {
+          v3.set(px2, py2, pz2).project(cam);
+          if (!(v3.z < 1 && Math.abs(v3.x) < 0.85 && v3.y > -0.9 && v3.y < 0.3)) continue;
+          let ok = true;
+          const L = Math.hypot(px2 - cx, pz2 - cz);
+          for (let t = 0.04; t < 0.98 && ok; t += 12 / L) if (world.heightAt(cx + (px2 - cx) * t, cz + (pz2 - cz) * t) > c.ch + (py2 - c.ch) * t) ok = false;
+          if (ok) vis++;
+        }
+        if (vis < VP.length * 0.2) continue;
+        // the ranges stand well back at the horizon line, no near wall across the middle of the frame
+        let far = 0;
+        for (const sx of [-0.25, 0, 0.25]) for (const sy of [0.33, 0.45]) { n2.set(sx, sy); rc.setFromCamera(n2, cam); if (march(rc.ray.origin, rc.ray.direction) > 4000) far++; }
+        // (the valley's axis runs north: a lens turned across it looks at the far wall rather than up the valley)
+        c.score = far * 1.2 + vis / VP.length * 12 - Math.abs(lip - 3) * 0.2 - 4 * Math.max(0, Math.abs(az - Math.PI) - 0.5);
+        c.vis = vis; c.far = far;
+        cands.push(c);
       }
-      // close enough that the cabin reads as a building (the reference's sits ~4% of the frame wide)
-      const score = hi ? depth * 3 - blocked * 4 - Math.abs(above - 320) * 0.12 - Math.abs(r - 520) * 0.03
-                       : depth * 3 - blocked * 4 - Math.abs(above - 85) * 0.25 - Math.abs(r - 175) * 0.08;
-      if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
-    if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
-    // pitch so the cabin sits in the lower third with the valley and the sky above it
-    const pitch = Math.atan2(cabY - best.ch, best.cab) + (hi ? 0.3 : 0.2);
-    // turn the lens partway up the valley: the homestead lands on a third line and the valley recedes beside it
-    let dv0 = upDir - best.va; dv0 = Math.atan2(Math.sin(dv0), Math.cos(dv0));
-    const la = best.va + Math.sign(dv0 || 1) * Math.min(Math.abs(dv0) * 0.7 + 0.1, 0.24);
-    const D = 1200, lx = best.cx + Math.sin(la) * D, lz = best.cz + Math.cos(la) * D;
-    return { cx: best.cx, cz: best.cz, tx: lx, tz: lz, th: best.ch + Math.tan(pitch) * D - world.heightAt(lx, lz) };
+    cands.sort((p, q) => q.score - p.score);
+    // a spot for the homestead in the lower middle of the frame, close enough to read as buildings (the
+    // reference's cluster spans about a tenth of the frame: ~180 m out); the yard is levelled into the slope
+    const homeSpot = () => {
+      // the ledge's own rim across the lower middle: the homestead must stand clear above it
+      let rim = -0.95;
+      for (let sy = -0.95; sy < 0.0; sy += 0.03) { n2.set(0, sy); rc.setFromCamera(n2, cam); if (march(rc.ray.origin, rc.ray.direction, 120) > 100) { rim = sy; break; } }
+      let hb = null, hs = -1e9;
+      for (let sx = -0.36; sx <= 0.37; sx += 0.04) for (let sy = Math.max(-0.7, rim + 0.07); sy <= -0.15; sy += 0.03) {
+        n2.set(sx, sy); rc.setFromCamera(n2, cam);
+        const t = march(rc.ray.origin, rc.ray.direction, 950);
+        if (t < 120 || t > 900) continue;
+        const x = rc.ray.origin.x + rc.ray.direction.x * t, z = rc.ray.origin.z + rc.ray.direction.z * t, h = world.heightAt(x, z), ny = world.normalAt(x, z).y;
+        if (ny < 0.75 || world.climateAt(x, z).snow < 0.5 || h < 3 || world.splatAt(x, z).wet > 0.2) continue;
+        const sc = -Math.abs(sx - 0.04) * 2 - Math.abs(sy + 0.3) * 3 - Math.abs(t - 260) * 0.004 - (1 - ny) * 6;
+        if (sc > hs) { hs = sc; hb = [x, z]; }
+      }
+      return [hb, hs];
+    };
+    // and the lookout's own rock to the left of the lens, as the reference's outcrop: the lens is nudged about the
+    // summit (a few metres aside or back) until there is ground near it on the left
+    let best = null, bs = -1e9;
+    for (const c0 of cands.slice(0, 60)) {
+      const fx = Math.sin(c0.az), fz = Math.cos(c0.az), rx = -fz, rz = fx;
+      for (const side of [0, -4, 4, -8, 8, -12]) for (const back of [0, -6, -12]) {
+        const cx = c0.cx + rx * side + fx * back, cz = c0.cz + rz * side + fz * back;
+        const c = { ...c0, cx, cz, ch: world.heightAt(cx, cz) + 2.2 };
+        frame(c);
+        let open = true;
+        for (const sx of [-0.25, 0, 0.25]) { n2.set(sx, -0.42); rc.setFromCamera(n2, cam); if (march(rc.ray.origin, rc.ray.direction, 200) < 160) { open = false; break; } }
+        if (!open) continue;
+        n2.set(-0.95, -0.72); rc.setFromCamera(n2, cam);
+        const leftRock = march(rc.ray.origin, rc.ray.direction, 30) < 30 ? 1 : 0;
+        const [hb, hs] = homeSpot();
+        const sc = c.score + leftRock * 2.5 + (hb ? 3 + hs : 0) - (Math.abs(side) + Math.abs(back)) * 0.02;
+        (G.vistaDbg = G.vistaDbg || []).push([+sc.toFixed(2), Math.round(cx), Math.round(cz), +c.az.toFixed(2), +c.score.toFixed(2), c.vis, c.far, leftRock, hb ? +hs.toFixed(2) : null]);
+        if (sc > bs) { bs = sc; best = { ...c, home: hb }; }
+      }
+    }
+    if (!best) {
+      // no bench in shot: fall back to looking over the trapper's own cabin
+      const c = cands[0] || { cx: CABIN.x + 260, cz: CABIN.z + 320, ch: world.heightAt(CABIN.x + 260, CABIN.z + 320) + 3.2, az: Math.atan2(-260, -320) };
+      best = { ...c, home: null };
+    }
+    const D = 1200, lx = best.cx + Math.sin(best.az) * D, lz = best.cz + Math.cos(best.az) * D;
+    // the homestead turned three-quarters on to the lens
+    const home = best.home && [best.home[0], best.home[1], Math.atan2(best.cx - best.home[0], best.cz - best.home[1]) + 0.55];
+    G.vistaCache = { cx: best.cx, cz: best.cz, ch: best.ch, tx: lx, tz: lz, th: best.ch + Math.tan(PITCH) * D - world.heightAt(lx, lz), home, n: cands.length };
+    return G.vistaCache;
   };
   // desert: a rider on the flat valley floor with a tall butte standing 500-1400 m ahead, sun low behind the camera
   G.findButte = () => {
@@ -538,36 +598,25 @@ async function init() {
     }
     // trailside anchors, as a set dresser would place them: a mossy boulder and a fallen trunk off the left verge,
     // ferns and scrub around them
-    // an old trapper's drift fence angling across the snowfield ahead, half buried, with snow on its rails: a made
-    // thing to ride toward in an otherwise empty white
+    // the reference's snowfield: dark boulders half-buried in drift and frosted sage in loose groups either side
+    // of the open ground ahead, thinning toward the line the rider is taking
     if (s.snowDress && !G.snowDressed) {
       G.snowDressed = true;
-      // silver-grey, weathered wood with snow lying on the upper faces
-      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x6c665e, roughness: 0.97 }), { fragColor: `#include <color_fragment>
-        { vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix); diffuseColor.rgb = mix(diffuseColor.rgb * (0.75 + 0.5 * vnoise(vWPos.xy * 9.0 + vWPos.z * 3.0)), vec3(0.8, 0.84, 0.9), smoothstep(0.55, 0.9, wn.y)); }` });
-      // laid out in the camera's frame (the lens is turned off the horse's heading): starting ahead and to the left,
-      // angling away across the view toward the valley
       const cy = yaw - (s.turn || 0);
       const f = [Math.sin(cy), Math.cos(cy)], lt = [Math.cos(cy), -Math.sin(cy)];
-      const geos = [];
-      const ang = cy - 1.05, dir = [Math.sin(ang), Math.cos(ang)];
-      const x0 = px + f[0] * 30 + lt[0] * 14, z0 = pz + f[1] * 30 + lt[1] * 14;
-      let prev = null;
-      for (let k = 0; k < 16; k++) {
-        const fx = x0 + dir[0] * k * 3.2, fz = z0 + dir[1] * k * 3.2, gy = world.heightAt(fx, fz);
-        const lean = (Math.sin(k * 2.3) * 0.12);
-        // buried to the lower rail in drift: only the upper part of each post shows
-        const post = new THREE.CylinderGeometry(0.07, 0.09, 1.5, 6); post.rotateZ(lean); post.translate(fx, gy + 0.15 + Math.sin(k * 1.7) * 0.12, fz); geos.push(post);
-        if (prev && k % 5 !== 3) for (const hh of [0.25, 0.7]) {   // a few spans have fallen
-          const ax = prev[0], az = prev[1], ay = prev[2] + hh, by = gy + hh;
-          const len = Math.hypot(fx - ax, fz - az, by - ay);
-          const rail = new THREE.CylinderGeometry(0.045, 0.05, len, 5); rail.rotateZ(Math.PI / 2);
-          rail.rotateY(-Math.atan2(fz - az, fx - ax)); rail.translate((ax + fx) / 2, (ay + by) / 2, (az + fz) / 2); geos.push(rail);
+      let sd = 191;
+      const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+      for (let gi = 0; gi < 18; gi++) {
+        const ahead = 14 + rr() * 90, side = (rr() < 0.5 ? -1 : 1) * (6 + ahead * 0.25 + rr() * 24);
+        const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
+        const n = 1 + Math.floor(rr() * 3);
+        for (let k = 0; k < n; k++) {
+          const x = gx + (rr() - 0.5) * 6, z = gz + (rr() - 0.5) * 6, sc = (k === 0 ? 1.3 : 0.5) + rr() * 1.3;
+          veg.rocks.add(x, world.heightAt(x, z) - 0.42 * sc, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
         }
-        prev = [fx, fz, gy];
+        for (let k = 0; k < 6; k++) { const x = gx + (rr() - 0.5) * 13, z = gz + (rr() - 0.5) * 13; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
       }
-      const fence = new THREE.Mesh(mergeGeometries(geos.map((g) => g.index ? g.toNonIndexed() : g)), wood);
-      fence.castShadow = true; fence.receiveShadow = true; scene.add(fence);
+      veg.update(player.hpos, true);
     }
     if (s.trailDress && !G.trailDressed) {
       G.trailDressed = true;
@@ -587,40 +636,67 @@ async function init() {
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
       G.fgPlaced = true;
       const c = G.camOverride.pos, l = G.camOverride.look;
-      // clear the lookout itself, and a sightline down to the cabin, as a location artist would
+      // clear the lookout itself, as a location artist would
       G.clearTreesNear(c.x, c.z, 40);
-      G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 10, 0.8);
-      G.clearTreesNear(CABIN.x, CABIN.z, 20);          // the homestead's own clearing
       G.clearTreesNear(c.x, c.z, 60, veg.crags);       // no crag looming in front of the lens
+      // the homestead on its bench below the lookout, with its yard and a sightline cleared down to it
+      if (s.home && !G.homePlaced) {
+        G.homePlaced = true;
+        const [hx, hz, hr] = s.home;
+        world.stampPad(hx, hz, 28, 34);
+        town.addHomestead(hx, hz, hr);
+        G.clearTreesNear(hx, hz, 36); G.clearTreesNear(hx, hz, 40, veg.rocks); G.clearTreesNear(hx, hz, 50, veg.crags);
+        G.clearTreesAlong(c.x, c.z, hx, hz, 7, 0.9);
+      }
+      // the frame as the lens will see it, to set the ledge's rocks against
+      camera.position.copy(c); camera.fov = s.fov || camera.fov; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      camera.lookAt(l); camera.updateMatrixWorld();
+      const rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
+      // the ground under a point of the frame, within maxD metres of the lens
+      const groundAt = (nx, ny, maxD) => {
+        n2.set(nx, ny); rc.setFromCamera(n2, camera);
+        const o = rc.ray.origin, r = rc.ray.direction;
+        for (let t = 0.6; t < maxD; t += 0.2) { const x = o.x + r.x * t, z = o.z + r.z * t, g = world.heightAt(x, z); if (o.y + r.y * t <= g) return [x, g, z, t]; }
+        return null;
+      };
+      let sd = 77;
+      const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+      // the lookout's own rock, as the reference's: broken granite slabs bedded in the near ground right across the
+      // bottom of the frame (sized with distance so each reads as a slab, not a pebble or a wall), and a split
+      // shoulder rising out of the lower-left corner; the lower middle stays low so the view drops past it
+      for (let i = 0; i < 34; i++) {
+        const nx = -1.06 + rr() * 2.12, ny = -1.0 + rr() * (Math.abs(nx) < 0.4 ? 0.2 : 0.42);
+        const hit = groundAt(nx, ny, 24);
+        if (!hit) continue;
+        const [x, g, z, t] = hit, sc = (0.45 + rr() * 0.55) * (0.3 + t * 0.085);
+        veg.rocks.add(x, g - sc * 0.42, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
+      }
+      for (const [nx, ny, crown, rot] of [[-1.02, -0.8, -0.02, 0.4], [-0.84, -0.92, -0.32, 1.9], [-0.66, -0.98, -0.6, 3.1]]) {
+        const hit = groundAt(nx, ny, 26);
+        if (!hit) continue;
+        const [x, g, z, t] = hit;
+        // the crown on the ray through (nx, crown) at the same range
+        n2.set(nx, crown); rc.setFromCamera(n2, camera);
+        const rd = rc.ray.direction, k = t / Math.hypot(rd.x, rd.z), top = c.y + rd.y * k;
+        const sc = Math.min(6.5, Math.max(1.4, (top - g) / 0.62));
+        veg.rocks.add(x, g - 0.14 * sc, z, rot, sc, 3);
+      }
+      // frosted brush and dead grass in the cracks of the ledge
+      for (let i = 0; i < 46; i++) {
+        const hit = groundAt(-1.05 + rr() * 2.1, -0.98 + rr() * 0.4, 18);
+        if (!hit) continue;
+        const [x, g, z] = hit;
+        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, 0.45 + rr() * 0.55, 7 + Math.floor(rr() * 2));
+      }
+      // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
+      // way down the near ground, so it reads as a mountainside rather than a blank white wedge
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
-      const g0 = world.heightAt(c.x, c.z);
-      // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
-      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff, gh = world.heightAt(x, z); if (gh > g0 - 12) veg.rocks.add(x, gh - 0.35 * scale, z, f * 1.3, scale, v); };
-      put(9.0, -7.5, 3.2, 0); put(11.5, -4.0, 2.2, 1); put(8.0, 6.8, 2.6, 3); put(13.0, 9.5, 2.0, 2); put(7.0, -11.0, 3.6, 1); put(15.0, -10.0, 2.4, 2);
-      // the lookout's own rock: a split granite outcrop filling the left edge and broken slabs along the lip below
-      put(5.5, -9.5, 5.0, 3); put(4.2, 1.8, 1.6, 2); put(4.8, -2.8, 1.9, 3); put(6.2, 4.6, 1.4, 2);
-      // the summit ledge itself, right under the lens: broken granite slabs along the lower edge of the frame
-      // (rt points to screen right) a big split-granite outcrop rising into the lower-left of the frame, as the
-      // reference's ledge, with frosted brush in its lee
-      for (const [f2, sd2, sc2, v2] of [[3.2, -5.5, 2.4, 3], [3.6, 5.8, 2.1, 2], [2.8, -1.2, 1.3, 2], [4.4, 2.6, 1.7, 3], [3.0, 9.0, 2.8, 3], [3.4, -9.5, 3.0, 2],
-        [7.5, -7.5, 5.2, 3], [10.5, -11.5, 6.5, 2], [6.0, -3.8, 3.2, 2], [9.0, -5.0, 3.8, 3], [12.5, -15.5, 7.0, 3]]) {
-        const x = c.x + d.x * f2 + rt.x * sd2, z = c.z + d.z * f2 + rt.z * sd2;
-        veg.rocks.add(x, world.heightAt(x, z) - 0.25 * sc2, z, f2 * 2.1, sc2, v2);
+      for (let i = 0; i < 90; i++) {
+        const f = 10 + rr() * 90, side = (rr() - 0.5) * (14 + f * 1.2);
+        const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
+        if (rr() < 0.4) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.5 + rr() * 1.6, 2 + Math.floor(rr() * 2));
+        else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
       }
-      for (let i = 0; i < 18; i++) { const f2 = 4 + (i % 6) * 1.6, sd2 = -2 - (i * 0.83) % 9; const x = c.x + d.x * f2 + rt.x * sd2, z = c.z + d.z * f2 + rt.z * sd2; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.55 + (i % 3) * 0.2, 7 + (i % 2)); }
-      // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the way
-      // down the near ground, so it reads as a mountainside rather than a blank white wedge
-      {
-        let sd = 77;
-        const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
-        for (let i = 0; i < 70; i++) {
-          const f = 7 + rr() * 60, side = (rr() - 0.5) * (12 + f * 0.9);
-          const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
-          if (rr() < 0.35) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.35 + rr() * 1.1, 2 + Math.floor(rr() * 2));
-          else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
-        }
-      }
-      for (let i = 0; i < 24; i++) { const x = c.x + d.x * (6 + (i % 8) * 1.1) + rt.x * (-11 + i * 0.95), z = c.z + d.z * (6 + (i % 8) * 1.1) + rt.z * (-11 + i * 0.95); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');

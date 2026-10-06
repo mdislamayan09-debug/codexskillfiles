@@ -550,7 +550,13 @@ export class World {
             {
               const rh = this.realAt(x, z), q = 70;
               const ra = this.realAt(x + q, z), rb = this.realAt(x - q, z), rc = this.realAt(x, z + q), rd2 = this.realAt(x, z - q);
-              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.05 + 1.25 * smoothstep(-2, 7, (ra + rb + rc + rd2) / 4 - rh);
+              // (on the flat valley floor there is no drainage to follow: groves of spruce and open snow meadows
+              // in about equal measure, as the reference's floor, instead of a near-empty white plain)
+              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) {
+                const dr = 0.05 + 1.25 * smoothstep(-2, 7, (ra + rb + rc + rd2) / 4 - rh);
+                const grove = 0.15 + 1.0 * smoothstep(0.47, 0.6, forest.fbm(x / 150 + 2.2, z / 150 - 9.1, 3) * 0.5 + 0.5);
+                fr *= lerp(dr, grove, smoothstep(0.2, 0.07, sl));
+              }
             }
             // stands and open snowfields in about equal measure, as the references' valley sides are: dark timber
             // in clumps and tongues with wide white glades between, not an even pepper of trees
@@ -684,6 +690,22 @@ export class World {
   }
 
   // Bilinear height sample — matches the GPU sampler exactly.
+  // level a yard into the slope (a homestead set down after load): within r the ground takes the height at the
+  // centre, easing back to the natural slope over `fall` metres; the GPU copy is re-uploaded
+  stampPad(x, z, r, fall = 14) {
+    const h0 = this.heightAt(x, z), R = r + fall;
+    const i0 = Math.max(0, Math.floor((x - R + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x + R + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z - R + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z + R + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const d = Math.hypot(i * CELL - HALF - x, j * CELL - HALF - z);
+      if (d > R) continue;
+      const k = j * RES + i;
+      this.heights[k] = lerp(this.heights[k], h0, smoothstep(R, r, d));
+    }
+    this.heightTex.needsUpdate = true;
+    return h0;
+  }
+
   heightAt(x, z) {
     const fx = clamp((x + HALF) / CELL, 0, RES - 1.001);
     const fz = clamp((z + HALF) / CELL, 0, RES - 1.001);

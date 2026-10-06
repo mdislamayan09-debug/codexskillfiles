@@ -998,22 +998,57 @@ function rockGeometry(seed, fractured = false, detail = 5) {
 function rockMaterial(surf = {}) {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0 });
   return patchMaterial(m, {
-    fragHead: 'uniform sampler2D tRockA; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }',
-    onShader: (sh) => { sh.uniforms.tRockA = { value: surf.rock || null }; },
+    fragHead: /* glsl */ `uniform sampler2D tRockA; uniform sampler2D tRockN; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }
+      // triplanar scanned relief in world space (whiteout blend), so a boulder scaled up to a ledge keeps its grain
+      vec3 rockTriN(vec3 p, vec3 n, float sc) {
+        vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 tx = texture(tRockN, p.zy / sc).xyz * 2.0 - 1.0;
+        vec3 ty = texture(tRockN, p.xz / sc).xyz * 2.0 - 1.0;
+        vec3 tz = texture(tRockN, p.xy / sc).xyz * 2.0 - 1.0;
+        tx = vec3(tx.xy + n.zy, abs(tx.z) * n.x);
+        ty = vec3(ty.xy + n.xz, abs(ty.z) * n.y);
+        tz = vec3(tz.xy + n.xy, abs(tz.z) * n.z);
+        return normalize(tx.zyx * w.x + ty.xzy * w.y + tz.xyz * w.z);
+      }
+      float rockCrack(vec3 p) {
+        // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
+        float a = vnoise(vec2(dot(p, vec3(0.71, 0.3, 0.6)), dot(p, vec3(-0.25, 0.9, 0.33))) * 0.9);
+        float b = vnoise(vec2(dot(p, vec3(-0.6, 0.45, 0.66)), dot(p, vec3(0.5, 0.2, -0.84))) * 1.6 + 3.7);
+        return max(smoothstep(0.035, 0.0, abs(a - 0.5)), 0.7 * smoothstep(0.025, 0.0, abs(b - 0.5)) * step(0.45, a));
+      }`,
+    onShader: (sh) => {
+      sh.uniforms.tRockA = { value: surf.rock || null };
+      sh.uniforms.tRockN = { value: surf.rockN || null };
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', /* glsl */ `#include <normal_fragment_maps>
+        {
+          vec3 wn0 = normalize(inverseTransformDirection(normal, viewMatrix));
+          float camD = length(vWPos - cameraPosition);
+          vec3 wn1 = rockTriN(vWPos, wn0, 2.6);
+          // the finer grain only where it resolves (close ledges)
+          vec3 wn2 = rockTriN(vWPos + 3.1, wn1, 0.8);
+          vec3 wnP = normalize(mix(wn1, wn2, 0.55 * smoothstep(30.0, 6.0, camD)));
+          normal = normalize((viewMatrix * vec4(wnP, 0.0)).xyz);
+        }`);
+    },
     fragColor: /* glsl */ `
       #include <color_fragment>
       // smooth world normal: snow and moss follow the rounded form, not individual triangles
       vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
       float n1 = fbm2(vWPos.xz*0.8 + vWPos.y*0.6);
       float n2 = vnoise(vec2(vWPos.x+vWPos.z, vWPos.y)*3.0);
-      vec3 base = mix(srgbR(vec3(118,112,104)), srgbR(vec3(92,86,80)), n1);
+      // weathered granite: warm grey-brown, as the reference's ledge, not slate blue
+      vec3 base = mix(srgbR(vec3(128,118,104)), srgbR(vec3(98,90,80)), n1);
       base = mix(base, srgbR(vec3(130,112,90)), smoothstep(0.6, 0.8, vnoise(vec2(vWPos.y*1.5, vWPos.x*0.2))) * 0.6);
       {
         vec3 w = pow(abs(wn), vec3(4.0)); w /= (w.x + w.y + w.z);
-        vec3 ra = texture(tRockA, vWPos.zy / 2.2).rgb * w.x + texture(tRockA, vWPos.xz / 2.2).rgb * w.y + texture(tRockA, vWPos.xy / 2.2).rgb * w.z;
-        base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2);
+        vec3 ra = texture(tRockA, vWPos.zy / 2.6).rgb * w.x + texture(tRockA, vWPos.xz / 2.6).rgb * w.y + texture(tRockA, vWPos.xy / 2.6).rgb * w.z;
+        // and the scan again at ledge scale, so a big outcrop is not one tile repeated
+        vec3 rb = texture(tRockA, vWPos.zy / 9.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 9.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 9.0 + 0.37).rgb * w.z;
+        base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
       }
       base *= 0.85 + 0.2*n2;
+      // dark joint seams
+      base *= 1.0 - 0.55 * rockCrack(vWPos) * smoothstep(60.0, 10.0, length(vWPos - cameraPosition));
       vec4 rcl = climateAt(vWPos.xz);
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
@@ -1021,10 +1056,17 @@ function rockMaterial(surf = {}) {
       // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
       // (a broad, noisy threshold: on a flat granite facet a tight one laid down a hard-edged white slab)
       float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.55, 0.95, wn.y + (n1 - 0.5) * 0.7 + 0.35 * (n2 - 0.5) + 0.2 * (vnoise(vWPos.xz * 4.0) - 0.5)) * 0.9;
-      // in patches and grains, not a smooth white cap: the grey stone and its lichen show through
-      rsnow *= 0.55 + 0.45 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
+      // in drifts and crusts, not a smooth white cap: the grey stone and its lichen show through
+      // (round grains of one size on a noise grid read as polka dots on a big ledge; these are torn, mixed-size flecks)
+      // clean patches of old snow lying on the flats, with a ragged edge; elsewhere only a sparse frost of flecks
+      float fleck = smoothstep(0.74, 0.8, vnoise(vWPos.xz * 7.0 + vWPos.y * 5.0) * 0.55 + vnoise(vWPos.xz * 19.0 - vWPos.y * 11.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
+      float drift = smoothstep(0.46, 0.56, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
+      rsnow *= max(drift, 0.7 * fleck);
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
+      // and the warm ochre crust lichen of the reference's granite, in scattered rosettes
+      float ochre = smoothstep(0.7, 0.82, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(150,128,82)), ochre * 0.45);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,
@@ -1295,7 +1337,13 @@ export class Vegetation {
         else if (h > 70) v = pick(G.pine);
         else v = r() < 0.75 ? pick(G.oak) : pick(G.pine);
         if (sp.forest < 0.2 && cl.jungle < 0.4 && !swamp && cl.snow < 0.45 && pz > -700) v = pick(G.oak); // lone meadow oaks
-        const s = cl.snow > 0.45 ? 0.5 + r() * r() * 1.1 + r() * 0.3 : 0.8 + r() * 0.5;   // spruce stands of mixed ages
+        // spruce stands of mixed ages, the mature trees 20 m and more (smaller, a valley's timber read as pepper)
+        let s = cl.snow > 0.45 ? 0.72 + r() * r() * 1.2 + r() * 0.4 : 0.8 + r() * 0.5;
+        // the pine belt's middle storey: young full-skirted firs among the tall clear boles, and the mature pines
+        // of mixed ages (one size of tall pine in an even stand read as planted poles)
+        if (pz < -700 && cl.snow <= 0.45 && cl.jungle <= 0.45 && !swamp && !beach) {
+          if (rc() < 0.24) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.82 + rc() * 0.42;
+        }
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving
         // bare duff wherever the stand was dense)

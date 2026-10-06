@@ -405,3 +405,40 @@ The critic now asks for:
   cells skipped their undergrowth. Now tree cells grow 2–5 larger shrubs and ferns, and the grass under the
   canopy is back.
 - **Snow ride.** A weathered, half-buried drift fence crosses the snowfield.
+
+**Round 40 critic:** pines 4, snowride 3, snowvista 2. Snowvista notes:
+- no foreground anchor
+- a smooth central dome
+- depth reads in reverse (the distant peak is the brightest thing)
+- an empty valley floor
+
+### Round 41–42: composing the vista by ray-marching the frame
+- **Diagnosis.** The round 40/41 lookout turned out to be:
+  - on a summit whose ground falls away so steeply that no ledge rock entered the frame
+  - aimed across the valley, not along it
+  - centred on a 1.5 km backdrop dome only 1.8 km past the map edge
+
+  A probe marching rays from the camera found the centre ray ending on that dome.
+- **`G.findVista`.**
+  - Now searches every ledge in the snowy north. Each candidate is a ledge where the ground 16 m ahead dips only 0–9 m.
+  - For each one it marches rays through a trial 46° frame and scores:
+    - an open vanishing region (centre rays travelling 3.5 km or more)
+    - a valley floor laid out below the horizon
+  - It then looks for a flat snow bench 170–450 m out in the lower-middle of that frame. A second homestead (a line
+    shack, built by the cabin builder) is set down on that bench and turned three-quarters to the lens.
+- **Ledge.** The ledge rocks are placed in frame space: each rock's crown is put at a chosen point of the frame a few
+  metres out. Where the slope drops away beneath that point, the rock grows down to meet the ground rather than
+  float. This gives the reference's split granite shoulder in the lower left, slabs across the bottom and a boulder
+  lower right, with frosted brush only where there is ground to root in.
+- **Backdrop.**
+  - The big massifs stay modest within the first ~9 km past the edge and step up range behind range.
+  - The valley's continuation is wider.
+  - A per-pixel erosion pass cuts fall-line gullies and ribs into the faces and bares dark rock on their steep parts,
+    so distant faces read as couloirs between rock ribs rather than smooth shaded domes.
+- **Snow ride.** The drift fence is gone (the reference has none). In its place are dark boulders half-buried in
+  drift, in loose groups with frosted sage, either side of the open snowfield.
+- **Pines.**
+  - The floor and trail measured 0.6× the reference's brightness in the lower third. They are now a paler, tan duff
+    and a dusty tread.
+  - Young, full-skirted firs make up a middle storey, and mature pines vary in size, so the stand no longer reads
+    as a planted grid of poles.
