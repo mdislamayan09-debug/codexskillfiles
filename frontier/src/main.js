@@ -613,7 +613,9 @@ async function init() {
     for (const cp of town.chimneys || []) {
       for (let i = 0; i < 70; i++) {
         const h = Math.random() * 14;
-        particles.emit(cp.clone().add(new THREE.Vector3(h * 0.35 + (Math.random() - 0.5) * (0.3 + h * 0.2), h, (Math.random() - 0.5) * (0.3 + h * 0.2))),
+        // the column leans and bends downwind as it rises (a straight vertical plume read as rigid)
+        const wv = U.uWind.value, lean = 0.25 + h * 0.07;
+        particles.emit(cp.clone().add(new THREE.Vector3(wv.x * h * lean + (Math.random() - 0.5) * (0.3 + h * 0.2), h, wv.y * h * lean + (Math.random() - 0.5) * (0.3 + h * 0.2))),
           new THREE.Vector3(0.2, 0.5, 0), { color: [0.5, 0.5, 0.53], alpha: 0.38 * (1 - h / 16), size: 0.8 + h * 0.45, life: 6, grow: 0.25, drag: 0.4 });
       }
     }
@@ -853,7 +855,8 @@ async function init() {
     water.update(camera);
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
-    const coldGrade = Math.max(sky.weather.blizzard, 0.75 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
+    // (in clear air under a storm the cold grade is lighter: warm rock and dry grass keep some colour against the snow)
+    const coldGrade = Math.max(sky.weather.blizzard, 0.6 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
     post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.1 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)

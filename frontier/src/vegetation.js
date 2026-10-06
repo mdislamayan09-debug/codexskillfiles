@@ -882,7 +882,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       dens *= smoothstep(0.02, 0.28, field + 0.12);
       // under closed pine canopy the grass gives way to needle duff (it holds on in the light along the trail)
-      dens *= 1.0 - 0.65 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));
+      dens *= 1.0 - 0.2 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));   // (much more and the floor went bare)
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -1019,7 +1019,8 @@ function rockMaterial(surf = {}) {
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
       // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
-      float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.6, 0.85, wn.y + (n1 - 0.5) * 0.6 + 0.25 * (n2 - 0.5)) * 0.9;
+      // (a broad, noisy threshold: on a flat granite facet a tight one laid down a hard-edged white slab)
+      float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.55, 0.95, wn.y + (n1 - 0.5) * 0.7 + 0.35 * (n2 - 0.5) + 0.2 * (vnoise(vWPos.xz * 4.0) - 0.5)) * 0.9;
       // in patches and grains, not a smooth white cap: the grey stone and its lichen show through
       rsnow *= 0.55 + 0.45 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
@@ -1300,11 +1301,11 @@ export class Vegetation {
         // bare duff wherever the stand was dense)
         if (pz < -700 && cl.snow < 0.4 && cl.desert < 0.3) {
           const ur = rc();
-          const nu = ur < 0.55 ? 1 + Math.floor(rc() * 3) : 0;
+          const nu = ur < 0.85 ? 2 + Math.floor(rc() * 4) : 0;
           for (let b = 0; b < nu; b++) {
-            const a = rc() * 6.28, d = 2 + rc() * 4, bx = px + Math.cos(a) * d, bz = pz + Math.sin(a) * d;
+            const a = rc() * 6.28, d = 1.8 + rc() * 5, bx = px + Math.cos(a) * d, bz = pz + Math.sin(a) * d;
             const t = rc();
-            this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, rc() * 6.28, t < 0.5 ? 0.45 + rc() * 0.5 : 0.6 + rc() * 0.8, t < 0.5 ? Math.floor(rc() * 3) : t < 0.9 ? 3 + Math.floor(rc() * 2) : 7 + Math.floor(rc() * 2));
+            this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, rc() * 6.28, t < 0.5 ? 0.7 + rc() * 0.8 : 0.8 + rc() * 0.9, t < 0.5 ? Math.floor(rc() * 3) : t < 0.92 ? 3 + Math.floor(rc() * 2) : 7 + Math.floor(rc() * 2));
           }
         }
         // closed-canopy stands on capable machines: a second, younger tree in every dense cell
@@ -1340,7 +1341,7 @@ export class Vegetation {
         for (let b = 0; b < nb; b++) {
           const bx = px + (r() - 0.5) * 7, bz = pz + (r() - 0.5) * 7;
           const t = r();
-          this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, t < 0.45 ? 0.45 + r() * 0.5 : 0.6 + r() * 0.8, t < 0.45 ? Math.floor(r() * 3) : t < 0.87 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, t < 0.45 ? 0.7 + r() * 0.8 : 0.7 + r() * 0.9, t < 0.45 ? Math.floor(r() * 3) : t < 0.87 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
         }
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
       // saplings and young firs filling the gaps between the big trees
