@@ -117,6 +117,8 @@ export async function loadRealTerrain() {
     loadPatch('terrain/kawuneeche').catch((e) => (console.warn('north terrain unavailable', e), null)),
     loadPatch('terrain/desert').then((p) => ({ ...p, region: 'desert' })).catch(() => null),
     loadPatch('terrain/jungle').then((p) => ({ ...p, region: 'jungle' })).catch(() => null),
+    loadPatch('terrain/autumn').then((p) => ({ ...p, region: 'autumn' })).catch(() => null),
+    loadPatch('terrain/canyon').then((p) => ({ ...p, region: 'canyon' })).catch(() => null),
   ]);
   setRealTerrain(north, rest.filter(Boolean));
   return !!north;
@@ -167,8 +169,15 @@ export class World {
     return smoothstep(-1550, -1950, z) * smoothstep(4070, 3720, Math.abs(x));
   }
 
-  // slope (1 - normal.y) of the real ground
+  // slope (1 - normal.y) of the real ground (the canyon patch where it covers, else the north window)
   realSlope(x, z) {
+    for (const p of PATCHES) if (p.region === 'canyon') {
+      const c = patchSample(p, x, z, 300);
+      if (c && c.w > 0.5) {
+        const e = p.meta.cell, a = patchSample(p, x - e, z), b = patchSample(p, x + e, z), cc = patchSample(p, x, z - e), dd = patchSample(p, x, z + e);
+        if (a && b && cc && dd) { const gx = (b.h - a.h) / (2 * e), gz = (dd.h - cc.h) / (2 * e); return 1 - 1 / Math.sqrt(gx * gx + gz * gz + 1); }
+      }
+    }
     const e = REAL.meta.cell;
     const a = this.realAt(x - e, z), b = this.realAt(x + e, z), c = this.realAt(x, z - e), d = this.realAt(x, z + e);
     if (a === null || b === null || c === null || d === null) return 0;
@@ -215,6 +224,11 @@ export class World {
     h += foot * foot * 300 + R.pine * 75 * (0.5 + 0.5 * n.fbm(x / 520, z / 520, 4));
     // Autumn hills: big rounded swells
     if (R.autumn > 0) h += R.autumn * (30 + 125 * (0.5 + 0.5 * n.fbm(x / 760 + 11, z / 760, 4)));
+    // the autumn hills are real ground: Cades Cove and its ridges in the Great Smoky Mountains
+    for (const p of PATCHES) if (p.region === 'autumn' && R.autumn > 0) {
+      const s = patchSample(p, x, z, 320);
+      if (s) h = lerp(h, s.h + 0.8 * n.fbm(x / 9, z / 9, 2), R.autumn * s.w);
+    }
     // Prairie buttes
     if (R.prairie > 0) {
       const b = n3.fbm(x / 420 + 5, z / 420, 3) + 0.04 * n.fbm(x / 60, z / 60, 2);
@@ -290,6 +304,11 @@ export class World {
           if (d && d.vd < 8) h -= 1.0 * smoothstep(4, 1.5, d.vd) * realW;
         }
       }
+    }
+    // the snowy north-west is a granite canyon: Yosemite Valley, sheer walls over a flat floor
+    for (const p of PATCHES) if (p.region === 'canyon') {
+      const s = patchSample(p, x, z, 300);
+      if (s) h = lerp(h, s.h + 1.2 * n2.fbm(x / 20, z / 20, 3) + 0.4 * n.fbm(x / 6, z / 6, 2), s.w);
     }
     // Desert: terraced red mesas over sand flats
     if (R.desert > 0) {
@@ -450,6 +469,14 @@ export class World {
           fj *= 0.85 + 0.15 * smoothstep(0.3, 0.6, forest.fbm(x / 150, z / 150, 3) * 0.5 + 0.5);
           f = lerp(f, fj, ps.w * smoothstep(0.2, 0.6, o.jungle));
         }
+        // Real autumn hills: hardwood forest on the ridges and slopes, open hay meadows on the cove floor
+        for (const p of PATCHES) if (p.region === 'autumn' && o.autumn > 0.2) {
+          const ps = patchSample(p, x, z, 320);
+          if (!ps) continue;
+          let fa = smoothstep(28, 45, ps.h + 10 * n2.fbm(x / 140, z / 140, 3)) * smoothstep(2.5, 6.5, o.roadD);
+          fa = Math.max(fa, 0.75 * smoothstep(0.62, 0.72, forest.fbm(x / 120 - 3.3, z / 120 + 1.1, 3) * 0.5 + 0.5) * smoothstep(2.5, 6.5, o.roadD));  // hedgerow groves
+          f = lerp(f, fa, ps.w * smoothstep(0.2, 0.6, o.autumn));
+        }
         // Real ground: a subalpine forest as it grows there — continuous spruce-fir on the valley walls below the
         // tree line, thinning into krummholz above it, broken by avalanche chutes, cliffs and wet meadows on the floor
         if (REAL) {
@@ -461,7 +488,12 @@ export class World {
             fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
             fr *= smoothstep(0.32, 0.46, forest.fbm(x / 210 + 8.1, z / 210 - 5.5, 3) * 0.5 + 0.5 + 0.15);   // clearings
             fr *= 1 - 0.85 * smoothstep(0.62, 0.7, n.noise(x / 60 + z / 900, z / 380) * 0.5 + 0.5) * smoothstep(0.25, 0.4, sl); // chutes
-            fr *= 0.35 + 0.65 * smoothstep(40, 110, vd);                                // open meadow along the creek
+            let inCanyon = 0;
+            for (const p of PATCHES) if (p.region === 'canyon') { const c = patchSample(p, x, z, 300); if (c) inCanyon = c.w; }
+            // open meadow along the creek (in the canyon: meadows and stands on the flat floor)
+            // (in the canyon: an open snowy floor with a few stands; forest on the talus at the foot of the walls)
+            const canyonF = 0.12 + 0.45 * smoothstep(0.55, 0.68, forest.fbm(x / 90 + 5.5, z / 90, 3) * 0.5 + 0.5) + 0.75 * smoothstep(350, 400, h) * (1 - smoothstep(0.45, 0.6, sl));
+            fr *= lerp(0.35 + 0.65 * smoothstep(40, 110, vd), Math.min(1, canyonF), inCanyon);
             fr *= smoothstep(2.5, 6.5, o.roadD);
             f = lerp(f, Math.min(1, fr * 1.05), rw);
           }

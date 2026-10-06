@@ -22,3 +22,6 @@
 - `models/human.bin`: built by `scripts/build_human.py` from the MakeHuman base mesh, macro targets and default rig
   (https://github.com/makehumancommunity/makehuman, `makehuman/data/3dobjs`, `targets/macrodetails`, `rigs`),
   released as CC0 in 2020.
+- `terrain/autumn.png` (+ `.json`): Cades Cove and its ridges, Great Smoky Mountains (USGS 3DEP), z14, 0.45x horizontal,
+  0.45x vertical.
+- `terrain/canyon.png` (+ `.json`): Yosemite Valley, California (USGS 3DEP), z14, 0.55x horizontal and vertical.

@@ -245,7 +245,7 @@ async function init() {
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22], trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 2.5, -5.4], lookRel: [-0.9, 1.6, 18], weather: 'snow' }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 2.5, -5.4], lookRel: [-0.9, 1.6, 18], weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
@@ -335,6 +335,28 @@ async function init() {
     const D = 1500, tx = best.x + Math.sin(best.a) * D, tz = best.z + Math.cos(best.a) * D;
     const th = best.h + 2.2 - D * 0.08 - world.heightAt(tx, tz);
     return { px: best.x - Math.sin(best.a) * 30, pz: best.z - Math.cos(best.a) * 30, yaw: best.a, cx: best.x, cz: best.z, tx, tz, th };
+  };
+  // the canyon: a rider on the flat floor looking along it, sheer walls rising close on both sides
+  G.findCanyonRide = () => {
+    const lo = Math.min(...[-3600, -3300, -3000, -2700, -2400].flatMap((z) => [-3800, -3400, -3000, -2600, -2200].map((x) => world.heightAt(x, z))));
+    let best = null, bs = -1e9;
+    for (let z = -3900; z < -2150; z += 30) for (let x = -3950; x < -1900; x += 30) {
+      const h = world.heightAt(x, z);
+      if (h > lo + 30 || world.normalAt(x, z).y < 0.975 || world.splatAt(x, z).wet > 0.1 || world.climateAt(x, z).snow < 0.7) continue;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+        const f = [Math.sin(a), Math.cos(a)], rt = [Math.cos(a), -Math.sin(a)];
+        let ahead = 0, sides = 0;
+        for (let d = 150; d <= 900; d += 150) ahead = Math.max(ahead, world.heightAt(x + f[0] * d, z + f[1] * d) - h);
+        for (const sd of [-1, 1]) {
+          let wall = 0;
+          for (let d = 150; d <= 700; d += 110) for (const fw of [100, 350]) wall = Math.max(wall, world.heightAt(x + rt[0] * sd * d + f[0] * fw, z + rt[1] * sd * d + f[1] * fw) - h);
+          sides += Math.min(wall, 450);
+        }
+        const score = sides - ahead * 0.8;
+        if (score > bs && G.treesNear(x, z, 6) === 0 && G.treesNear(x - f[0] * 6, z - f[1] * 6, 5) === 0) { bs = score; best = [x, z, a]; }
+      }
+    }
+    return best;
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {

@@ -526,18 +526,18 @@ export class Human {
       const colFur = std({ map: hairTexture(o.fur || 0xa48c6c, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
       const hy = MH ? HA.hatY : 1.79, hz = MH ? HA.hatZ : -0.014;
       if (MH) {
-        const shell = new THREE.SphereGeometry(0.112, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
-        shell.scale(1, 0.95, 1.1);
+        const shell = new THREE.SphereGeometry(0.125, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.58);
+        shell.scale(1.12, 0.82, 1.18);                                      // a broad, low ushanka, not a stovepipe
         const sm = mesh(shell, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         for (const sd of [-1, 1]) {   // ear flaps
-          const flap = new THREE.SphereGeometry(0.045, 12, 10); flap.scale(0.45, 1.1, 1);
+          const flap = new THREE.SphereGeometry(0.06, 12, 10); flap.scale(0.5, 1.15, 1.1);
           const fm = mesh(flap, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
-          fm.position.copy(at(bones.head, sd * 0.095, hy - 0.05, hz - 0.005)); bones.head.add(fm);
+          fm.position.copy(at(bones.head, sd * 0.11, hy - 0.04, hz - 0.01)); bones.head.add(fm);
         }
       }
-      bones.head.add(mesh(furCards(0, 0, hz, HA.headR, hy, hy + 0.14, 46, 0.055, bones.head), hatFur, false));
-      bones.head.add(mesh(furCards(0, 0, hz, 0.07, hy + 0.14, hy + 0.16, 14, 0.06, bones.head), hatFur, false));
+      bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.135 : HA.headR, hy - 0.01, hy + (MH ? 0.06 : 0.14), 56, 0.06, bones.head), hatFur, false));
+      bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.09 : 0.07, hy + (MH ? 0.07 : 0.14), hy + (MH ? 0.1 : 0.16), 20, 0.06, bones.head), hatFur, false));
       bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.15, HA.collarY, HA.collarY + 0.07, 40, 0.06, bones.spine), colFur, false));
     }
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
