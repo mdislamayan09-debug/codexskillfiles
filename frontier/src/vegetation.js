@@ -240,7 +240,8 @@ function buildPine(seed, kind = 'pine') {
       wood.push(branchGeo(new THREE.Vector3(0, y, 0), new THREE.Vector3(Math.cos(a) * L, y - 0.2 - rnd() * 0.4, Math.sin(a) * L), 0.06, 0.02, 4));
     }
   }
-  const spread = kind === 'tall' ? 3.3 : kind === 'fir' ? 3.1 : 3.4;
+  // each variant has its own habit: narrow spire-like subalpine firs to broad, heavy spruces
+  const spread = (kind === 'tall' ? 3.3 : kind === 'fir' ? 3.1 : 3.4) * (kind === 'fir' ? 0.62 + rnd() * 0.6 : 0.85 + rnd() * 0.3);
   const tall = kind === 'tall';
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
@@ -987,11 +988,11 @@ export class Vegetation {
     // world v2 biomes: forest giants, snow firs, palms, jungle canopy trees, saguaro
     const G = (this.groups = { oak: [0, 1, 2, 3], pine: [4, 5, 6, 7], cypress: [8, 9], tall: [], fir: [], palm: [], jungle: [], cactus: [] });
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
       addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
     }
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 5; i++) {
       const b = buildPine(760 + i * 31, 'fir');
       addB('fir', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
     }
@@ -1155,6 +1156,8 @@ export class Vegetation {
       }
       // (a flat background chance sprinkled lone trees evenly over open snow like pepper; up there trees keep to stands)
       let p = sp.forest * (cl.snow > 0.45 ? 0.85 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
+      // trees grow in clumps and thickets with gaps between them, not one to every grid cell
+      p *= 0.35 + 1.3 * THREE.MathUtils.smoothstep(w.n3.noise(px / 28 + 7.7, pz / 28 - 3.1), -0.45, 0.55);
       if (blocked(px, pz)) p = 0;
       if (r() < p) {
         let v;
