@@ -1159,7 +1159,7 @@ export class Vegetation {
         continue;
       }
       // (a flat background chance sprinkled lone trees evenly over open snow like pepper; up there trees keep to stands)
-      let p = sp.forest * (cl.snow > 0.45 ? 0.85 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
+      let p = sp.forest * (cl.snow > 0.45 ? 0.85 : cl.jungle > 0.45 ? 0.95 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
       // trees grow in clumps and thickets with gaps between them, not one to every grid cell
       p *= 0.35 + 1.3 * THREE.MathUtils.smoothstep(w.n3.noise(px / 28 + 7.7, pz / 28 - 3.1), -0.45, 0.55);
       if (blocked(px, pz)) p = 0;

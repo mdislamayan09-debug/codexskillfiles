@@ -382,7 +382,7 @@ export class Terrain {
           canopy = mix(canopy, srgb(vec3(30,40,30)), smoothstep(80.0, 200.0, vWPos.y) * 0.6);
           vec4 ccl = climateAt(vWPos.xz);
           float cn = mix(0.5, fbm2(vWPos.xz / 26.0 + 4.0), smoothstep(14.0, 5.0, cfp));
-          canopy = mix(canopy, mix(srgb(vec3(26,50,20)), srgb(vec3(40,68,26)), cn), ccl.g);                       // jungle
+          canopy = mix(canopy, mix(srgb(vec3(20,40,16)), srgb(vec3(36,60,22)), cn), ccl.g);                       // jungle
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
           canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.45 + 0.1), smoothstep(0.4, 0.8, ccl.r));
@@ -391,7 +391,9 @@ export class Terrain {
           if (canopyK > 0.01) {
             float fade = smoothstep(9.0, 2.5, cfp) * smoothstep(0.45, 0.85, canopyK);
             float m = 0.6 * vnoise(vWPos.xz / mix(4.5, 6.5, ccl0.g) + 3.1) + 0.4 * vnoise(vWPos.xz / 2.1 - 7.7);
-            canopy *= mix(1.0, 0.72 + 0.5 * smoothstep(0.25, 0.75, m) + 0.1 * (fbm2(vWPos.xz / 23.0) - 0.5), fade);
+            // rainforest canopy: deep shaded gaps between big lit crowns
+            float lo = mix(0.72, 0.5, ccl0.g), hiK = mix(0.5, 0.8, ccl0.g);
+            canopy *= mix(1.0, lo + hiK * smoothstep(0.25, 0.75, m) + 0.1 * (fbm2(vWPos.xz / 23.0) - 0.5), fade);
           }
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
