@@ -76,7 +76,20 @@ export let REAL = null; // { meta, h: Float32Array }
 // further real ground laid over whole regions: [{ meta, h, region: 'desert' | 'jungle' }]
 export let PATCHES = [];
 export function setRealTerrain(real, patches = null) {
-  if (patches) PATCHES = patches;
+  if (patches) {
+    PATCHES = patches;
+    // the canyon's creek follows the real valley floor: the lowest ground down each column, smoothed
+    for (const p of PATCHES) if (p.region === 'canyon' && !p.creek) {
+      const m = p.meta, zs = [];
+      for (let i = 0; i < m.w; i++) {
+        let best = 1e9, bj = 0;
+        for (let j = 0; j < m.h; j++) { const v = p.h[j * m.w + i]; if (v < best) { best = v; bj = j; } }
+        zs.push(m.z0 + bj * m.cell);
+      }
+      const sm = zs.map((_, i) => { let a = 0, n = 0; for (let k = -12; k <= 12; k++) { const q = zs[Math.min(zs.length - 1, Math.max(0, i + k))]; a += q; n++; } return a / n; });
+      p.creek = { x0: m.x0, cell: m.cell, z: Float32Array.from(sm) };
+    }
+  }
   REAL = real;
   if (!real) return;
   const m = real.meta;
@@ -131,6 +144,17 @@ function patchSample(p, x, z, fade = 260) {
   const h = lerp(lerp(H[k], H[k + 1], tx), lerp(H[k + m.w], H[k + m.w + 1], tx), tz);
   const edge = Math.min(fx, fz, m.w - 1 - fx, m.h - 1 - fz) * m.cell;
   return { h, w: smoothstep(0, fade, edge) };
+}
+// distance (metres, across the valley) to the canyon creek, or a large number away from it
+function canyonCreekD(x, z) {
+  for (const p of PATCHES) if (p.creek) {
+    const c = p.creek, f = (x - c.x0) / c.cell;
+    if (f < 0 || f > c.z.length - 1.001) return 1e9;
+    const i = Math.floor(f), zc = lerp(c.z[i], c.z[i + 1], f - i);
+    // a gentle meander on top of the traced line, so it winds across the flat floor
+    return Math.abs(z - zc - 18 * Math.sin(x / 140) - 9 * Math.sin(x / 53 + 1.7));
+  }
+  return 1e9;
 }
 
 // Smooth the polylines with Catmull-Rom so rivers and roads meander naturally.
@@ -317,9 +341,15 @@ export class World {
       }
     }
     // the snowy north-west is a granite canyon: Yosemite Valley, sheer walls over a flat floor
+    let creekD = 1e9;
     for (const p of PATCHES) if (p.region === 'canyon') {
       const s = patchSample(p, x, z, 300);
-      if (s) h = lerp(h, s.h + 1.2 * n2.fbm(x / 20, z / 20, 3) + 0.4 * n.fbm(x / 6, z / 6, 2), s.w);
+      if (s) {
+        h = lerp(h, s.h + 1.2 * n2.fbm(x / 20, z / 20, 3) + 0.4 * n.fbm(x / 6, z / 6, 2), s.w);
+        // the creek: a shallow channel winding down the floor
+        creekD = canyonCreekD(x, z);
+        if (creekD < 12) h -= 1.4 * smoothstep(9, 3, creekD) * s.w;
+      }
     }
     // Desert: terraced red mesas over sand flats
     if (R.desert > 0) {
@@ -390,7 +420,9 @@ export class World {
       // main channel runs open (wet = 1); the braided side channels are iced over (wet ~0.7)
       // (valley distances are scaled by the widening, so keep the braid band narrow in those units)
       const braid = d && d.vd < 36 ? Math.max(smoothstep(4, 1.5, d.vd), 0.7 * smoothstep(36, 22, d.vd) * smoothstep(0.62, 0.7, n.noise(x / 30, z / 30) * 0.5 + 0.5)) : 0;
-      out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid);
+      // canyon creek: an open channel with iced side braids
+      const cbraid = creekD < 40 ? Math.max(smoothstep(5, 2.5, creekD), 0.7 * smoothstep(40, 26, creekD) * smoothstep(0.6, 0.7, n.noise(x / 28, z / 28) * 0.5 + 0.5)) : 0;
+      out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid, cbraid);
       out.town = Math.max(town, rnd * 0.32, cc, cb * 0.6);
       out.swamp = sw;
       out.roadD = roadD;

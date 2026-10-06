@@ -811,7 +811,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
-      dens *= 1.0 - snowG;          // buried under snow
+      dens *= 1.0 - 0.9 * snowG;    // mostly buried under snow; a few dry tufts poke through
       dens *= 1.0 - 0.9 * gcl.a;    // desert: sparse bunch grass
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       float field = fbm2(xz/26.0);
@@ -821,7 +821,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
       float hgt = mix(0.18, 0.66, smoothstep(0.25, 0.8, field)) * (0.55 + 0.7*aOff.w) * (0.85 + 0.35*dry) * (0.7 + 0.6 * fbm2(xz / 9.0));
       hgt *= mix(0.42, 1.0, smoothstep(55.0, 110.0, length(xz - RANCH_XZ))); // grazed ranch pasture
-      hgt *= (1.0 + 0.55 * gcl.g) * (1.0 - 0.3 * snowG);
+      hgt *= (1.0 + 0.55 * gcl.g) * (1.0 - 0.45 * snowG);
       hgt *= alive * fade;
       float ang = aOff.z * 37.0 + aOff.w * 11.0;
       float ca = cos(ang), sa = sin(ang);
@@ -848,7 +848,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(vGCol, mix(srgbV(vec3(120,165,80)), srgbV(vec3(100,150,70)), aOff.w) * 1.2, gcl.g);           // jungle
       vGCol = mix(vGCol, srgbV(vec3(232,214,168)) * 1.3, gcl.a);                                                 // desert straw
       vGCol = mix(vGCol, mix(srgbV(vec3(112,140,66)), srgbV(vec3(138,156,80)), aOff.w) * 1.25 * (0.75 + 0.5 * midV), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85); // shaded pine-belt grass stays green
-      vGCol = mix(vGCol, srgbV(vec3(236,236,232)) * 1.4, snowG * 0.75);                                          // frosted
+      vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
       vGY = y;
       vGFar = smoothstep(9.0, 48.0, dist);
       vGDry = max(gcl.a, gcl.b * 0.6);
@@ -1188,7 +1188,8 @@ export class Vegetation {
       if (cl.jungle > 0.4) {
         if (r() < under * 2.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.1, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
       } else if (cl.snow > 0.5) {
-        // dry alpine brush poking through the snow in clumps
+        // dark boulders standing out of the snow, and dry alpine brush poking through in clumps
+        if (r() < 0.012 + 0.05 * field) this.rocks.add(px, h - 0.4, pz, r() * 6.28, 0.6 + r() * 1.8, Math.floor(r() * 4));
         const brush = THREE.MathUtils.smoothstep(w.n.noise(px / 45 - 2.2, pz / 45 + 5.3), 0.1, 0.6);
         const nb = r() < 0.04 + 0.5 * brush ? 1 + Math.floor(r() * 3 * brush) : 0;
         for (let b = 0; b < nb; b++) {
