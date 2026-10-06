@@ -64,7 +64,8 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.5);
+      // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.22);
       #endif
     }
     #ifdef FROST_ALL
@@ -958,7 +959,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(vGCol, srgbV(vec3(232,214,168)) * 1.3, gcl.a);                                                 // desert straw
       // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
       {
-        vec3 pg = mix(srgbV(vec3(112,128,66)), srgbV(vec3(140,148,84)), aOff.w);
+        // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
+        vec3 pg = mix(srgbV(vec3(130,140,70)), srgbV(vec3(160,160,92)), aOff.w);
         vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
         vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 1.2 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);

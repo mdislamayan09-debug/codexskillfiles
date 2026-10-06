@@ -246,11 +246,11 @@ async function init() {
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
-    // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
-    // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.45, -5.6], lookRel: [-0.6, 2.2, 22], turn: -0.55, trailDress: true }; },
+    // both rides as the references frame them: camera close behind and to the left (+x of the frame is screen left),
+    // the horse bearing right so its neck and ears show past the rider's shoulder, the rider filling the lower centre
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.5, 2.55, -4.3], lookRel: [-0.6, 2.15, 22], turn: -0.55, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.65, 2.45, -5.3], lookRel: [-2.4, 1.7, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -745,7 +745,7 @@ async function init() {
         const f = 10 + rr() * 90, side = (rr() - 0.5) * (14 + f * 1.2);
         const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
         if (rr() < 0.4) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.5 + rr() * 1.6, 4 + Math.floor(rr() * 2));
-        else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
+        else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, [9, 9, 7, 8][Math.floor(rr() * 4)]); }
       }
     }
     veg.refreshImpostors();
@@ -883,6 +883,9 @@ async function init() {
       // forest around the camera, not just under it (a trail through deep woods has no forest on the trail itself)
       let fo = world.splatAt(camera.position.x, camera.position.z).forest;
       for (const rr of [12, 30]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; fo = Math.max(fo, 0.85 * world.splatAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr).forest); }
+      // (the sunlit forest haze, shafts and warm forest grade belong to the woods below the snow line: on a snowy
+      // lookout with spruce about, they milked out the storm vista)
+      fo *= 1 - THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8);
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
       // (the forest haze once read as milk at 1.7x the reference's exposure; with the canopy now closed by full
@@ -931,8 +934,8 @@ async function init() {
       // (the open, sun-shafted canopy is bright enough now: no extra lift in the woods; snow under a storm sky in clear
       // air reads brighter than the eye wants it, so stop down a little there)
       const W = sky.weather;
-      // (a storm with clear air under it is not dim: the reference's storm vista sits ~25% brighter than ours did)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.14 * W.storm * (1 - W.blizzard)) * (1 + 0.08 * (G.forestK || 0));
+      // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.06 * W.storm * (1 - W.blizzard)) * (1 + 0.18 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
@@ -1003,7 +1006,8 @@ async function init() {
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     // (in clear air under a storm the cold grade is lighter: warm rock and dry grass keep some colour against the snow)
-    const coldGrade = Math.max(sky.weather.blizzard, 0.6 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
+    // (a clear-air storm keeps more colour: warm rock and dry grass against the cool snow, as the reference's vista)
+    const coldGrade = Math.max(sky.weather.blizzard, 0.42 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
     post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
