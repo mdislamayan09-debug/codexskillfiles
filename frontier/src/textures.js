@@ -112,39 +112,34 @@ export function barkTexture(seed = 5, base = [70, 58, 46]) {
 // Returns { map, normalMap } from one height field so light catches the plate edges.
 export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024) {
   const r = mulberry32(seed);
-  // jittered cell sites on a wrapped grid, cells tall and narrow like ponderosa/spruce plates
-  const CX = 7, CY = 3, sites = [];
-  for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) sites.push([(i + 0.15 + r() * 0.7) / CX, (j + 0.15 + r() * 0.7) / CY, r()]);
+  // fir/spruce bark: deep vertical furrows between corky ridges that wander, split and are broken by
+  // horizontal cracks into long plates. Built from periodic functions so the tile wraps seamlessly.
+  const TAU = Math.PI * 2;
+  const ph = Array.from({ length: 8 }, () => r() * TAU);
   const hgt = new Float32Array(W * H), tone = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x / W, v = y / H;
-    let d1 = 9, d2 = 9, id = 0;
-    const gi = Math.floor(u * CX), gj = Math.floor(v * CY);
-    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-      const ii = gi + di, jj = gj + dj, wi = (ii + CX) % CX, wj = (jj + CY) % CY;
-      const [sx0, sy0, t] = sites[wj * CX + wi];
-      const sx = sx0 + Math.floor(ii / CX), sy = sy0 + Math.floor(jj / CY);   // unwrap across the tile edge
-      const dx = u - sx, dy = (v - sy) * 0.32;                              // squash vertically: tall plates
-      const d = Math.hypot(dx, dy);
-      if (d < d1) { d2 = d1; d1 = d; id = t; } else if (d < d2) d2 = d;
-    }
-    const edge = d2 - d1;                                         // 0 on furrows
-    // long vertical fissures wander down the plates as well
-    const fis = Math.abs(Math.sin(u * Math.PI * 2 * 11 + Math.sin(v * 9 + id * 6) * 1.6 + id * 4));
-    const plate = Math.min(1, edge * 30) * (0.55 + 0.45 * Math.min(1, fis * 3));
+    const warp = 0.035 * Math.sin(TAU * 3 * v + ph[0]) + 0.02 * Math.sin(TAU * (7 * v + 2 * u) + ph[1]) + 0.012 * Math.sin(TAU * (13 * v - 3 * u) + ph[2]);
+    const r1 = Math.pow(Math.abs(Math.sin(Math.PI * 9 * (u + warp))), 0.55);
+    const r2 = Math.pow(Math.abs(Math.sin(Math.PI * 14 * (u + 1.4 * warp + 0.031) + ph[3])), 0.7);
+    let ridge = 0.68 * r1 + 0.32 * r2;
+    // horizontal cracks break the ridges into plates, staggered from ridge to ridge
+    const col = Math.floor(9 * (u + warp) + 9) % 9;
+    const crackLine = Math.abs(Math.sin(Math.PI * (4 * v + 0.37 * col + 0.15 * Math.sin(TAU * 2 * u + ph[4]))));
+    const crack = Math.max(0, 1 - crackLine / 0.06);
+    ridge *= 1 - 0.75 * crack;
+    // fine fibrous grain along the ridges
+    const grain = 0.5 + 0.5 * Math.sin(TAU * (60 * u + 9 * Math.sin(TAU * 5 * v + ph[5])) );
     const k = y * W + x;
-    // scaly flakes on the plate surface
-    const flake = 0.5 + 0.5 * Math.sin(y * 0.9 + Math.sin(x * 0.35 + id * 30) * 2.5) * Math.sin(x * 0.6 + id * 11);
-    hgt[k] = plate * plate * (0.8 + 0.2 * flake) + 0.04 * r();
-    tone[k] = id;
+    hgt[k] = ridge * (0.88 + 0.12 * grain);
+    tone[k] = 0.5 + 0.5 * Math.sin(TAU * (2 * u + 1 * v) + ph[6]) * Math.sin(TAU * 3 * v + ph[7]);
   }
   const [c, g] = canvas(W, H), img = g.createImageData(W, H), d = img.data;
   for (let k = 0; k < W * H; k++) {
     const h = hgt[k], t = tone[k];
-    const lit = 0.32 + 0.85 * h;
-    const warm = 0.9 + 0.25 * t;                                  // plates vary from grey-brown to rusty
-    let R = base[0] * lit * warm * 1.08, G = base[1] * lit * (0.95 + 0.1 * t), B = base[2] * lit * 0.95;
-    if (h < 0.15) { R = 26 + 20 * h; G = 18 + 14 * h; B = 13 + 10 * h; }   // deep furrow shadow
+    const lit = 0.18 + 0.95 * Math.pow(h, 0.8);
+    const warm = 0.88 + 0.28 * t;                                 // ridges vary from grey-brown to rusty
+    const R = base[0] * lit * warm * 1.06, G = base[1] * lit * (0.94 + 0.1 * t), B = base[2] * lit * 0.94;
     d[k * 4] = R; d[k * 4 + 1] = G; d[k * 4 + 2] = B; d[k * 4 + 3] = 255;
   }
   g.putImageData(img, 0, 0);
@@ -157,7 +152,7 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
   const [cn, gn] = canvas(W, H), ni = gn.createImageData(W, H), nd = ni.data;
   const Hs = (x, y) => hgt[((y + H) % H) * W + ((x + W) % W)];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const dx = (Hs(x + 1, y) - Hs(x - 1, y)) * 3.2, dy = (Hs(x, y + 1) - Hs(x, y - 1)) * 3.2;
+    const dx = (Hs(x + 1, y) - Hs(x - 1, y)) * 2.4, dy = (Hs(x, y + 1) - Hs(x, y - 1)) * 2.4;
     const n = Math.hypot(dx, dy, 1), k = (y * W + x) * 4;
     nd[k] = (-dx / n * 0.5 + 0.5) * 255; nd[k + 1] = (dy / n * 0.5 + 0.5) * 255; nd[k + 2] = (1 / n * 0.5 + 0.5) * 255; nd[k + 3] = 255;
   }
