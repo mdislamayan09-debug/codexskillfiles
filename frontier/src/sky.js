@@ -276,6 +276,9 @@ export class Sky {
     this.sun.position.sub(focus).add(f);
     const W = this.weather;
     this.sun.intensity *= 1 - (0.62 + 0.16 * W.blizzard) * W.storm;   // a blizzard is lit mostly by the sky: soft, faint shadows
+    // a storm deck in clear air is broken: cloud shadows cover most of the land, and the sun in the breaks is strong
+    U.uCloudShadow.value = 0.9 * W.storm * (1 - W.blizzard);
+    this.sun.intensity *= 1 + 1.3 * U.uCloudShadow.value;
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uBlizzard.value = W.blizzard;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
@@ -294,15 +297,19 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= (1 + 0.2 * W.blizzard + 0.45 * W.humid - 0.4 * W.dry) * (1 - 0.45 * W.storm * (1 - W.blizzard));   // humid air hazes, but the sea still reads blue to the horizon
+    U.uFogDensity.value *= (1 + 0.2 * W.blizzard + 0.45 * W.humid - 0.4 * W.dry) * (1 - 0.2 * W.storm * (1 - W.blizzard));   // humid air hazes, but the sea still reads blue to the horizon
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
     this.uniforms.uHaze.value.copy(U.uFogColor.value);
 
     // environment map refresh
-    if (Math.abs(this.time - this.lastEnvTime) > 0.08 || Math.abs(W.storm - this.lastEnvStorm) > 0.04) {
-      this.lastEnvTime = this.time; this.lastEnvStorm = W.storm;
-      this.envGround.material.color.setRGB(0.22 * day + 0.01, 0.2 * day + 0.01, 0.13 * day + 0.012);
+    // the lower hemisphere of the ambient light is the ground around the camera: snow throws a bright, cool bounce
+    // up under hat brims and bellies, a forest floor almost none
+    const ga = this.groundAlbedo || (this.groundAlbedo = new THREE.Color(0.22, 0.2, 0.13));
+    const gKey = ga.r + ga.g * 3.1 + ga.b * 7.3;
+    if (Math.abs(this.time - this.lastEnvTime) > 0.08 || Math.abs(W.storm - this.lastEnvStorm) > 0.04 || Math.abs(gKey - (this.lastGroundKey ?? -1)) > 0.05) {
+      this.lastEnvTime = this.time; this.lastEnvStorm = W.storm; this.lastGroundKey = gKey;
+      this.envGround.material.color.setRGB(ga.r * day + 0.01, ga.g * day + 0.01, ga.b * day + 0.012);
       const rt = this.pmrem.fromScene(this.envScene, 0, 0.1, 400);
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;

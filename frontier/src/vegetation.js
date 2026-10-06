@@ -1021,7 +1021,9 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
+    // alpha to coverage on the multisampled target: needle and leaf card edges resolve soft instead of a jagged,
+    // crawling fringe
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -1059,9 +1061,23 @@ export class Vegetation {
       const b = buildPine(700 + i * 29, 'tall');
       addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
     }
+    // tree wells: under a snow-loaded spruce the boughs shelter a hollow of shaded, shallower snow round the trunk,
+    // which seats every tree in the snowfield instead of leaving it standing on the white like a cut-out
+    const wellTex = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+      const gr = g.createRadialGradient(64, 64, 6, 64, 64, 63);
+      gr.addColorStop(0, 'rgb(230,230,230)'); gr.addColorStop(0.45, 'rgb(150,150,150)'); gr.addColorStop(1, 'rgb(0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    })();
+    const wellMat = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x8796ac, alphaMap: wellTex, transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), {
+      fragColor: '#include <color_fragment>\n diffuseColor.a *= 0.55 * smoothstep(0.45, 0.8, climateAt(vWPos.xz).r);',
+    });
+    const wellGeo = new THREE.CircleGeometry(2.3, 28).rotateX(-Math.PI / 2).translate(0, 0.07, 0);
     for (let i = 0; i < 5; i++) {
       const b = buildPine(760 + i * 31, 'fir');
-      addB('fir', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
+      addB('fir', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) },
+        { geometry: wellGeo, material: wellMat, castShadow: false }]);
     }
     const frondTex = palmFrondTexture();
     const palmMat = leafMat(frondTex, 0xd2dcb4);
@@ -1095,7 +1111,7 @@ export class Vegetation {
       bushBuilds.push({ parts: [{ geometry: g, material: oakMats[i % 3], depth: windDepthMaterial(oakTex[i % 3], 1) }] });
     }
     // ferns (3, 4), big-leaf jungle plants (5, 6), dry scrub (7, 8)
-    const fernT = fernTexture(), fernMat = leafMat(fernT, 0xc8d4ae);
+    const fernT = fernTexture(), fernMat = leafMat(fernT, 0xb8bc9e);   // (muted: a saturated card green reads as pasted on)
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(950 + i), fr = [];
       const n = 9 + Math.floor(rnd() * 5);

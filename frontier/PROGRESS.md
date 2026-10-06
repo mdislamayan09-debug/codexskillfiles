@@ -304,3 +304,32 @@ The critic asked for:
   - true darks in the storm frame
   - forest by gully and treeline across the whole valley
   - a bigger, warmer cabin focal point
+
+### Round 30: open pine forest (scores 3, 2, 3)
+The pines frame changed character:
+- tall clear-boled lodgepole and ponderosa stands with high open crowns
+- shafts through bright haze, root flares and the fallen log
+- the horse's head and neck clear of the rider
+
+The critic now asks for:
+- **Pines:** canopy shade on the floor (the frame was overexposed: its mean was 1.7x the reference's).
+- **Snow ride:** riders that take bounce light from the snow instead of reading as black cut-outs.
+- **Snow vista:**
+  - eroded ridgelines instead of noise lumps (the drifts had spilled onto the mountainsides)
+  - light breaking through the storm deck
+  - more snow on the boughs, and tree wells
+
+### Round 31: light
+- **Exposure.** Recalibrated against the references' measured means: no exposure lift in the forest; clear-air
+  storms stop down. The snow ride already matched the reference's highlight, midtone and shadow colours to within
+  about 10%.
+- **Ambient bounce.** It now comes from the ground under the camera: snow throws a bright cool fill up under
+  brims and bellies, while forest floor gives almost none.
+- **Cloud shadows.** A broken storm deck casts drifting cloud shadows over everything lit, and the breaks drop
+  strong pools of sun on slopes and peaks.
+- **Trees and ground.** Tree wells under the snow-country spruce. Wind drifts only on flat snow.
+- **Rider and horse.**
+  - real geometric folds in the rider's coat
+  - a girth strap and rings on the horse
+  - breath smoking from the horse's nostrils in the cold
+- **Grade.** Muted ferns; slightly warmer storm highlights.

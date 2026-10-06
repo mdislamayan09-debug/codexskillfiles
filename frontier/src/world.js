@@ -328,9 +328,7 @@ export class World {
         const r = this.realAt(x, z);
         if (r === null) realW = 0;
         else {
-          // the map's north boundary: the real ground climbs into a closing ridge rather than ending at a cut
-          // except where the valley itself runs on north out of the map (the backdrop carries it to the horizon)
-          const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3)) * smoothstep(240, 760, d ? d.vd : Math.abs(x + 725));
+          // (no closing wall at the north edge any more: the backdrop carries the real ground on past the map)
           let rb = r;
           const sl = this.realSlope(x, z);
           // (not on the summits: steps along a skyline read as a sawtooth)
@@ -342,7 +340,7 @@ export class World {
             const fl = Math.floor(t), fr = t - fl;
             rb += cw * (fl + smoothstep(0.62, 0.95, fr) - t) * S * 0.55;
           }
-          h = lerp(h, rb + rise + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
+          h = lerp(h, rb + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
           // the creek winds down the real valley floor
           // (wide enough to read from the lookouts: an 18 m channel with a braided, iced flood plain beside it)
           if (d && d.vd < 14) h -= 1.5 * smoothstep(10, 3, d.vd) * realW;

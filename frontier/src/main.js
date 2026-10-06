@@ -82,7 +82,7 @@ async function init() {
   if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
-  const snowfall = new Snowfall(scene, QUALITY >= 2 ? 32000 : QUALITY > 1 ? 22000 : 15000);
+  const snowfall = new Snowfall(scene, QUALITY >= 2 ? 80000 : QUALITY > 1 ? 52000 : 30000);
   const snowTrail = new SnowTrail(scene, world);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));
   // lily pads drifting on shallow bayou water
@@ -697,6 +697,14 @@ async function init() {
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
       const swampy = world.splatAt(camera.position.x, camera.position.z).wet * (camera.position.x > 500 && camera.position.z > 600 ? 1 : 0);
+      {
+        // ground under the camera for the ambient bounce: snow, sand, rainforest, autumn litter or ordinary ground
+        const fo2 = world.splatAt(camera.position.x, camera.position.z).forest;
+        const g = new THREE.Color(0.22, 0.2, 0.13).multiplyScalar(1 - 0.45 * fo2);
+        g.lerp(new THREE.Color(0.52, 0.34, 0.2), cc.desert).lerp(new THREE.Color(0.1, 0.14, 0.06), cc.jungle * 0.8)
+          .lerp(new THREE.Color(0.3, 0.2, 0.1), cc.autumn * 0.6).lerp(new THREE.Color(0.7, 0.75, 0.82), THREE.MathUtils.smoothstep(cc.snow, 0.35, 0.75));
+        sky.groundAlbedo = g;
+      }
       sky.setWeather({
         storm: THREE.MathUtils.smoothstep(cc.snow, 0.35, 0.8),
         humid: Math.max(cc.jungle, swampy * 0.7),
@@ -743,6 +751,17 @@ async function init() {
       if (cp.distanceToSquared(camera.position) > 400 * 400 || Math.random() > dt * 9) continue;
       particles.emit(cp.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3)),
         new THREE.Vector3(U.uWind.value.x * 0.6, 1.1 + Math.random() * 0.4, U.uWind.value.y * 0.6), { color: [0.5, 0.5, 0.53], alpha: 0.4, size: 0.8, life: 9, grow: 0.6, drag: 0.25 });   // wood smoke: a grey that reads against snow
+    }
+    // breath smoking from the horse's nostrils in the cold
+    if (player.mounted && world.climateAt(player.hpos.x, player.hpos.z).snow > 0.5) {
+      G.breathT = (G.breathT || 0) + rdt;
+      if (G.breathT > 2.4) {
+        G.breathT = 0;
+        const hp = new THREE.Vector3(0, -0.36, 0.42); player.horse.head.localToWorld(hp);
+        const fw = new THREE.Vector3(Math.sin(player.hyaw), -0.35, Math.cos(player.hyaw));
+        for (let k = 0; k < 8; k++) particles.emit(hp.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.06)),
+          fw.clone().multiplyScalar(0.5 + Math.random() * 0.4), { color: [0.86, 0.88, 0.92], alpha: 0.2, size: 0.14, life: 1.8, grow: 0.7, drag: 0.7 });
+      }
     }
     // sunlit motes / insects drifting around the camera
     if (U.uNight.value < 0.6 && Math.random() < rdt * 6) {

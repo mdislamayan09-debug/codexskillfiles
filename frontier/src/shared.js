@@ -21,6 +21,7 @@ export const U = {
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
   uNight: { value: 0 },
+  uCloudShadow: { value: 0 },  // how much of the sun the broken storm deck blocks (0 = none)
   uTrail: { value: Array.from({ length: 48 }, () => new THREE.Vector2()) },   // horse trail through snow (terrain)
   uTrailN: { value: 0 },
 };
@@ -77,6 +78,17 @@ void farDepth(inout vec4 pos){
 
 export const GLSL_SUNSHADOW = /* glsl */ `
 float gSunVis = 1.0;
+uniform float uCloudShadow;
+// shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the
+// breaks drop drifting pools of sunlight on slopes and peaks (the light the eye goes to)
+float cloudShade(vec3 wp){
+  if (uCloudShadow <= 0.001) return 1.0;
+  vec3 L = normalize(uSunDir);
+  vec2 q = (wp.xz + L.xz / max(L.y, 0.15) * max(1800.0 - wp.y, 200.0)) / 2600.0 + vec2(uTime * 0.0012, uTime * 0.0005);
+  float c = mistN(q) * 0.6 + mistN(q * 2.3 + 7.1) * 0.3 + mistN(q * 5.1 - 3.3) * 0.1;
+  return mix(1.0, smoothstep(0.52, 0.64, c), uCloudShadow);
+}
+
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
 float terrainSunShadow(vec3 wp){
   vec3 L = normalize(uSunDir);
@@ -135,9 +147,9 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     float m = uMist * bank * (1.0 - exp(-dist / 1100.0));
     col = mix(col, mix(uFogColor * 1.15, fogCol, 0.4), clamp(m, 0.0, 0.85));
     // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
-    float band = smoothstep(150.0, 240.0, above) * smoothstep(560.0, 380.0, above);
-    float rag = smoothstep(0.45, 0.75, mistN(wpos.xz / 650.0 + vec2(wpos.y / 400.0, 0.0)) * 0.65 + mistN(wpos.xz / 190.0 - 3.7) * 0.35);
-    col = mix(col, mix(uFogColor * 1.2, fogCol, 0.3), clamp(uMist * band * rag * 0.8 * (1.0 - exp(-dist / 1500.0)), 0.0, 0.8));
+    float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
+    float rag = smoothstep(0.4, 0.8, mistN(wpos.xz / 650.0 + vec2(wpos.y / 400.0, 0.0)) * 0.65 + mistN(wpos.xz / 190.0 - 3.7) * 0.35);
+    col = mix(col, mix(uFogColor * 1.15, fogCol, 0.35), clamp(uMist * band * rag * 0.5 * (1.0 - exp(-dist / 1800.0)), 0.0, 0.6));
     // and the far ranges step back in pale blue-grey layers
     col = mix(col, uFogColor * vec3(0.95, 1.02, 1.15), uMist * 0.32 * (1.0 - exp(-dist / 3200.0)));
   }
@@ -174,12 +186,11 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
       .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FOG_PARS}\n${GLSL_SUNSHADOW}\nvarying vec3 vWPos;\n${fragHead}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n gl_FragColor.rgb = applyAtmosphere(min(gl_FragColor.rgb, vec3(4.0)), vWPos);`);   // clamp specular fireflies before bloom
     if (fragColor) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', fragColor);
-    if (sunShadow) {
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n gSunVis = terrainSunShadow(vWPos);')
-        .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace(
-          'getDirectionalLightInfo( directionalLight, directLight );', 'getDirectionalLightInfo( directionalLight, directLight ); directLight.color *= gSunVis;'));
-    }
+    // every lit surface takes the cloud shadows; terrain-aware materials also take the ridges' long shadows
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n gSunVis = ' + (sunShadow ? 'terrainSunShadow(vWPos) * ' : '') + 'cloudShade(vWPos);')
+      .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace(
+        'getDirectionalLightInfo( directionalLight, directLight );', 'getDirectionalLightInfo( directionalLight, directLight ); directLight.color *= gSunVis;'));
     if (noFlip) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;');
     if (onShader) onShader(shader, renderer);
     if (prev) prev(shader, renderer);

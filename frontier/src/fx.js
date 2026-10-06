@@ -237,7 +237,7 @@ export class Snowfall {
         uniform float uIntensity; uniform vec3 uCam; uniform float uScale; uniform float uTime; uniform vec2 uWind;
         varying float vA;
         void main(){
-          const vec3 BOX = vec3(56.0, 28.0, 56.0);
+          const vec3 BOX = vec3(84.0, 38.0, 84.0);   // deep enough that the fall thins into the distance
           float fall = 0.9 + aSeed.w * 0.9;
           vec3 p = aSeed.xyz * BOX;
           p.y -= uTime * fall;
@@ -246,8 +246,10 @@ export class Snowfall {
           vec4 mv = viewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           float d = -mv.z;
-          gl_PointSize = max((0.02 + 0.03 * aSeed.x * aSeed.x) * uScale / max(d, 0.3), 1.6);
-          vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.8, 2.6, d) * smoothstep(28.0, 14.0, d) * (0.55 + 0.45 * aSeed.z);
+          // a few big wet flakes among many fine ones; those passing close to the lens are soft, out-of-focus discs
+          float sz = 0.016 + 0.03 * aSeed.x * aSeed.x + 0.05 * step(0.93, aSeed.z) * aSeed.x;
+          gl_PointSize = max(sz * uScale / max(d, 0.3) * (1.0 + 1.5 * smoothstep(3.0, 0.8, d)), 1.4);
+          vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.5, 1.4, d) * smoothstep(40.0, 16.0, d) * (0.55 + 0.45 * aSeed.z) * mix(0.35, 1.0, smoothstep(0.8, 3.0, d));
           if (vA <= 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         }`,
       fragmentShader: /* glsl */ `
@@ -255,7 +257,7 @@ export class Snowfall {
         varying float vA;
         void main(){
           float r = length(gl_PointCoord - 0.5);
-          float a = smoothstep(0.5, 0.15, r) * vA;
+          float a = smoothstep(0.5, 0.1, r) * vA;
           gl_FragColor = vec4(mix(vec3(0.9, 0.93, 0.97), uFogColor * 1.6, 0.25), a * 0.85);
         }`,
       transparent: true, depthWrite: false,

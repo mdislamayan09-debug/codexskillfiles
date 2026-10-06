@@ -34,12 +34,16 @@ function hairTexture(col, strands = 260, wispy = false) {
 function blanketTexture(r) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d');
-  const pal = [['#7a2418', '#d8c8a0', '#1e1a18'], ['#2a3a5a', '#c8b890', '#7a2418'], ['#5a4a2a', '#e0d0a8', '#3a5a6a']][Math.floor(r() * 3)];
+  // worn, sun-faded wool in earth reds and browns (a bright blue blanket read as a plastic placeholder)
+  const pal = [['#6a2a1c', '#c4b088', '#2a221c'], ['#7a3a22', '#b8a47c', '#3a2a20'], ['#4a3a2a', '#c0ae86', '#6a2a1c']][Math.floor(r() * 3)];
   g.fillStyle = pal[0]; g.fillRect(0, 0, 256, 256);
   for (let y = 0; y < 256; y += 32) { g.fillStyle = pal[2]; g.fillRect(0, y + 2, 256, 4); }
   g.fillStyle = pal[1];
   for (let k = 0; k < 4; k++) { const cx = 32 + k * 64; for (let s = 0; s < 6; s++) g.fillRect(cx - 24 + s * 4, 128 - s * 8, 48 - s * 8, 16 * 0 + 8), g.fillRect(cx - 24 + s * 4, 120 + s * 8, 48 - s * 8, 8); }
   for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.12})`; g.fillRect(r() * 256, r() * 256, 2, 1); }
+  // wool weave and felted wear where the saddle and legs rub
+  for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(255,240,210,${r() * 0.06})`; g.fillRect(r() * 256, r() * 256, 1 + r() * 3, 1); }
+  for (let i = 0; i < 40; i++) { const x = r() * 256, y = r() * 256, rad = 8 + r() * 30; const gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(200,180,150,0.18)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 // Worn saddle leather: mottled tan-to-dark hide, grain creases, scuffs rubbed lighter
@@ -188,7 +192,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             ${quad
               // broad muscle swells, the coat's hair lying in streaks along the body (catching the light in bands),
               // and the groove down the croup
-              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 95.0, vRest.y * 32.0 + vRest.x * 42.0)) * 0.0032 + vnoise(vec2(vRest.z * 300.0, vRest.y * 90.0 + vRest.x * 120.0)) * 0.0009 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
+              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0013 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0005 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -412,6 +416,18 @@ function mhTemplate(outfit, o) {
     else if (r === G.foot) { L0 = L.boots; push = 0.009; }
     else if (r === G.hand) { if (o.gloves) { L0 = L.gloves; push = 0.002; } }
     lab[i] = L0;
+    // real cloth relief on the coat: hanging folds down the back and skirt, bunched creases at the elbows and
+    // across the sleeves, so the silhouette and the light both break up (shading alone reads as a flat shell)
+    if (L0 === L.coat) {
+      const fn = Math.sin(x * 9.1 + z * 6.3) * 0.5 + Math.sin(y * 17.0 + x * 4.0) * 0.5;
+      if (r === G.torso || r === G.pelvis || r === G.thigh) {
+        const hang = (Math.sin(x * 52 + 2.2 * fn) * 0.5 + 0.5) ** 2 * (1 - Math.min(1, Math.max(0, (y - 0.95) / 0.5)));
+        push += 0.011 * hang * (winter ? 1.3 : 1);
+        push += 0.004 * Math.sin(y * 38 + x * 12 + fn * 2.5) * (z < 0 ? 1 : 0.5);
+      } else if (r === G.uarm || r === G.farm) {
+        push += 0.006 * (Math.sin(y * 64 + z * 30 + fn * 3.0) * 0.5 + 0.5) ** 2;
+      }
+    }
     pos[i * 3] = x + N[i * 3] * push; pos[i * 3 + 1] = y + N[i * 3 + 1] * push; pos[i * 3 + 2] = z + N[i * 3 + 2] * push;
   }
   const geo = new THREE.BufferGeometry();
@@ -1129,6 +1145,13 @@ export class Quadruped {
       const stir = new THREE.TorusGeometry(0.06, 0.012, 4, 10); stir.translate(s * 0.42, 1.14, 0.05);
       body.add(mesh(stir, std({ color: 0x3a3632, metalness: 0.6 })));
       const fender = new THREE.BoxGeometry(0.02, 0.4, 0.18); fender.translate(s * 0.36, 1.45, 0.02); body.add(mesh(fender, leather));
+    }
+    // the cinch: a girth strap round the barrel under the belly, holding the saddle down
+    {
+      const girth = new THREE.TorusGeometry(1, 0.028, 6, 30, Math.PI);
+      girth.rotateZ(Math.PI); girth.scale(0.395, 0.45, 1); girth.translate(0, 1.33, 0.14);
+      body.add(mesh(girth, leather));
+      for (const s of [-1, 1]) { const rg = new THREE.TorusGeometry(0.035, 0.007, 4, 10); rg.rotateY(Math.PI / 2); rg.translate(s * 0.4, 1.4, 0.14); body.add(mesh(rg, std({ color: 0x8a8070, metalness: 0.7, roughness: 0.4 }))); }
     }
     // rifle in a leather scabbard slung forward along the off-side shoulder
     const scab = new THREE.CylinderGeometry(0.035, 0.05, 0.8, 8);

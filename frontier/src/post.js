@@ -89,7 +89,7 @@ const GradeShader = {
       col = mix(col, sat(col, 0.82) * mix(vec3(0.86, 0.95, 1.12), vec3(1.0), smoothstep(0.15, 0.6, l)), uStorm * 0.7);
       // and the whole frame steps down into steel blue, as in the references (their snow sits near 0.6/0.75/0.9
       // R/G/B of ours): red and green pulled down hardest in the shadows, the whites keep a little more
-      col *= mix(vec3(1.0), mix(vec3(0.6, 0.8, 1.02), vec3(0.74, 0.88, 1.03), smoothstep(0.2, 0.85, l)), uStorm);
+      col *= mix(vec3(1.0), mix(vec3(0.6, 0.8, 1.02), vec3(0.8, 0.9, 1.02), smoothstep(0.2, 0.85, l)), uStorm);
       // and a firmer S-curve, so the storm frame has true darks in rock and timber and bright snow, not one mid band
       col = mix(col, col * col * (3.0 - 2.0 * col) * 1.08, uStorm * 0.25);
       // night: blue shift
