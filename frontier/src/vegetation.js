@@ -61,6 +61,10 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // (in clumps along the bough, not a full coat: evenly coated firs read as frosted Christmas trees)
       sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.54, 0.66, vMapUv.y + 0.1 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)) * smoothstep(0.3, 0.6, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)));
       #endif
+      #if defined(FROST_ALL) && defined(USE_MAP)
+      // and snow lodged in the upper crown of the brush, in clumps (snowless brush read as grey pom-poms on the snow)
+      sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
+      #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
@@ -550,7 +554,7 @@ const twigTexture = () => cardCanvas(256, 256, (g, r) => {
     g.strokeStyle = `rgb(${110 + r() * 30},${92 + r() * 20},${70 + r() * 15})`; g.lineWidth = w;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
     if (d > 0) for (let k = 0; k < 2 + (r() < 0.5); k++) branch(x2, y2, a + (r() - 0.5) * 1.3, L * (0.6 + r() * 0.2), w * 0.65, d - 1);
-    else { g.fillStyle = `rgba(${150 + r() * 40},${140 + r() * 30},${90},0.8)`; g.fillRect(x2 - 2, y2 - 2, 4, 4); }
+    else { g.fillStyle = `rgba(${62 + r() * 20},${48 + r() * 14},${34},0.9)`; g.fillRect(x2 - 1, y2 - 1, 2, 2); }   // dark buds (pale tips frosted into white dots)
   };
   for (let i = 0; i < 7; i++) branch(128 + (r() - 0.5) * 40, 256, Math.PI / 2 + (r() - 0.5) * 1.2, 50 + r() * 30, 4, 4);
 });
@@ -923,7 +927,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.2 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));   // (much more and the floor went bare)
       // and in the pine woods it grows in drifts where the light gets in, open duff between them (a clump every few
       // metres everywhere read as tufts dotted over the floor at regular spacing)
-      dens *= mix(1.0, smoothstep(0.3, 0.55, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
+      dens *= mix(1.0, smoothstep(0.38, 0.6, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -1092,7 +1096,8 @@ function rockMaterial(surf = {}, bare = false) {
       }
       base *= 0.85 + 0.2*n2;
       // dark joint seams
-      base *= 1.0 - 0.55 * rockCrack(vWPos) * smoothstep(60.0, 10.0, length(vWPos - cameraPosition));
+      // (faint: dark winding seams at full strength read as the veins of wet marble, not jointed granite)
+      base *= 1.0 - 0.25 * rockCrack(vWPos) * smoothstep(40.0, 8.0, length(vWPos - cameraPosition));
       vec4 rcl = climateAt(vWPos.xz);
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);

@@ -82,7 +82,7 @@ async function init() {
   if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
-  const snowfall = new Snowfall(scene, QUALITY >= 2 ? 80000 : QUALITY > 1 ? 52000 : 30000);
+  const snowfall = new Snowfall(scene, QUALITY >= 2 ? 150000 : QUALITY > 1 ? 70000 : 30000);
   const snowTrail = new SnowTrail(scene, world);
   const campfires = town.campfires.map((p) => new Campfire(scene, p, particles));
   // lily pads drifting on shallow bayou water
@@ -447,7 +447,12 @@ async function init() {
           for (let d = 150; d <= 700; d += 110) for (const fw of [100, 350]) wall = Math.max(wall, world.heightAt(x + rt[0] * sd * d + f[0] * fw, z + rt[1] * sd * d + f[1] * fw) - h);
           sides += Math.min(wall, 450);
         }
-        const score = sides - ahead * 0.8;
+        // the frozen creek winding away through the middle of the lens's view, 40-220 m out, leading the eye up the
+        // valley as in the reference (the lens looks 0.56 rad left of the horse's heading)
+        let creek = 0;
+        const va = a + 0.56;
+        for (let d = 40; d <= 220; d += 20) for (const b of [-0.18, 0, 0.18]) if (world.splatAt(x + Math.sin(va + b) * d, z + Math.cos(va + b) * d).wet > 0.4) { creek++; break; }
+        const score = sides - ahead * 0.8 + creek * 45;
         if (score > bs && G.treesNear(x, z, 6) === 0 && G.treesNear(x - f[0] * 6, z - f[1] * 6, 5) === 0) { bs = score; best = [x, z, a]; }
       }
     }
@@ -642,7 +647,8 @@ async function init() {
       }
       const firs = veg.groups.fir;
       if (firs.length) for (let gi = 0; gi < 12; gi++) {
-        const ahead = 40 + rr() * 150, side = (rr() < 0.5 ? -1 : 1) * (14 + ahead * 0.3 + rr() * 40);   // (within the near-tree radius: no billboards are built for trees set down after load)
+        // (out toward the sides: a clump in the middle walled off the valley's vanishing point)
+        const ahead = 40 + rr() * 150, side = (rr() < 0.5 ? -1 : 1) * (20 + ahead * 0.38 + rr() * 30);
         const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
         for (let k = 0, n = 2 + Math.floor(rr() * 5); k < n; k++) {
           const x = gx + (rr() - 0.5) * 16, z = gz + (rr() - 0.5) * 16;
@@ -676,6 +682,27 @@ async function init() {
       for (let i = 0; i < 14; i++) {
         const [ux, uz] = at(3 + i * 1.3, (i % 2 ? 1 : -1) * (2.4 + (i * 0.37) % 1.6));
         veg.bushes.add(ux, world.heightAt(ux, uz) - 0.05, uz, i * 1.3, 0.55 + (i % 3) * 0.2, i % 4 === 3 ? 7 : 3 + (i % 2));
+      }
+      // the floor the reference rides through: drifts of knee-high shrub, fern and backlit bunchgrass either side of
+      // the trail out to forty metres, in clumps with bare duff between, and young pines among them (the floor had
+      // read as a bare plane with grass tufts stamped on it)
+      {
+        let sd = 4242;
+        const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+        for (let gi = 0; gi < 26; gi++) {
+          const ahead = 2 + rr() * 38, side = (rr() < 0.5 ? -1 : 1) * (4.6 + rr() * (5 + ahead * 0.5));   // (clear of the trail itself)
+          const [gx, gz] = at(ahead, side), kind = rr();
+          for (let k = 0, n = 3 + Math.floor(rr() * 6); k < n; k++) {
+            const x = gx + (rr() - 0.5) * 4.5, z = gz + (rr() - 0.5) * 4.5;
+            const v = kind < 0.4 ? Math.floor(rr() * 3) : kind < 0.75 ? 3 + Math.floor(rr() * 2) : 9;
+            veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, (v === 9 ? 0.6 : 0.65) + rr() * 0.6, v);
+          }
+        }
+        const pines = veg.groups.pine;
+        if (pines.length) for (let i = 0; i < 5; i++) {
+          const [x, z] = at(8 + rr() * 30, (rr() < 0.5 ? -1 : 1) * (5 + rr() * 12));
+          veg.trees.add(x, world.heightAt(x, z) - 0.1, z, rr() * 6.28, 0.18 + rr() * 0.16, pines[Math.floor(rr() * pines.length)]);
+        }
       }
       veg.update(player.hpos, true);
     }
@@ -898,7 +925,7 @@ async function init() {
       // (the forest haze once read as milk at 1.7x the reference's exposure; with the canopy now closed by full
       // crowns the woods went the other way, 0.6x in their upper two-thirds, and want the sunlit haze back)
       // (the reference's woods are full of warm backlit haze: trunks 150 m off fade to pale gold-grey)
-      G.mistK = 1 + (fo * 1.7 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 1.25 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -926,7 +953,8 @@ async function init() {
       for (const rr of [220, 800]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; gmin = Math.min(gmin, world.heightAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr)); }
       const fb = Math.max(0, gmin - 10);
       U.uFogBase.value += (fb - U.uFogBase.value) * (G.frame < 3 ? 1 : Math.min(1, rdt * 0.5));
-      U.uMist.value = sky.weather.storm * (1 - sky.weather.blizzard) * THREE.MathUtils.smoothstep(cc.snow, 0.4, 0.8);
+      // (fog banks stack down the valley in falling snow too: the reference's ridges separate by value through it)
+      U.uMist.value = sky.weather.storm * (1 - 0.55 * sky.weather.blizzard) * THREE.MathUtils.smoothstep(cc.snow, 0.4, 0.8);
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);

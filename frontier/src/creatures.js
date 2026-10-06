@@ -127,7 +127,8 @@ function buildBones(spec) {
 
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
 const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8, 0.95, 0.95'; // coat (index 3) is worn leather
-const ROUGH_QUAD = '0.6, 0.58, 0.35, 0.5, 0.72, 0.65, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
+// (a groomed coat has a satin sheen, not a gloss: at 0.6 the horse read as polished plastic)
+const ROUGH_QUAD = '0.74, 0.7, 0.35, 0.55, 0.78, 0.76, 0.72, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
 function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.7, sheenRoughness: 0.45, sheenColor: new THREE.Color(0.55, 0.42, 0.3), envMapIntensity: 1.5 })
@@ -166,8 +167,10 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         // a dusting of snow settles on shoulders, hats and backs out in the cold country
         {
           vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
-          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.6, 0.95, wn.y) * (0.5 + 0.5 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * ${kind === 'human' ? '0.16' : '0.4'});
+          // (caught in clumps on the hat, shoulders, bedroll and rump, as in the reference's storm; a faint even
+          // dusting read as no snow at all)
+          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.45, 0.9, wn.y) * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0) + 0.4 * vnoise(vRest.xz * 13.0 - vRest.y * 7.0));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.6'});
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
@@ -192,7 +195,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             ${quad
               // broad muscle swells, the coat's hair lying in streaks along the body (catching the light in bands),
               // and the groove down the croup
-              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0013 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0005 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
+              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0018 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0008 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -396,7 +399,9 @@ function mhTemplate(outfit, o) {
     }
     else if (r === G.neck) {
       if (o.bandana && y < MH.rest.neck[1] + 0.03) { L0 = L.bandana; push = winter ? 0.022 : 0.01; }
-      else if (o.coat && y < MH.rest.neck[1] - 0.01) { L0 = L.coat; push = 0.014; }
+      // the collar stands out lower down to meet the coat on the shoulders (a step between the two shells showed the
+      // dark inside of the coat as a black triangle at the nape)
+      else if (o.coat && y < MH.rest.neck[1] - 0.01) { L0 = L.coat; push = 0.014 + 0.022 * Math.min(1, Math.max(0, (MH.rest.neck[1] - 0.01 - y) / 0.06)); }
     } else if (r === G.torso || r === G.uarm || r === G.farm) {
       // open coat front: a V from the collar down to the belt shows the vest, and the shirt at the throat
       const fz = z - MH.rest.spine[2];
@@ -1041,10 +1046,11 @@ export class Quadruped {
       const tcards = [];
       // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a
       // round, layered bundle, full at the top and separating into wisps toward the hocks (not one flat card)
-      for (let i = 0; i < 34; i++) {
-        const th = r() * Math.PI * 2, rho = 0.015 + r() * 0.05;
-        const len = 0.75 + r() * 0.5 - rho * 2;
-        const c = new THREE.PlaneGeometry(0.05 + r() * 0.04, len, 1, 9);
+      // (fuller: 34 narrow locks within 7 cm of the dock read from behind as one dark strip)
+      for (let i = 0; i < 52; i++) {
+        const th = r() * Math.PI * 2, rho = 0.02 + r() * 0.075;
+        const len = 0.8 + r() * 0.55 - rho * 2;
+        const c = new THREE.PlaneGeometry(0.06 + r() * 0.06, len, 1, 9);
         c.translate(0, -len / 2, 0);
         const cp0 = c.attributes.position;
         for (let k = 0; k < cp0.count; k++) { const y = -cp0.getY(k); cp0.setX(k, cp0.getX(k) * (1 + y * 0.7)); }
@@ -1056,7 +1062,7 @@ export class Quadruped {
         for (let k = 0; k < cp.count; k++) {
           const y = -cp.getY(k);
           cp.setZ(k, cp.getZ(k) - Math.sin(Math.min(y, 0.45) * 2.4) * 0.15 + y * 0.03);
-          cp.setX(k, cp.getX(k) * (1 + y * 0.35));
+          cp.setX(k, cp.getX(k) * (1 + y * 0.6) + Math.sin(th) * y * 0.09);
         }
         tcards.push(c);
       }
@@ -1088,7 +1094,8 @@ export class Quadruped {
   addTack(bones, r, at) {
     const body = bones.body;
     // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
-    const leather = std({ map: leatherTexture(r), color: new THREE.Color(2.0, 1.7, 1.4), roughness: 0.55 });
+    // (worn, oiled and dusty: at 0.55 roughness with a strong lift the bags and seat read as orange plastic)
+    const leather = std({ map: leatherTexture(r), color: new THREE.Color(1.55, 1.28, 1.02), roughness: 0.78 });
     const blanket = std({ map: blanketTexture(r), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
@@ -1170,7 +1177,7 @@ export class Quadruped {
     scab.rotateX(Math.PI / 2 - 0.55); scab.translate(0.37, 1.42, 0.38);
     body.add(mesh(scab, leather));
     const stock = new THREE.BoxGeometry(0.045, 0.09, 0.26); stock.rotateX(-0.55); stock.translate(0.37, 1.66, 0.0);
-    body.add(mesh(stock, std({ color: 0x5a3820, roughness: 0.5 })));
+    body.add(mesh(stock, std({ color: 0x3a2416, roughness: 0.68 })));   // dark oiled walnut, not a pale lit block
     const rope = new THREE.TorusGeometry(0.12, 0.018, 6, 16); rope.rotateY(Math.PI / 2); rope.translate(0.24, 1.73, 0.22);
     body.add(mesh(rope, std({ color: 0x9a845a })));
     // bridle + reins on the head

@@ -545,6 +545,9 @@ export class World {
             const sl = this.realSlope(x, z);
             const vd = D.vd[k];
             let fr = smoothstep(760, 690, h + 70 * n2.fbm(x / 180, z / 180, 3));     // tree line: ragged but sharp
+            // and the timber thins as it climbs: massed on the valley floor and lower slopes, open stands higher up
+            // (one density over every slope and ridgetop read as pepper)
+            fr *= 0.35 + 0.65 * smoothstep(640, 330, h + 50 * n2.fbm(x / 240 + 3.3, z / 240, 3));
             fr *= 1 - smoothstep(0.4, 0.56, sl);                                        // cliffs and steep faces stay bare
             // timber follows the water: thick in the draws and gullies, thin on the spurs and convex shoulders
             {
@@ -703,6 +706,14 @@ export class World {
       this.heights[k] = lerp(this.heights[k], h0, smoothstep(R, r, d));
     }
     this.heightTex.needsUpdate = true;
+    // and the yard is open ground: no forest tint left under the cleared trees (it read as a flat grey shelf)
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const d = Math.hypot(i * CELL - HALF - x, j * CELL - HALF - z);
+      if (d > R) continue;
+      const k = (j * RES + i) * 4 + 2;
+      this.splat[k] = Math.round(this.splat[k] * (1 - smoothstep(R, r, d)));
+    }
+    this.splatTex.needsUpdate = true;
     return h0;
   }
 

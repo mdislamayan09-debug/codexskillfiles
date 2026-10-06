@@ -473,3 +473,37 @@ as a lookout over a valley.
 - The dense young firs crowded the pine trail into Christmas-tree walls, so there are now fewer of them.
 - The snow ride's air read as too clear.
 - The vista's mountains still lack rock faces.
+
+**Round 45 critic:** pines 4, snowride 5, snowvista 4.
+**Round 46 critic:** pines 4, snowride 4, snowvista 3.5.
+
+### Rounds 46–48: air in the forest, a storm deck, closer riders
+- **Pines.**
+  - The floor went back to a darker, layered brown needle duff and the trail to a brown dirt tread; the pale
+    version had read as beige sand.
+  - Forest effects (warm backlit haze, stronger shafts, a little exposure lift, the forest grade) now apply only
+    below the snow line. On the snowy lookout they had milked out the vista.
+- **Snow vista and snow ride.**
+  - Erosion ribs and runnels run down the fall line of the snow-country slopes, so steep faces read as couloirs
+    and rock bands.
+  - Exposed rock keeps its warm grey-brown.
+  - Clear-air storms keep more colour.
+  - In storm the cloud slab flattens into a low deck with dark undersides.
+  - Mist rags are torn apart with clear air between them.
+- **Rides.** Both are framed closer, with the rider filling the lower centre as in the references.
+- **Snow ride.**
+  - The horse wades deeper, and its trench is stronger.
+  - Sage, rocks and dead snags cover the near snowfield.
+  - The crags now sit inside the frame.
+  - Lone dead stalks are gone; they read as black stakes.
+- **Billboards.** They are re-packed after a shot's dressing, so cleared sightlines clear at every distance. The
+  vista's homestead now shows, with chimney smoke.
+- **Ledge granite.** Cut by twice the joint planes, near-matte.
+- **Tack and horse.**
+  - Darker, rougher leather.
+  - A dark walnut stock instead of a pale lit block.
+  - The coat collar closes the gap that showed a black triangle at the nape.
+  - A fuller tail.
+  - A satin rather than glossy horse coat.
+- **Captures.** They now render at 1.5× supersampling. Headless Chromium has a device pixel ratio of 1, while the
+  target Mac renders at 2×, so the critic had been judging aliased foliage that a player never sees.

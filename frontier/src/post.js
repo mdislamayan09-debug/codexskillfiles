@@ -41,9 +41,10 @@ const ShaftShader = {
         w *= 0.965;
       }
       acc /= float(N) * 0.5;
-      float fall = exp(-dist * 2.2);
+      // (a long reach at a lower strength: beams carried across the midground, not a halo round the sun)
+      float fall = exp(-dist * 1.25);
       // capped, so the sun's own gap does not swell into a white blob
-      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.7);
+      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis * 0.8, uSunColor * 0.55);
       gl_FragColor = vec4(base.rgb + shafts, base.a);
     }`,
 };
@@ -82,7 +83,8 @@ const GradeShader = {
       // reference's woods keep true blacks but hold the hazy canopy gaps near 0.45 and their brightest 5% near
       // 0.75; an S-curve here had blown the gaps to 0.6 and the top 5% to 0.9 (and a lifted toe went milky)
       {
-        vec3 c2 = sat(col, 1.12) * mix(vec3(0.94, 0.98, 0.94), vec3(1.06, 1.0, 0.88), smoothstep(0.2, 0.8, l));
+        // (cool teal-green in the shade against warm gold in the light: an even olive cast read as grey-green mud)
+        vec3 c2 = sat(col, 1.15) * mix(vec3(0.88, 1.0, 0.97), vec3(1.08, 1.0, 0.84), smoothstep(0.15, 0.75, l));
         c2 -= 0.2 * max(c2 - 0.35, 0.0);
         col = mix(col, c2, uForest);
       }
