@@ -1293,7 +1293,10 @@ export class Vegetation {
           }
           // rainforest crowns read lush and mid-green from afar, not black
           alb = mix(alb, alb * vec3(0.9, 1.25, 0.8) * 1.6, icl.g);
-          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.6);
+          // snow on the upper boughs, fading out with distance: a few-pixel tree with a white cap is what turns a
+          // far forest into salt-and-pepper speckle
+          float dCam = length(cameraPosition - vW);
+          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.6 * smoothstep(520.0, 220.0, dCam));
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
@@ -1302,13 +1305,13 @@ export class Vegetation {
           vec3 col = alb * (uSunColor * ndl * 0.13 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.24 * ao + vec3(0.005));
           // far trees take on the shading of the canopy-tinted terrain they sink into, so the fade band
           // reads as forest texture rather than pale or black specks
-          float farK = smoothstep(620.0, 1050.0, length(cameraPosition - vW));
+          float farK = smoothstep(mix(620.0, 260.0, smoothstep(0.4, 0.8, icl.r)), mix(1050.0, 640.0, smoothstep(0.4, 0.8, icl.r)), length(cameraPosition - vW));
           if (farK > 0.0) {
             float cn = fbm2(vW.xz / 18.0);
             vec3 cAlb = mix(pow(vec3(34.0, 46.0, 26.0) / 255.0, vec3(2.2)), pow(vec3(52.0, 62.0, 32.0) / 255.0, vec3(2.2)), cn);
             cAlb = mix(cAlb, mix(pow(vec3(26.0, 50.0, 20.0) / 255.0, vec3(2.2)), pow(vec3(40.0, 68.0, 26.0) / 255.0, vec3(2.2)), cn), icl.g);
             cAlb = mix(cAlb, mix(pow(vec3(124.0, 58.0, 22.0) / 255.0, vec3(2.2)), pow(vec3(158.0, 112.0, 32.0) / 255.0, vec3(2.2)), cn), icl.b * 0.85);
-            cAlb = mix(cAlb, mix(cAlb, vec3(0.55, 0.6, 0.65), 0.5), smoothstep(0.4, 0.8, icl.r));
+            cAlb = mix(cAlb, pow(vec3(30.0, 38.0, 36.0) / 255.0, vec3(2.2)), smoothstep(0.4, 0.8, icl.r));   // matches the snow-country canopy
             vec3 nT = normalAt(vW.xz);
             float ndlT = max(dot(nT, normalize(uSunDir)), 0.0);
             vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.2 * ao);

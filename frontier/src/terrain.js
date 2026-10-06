@@ -312,7 +312,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // the frozen creek in Frostwater Valley
   float cold = smoothstep(0.5, 0.8, snowC);
   // dark meltwater only in short open leads; most of the channel is iced and drifted over
-  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.58, 0.72, fbm2(xz / 60.0 + 3.3));
+  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.4, 0.58, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   c = mix(c, mix(srgb(vec3(112,128,140)), snow, 0.25 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);

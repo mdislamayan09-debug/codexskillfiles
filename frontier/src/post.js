@@ -76,7 +76,7 @@ const GradeShader = {
       {
         vec3 c2 = col * col * (3.0 - 2.0 * col);
         c2 = sat(c2, 1.15) * mix(vec3(0.94, 0.98, 0.94), vec3(1.06, 1.0, 0.88), smoothstep(0.2, 0.8, l));
-        col = mix(col, c2 - 0.012, uForest * 0.55);
+        col = mix(col, c2, uForest * 0.3);
       }
       // storm: cold, blue-grey and low-saturation
       col = mix(col, sat(col, 0.6) * vec3(0.84, 0.95, 1.15), uStorm * 0.75);

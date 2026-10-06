@@ -302,7 +302,8 @@ export class World {
           let rb = r;
           const sl = this.realSlope(x, z);
           // (not on the summits: steps along a skyline read as a sawtooth)
-          const cw = smoothstep(0.22, 0.42, sl) * smoothstep(0.35, 0.6, n3.fbm(x / 500 + 2.2, z / 500 - 7.1, 3) + 0.5) * (1 - smoothstep(560, 760, r));
+          // only on genuinely steep faces (on forested slopes the steps read as contour lines)
+          const cw = smoothstep(0.34, 0.5, sl) * smoothstep(0.35, 0.6, n3.fbm(x / 500 + 2.2, z / 500 - 7.1, 3) + 0.5) * (1 - smoothstep(560, 760, r));
           if (cw > 0.01) {
             const S = 11 + 8 * (0.5 + 0.5 * n2.fbm(x / 300 + 4.4, z / 300, 2));
             const t = r / S + 0.7 * n.fbm(x / 120 - 1.3, z / 120 + 6.6, 3);

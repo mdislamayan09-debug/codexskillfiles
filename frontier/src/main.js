@@ -253,29 +253,35 @@ async function init() {
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
   G.findVista = () => {
-    // A lookout over the cabin: look up or down the valley from an open shoulder, the cabin in the lower third
+    // A lookout above the cabin, looking straight over it and on down the valley: the cabin sits in the lower
+    // third, the creek and the valley floor lead the eye away, the ranges and the storm fill the top
     const cabY = world.heightAt(CABIN.x, CABIN.z) + 3;
-    const V = world.valley;
-    const targets = [V[Math.floor(V.length * 0.06)]];   // up-valley: the range closes the view, as in the reference
+    const vh = world.valley[Math.floor(world.valley.length * 0.06)];
+    const upDir = Math.atan2(vh[0] - CABIN.x, vh[1] - CABIN.z);
     let best = null, bs = -1e9;
-    for (const [tx, tz] of targets) for (let r = 110; r <= 560; r += 30) for (let a = 0; a < Math.PI * 2; a += Math.PI / 18) {
+    for (let r = 110; r <= 420; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
-      if (above < 30 || above > 220) continue;
-      const va = Math.atan2(tx - cx, tz - cz);
-      let off = Math.atan2(CABIN.x - cx, CABIN.z - cz) - va;
-      off = Math.atan2(Math.sin(off), Math.cos(off));
-      if (Math.abs(off) > 0.4) continue;
+      if (above < 25 || above > 160) continue;
+      const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
+      // looking up-valley, toward the head of the valley and its peaks
+      let dv = va - upDir; dv = Math.atan2(Math.sin(dv), Math.cos(dv));
+      if (Math.abs(dv) > 0.75) continue;
       let clear = true;
       for (let k = 1; k < 30 && clear; k++) { const t = k / 30; if (world.heightAt(cx + (CABIN.x - cx) * t, cz + (CABIN.z - cz) * t) > ch + (cabY - ch) * t - 1.5) clear = false; }
       if (!clear) continue;
-      // openness: nothing rising into a 65 degree fan in front of the lens
-      let blocked = 0;
-      for (let b = -0.55; b <= 0.56; b += 0.11) for (let d = 20; d <= 320; d += 25) {
-        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 2 - d * 0.1) blocked += Math.abs(b) < 0.3 ? 3 : 1;
+      // depth beyond the cabin: the valley floor stays well below the lens for a long way
+      let depth = 0;
+      for (let d = r + 150; d <= r + 2400; d += 150) for (const b of [-0.25, 0, 0.25]) {
+        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) < ch - 25) depth++;
       }
-      const score = -blocked * 4 - Math.abs(above - 95) * 0.4 - Math.abs(off) * 40 - Math.abs(r - 280) * 0.03;
-      if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: Math.hypot(CABIN.x - cx, CABIN.z - cz) }; }
+      // nothing near the lens rising into the frame
+      let blocked = 0;
+      for (let b = -0.5; b <= 0.51; b += 0.1) for (let d = 15; d <= Math.min(r, 160); d += 15) {
+        if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
+      }
+      const score = depth * 3 - blocked * 4 - Math.abs(above - 55) * 0.4 - Math.abs(r - 180) * 0.06;
+      if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
     // pitch so the cabin sits in the lower third with the valley and the sky above it
@@ -659,7 +665,7 @@ async function init() {
       const fo = world.splatAt(camera.position.x, camera.position.z).forest;
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 0.6 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 0.85 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -751,7 +757,7 @@ async function init() {
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     const coldGrade = Math.max(sky.weather.blizzard, 0.75 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 2.4 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;
