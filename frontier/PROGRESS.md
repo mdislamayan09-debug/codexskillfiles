@@ -221,3 +221,54 @@ What's limiting the remaining distance:
 - **Characters and vegetation need real art.** RDR2's look comes from scanned and hand-authored assets. The CC0
   scan libraries (Poly Haven, ambientCG) are blocked by this environment's network policy, so characters and
   foliage are still procedural.
+
+### Rounds 22–27: more real ground, a real human body (scores 2–5 ours vs reference, worst "clearly")
+- **Every climate on real ground.** Real DEM patches now cover:
+  - Monument Valley (desert)
+  - Na Pali (jungle coast)
+  - Cades Cove (autumn hills)
+  - Yosemite Valley (the snowy canyon ride)
+
+  Each patch is baked with `scripts/bake_patch.py`. The generated world fills the gaps and the boundary ranges.
+- **The rider is a MakeHuman (CC0) body.** It is reposed and folded onto the game skeleton by `scripts/build_human.py`.
+  Clothing is cut from body regions and pushed out along the normals:
+  - open coat with a V-front over the vest
+  - creased felt hat
+  - trapper hat with ear flaps for the cold
+- **Cinematic preset by default.** 4096² heightmap, finer creature sculpts, denser stands and understorey.
+- **Recurring critic notes:**
+  - forest lighting crushed to black, with no shafts
+  - distant forest reads as stipple
+  - mountains streaked rather than rock with snow on the ledges
+  - the snow grade goes sepia instead of steel-blue
+  - not enough foreground anchors
+  - a bare snow floor
+
+  All of these got targeted fixes: forest grade and shafts that fire on trails, clean stand edges, rock joints and
+  lichen, cool storm highlights, set-dressed foreground rocks and brush, and dry tufts.
+- **Bug found in round 27.** Grass had silently failed to compile since the snow-tuft change: a variable was
+  used before it was declared. Every frame from rounds 25–27 was missing its grass. The probe script now prints
+  console shader errors, and every probe is checked for them.
+
+### Round 28: the horizon, the horse, the kit
+- **Distant country beyond the map edge** (`src/backdrop.js`).
+  - **What it is.** A square ring of terrain out to about 70 km that carries on whatever lies at each edge:
+    - snowy ranges to the north
+    - mesas and sierras to the south-west
+    - forested ridges elsewhere
+    - sea off the coast
+  - **The valley carries on.** Kawuneeche runs on north between the ranges, so the up-valley vista recedes into
+    the haze like the reference, instead of ending at a wall.
+  - **Depth.** Every patched material squeezes depth beyond 6.5 km into the 6.5–8 km band (`GLSL_FAR_DEPTH`), so
+    the ranges sort correctly and are never clipped by the far plane.
+- **Horse framing.** Shots can turn the horse against the lens (`turn`), so its neck and ears show past the rider,
+  as in both ride references.
+- **Horse anatomy.** A deeper barrel and chest and thicker forearms and quarters: the legs no longer read as stilts.
+- **Tack and kit.**
+  - warm saddle-brown leather instead of near-black
+  - a canvas bedroll
+  - a solid cantle instead of a hoop that read as a handlebar
+  - a satchel strap across the back with the satchel on the left hip, and the holster on the right
+- **Winter rider.** A rolled sheepskin collar standing up round the neck replaces the flat patch the critic called
+  a "gold placeholder". The trapper hat is tufted rather than a smooth dome.
+- **Forest.** Slimmer, greyer lodgepole and ponderosa trunks instead of redwood columns.

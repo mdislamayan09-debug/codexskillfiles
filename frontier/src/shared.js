@@ -61,6 +61,18 @@ vec4 splatAt(vec2 xz){ return texture(uSplat, (xz + uWorldSize*0.5)/uWorldSize);
 vec4 climateAt(vec2 xz){ return texture(uClimate, (xz + uWorldSize*0.5)/uWorldSize); }
 `;
 
+// Beyond 6.5 km every surface's depth is squeezed (monotonically) into 6.5–8 km: the distant ranges past the map
+// edge (out to ~70 km) stay inside the far plane and still sort against each other and the world. Perspective only;
+// the orthographic shadow pass is left alone. 8 km stays under the post chain's sky depth threshold.
+export const GLSL_FAR_DEPTH = /* glsl */ `
+void farDepth(inout vec4 pos){
+  if (projectionMatrix[2][3] > -0.5 || pos.w < 6500.0) return;
+  float dd = 6500.0 + 1500.0 * (1.0 - exp(-(pos.w - 6500.0) / 18000.0));
+  float zc = projectionMatrix[2][2] * (-dd) + projectionMatrix[3][2];
+  pos.z = zc / dd * pos.w;
+}
+`;
+
 export const GLSL_SUNSHADOW = /* glsl */ `
 float gSunVis = 1.0;
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
@@ -135,7 +147,8 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
   mat.onBeforeCompile = (shader, renderer) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\nvarying vec3 vWPos;\n${vertexHead}`);
+      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FAR_DEPTH}\nvarying vec3 vWPos;\n${vertexHead}`)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n farDepth(gl_Position);');
     if (beginNormal) shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', beginNormal);
     if (vertexBody) shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', vertexBody);
     if (vertexReplace) for (const [a, b] of vertexReplace) shader.vertexShader = shader.vertexShader.replace(a, b);

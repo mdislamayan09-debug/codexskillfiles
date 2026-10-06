@@ -61,6 +61,23 @@ function leatherTexture(r) {
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
+// oiled canvas for the bedroll: a tan weave, darker where it is creased and grimed
+function canvasTexture(r) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8a7656'; g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 2) { g.fillStyle = `rgba(40,30,18,${0.05 + r() * 0.06})`; g.fillRect(0, y, 256, 1); }
+  for (let x = 0; x < 256; x += 2) { g.fillStyle = `rgba(200,180,140,${0.03 + r() * 0.04})`; g.fillRect(x, 0, 1, 256); }
+  for (let i = 0; i < 70; i++) {
+    const x = r() * 256, y = r() * 256, rad = 8 + r() * 36;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, r() < 0.6 ? 'rgba(46,32,18,0.22)' : 'rgba(190,168,126,0.18)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  // creases running round the roll
+  for (let i = 0; i < 18; i++) { const x = r() * 256; g.strokeStyle = `rgba(36,26,14,${0.2 + r() * 0.2})`; g.lineWidth = 1 + r() * 2; g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + 10, 80, x - 10, 170, x + 4, 256); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 // sculpt resolution: finer surface nets on capable machines (smoother faces, folds and muscle)
 let DETAIL = 1;
 export function setCreatureDetail(q) { DETAIL = q >= 2 ? 1.45 : q > 1 ? 1.2 : 1; }
@@ -525,18 +542,93 @@ export class Human {
     // turned-down coat collar and lapel edges on the real body
     if (MH && o.coat) {
       const nk = MH.rest.neck, ny = nk[1] - 0.05;
-      const prof = [[0.075, 0.035], [0.095, 0.02], [0.12, -0.01], [0.14, -0.045]].map(([r0, y0]) => new THREE.Vector2(r0, y0));
-      const col = new THREE.LatheGeometry(prof, 28, Math.PI * 0.62, Math.PI * 1.76);   // open at the front
-      col.scale(1.05, 1, 1.0);
+      // lathe angle 0 faces +z (the chest): start and end either side of it so the collar opens at the throat
+      let col;
+      if (o.winter) {
+        // a thick rolled sheepskin collar standing up round the back of the neck: a rounded, closed cross-section
+        const prof = [];
+        // turned up: it rises from the shoulders to just under the hat brim, hiding the nape
+        for (let k = 0; k <= 12; k++) {
+          const t = -Math.PI * 0.6 + (k / 12) * Math.PI * 1.3;
+          prof.push(new THREE.Vector2(0.098 + Math.cos(t) * 0.036, 0.075 + Math.sin(t) * 0.075));
+        }
+        col = new THREE.LatheGeometry(prof, 36, Math.PI * 0.16, Math.PI * 1.68);
+        // soft lumps along the roll so the silhouette reads as pelt, not a turned ring
+        const pp = col.attributes.position;
+        for (let k = 0; k < pp.count; k++) {
+          const x = pp.getX(k), y = pp.getY(k), z = pp.getZ(k), a = Math.atan2(x, z);
+          const s = 1 + 0.06 * Math.sin(a * 9 + y * 60) + 0.04 * Math.sin(a * 23 + 1.3);
+          pp.setXYZ(k, x * s, y, z * s);
+        }
+        col.computeVertexNormals();
+        col.scale(1.08, 1, 1.02);
+      } else {
+        const prof = [[0.075, 0.035], [0.095, 0.02], [0.12, -0.01], [0.14, -0.045]].map(([r0, y0]) => new THREE.Vector2(r0, y0));
+        col = new THREE.LatheGeometry(prof, 28, Math.PI * 0.12, Math.PI * 1.76);
+        col.scale(1.05, 1, 1.0);
+      }
       col.translate(0, ny, nk[2] - 0.035);
       col.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
-      const colM = std({ map: leatherTexture(r), color: new THREE.Color(o.winter ? (o.fur || 0xa48c6c) : o.coat).multiplyScalar(o.winter ? 1.6 : 1.9), roughness: o.winter ? 0.95 : 0.62, side: THREE.DoubleSide });
+      const colM = o.winter
+        ? std({ map: furTexture(0xa08a68), roughness: 0.97, side: THREE.DoubleSide })
+        : std({ map: leatherTexture(r), color: new THREE.Color(o.coat).multiplyScalar(1.9), roughness: 0.62, side: THREE.DoubleSide });
+      if (o.winter) { colM.map.repeat.set(6, 1); }
       bones.spine.add(mesh(col, colM));
     }
+    // satchel strap across the back, right shoulder to left hip, and the satchel riding on the hip:
+    // the diagonal line every rider in the references carries
+    if (MH && (outfit === 'arthur' || outfit === 'winter')) {
+      const RG = MH.regions, P = MH.position, Rg = MH.region;
+      const push = o.coat ? (o.winter ? 0.04 : 0.028) * 1.15 : 0.012;
+      const backAt = (x, y) => {
+        let best = 1e9;
+        for (let i = 0; i < MH.count; i++) {
+          const rg = Rg[i];
+          if (rg !== RG.torso && rg !== RG.pelvis && rg !== RG.belt) continue;
+          if (Math.abs(P[i * 3] - x) < 0.022 && Math.abs(P[i * 3 + 1] - y) < 0.022) best = Math.min(best, P[i * 3 + 2]);
+        }
+        return best < 1e8 ? best - push - 0.008 : null;
+      };
+      const yS = MH.rest.neck[1] - 0.045, yH = MH.rest.hips[1] + 0.02;
+      const pts = [];
+      for (let k = 0; k <= 14; k++) {
+        // the figure faces +z, so its right shoulder is at -x (screen right from behind)
+        const t = k / 14, x = -0.085 + t * 0.255, y = yS - t * (yS - yH) - Math.sin(t * Math.PI) * 0.03;
+        const z = backAt(x, y);
+        if (z !== null) pts.push(V(x, y, z));
+      }
+      if (pts.length > 6) {
+        // over the shoulder: the strap climbs onto the top of the shoulder before dropping out of view in front
+        const s0 = pts[0];
+        pts.unshift(V(s0.x - 0.02, s0.y + 0.035, s0.z + 0.05), V(s0.x - 0.012, s0.y + 0.022, s0.z + 0.012));
+        const W = 0.052, pos = [], uvs = [], idx = [];
+        for (let k = 0; k < pts.length; k++) {
+          const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)];
+          const T = b.clone().sub(a).normalize(), N = V(0, 0, -1), S = T.clone().cross(N).normalize().multiplyScalar(W / 2);
+          pos.push(pts[k].x + S.x, pts[k].y + S.y, pts[k].z + S.z, pts[k].x - S.x, pts[k].y - S.y, pts[k].z - S.z);
+          uvs.push(0, k * 0.25, 0.15, k * 0.25);
+          if (k) { const q = (k - 1) * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+        }
+        const sg = new THREE.BufferGeometry();
+        sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        sg.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        sg.setIndex(idx); sg.computeVertexNormals();
+        sg.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
+        const strapM = std({ map: leatherTexture(r), color: new THREE.Color(2.6, 2.1, 1.6), roughness: 0.5, side: THREE.DoubleSide });   // lighter than the coat so the diagonal reads
+        bones.spine.add(mesh(sg, strapM));
+        // the satchel: a soft flapped bag on the left hip
+        const e = pts[pts.length - 1];
+        const bag = sweep([{ p: V(0.235, e.y - 0.02, e.z + 0.13), rx: 0.03, ry: 0.06 }, { p: V(0.25, e.y - 0.05, e.z + 0.09), rx: 0.05, ry: 0.11 },
+          { p: V(0.255, e.y - 0.06, e.z + 0.02), rx: 0.055, ry: 0.12 }, { p: V(0.25, e.y - 0.05, e.z - 0.045), rx: 0.05, ry: 0.11 }, { p: V(0.235, e.y - 0.02, e.z - 0.08), rx: 0.03, ry: 0.06 }], 12);
+        bag.translate(-bones.hips.userData.rest.x, -bones.hips.userData.rest.y, -bones.hips.userData.rest.z);
+        bones.hips.add(mesh(bag, std({ map: leatherTexture(r), color: new THREE.Color(1.9, 1.6, 1.3), roughness: 0.7 })));
+      }
+    }
     // holster + revolver grip on the hip
-    const holster = new THREE.BoxGeometry(0.06, 0.2, 0.08); holster.translate(0.19, -0.14, 0.02);
+    // on the right hip (-x), the satchel rides on the left
+    const holster = new THREE.BoxGeometry(0.06, 0.2, 0.08); holster.translate(-0.19, -0.14, 0.02);
     bones.hips.add(mesh(holster, leather));
-    const grip = new THREE.BoxGeometry(0.03, 0.08, 0.04); grip.rotateZ(-0.3); grip.translate(0.2, -0.01, 0.03);
+    const grip = new THREE.BoxGeometry(0.03, 0.08, 0.04); grip.rotateZ(0.3); grip.translate(-0.2, -0.01, 0.03);
     bones.hips.add(mesh(grip, std({ color: 0x5a3a24 })));
     // fur fringe: short hair cards around the trapper hat and the collar so the silhouette reads as pelt, not a shell
     if (o.furHat) {
@@ -556,11 +648,20 @@ export class Human {
         return geo;
       };
       const hatFur = std({ map: hairTexture(o.furHatColor || 0x6a5238, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
-      const colFur = std({ map: hairTexture(o.fur || 0xa48c6c, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
+      const colFur = std({ map: hairTexture(MH ? 0xa08a68 : (o.fur || 0xa48c6c), 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
       const hy = MH ? HA.hatY : 1.79, hz = MH ? HA.hatZ : -0.014;
       if (MH) {
         const shell = new THREE.SphereGeometry(0.135, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
         shell.scale(1.16, 0.95, 1.2);                                       // a broad, full fur cap that reads from behind
+        {   // tufted, uneven pelt instead of a smooth helmet dome
+          const sp = shell.attributes.position;
+          for (let k = 0; k < sp.count; k++) {
+            const x = sp.getX(k), y = sp.getY(k), z = sp.getZ(k);
+            const s = 1 + 0.035 * Math.sin(x * 70 + z * 31) * Math.sin(y * 55 + x * 17) + 0.025 * Math.sin(z * 90 + y * 40);
+            sp.setXYZ(k, x * s, y * (0.5 + 0.5 * s), z * s);
+          }
+          shell.computeVertexNormals();
+        }
         const sm = mesh(shell, std({ map: furTexture(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         for (const sd of [-1, 1]) {   // ear flaps
@@ -571,7 +672,9 @@ export class Human {
       }
       bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.135 : HA.headR, hy - 0.01, hy + (MH ? 0.06 : 0.14), 56, 0.06, bones.head), hatFur, false));
       bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.09 : 0.07, hy + (MH ? 0.07 : 0.14), hy + (MH ? 0.1 : 0.16), 20, 0.06, bones.head), hatFur, false));
-      bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.17, HA.collarY - 0.01, HA.collarY + 0.09, 64, 0.075, bones.spine), colFur, false));
+      // on the real body the rolled collar carries the pelt; only a short soft fringe on its rim
+      if (MH) bones.spine.add(mesh(furCards(0, 0, MH.rest.neck[2] - 0.035, 0.125, MH.rest.neck[1] + 0.06, MH.rest.neck[1] + 0.1, 80, 0.032, bones.spine), colFur, false));
+      else bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.17, HA.collarY - 0.01, HA.collarY + 0.09, 64, 0.075, bones.spine), colFur, false));
     }
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
     // (the sculpted skirt alone reads as a solid tube from behind)
@@ -731,9 +834,10 @@ function quadPrims(kind, QB) {
   const bw = deer ? 0.8 : sheep ? 1.25 : 1; // body width factor
   const lw = deer ? 0.62 : sheep ? 0.85 : 1; // leg thickness
   // torso
-  add(EL([0, 1.33, -0.05], [0.36 * bw, 0.36, 0.62]), QL.coat, 'body', 0.12);
-  add(EL([0, 1.2, 0.02], [0.31 * bw, 0.24, 0.5]), QL.belly, 'body', 0.12);
-  add(EL([0, 1.33, 0.52], [0.3 * bw, 0.38, 0.3]), QL.coat, 'body', 0.1);
+  // a deep barrel and chest: the belly hangs at about half the height to the withers, so the legs don't read as stilts
+  add(EL([0, 1.3, -0.05], [0.37 * bw, 0.4, 0.62]), QL.coat, 'body', 0.12);
+  add(EL([0, 1.15, 0.02], [0.32 * bw, 0.27, 0.5]), QL.belly, 'body', 0.12);
+  add(EL([0, 1.28, 0.52], [0.31 * bw, 0.42, 0.3]), QL.coat, 'body', 0.1);
   add(EL([0, 1.43, 0.44], [0.26 * bw, 0.32, 0.28]), QL.coat, 'body', 0.1);
   add(RC([0, 1.58, 0.4], [0, 1.6, 0.1], 0.1, 0.09), QL.coat, 'body', 0.12); // withers
   add(EL([0, 1.38, -0.6], [0.35 * bw, 0.37, 0.36]), QL.coat, 'body', 0.1);
@@ -749,7 +853,7 @@ function quadPrims(kind, QB) {
   // head (angled down-forward)
   const H = sheep ? [0, 1.55, 0.95] : [0, 1.98, 1.06];
   const muzzle = sheep ? [0, 1.38, 1.18] : deer ? [0, 1.66, 1.36] : [0, 1.6, 1.38];
-  const hs = sheep ? 0.85 : deer ? 0.82 : 1;
+  const hs = sheep ? 0.85 : deer ? 0.82 : 1.1;
   add(EL(H, [0.11 * hs, 0.12 * hs, 0.14 * hs]), sheep ? QL.points : QL.coat, 'head', 0.05);
   add(RC([H[0], H[1] - 0.04, H[2] + 0.04], muzzle, 0.1 * hs, 0.06 * hs), sheep ? QL.points : QL.coat, 'head', 0.06);
   add(EL([0, H[1] - 0.12 * hs, H[2] + 0.04], [0.1 * hs, 0.12 * hs, 0.11 * hs]), sheep ? QL.points : QL.coat, 'head', 0.06); // jowl
@@ -768,13 +872,14 @@ function quadPrims(kind, QB) {
     const nb = (k) => `${front ? 'f' : 'h'}${s < 0 ? 'L' : 'R'}${k}`;
     const x = s * 0.2;
     if (front) {
-      add(RC([x * 0.95, 1.3, 0.52], [x, 0.92, 0.53], 0.14 * lw, 0.085 * lw), QL.coat, nb(0), 0.08);
-      add(RC([x, 0.92, 0.53], [x, 0.53, 0.53], 0.085 * lw, 0.05 * lw), QL.coat, nb(1), 0.04);
+      // muscled forearm tapering hard into a flat, bony cannon
+      add(RC([x * 0.95, 1.3, 0.52], [x, 0.92, 0.53], 0.15 * lw, 0.1 * lw), QL.coat, nb(0), 0.08);
+      add(RC([x, 0.92, 0.53], [x, 0.53, 0.53], 0.1 * lw, 0.055 * lw), QL.coat, nb(1), 0.05);
       add(EL([x, 0.51, 0.535], [0.055 * lw, 0.06 * lw, 0.06 * lw]), QL.points, nb(2), 0.03);
       add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.043 * lw, 0.038 * lw), QL.points, nb(2), 0.02);
     } else {
-      add(EL([x * 0.95, 1.18, -0.6], [0.17 * lw * bw, 0.3, 0.24]), QL.coat, nb(0), 0.1);
-      add(RC([x, 0.97, -0.66], [x, 0.58, -0.74], 0.11 * lw, 0.055 * lw), QL.coat, nb(1), 0.05);
+      add(EL([x * 0.95, 1.15, -0.6], [0.18 * lw * bw, 0.34, 0.27]), QL.coat, nb(0), 0.1);   // big quarters and stifle
+      add(RC([x, 0.97, -0.66], [x, 0.58, -0.74], 0.13 * lw, 0.06 * lw), QL.coat, nb(1), 0.06);
       add(EL([x, 0.56, -0.74], [0.05 * lw, 0.075 * lw, 0.07 * lw]), QL.points, nb(2), 0.03);
       add(RC([x, 0.55, -0.74], [x, 0.18, -0.72], 0.043 * lw, 0.038 * lw), QL.points, nb(2), 0.02);
     }
@@ -937,7 +1042,8 @@ export class Quadruped {
 
   addTack(bones, r, at) {
     const body = bones.body;
-    const leather = std({ map: leatherTexture(r), color: 0xb08a6a, roughness: 0.55 });
+    // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
+    const leather = std({ map: leatherTexture(r), color: new THREE.Color(2.0, 1.7, 1.4), roughness: 0.55 });
     const blanket = std({ map: blanketTexture(r), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
@@ -950,10 +1056,12 @@ export class Quadruped {
     seat.computeVertexNormals();
     body.add(mesh(seat, leather));
     const horn = new THREE.CylinderGeometry(0.035, 0.025, 0.12, 8); horn.translate(0, 1.91, 0.27); body.add(mesh(horn, leather));
-    const cant = new THREE.TorusGeometry(0.16, 0.03, 6, 12, Math.PI); cant.translate(0, 1.78, -0.36); body.add(mesh(cant, leather));
+    // cantle: the raised, dished back of the seat (a solid curved board, not a hoop)
+    const cant = new THREE.CylinderGeometry(0.17, 0.17, 0.045, 16, 1, false, Math.PI / 2, Math.PI);
+    cant.rotateX(Math.PI / 2); cant.scale(1, 0.55, 1); cant.rotateX(-0.35); cant.translate(0, 1.78, -0.35); body.add(mesh(cant, leather));
     // bedroll: a canvas-and-hide roll with the wool blanket showing in the ends
     const roll = new THREE.CylinderGeometry(0.13, 0.13, 0.78, 14, 1, true); roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.84, -0.52);
-    body.add(mesh(roll, std({ map: leatherTexture(r), color: 0xd0b494, roughness: 0.9 })));
+    body.add(mesh(roll, std({ map: canvasTexture(r), roughness: 0.95 })));
     for (const sx of [-0.39, 0.39]) {
       const end = new THREE.CircleGeometry(0.128, 14); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.84, -0.52);
       body.add(mesh(end, std({ color: 0x6a2e20, roughness: 1 })));

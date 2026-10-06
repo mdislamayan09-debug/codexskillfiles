@@ -52,7 +52,7 @@ float cloudDen(vec3 p, float cov){
   vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
   // a storm closes the gaps into a continuous, lumpy deck
   // a storm deck: heavy, but torn with breaks of brighter sky between the cells
-  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.16 * uStorm * smoothstep(0.25, 0.6, weather), 0.0, 1.0);
+  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.24 * uStorm * smoothstep(0.2, 0.6, weather), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
   float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
@@ -166,7 +166,7 @@ export class Sky {
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
-            cl.rgb *= mix(1.0, mix(0.62, 0.95, far), uStorm * (1.0 - 0.45 * uBlizzard));
+            cl.rgb *= mix(1.0, mix(0.46, 0.85, far), uStorm * (1.0 - 0.45 * uBlizzard));
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;

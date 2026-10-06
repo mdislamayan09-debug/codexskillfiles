@@ -133,6 +133,13 @@ export async function loadRealTerrain() {
     loadPatch('terrain/autumn').then((p) => ({ ...p, region: 'autumn' })).catch(() => null),
     loadPatch('terrain/canyon').then((p) => ({ ...p, region: 'canyon' })).catch(() => null),
   ]);
+  // the north was baked with 1.7x vertical exaggeration, which sharpened the Never Summer peaks into knife-edged
+  // fins; ease the relief above the valley floor back toward the broad, rounded ranges of the references
+  if (north) {
+    const B = 200, K = 0.8;
+    for (let i = 0; i < north.h.length; i++) north.h[i] = B + (north.h[i] - B) * K;
+    for (const v of north.meta.valley) v[2] = B + (v[2] - B) * K;
+  }
   setRealTerrain(north, rest.filter(Boolean));
   return !!north;
 }
@@ -322,7 +329,8 @@ export class World {
         if (r === null) realW = 0;
         else {
           // the map's north boundary: the real ground climbs into a closing ridge rather than ending at a cut
-          const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3));
+          // except where the valley itself runs on north out of the map (the backdrop carries it to the horizon)
+          const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3)) * smoothstep(240, 760, d ? d.vd : Math.abs(x + 725));
           let rb = r;
           const sl = this.realSlope(x, z);
           // (not on the summits: steps along a skyline read as a sawtooth)
@@ -529,7 +537,9 @@ export class World {
             const vd = D.vd[k];
             let fr = smoothstep(760, 690, h + 70 * n2.fbm(x / 180, z / 180, 3));     // tree line: ragged but sharp
             fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
-            fr *= smoothstep(0.32, 0.46, forest.fbm(x / 210 + 8.1, z / 210 - 5.5, 3) * 0.5 + 0.5 + 0.15);   // clearings
+            // stands and open snowfields in about equal measure, as the references' valley sides are: dark timber
+            // in clumps and tongues with wide white glades between, not an even pepper of trees
+            fr *= smoothstep(0.44, 0.56, forest.fbm(x / 260 + 8.1, z / 260 - 5.5, 4) * 0.5 + 0.5 + 0.08);   // clearings
             fr *= 1 - 0.85 * smoothstep(0.62, 0.7, n.noise(x / 60 + z / 900, z / 380) * 0.5 + 0.5) * smoothstep(0.25, 0.4, sl); // chutes
             let inCanyon = 0;
             for (const p of PATCHES) if (p.region === 'canyon') { const c = patchSample(p, x, z, 300); if (c) inCanyon = c.w; }

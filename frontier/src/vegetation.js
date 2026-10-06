@@ -228,7 +228,8 @@ function buildPine(seed, kind = 'pine') {
   const wood = [], leaves = [];
   const height = kind === 'tall' ? 26 + rnd() * 9 : kind === 'fir' ? 11 + rnd() * 7 : 14 + rnd() * 9;
   // trunk in two tapering sections (flared base, then a steady taper to the leader)
-  const r0 = (kind === 'tall' ? 0.5 : 0.34) + rnd() * 0.12;
+  // lodgepole/ponderosa trunks: slim poles, not redwood columns
+  const r0 = (kind === 'tall' ? 0.31 : 0.24) + rnd() * 0.09;
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
   wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.4, height - 2.4, (rnd() - 0.5) * 0.4), r0, 0.05, 9));
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
@@ -811,12 +812,12 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
-      // under snow: only a sparse random few full-height dry tufts poke through (a low density would squash
-      // every clump flat into dark stars on the snow)
-      dens = mix(dens, dens * step(aOff.w, 0.07) * step(0.25, field + 0.3), snowG);
+      float field = fbm2(xz/26.0);
+      // under snow there is no lawn at all (thin clumps squash flat into dark stars on the white); the dry
+      // frosted brush scattered by the CPU is what pokes through
+      dens *= 1.0 - smoothstep(0.15, 0.4, gcl.r);
       dens *= 1.0 - 0.9 * gcl.a;    // desert: sparse bunch grass
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
-      float field = fbm2(xz/26.0);
       dens *= smoothstep(0.02, 0.28, field + 0.12);
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
@@ -938,6 +939,8 @@ function rockMaterial(surf = {}) {
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
       // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
       float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.6, 0.85, wn.y + (n1 - 0.5) * 0.6 + 0.25 * (n2 - 0.5)) * 0.9;
+      // in patches and grains, not a smooth white cap: the grey stone and its lichen show through
+      rsnow *= 0.35 + 0.65 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(150,152,118)), lichen * 0.55);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -952,7 +955,7 @@ export class Vegetation {
     this.world = world;
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
-    const cb = conBarkTextures(6, [96, 72, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const cb = conBarkTextures(6, [92, 76, 64], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted

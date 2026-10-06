@@ -5,6 +5,7 @@ import { setCreatureDetail, loadHumanModel } from './creatures.js';
 import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution, loadRealTerrain } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
+import { Backdrop } from './backdrop.js';
 import { loadSurfaces } from './assets.js';
 import { Sky } from './sky.js';
 import { Vegetation } from './vegetation.js';
@@ -70,6 +71,7 @@ async function init() {
   setLoad(0.57, 'Loading photographic surfaces…'); await tick();
   const surf = await loadSurfaces(renderer);
   const terrain = new Terrain(world, scene, surf, QUALITY);
+  const backdrop = new Backdrop(world, scene, QUALITY);   // the country beyond the map edge, out to the horizon
   setLoad(0.6, 'Raising Copper Hollow…'); await tick();
   const town = new Town(world, scene, surf);
   setLoad(0.7, 'Planting forests…'); await tick();
@@ -244,8 +246,12 @@ async function init() {
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [1.25, 2.9, -4.1], lookRel: [0.1, 2.9, 22], trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-1.25, 2.85, -4.2], lookRel: [-0.3, 1.9, 18], weather: 'snow' }; },
+    // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
+    // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.75, -4.9], lookRel: [-0.3, 2.5, 22], turn: -0.36, trailDress: true }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [1.3, 2.35, -6.6], lookRel: [0.2, 1.75, 18], turn: -0.45, weather: 'snow' }; },
+    // close look at the winter rider and tack from behind (costume detail checks)
+    riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.78, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
@@ -259,10 +265,11 @@ async function init() {
     const vh = world.valley[Math.floor(world.valley.length * 0.06)];
     const upDir = Math.atan2(vh[0] - CABIN.x, vh[1] - CABIN.z);
     let best = null, bs = -1e9;
-    for (let r = 110; r <= 420; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
+    // high on the valley side, as in the reference: well above the cabin, so the floor opens out below the lens
+    for (let r = 160; r <= 640; r += 20) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
-      if (above < 25 || above > 160) continue;
+      if (above < 50 || above > 280) continue;
       const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
       // looking up-valley, toward the head of the valley and its peaks
       let dv = va - upDir; dv = Math.atan2(Math.sin(dv), Math.cos(dv));
@@ -272,7 +279,7 @@ async function init() {
       if (!clear) continue;
       // depth beyond the cabin: the valley floor stays well below the lens for a long way
       let depth = 0;
-      for (let d = r + 150; d <= r + 2400; d += 150) for (const b of [-0.25, 0, 0.25]) {
+      for (let d = r + 150; d <= r + 3000; d += 150) for (const b of [-0.25, 0, 0.25]) {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) < ch - 25) depth++;
       }
       // nothing near the lens rising into the frame
@@ -280,7 +287,7 @@ async function init() {
       for (let b = -0.5; b <= 0.51; b += 0.1) for (let d = 15; d <= Math.min(r, 160); d += 15) {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
       }
-      const score = depth * 3 - blocked * 4 - Math.abs(above - 55) * 0.4 - Math.abs(r - 180) * 0.06;
+      const score = depth * 3 - blocked * 4 - Math.abs(above - 140) * 0.25 - Math.abs(r - 360) * 0.04;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
@@ -506,11 +513,14 @@ async function init() {
         const hp = world.heightAt(px + r.x * rel[0], pz + r.z * rel[0]), hm = world.heightAt(px - r.x * rel[0], pz - r.z * rel[0]);
         if (hm < hp) rel[0] = -rel[0];
       }
-      G.camOverride = { rel, lookRel: s.lookRel };
+      // turn: the horse heads off at an angle to the lens, so its neck and head show beside the rider
+      G.camOverride = { rel, lookRel: s.lookRel, turn: s.turn || 0 };
       // keep the lens clear: no boughs between the camera and the rider
-      const f = [Math.sin(yaw), Math.cos(yaw)], rt = [Math.cos(yaw), -Math.sin(yaw)];
+      const cy = yaw - (s.turn || 0);
+      const f = [Math.sin(cy), Math.cos(cy)], rt = [Math.cos(cy), -Math.sin(cy)];
       const camX = px + rt[0] * rel[0] + f[0] * rel[2], camZ = pz + rt[1] * rel[0] + f[1] * rel[2];
       G.clearTreesNear(camX, camZ, 5);
+      G.clearTreesNear(camX, camZ, 9, veg.rocks);   // and no boulder half-in the lens
       G.clearTreesAlong(camX, camZ, px, pz, 2.5);
     }
     // trailside anchors, as a set dresser would place them: a mossy boulder and a fallen trunk off the left verge,
@@ -629,7 +639,7 @@ async function init() {
       const o = G.camOverride;
       if (o.pos) { camera.position.copy(o.pos); camera.lookAt(o.look); }
       else {
-        const yaw = player.hyaw;
+        const yaw = player.hyaw - (o.turn || 0);
         const f = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)), r = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
         const base = player.hpos;
         camera.position.copy(base).addScaledVector(r, o.rel[0]).addScaledVector(f, o.rel[2]).add(new THREE.Vector3(0, o.rel[1], 0));

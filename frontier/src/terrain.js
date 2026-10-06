@@ -385,7 +385,8 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(20,40,16)), srgb(vec3(36,60,22)), cn), ccl.g);                       // jungle
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.45 + 0.1), smoothstep(0.4, 0.8, ccl.r));
+          // (from afar the snow caught on every crown and lying between them averages to a cold mid grey)
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.12 + 0.2 * smoothstep(2.0, 8.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
           // grazing angles), strongest where the canopy is closed and crowns span a few pixels
           if (canopyK > 0.01) {

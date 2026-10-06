@@ -1,0 +1,141 @@
+// Distant country beyond the edge of the map: a square ring of terrain from the world's edge out to ~70 km that
+// carries on whatever lies at each edge — the snowy Rockies to the north, mesas and sierras to the south-west,
+// forested ridges elsewhere, open sea off the jungle coast — so every vista ends in layered ranges stepping back
+// into the haze instead of a hard horizon. The shared atmosphere does the layering; patchMaterial's far-depth
+// squeeze keeps it inside the far plane.
+import * as THREE from 'three';
+import { patchMaterial } from './shared.js';
+import { HALF, WATER_LEVEL } from './world.js';
+
+const fract = (x) => x - Math.floor(x);
+const hash = (ix, iz) => fract(Math.sin(ix * 127.1 + iz * 311.7) * 43758.5453);
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function vnoise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+  const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+  const a = hash(ix, iz), b = hash(ix + 1, iz), c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1);
+  return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+}
+// octaves are rotated against each other so no grid shows in the ridgelines
+const ROT = [Math.cos(0.62), Math.sin(0.62)];
+function fbm(x, z, o = 5) {
+  let s = 0, a = 0.5;
+  for (let i = 0; i < o; i++) { s += a * vnoise(x, z); const nx = (x * ROT[0] - z * ROT[1]) * 2.03 + 1.7, nz = (x * ROT[1] + z * ROT[0]) * 2.03 + 9.2; x = nx; z = nz; a *= 0.5; }
+  return s / (1 - Math.pow(0.5, o));
+}
+// sharp-crested ranges: ridged multifractal, each octave weighted by the one above so peaks get the detail
+function ridged(x, z, o = 6) {
+  let s = 0, a = 0.5, w = 1, norm = 0;
+  for (let i = 0; i < o; i++) {
+    let n = 1 - Math.abs(vnoise(x, z) * 2 - 1); n *= n; n *= w; w = Math.min(1, n * 1.8);
+    s += a * n; norm += a;
+    const nx = (x * ROT[0] - z * ROT[1]) * 2.07 + 3.1, nz = (x * ROT[1] + z * ROT[0]) * 2.07 - 4.7; x = nx; z = nz; a *= 0.5;
+  }
+  return s / norm;
+}
+
+export class Backdrop {
+  constructor(world, scene, quality = 1) {
+    const SEG = quality >= 2 ? 2048 : 1024, RINGS = quality >= 2 ? 128 : 96, H0 = HALF - 40, R1 = 70000;
+    const nV = SEG * (RINGS + 1);
+    const pos = new Float32Array(nV * 3), col = new Float32Array(nV * 3);
+    const info = new Float32Array(nV * 4);     // per vertex: north, desert, sea, hills weights (for the colour pass)
+    const perim = (u) => {
+      const t = u * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
+      return side === 0 ? [-1 + 2 * f, -1] : side === 1 ? [1, -1 + 2 * f] : side === 2 ? [1 - 2 * f, 1] : [-1, 1 - 2 * f];
+    };
+    for (let i = 0; i < SEG; i++) {
+      const [ux, uz] = perim(i / SEG);
+      const ex = ux * (HALF - 6), ez = uz * (HALF - 6);
+      const eh = world.heightAt(ex, ez);
+      // which country lies at this stretch of the edge
+      const north = sstep(-1300, -2300, ez);
+      const desert = sstep(-1200, -1800, ex) * sstep(1100, 1700, ez) * (1 - north);
+      const sea = sstep(3, -8, eh) * (1 - north) * (1 - desert);
+      const autumn = sstep(-1500, -2200, ex) * sstep(-2000, -1600, ez) * sstep(1300, 900, ez);
+      const hills = Math.max(0, 1 - north - desert - sea);
+      for (let k = 0; k <= RINGS; k++) {
+        const s = H0 + (R1 - H0) * Math.pow(k / RINGS, 2.1);
+        const x = ux * s, z = uz * s, d = Math.max(0, s - HALF);
+        // the snowy north: big ridged ranges, taller the further they stand
+        const far = sstep(4000, 40000, d);
+        const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far)
+          + ridged(x / 2400, z / 2400 + 7.7, 4) * 240;
+        // forested ridge country, rolling up into a far blue sierra
+        const hillH = 110 + fbm(x / 6000 + 5.1, z / 6000, 5) * 520 + ridged(x / 2100, z / 2100, 4) * 150 + ridged(x / 11000, z / 11000, 5) * 900 * far;
+        // canyon country: flat-topped mesas and buttes on a desert floor, sierras on the far horizon
+        const n = fbm(x / 4300 + 11.3, z / 4300 - 2.1, 5);
+        const desertH = 45 + fbm(x / 1500, z / 1500, 3) * 40 + sstep(0.5, 0.525, n) * 230 + sstep(0.62, 0.64, n) * 170
+          + ridged(x / 9000 - 4.4, z / 9000, 5) * 650 * far;
+        const seaH = WATER_LEVEL - 0.7;
+        // north of the map the real valley carries on: a broad snowy floor winding away between the ranges
+        // for twenty kilometres, so looking up-valley the eye travels into the haze rather than into a wall
+        const dn = Math.max(0, -HALF - z);
+        const vx = -725 + 1100 * Math.sin(dn / 5200) * sstep(0, 4000, dn) - 700 * Math.sin(dn / 13000 + 1.2) * sstep(3000, 9000, dn);
+        const vw = 380 + 0.05 * dn;
+        const floor = 225 + dn * 0.011 + 30 * fbm(x / 1500, z / 1500, 3);
+        const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 2800, Math.abs(x - vx));
+        const regionH = north * snowV + desert * desertH + sea * seaH + hills * hillH;
+        // carry the map's own edge heights out, then rise into the region's relief
+        const t = sstep(0, 2600, d);
+        const h = eh * (1 - t) + regionH * t - (k === 0 ? 6 : 0);
+        const v = i * (RINGS + 1) + k;
+        pos[v * 3] = x; pos[v * 3 + 1] = h; pos[v * 3 + 2] = z;
+        info[v * 4] = north; info[v * 4 + 1] = desert; info[v * 4 + 2] = sea * t; info[v * 4 + 3] = autumn;
+      }
+    }
+    const idx = new Uint32Array(SEG * RINGS * 6);
+    let q = 0;
+    for (let i = 0; i < SEG; i++) {
+      const i1 = (i + 1) % SEG;
+      for (let k = 0; k < RINGS; k++) {
+        const a = i * (RINGS + 1) + k, b = i1 * (RINGS + 1) + k, c = a + 1, dd = b + 1;
+        // winding so the faces point up (rings run outward, the perimeter runs anticlockwise seen from above)
+        idx[q++] = a; idx[q++] = c; idx[q++] = b;
+        idx[q++] = b; idx[q++] = c; idx[q++] = dd;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeVertexNormals();
+    // make sure the faces point up whatever the winding came out as
+    const nrm = geo.attributes.normal;
+    let up = 0; for (let v = 0; v < nV; v += 97) up += nrm.getY(v);
+    if (up < 0) {
+      for (let j = 0; j < idx.length; j += 3) { const tmp = idx[j + 1]; idx[j + 1] = idx[j + 2]; idx[j + 2] = tmp; }
+      geo.index.needsUpdate = true; geo.computeVertexNormals();
+    }
+    // colour: snowfields with dark timber and bare rock in the north, red rock and sand in the south-west,
+    // dark forest with autumn rust in the ridge country, deep water off the coast
+    const SNOW = [0.74, 0.77, 0.82], ROCK = [0.1, 0.098, 0.095], TIMBER = [0.02, 0.03, 0.027], SNOWTIMBER = [0.2, 0.22, 0.23];
+    const FOREST = [0.03, 0.045, 0.022], RUST = [0.11, 0.045, 0.014], MEADOW = [0.1, 0.095, 0.045];
+    const SAND = [0.4, 0.22, 0.11], REDROCK = [0.26, 0.1, 0.04], SEA = [0.012, 0.03, 0.045];
+    const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    for (let v = 0; v < nV; v++) {
+      const x = pos[v * 3], h = pos[v * 3 + 1], z = pos[v * 3 + 2], ny = nrm.getY(v);
+      const north = info[v * 4], desert = info[v * 4 + 1], sea = info[v * 4 + 2], autumn = info[v * 4 + 3];
+      const hills = Math.max(0, 1 - north - desert - sea);
+      const m = fbm(x / 1700, z / 1700, 4);
+      // north: timber in the valleys and on the lower slopes, snow above, rock on the steep faces
+      const timber = sstep(0.42, 0.62, m) * sstep(1050, 700, h + (m - 0.5) * 300) * sstep(0.6, 0.8, ny);
+      let cN = mix3(SNOW, mix3(TIMBER, SNOWTIMBER, 0.35), timber * 0.85);
+      cN = mix3(cN, ROCK, sstep(0.66, 0.5, ny + (m - 0.5) * 0.15) * 0.85);
+      // ridge country
+      let cH = mix3(FOREST, MEADOW, sstep(0.62, 0.75, m));
+      cH = mix3(cH, RUST, autumn * sstep(0.35, 0.6, fbm(x / 900 + 3, z / 900, 3)) * 0.8);
+      cH = mix3(cH, mix3(ROCK, SNOW, sstep(1100, 1400, h)), sstep(900, 1300, h));      // the far sierra's tops
+      // canyon country
+      let cD = mix3(SAND, REDROCK, sstep(0.82, 0.6, ny));
+      cD = mix3(cD, mix3(ROCK, SNOW, sstep(800, 1000, h) * 0.6), sstep(450, 700, h));
+      for (let c = 0; c < 3; c++) col[v * 3 + c] = north * cN[c] + desert * cD[c] + sea * SEA[c] + hills * cH[c];
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeBoundingSphere();
+    const mat = patchMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.94, metalness: 0, envMapIntensity: 0.6 }));
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false;
+    this.mesh.castShadow = false; this.mesh.receiveShadow = false;
+    scene.add(this.mesh);
+  }
+}

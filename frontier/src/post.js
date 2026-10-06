@@ -82,6 +82,9 @@ const GradeShader = {
       // storm: cold, blue-grey and low-saturation
       // storm: cool blue-grey shadows, but warm wood and rock keep some colour
       col = mix(col, sat(col, 0.82) * mix(vec3(0.86, 0.95, 1.12), vec3(1.0), smoothstep(0.15, 0.6, l)), uStorm * 0.7);
+      // and the whole frame steps down into steel blue, as in the references (their snow sits near 0.6/0.75/0.9
+      // R/G/B of ours): red and green pulled down hardest in the shadows, the whites keep a little more
+      col *= mix(vec3(1.0), mix(vec3(0.6, 0.8, 1.02), vec3(0.74, 0.88, 1.03), smoothstep(0.2, 0.85, l)), uStorm);
       // night: blue shift
       col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse
