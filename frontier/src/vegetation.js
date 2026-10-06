@@ -822,7 +822,9 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float hgt = mix(0.18, 0.66, smoothstep(0.25, 0.8, field)) * (0.55 + 0.7*aOff.w) * (0.85 + 0.35*dry) * (0.7 + 0.6 * fbm2(xz / 9.0));
       hgt *= mix(0.42, 1.0, smoothstep(55.0, 110.0, length(xz - RANCH_XZ))); // grazed ranch pasture
       hgt *= (1.0 + 0.55 * gcl.g) * (1.0 - 0.45 * snowG);
-      hgt *= alive * fade;
+      // grass shortens toward a path or yard edge (trampled, grazed) instead of standing as a cut wall
+      float edgeCut = smoothstep(0.08, 0.55, 1.0 - smoothstep(0.05, 0.45, sp.r + edgeN * 0.8));
+      hgt *= alive * fade * mix(0.25, 1.0, edgeCut);
       float ang = aOff.z * 37.0 + aOff.w * 11.0;
       float ca = cos(ang), sa = sin(ang);
       vec2 local = vec2(position.x*ca - position.z*sa, position.x*sa + position.z*ca) * CSIZE * (0.8 + 0.4*aOff.w);
