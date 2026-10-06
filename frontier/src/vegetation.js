@@ -232,10 +232,14 @@ function buildSnag(seed) {
   const wood = [branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10), branchGeo(new THREE.Vector3(0, 1.4, 0), top, r0, r0 * 0.45, 9)];
   // the jagged break
   for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28 + rnd(), rr = r0 * 0.4; const p0 = top.clone().add(new THREE.Vector3(Math.cos(a) * rr, -0.1, Math.sin(a) * rr)); wood.push(branchGeo(p0, p0.clone().add(new THREE.Vector3((rnd() - 0.5) * 0.1, 0.3 + rnd() * 0.7, (rnd() - 0.5) * 0.1)), 0.05, 0.006, 4)); }
-  for (let i = 0; i < 26; i++) {
-    const y = 3 + rnd() * (height - 4), a = rnd() * 6.28, L = 0.4 + rnd() * 1.6 * (1 - y / height);
+  // dead limbs all the way up, long and drooping low down, short near the break: the silhouette of a dead pine,
+  // not a bare pole
+  for (let i = 0; i < 44; i++) {
+    const y = 2 + rnd() * (height - 2.5), a = rnd() * 6.28, L = 0.5 + rnd() * 2.4 * Math.pow(1 - y / height, 0.7);
     const b0 = new THREE.Vector3(top.x * y / height, y, top.z * y / height);
-    wood.push(branchGeo(b0, b0.clone().add(new THREE.Vector3(Math.cos(a) * L, -0.15 - rnd() * 0.4, Math.sin(a) * L)), 0.05, 0.015, 4));
+    const tip = b0.clone().add(new THREE.Vector3(Math.cos(a) * L, -0.2 - rnd() * 0.5 * L, Math.sin(a) * L));
+    wood.push(branchGeo(b0, tip, 0.06, 0.012, 4));
+    if (L > 1.2) { const m = b0.clone().lerp(tip, 0.55); wood.push(branchGeo(m, m.clone().add(new THREE.Vector3(Math.cos(a + 0.9) * L * 0.35, 0.1, Math.sin(a + 0.9) * L * 0.35)), 0.025, 0.006, 3)); }
   }
   for (let i = 0; i < 4; i++) { const a = (i / 4) * 6.28 + rnd(); wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * r0 * 2.6, -0.25, Math.sin(a) * r0 * 2.6), new THREE.Vector3(Math.cos(a) * r0 * 0.3, 1.0, Math.sin(a) * r0 * 0.3), r0 * 0.22, r0 * 0.5, 5)); }
   return { wood: setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), () => 0), height };
@@ -1082,7 +1086,7 @@ export class Vegetation {
       addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
     }
     // dead snags, silver-grey and barkless
-    const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: 0xb4aca0, roughness: 0.95 }), 0);
+    const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: new THREE.Color(1.55, 1.5, 1.45), roughness: 0.95 }), 0);   // weathered silver-grey
     for (let i = 0; i < 2; i++) { const b = buildSnag(1300 + i * 41); addB('snag', 'pine', b, [{ geometry: b.wood, material: snagMat }]); }
     // tree wells: under a snow-loaded spruce the boughs shelter a hollow of shaded, shallower snow round the trunk,
     // which seats every tree in the snowfield instead of leaving it standing on the white like a cut-out
@@ -1204,7 +1208,7 @@ export class Vegetation {
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
         makeClutter(scene, cone, { spacing: 0.62 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
-        makeClutter(scene, twig, { spacing: 1.05 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.9, color: 0x5a4632, flat: true, seed: 5 }),
+        makeClutter(scene, twig, { spacing: 1.9 / Math.sqrt(q), radius: 34, smin: 0.4, smax: 1.3, color: 0x5a4632, flat: true, seed: 5 }),
         makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];
     }
@@ -1276,7 +1280,7 @@ export class Vegetation {
         if (beach) v = pick(G.palm);
         else if (cl.jungle > 0.45) v = r() < 0.28 ? pick(G.palm) : pick(G.jungle);
         else if (swamp) v = pick(G.cypress);
-        else if (cl.snow > 0.45) v = r() < 0.03 ? pick(G.snag) : pick(G.fir);
+        else if (cl.snow > 0.45) v = r() < 0.01 ? pick(G.snag) : pick(G.fir);
         // the pine belt is open lodgepole/ponderosa forest: tall clear boles with high crowns, a few full-skirted
         // spruce and young firs among them
         else if (pz < -700) v = r() < 0.04 ? pick(G.snag) : r() < 0.8 ? pick(G.tall) : r() < 0.65 ? pick(G.pine) : pick(G.fir);

@@ -236,6 +236,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.85 * ribs;
+  // a used track through the snow stays trampled and dirty: a dark line leading to the homestead
+  snowAmt *= 1.0 - 0.55 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
   rockAmt = max(rockAmt, ribs * 0.9);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches

@@ -995,6 +995,14 @@ export class Quadruped {
       const n = (k) => bones[`${front ? 'f' : 'h'}${s < 0 ? 'L' : 'R'}${k}`];
       this.legs.push({ top: n(0), j2: n(1), j3: n(2), j4: n(3), front, s });
     }
+    // broken crust thrown up round each leg where it goes into deep snow (shown only in the snow country)
+    if (kind === 'horse') {
+      const ringM = std({ color: 0xdfe6ee, roughness: 0.85 });
+      const ringG = new THREE.TorusGeometry(0.085, 0.05, 6, 14);
+      ringG.rotateX(Math.PI / 2); ringG.scale(1, 0.8, 1);
+      { const rp = ringG.attributes.position; for (let k = 0; k < rp.count; k++) { const a = Math.atan2(rp.getZ(k), rp.getX(k)); rp.setY(k, rp.getY(k) * (0.7 + 0.5 * Math.abs(Math.sin(a * 3 + 1.3)))); } ringG.computeVertexNormals(); }
+      this.snowRings = this.legs.map((l) => { const m = mesh(ringG, ringM, false); m.position.set(0, 0.08, 0); m.visible = false; l.j4.add(m); return m; });
+    }
     const at = (bone, x, y, z) => V(x, y, z).sub(bone.userData.rest);
     // eyes
     const H = kind === 'sheep' ? [0, 1.55, 0.95] : [0, 1.98, 1.06];

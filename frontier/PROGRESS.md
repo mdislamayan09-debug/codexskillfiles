@@ -333,3 +333,35 @@ The critic now asks for:
   - a girth strap and rings on the horse
   - breath smoking from the horse's nostrils in the cold
 - **Grade.** Muted ferns; slightly warmer storm highlights.
+
+**Round 31 critic:** pines 4 (up one), snowride 3 (up one), snowvista 3.
+
+### Rounds 32–33
+- **The north wall is gone.** A smooth artificial rise at the north edge had been closing the valley. Its striped
+  slopes were the "comb" peaks the critic kept naming. The backdrop now carries the real ground on past the map,
+  and the vista's background is real ranges with natural snow.
+- **Light.**
+  - ambient bounce follows the ground under the camera, so riders in the snow are lit from below
+  - cloud shadows with sunlit breaks under a broken storm deck
+- **Snow scenes.**
+  - tree wells under the spruces
+  - dead snags among the pines and spruces
+  - a deeper snowfall volume with size variety and soft flakes near the lens
+- **Characters.**
+  - real geometric folds in the coat
+  - a girth strap, breath vapour, and faded wool saddle blankets
+  - hat brims with thickness
+- **Mistake caught.** Alpha-to-coverage on the foliage (to soften card edges) thinned every distant crown into a
+  see-through snag. Round 32 is discarded, and it is reverted.
+- **Round 33 critic:** pines 3, snowride 2, snowvista 3. Its notes:
+  - milky forest haze and clipped highlights (p95 218 against the reference's 184)
+  - camouflage-like soft forest and snow blotches on the far slopes
+  - soft clouds
+  - the horse floating on the snow
+- **Round 34 fixes.**
+  - less forest exposure and haze
+  - crisp, crown-ragged stand edges and snow-to-rock edges
+  - finer cloud erosion
+  - the snow ride framed off-centre toward the valley
+  - snow-capped, half-buried rocks
+  - broken-crust rings where the horse's legs enter deep snow

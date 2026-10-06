@@ -289,7 +289,7 @@ async function init() {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
       }
       // close enough that the cabin reads as a building (the reference's sits ~4% of the frame wide)
-      const score = depth * 3 - blocked * 4 - Math.abs(above - 105) * 0.25 - Math.abs(r - 230) * 0.06;
+      const score = depth * 3 - blocked * 4 - Math.abs(above - 85) * 0.25 - Math.abs(r - 175) * 0.08;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
