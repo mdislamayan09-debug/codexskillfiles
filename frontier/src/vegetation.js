@@ -805,7 +805,7 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       vec4 cl = climateAt(xz);
       float dist = length(xz - cam);
       float dens = ${mode === 'stone'
-        ? 'max(sp.b * 0.8, max(smoothstep(0.3, 0.8, sp.r) * 0.7, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
+        ? 'max(sp.b * 0.55, max(smoothstep(0.3, 0.8, sp.r) * 0.22, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
         : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
       // gathered in drifts and clusters (under a tree, along a runnel), bare between: never an even sprinkle

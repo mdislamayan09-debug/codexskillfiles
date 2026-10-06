@@ -391,3 +391,17 @@ The critic now asks for:
   - an old half-buried drift fence across the snowfield, as a made thing to ride toward
 - **Snow vista.** The lens is turned partway up the valley so the homestead sits on a third, and a trampled road
   leads to it through the snow.
+
+**Rounds 37–39 critic:** pines 4, 4, 3; snowride 3, 3, 2; snowvista 3, 3, 3.
+
+### Round 40: the reference's vantage
+- **Vista lookout.** The snow vista is now shot from a summit lookout 170–520 m above the homestead, looking up the
+  length of the valley over it, past the map edge into the backdrop's ranges, under the storm deck. This is the
+  first frame that is composed like the reference (`G.findVista(true)`). The old lookout sat just above the cabin
+  and looked across at the nearby walls.
+- **Backdrop.** The ranges get finer ridged spurs and gullies, on a ring mesh dense enough near the map to carry
+  them.
+- **Pine floor.** It finally has an understorey. A probe found 88 small bushes within 40 m of the rider, and tree
+  cells skipped their undergrowth. Now tree cells grow 2–5 larger shrubs and ferns, and the grass under the
+  canopy is back.
+- **Snow ride.** A weathered, half-buried drift fence crosses the snowfield.

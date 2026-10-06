@@ -542,7 +542,7 @@ async function init() {
     // thing to ride toward in an otherwise empty white
     if (s.snowDress && !G.snowDressed) {
       G.snowDressed = true;
-      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95 }), { fragColor: `#include <color_fragment>
+      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x6c665e, roughness: 0.97 }),   // silver-grey, weathered { fragColor: `#include <color_fragment>
         { vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix); diffuseColor.rgb = mix(diffuseColor.rgb * (0.75 + 0.5 * vnoise(vWPos.xy * 9.0 + vWPos.z * 3.0)), vec3(0.8, 0.84, 0.9), smoothstep(0.55, 0.9, wn.y)); }` });
       // laid out in the camera's frame (the lens is turned off the horse's heading): starting ahead and to the left,
       // angling away across the view toward the valley
@@ -555,8 +555,9 @@ async function init() {
       for (let k = 0; k < 16; k++) {
         const fx = x0 + dir[0] * k * 3.2, fz = z0 + dir[1] * k * 3.2, gy = world.heightAt(fx, fz);
         const lean = (Math.sin(k * 2.3) * 0.12);
-        const post = new THREE.CylinderGeometry(0.07, 0.09, 1.5, 6); post.rotateZ(lean); post.translate(fx, gy + 0.45, fz); geos.push(post);
-        if (prev && k % 5 !== 3) for (const hh of [0.45, 0.95]) {   // a few spans have fallen
+        // buried to the lower rail in drift: only the upper part of each post shows
+        const post = new THREE.CylinderGeometry(0.07, 0.09, 1.5, 6); post.rotateZ(lean); post.translate(fx, gy + 0.15 + Math.sin(k * 1.7) * 0.12, fz); geos.push(post);
+        if (prev && k % 5 !== 3) for (const hh of [0.25, 0.7]) {   // a few spans have fallen
           const ax = prev[0], az = prev[1], ay = prev[2] + hh, by = gy + hh;
           const len = Math.hypot(fx - ax, fz - az, by - ay);
           const rail = new THREE.CylinderGeometry(0.045, 0.05, len, 5); rail.rotateZ(Math.PI / 2);
@@ -598,10 +599,14 @@ async function init() {
       // the lookout's own rock: a split granite outcrop filling the left edge and broken slabs along the lip below
       put(5.5, -9.5, 5.0, 3); put(4.2, 1.8, 1.6, 2); put(4.8, -2.8, 1.9, 3); put(6.2, 4.6, 1.4, 2);
       // the summit ledge itself, right under the lens: broken granite slabs along the lower edge of the frame
-      for (const [f2, sd2, sc2, v2] of [[3.2, -5.5, 2.4, 3], [3.6, 5.8, 2.1, 2], [2.8, -1.2, 1.3, 2], [4.4, 2.6, 1.7, 3], [3.0, 9.0, 2.8, 3], [3.4, -9.5, 3.0, 2]]) {
+      // (rt points to screen right) a big split-granite outcrop rising into the lower-left of the frame, as the
+      // reference's ledge, with frosted brush in its lee
+      for (const [f2, sd2, sc2, v2] of [[3.2, -5.5, 2.4, 3], [3.6, 5.8, 2.1, 2], [2.8, -1.2, 1.3, 2], [4.4, 2.6, 1.7, 3], [3.0, 9.0, 2.8, 3], [3.4, -9.5, 3.0, 2],
+        [7.5, -7.5, 5.2, 3], [10.5, -11.5, 6.5, 2], [6.0, -3.8, 3.2, 2], [9.0, -5.0, 3.8, 3], [12.5, -15.5, 7.0, 3]]) {
         const x = c.x + d.x * f2 + rt.x * sd2, z = c.z + d.z * f2 + rt.z * sd2;
-        veg.rocks.add(x, world.heightAt(x, z) - 0.3 * sc2, z, f2 * 2.1, sc2, v2);
+        veg.rocks.add(x, world.heightAt(x, z) - 0.25 * sc2, z, f2 * 2.1, sc2, v2);
       }
+      for (let i = 0; i < 18; i++) { const f2 = 4 + (i % 6) * 1.6, sd2 = -2 - (i * 0.83) % 9; const x = c.x + d.x * f2 + rt.x * sd2, z = c.z + d.z * f2 + rt.z * sd2; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.55 + (i % 3) * 0.2, 7 + (i % 2)); }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the way
       // down the near ground, so it reads as a mountainside rather than a blank white wedge
       {
