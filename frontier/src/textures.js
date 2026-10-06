@@ -58,29 +58,100 @@ export function leafCardTexture(seed = 1, hue = 85) {
 
 // Pine branch card (alpha), drawn as a frond of needles
 export function pineCardTexture(seed = 3) {
-  const [c, g] = canvas(512, 256);
+  // A conifer bough as dense as the real thing: a drooping main stem, branchlets off it and sub-branchlets off
+  // those, every twig furred with needles. The spray fills most of its card in a ragged, tapering silhouette
+  // (the old card was a few fronds on an empty card, so crowns read as thin see-through grey sheets). Inner
+  // needles are drawn first and darker, the outer tips last and lighter, for depth inside the spray.
+  const W = 1024, H = 512;
+  const [c, g] = canvas(W, H);
   const r = mulberry32(seed);
-  g.clearRect(0, 0, 512, 256);
-  const frond = (x0, y0, len, ang, w) => {
-    g.strokeStyle = 'rgba(70,52,34,1)';
-    g.lineWidth = w;
-    const x1 = x0 + Math.cos(ang) * len, y1 = y0 + Math.sin(ang) * len;
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-    const n = Math.floor(len / 3);
-    for (let i = 0; i < n; i++) {
-      const t = i / n;
-      const px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t;
-      const nl = (1 - t * 0.6) * 26 * (0.7 + r() * 0.5);
-      for (const s of [-1, 1]) {
-        const na = ang + s * (0.9 + r() * 0.4);
-        g.strokeStyle = hsl(96 + r() * 26, 26 + r() * 14, 11 + r() * 14);
-        g.lineWidth = 1.6;
-        g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(na) * nl, py + Math.sin(na) * nl + 6); g.stroke();
+  g.clearRect(0, 0, W, H);
+  g.lineCap = 'round';
+  const twigs = [];   // [x0, y0, x1, y1, order]
+  const stemY = (x) => H * 0.5 + Math.pow(x / W, 2) * 26;      // the bough sags toward its tip
+  twigs.push([8, stemY(8), W - 14, stemY(W - 14), 0]);
+  for (let x = 30; x < W - 50; x += 26 + r() * 14) {
+    const t = x / W, env = Math.sin(Math.min(1, t * 1.25) * Math.PI) * 0.75 + 0.25;   // widest a third of the way out
+    for (const side of [-1, 1]) {
+      if (r() < 0.12) continue;
+      const ang = side * (0.62 + r() * 0.42) + (r() - 0.5) * 0.15, len = (60 + r() * 120) * env * (1 - t * 0.45);
+      const x0 = x, y0 = stemY(x), x1 = x0 + Math.cos(ang) * len, y1 = y0 + Math.sin(ang) * len + len * 0.08;
+      twigs.push([x0, y0, x1, y1, 1]);
+      for (let k = 0.3; k < 0.92; k += 0.2 + r() * 0.12) {
+        const sx = x0 + (x1 - x0) * k, sy = y0 + (y1 - y0) * k, a2 = ang + side * (r() < 0.5 ? 0.7 : -0.5) * (0.6 + r() * 0.5), l2 = len * (0.25 + r() * 0.25) * (1 - k * 0.4);
+        twigs.push([sx, sy, sx + Math.cos(a2) * l2, sy + Math.sin(a2) * l2 + l2 * 0.1, 2]);
       }
     }
-  };
-  frond(10, 128, 480, 0, 5);
-  for (let i = 0; i < 9; i++) frond(60 + i * 45, 128, 120 - i * 8, (r() > 0.5 ? 1 : -1) * (0.5 + r() * 0.4), 2.5);
+  }
+  // twigs (brown-grey wood, thin)
+  for (const [x0, y0, x1, y1, o] of twigs) {
+    g.strokeStyle = o === 0 ? 'rgba(62,46,32,1)' : 'rgba(70,56,40,1)';
+    g.lineWidth = o === 0 ? 6 : o === 1 ? 2.6 : 1.6;
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+  }
+  // needles in three passes: shaded interior, mid, sunlit outer tips
+  for (let pass = 0; pass < 3; pass++) {
+    for (const [x0, y0, x1, y1, o] of twigs) {
+      const len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0);
+      const step = o === 0 ? 3.2 : 2.6, n = Math.floor(len / step);
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        // pass 0 along the whole twig, the lighter passes weighted to its outer end
+        if (pass > 0 && r() > (pass === 1 ? 0.55 : 0.3) * (0.4 + t)) continue;
+        const px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t;
+        const nl = (o === 0 ? 30 : o === 1 ? 24 : 18) * (1 - t * 0.35) * (0.7 + r() * 0.5);
+        for (const sd of [-1, 1]) {
+          const na = ang + sd * (0.55 + r() * 0.5);
+          const L = pass === 0 ? 14 + r() * 8 : pass === 1 ? 20 + r() * 9 : 27 + r() * 12;
+          g.strokeStyle = hsl(98 + r() * 22, 24 + r() * 16, L);
+          g.lineWidth = pass === 2 ? 1.5 : 2.0;
+          g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(na) * nl, py + Math.sin(na) * nl + 3); g.stroke();
+        }
+      }
+    }
+  }
+  return tex(c);
+}
+
+// A ponderosa bough: long needles in bottlebrush tufts at the ends of short twigs off a bare stem, clumped with
+// sky between the clumps (a fir's flat feathery spray on a pine read as fern fronds)
+export function pineTuftTexture(seed = 7) {
+  const W = 1024, H = 512;
+  const [c, g] = canvas(W, H);
+  const r = mulberry32(seed);
+  g.clearRect(0, 0, W, H);
+  g.lineCap = 'round';
+  const stemY = (x) => H * 0.5 + Math.pow(x / W, 2) * 30;
+  g.strokeStyle = 'rgba(66,50,36,1)'; g.lineWidth = 7;
+  g.beginPath(); g.moveTo(6, stemY(6)); for (let x = 6; x <= W - 60; x += 20) g.lineTo(x, stemY(x)); g.stroke();
+  const tufts = [];
+  for (let x = 120; x < W - 40; x += 70 + r() * 50) {
+    const n = 1 + (r() < 0.75 ? 1 : 0), s0 = r() < 0.5 ? -1 : 1;
+    for (let k = 0; k < n; k++) {
+      const side = k === 0 ? s0 : -s0;   // a pair of twigs goes off either side
+      const ang = side * (0.35 + r() * 0.7) - 0.1, len = 50 + r() * 90;
+      const x0 = x, y0 = stemY(x), x1 = x0 + Math.cos(ang) * len, y1 = y0 + Math.sin(ang) * len;
+      g.strokeStyle = 'rgba(70,54,38,1)'; g.lineWidth = 3.5;
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      tufts.push([x1, y1, ang]);
+    }
+  }
+  tufts.push([W - 50, stemY(W - 50), 0]);   // the leading tuft at the bough's end
+  // each tuft: long needles radiating from the twig end, swept forward, darker inside, lighter at the tips
+  for (let pass = 0; pass < 3; pass++) {
+    for (const [tx, ty, ang] of tufts) {
+      const n = pass === 0 ? 70 : pass === 1 ? 55 : 30;
+      for (let i = 0; i < n; i++) {
+        const a = ang + (r() - 0.5) * 2 * (1.45 + r() * 0.6), L = (58 + r() * 44) * (pass === 2 ? 1.05 : 1);
+        const bx = tx - Math.cos(ang) * r() * 26, by = ty - Math.sin(ang) * r() * 26;
+        const l = pass === 0 ? 10 + r() * 7 : pass === 1 ? 17 + r() * 9 : 26 + r() * 12;
+        g.strokeStyle = hsl(84 + r() * 22, 26 + r() * 16, l);
+        g.lineWidth = pass === 2 ? 1.4 : 1.9;
+        const ex = bx + Math.cos(a) * L, ey = by + Math.sin(a) * L + L * 0.12;
+        g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx + Math.cos(a) * L * 0.6, by + Math.sin(a) * L * 0.6, ex, ey); g.stroke();
+      }
+    }
+  }
   return tex(c);
 }
 

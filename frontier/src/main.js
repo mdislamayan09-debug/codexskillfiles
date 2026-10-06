@@ -249,7 +249,8 @@ async function init() {
     // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
     // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.45, -5.6], lookRel: [-0.6, 2.2, 22], turn: -0.55, trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: 'snow', snowDress: true }; },
+    // (a falling-snow storm, not a white-out: the reference keeps its cloud deck, ridges and fog banks readable)
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.55 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -259,7 +260,7 @@ async function init() {
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
   };
   // handles for the capture/probe tooling
-  G.dbg = { world, veg, sky, backdrop, scene, camera, U, THREE, CABIN };
+  G.dbg = { world, veg, sky, backdrop, scene, camera, U, THREE, CABIN, renderer, post, town };
   // The summit lookout the reference is taken from: a ledge high on a valley side, the valley receding to the
   // horizon through the middle of the frame, a homestead on a bench a few hundred metres below the lens. Searched
   // over the snowy north by marching rays through a trial frame from every ledge.
@@ -614,7 +615,23 @@ async function init() {
           const x = gx + (rr() - 0.5) * 6, z = gz + (rr() - 0.5) * 6, sc = (k === 0 ? 1.3 : 0.5) + rr() * 1.3;
           veg.rocks.add(x, world.heightAt(x, z) - 0.42 * sc, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
         }
-        for (let k = 0; k < 6; k++) { const x = gx + (rr() - 0.5) * 13, z = gz + (rr() - 0.5) * 13; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
+        for (let k = 0; k < 6; k++) { const x = gx + (rr() - 0.5) * 13, z = gz + (rr() - 0.5) * 13; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, 0.5 + rr() * 0.6, [7, 8, 9, 9][Math.floor(rr() * 4)]); }
+      }
+      // the midground the reference's valley is built from: split granite outcrops breaking the snow either side
+      // of the open lane, and clusters of snow-laden spruce of mixed sizes stepping back up the valley
+      for (let gi = 0; gi < 9; gi++) {
+        const ahead = 35 + rr() * 140, side = (gi % 2 ? 1 : -1) * (18 + ahead * 0.22 + rr() * 30);
+        const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, sc = 2.5 + rr() * 4.5;
+        veg.crags.add(x, world.heightAt(x, z) - sc * 0.45, z, rr() * 6.28, sc, Math.floor(rr() * 3));
+      }
+      const firs = veg.groups.fir;
+      if (firs.length) for (let gi = 0; gi < 12; gi++) {
+        const ahead = 40 + rr() * 150, side = (rr() < 0.5 ? -1 : 1) * (14 + ahead * 0.3 + rr() * 40);   // (within the near-tree radius: no billboards are built for trees set down after load)
+        const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
+        for (let k = 0, n = 2 + Math.floor(rr() * 5); k < n; k++) {
+          const x = gx + (rr() - 0.5) * 16, z = gz + (rr() - 0.5) * 16;
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.45 + rr() * rr() * 1.3, firs[Math.floor(rr() * firs.length)]);
+        }
       }
       veg.update(player.hpos, true);
     }
@@ -669,7 +686,7 @@ async function init() {
         const hit = groundAt(nx, ny, 24);
         if (!hit) continue;
         const [x, g, z, t] = hit, sc = (0.45 + rr() * 0.55) * (0.3 + t * 0.085);
-        veg.rocks.add(x, g - sc * 0.42, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
+        veg.rocks.add(x, g - sc * 0.42, z, rr() * 6.28, sc, 4 + Math.floor(rr() * 2));
       }
       for (const [nx, ny, crown, rot] of [[-1.02, -0.8, -0.02, 0.4], [-0.84, -0.92, -0.32, 1.9], [-0.66, -0.98, -0.6, 3.1]]) {
         const hit = groundAt(nx, ny, 26);
@@ -679,14 +696,15 @@ async function init() {
         n2.set(nx, crown); rc.setFromCamera(n2, camera);
         const rd = rc.ray.direction, k = t / Math.hypot(rd.x, rd.z), top = c.y + rd.y * k;
         const sc = Math.min(6.5, Math.max(1.4, (top - g) / 0.62));
-        veg.rocks.add(x, g - 0.14 * sc, z, rot, sc, 3);
+        veg.rocks.add(x, g - 0.14 * sc, z, rot, sc, 5);
       }
-      // frosted brush and dead grass in the cracks of the ledge
-      for (let i = 0; i < 46; i++) {
+      // dry ochre bunchgrass, tall frosted stalks and a little frosted brush in the cracks of the ledge, in
+      // mixed sizes
+      for (let i = 0; i < 70; i++) {
         const hit = groundAt(-1.05 + rr() * 2.1, -0.98 + rr() * 0.4, 18);
         if (!hit) continue;
-        const [x, g, z] = hit;
-        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, 0.45 + rr() * 0.55, 7 + Math.floor(rr() * 2));
+        const [x, g, z] = hit, k = rr();
+        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : k < 0.92 ? 7 + Math.floor(rr() * 2) : 10);
       }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
       // way down the near ground, so it reads as a mountainside rather than a blank white wedge
@@ -694,7 +712,7 @@ async function init() {
       for (let i = 0; i < 90; i++) {
         const f = 10 + rr() * 90, side = (rr() - 0.5) * (14 + f * 1.2);
         const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
-        if (rr() < 0.4) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.5 + rr() * 1.6, 2 + Math.floor(rr() * 2));
+        if (rr() < 0.4) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.5 + rr() * 1.6, 4 + Math.floor(rr() * 2));
         else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
       }
     }

@@ -5,7 +5,7 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
-import { leafCardTexture, pineCardTexture, barkTexture, conBarkTextures } from './textures.js';
+import { leafCardTexture, pineCardTexture, pineTuftTexture, barkTexture, conBarkTextures } from './textures.js';
 
 // ---------------------------------------------------------------------------- wind
 const WIND_VERT = /* glsl */ `
@@ -55,7 +55,12 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       vec3 fn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
       float up = abs(fn.y);
       float sk = smoothstep(0.35, 0.8, cl.r) * smoothstep(0.4, 0.85, up + 0.3 * (hash12(floor(vWPos.xz * 3.0 + vWPos.y * 2.0)) - 0.5));
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.9);
+      #if defined(CONIFER_SNOW) && defined(USE_MAP)
+      // a spruce bough carries a load of snow along its upper side: on the standing cards the half above the
+      // stem is white too, so each bough reads as a white shelf over dark needles
+      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.5, 0.62, vMapUv.y + 0.08 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)));
+      #endif
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.92);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.5);
@@ -66,13 +71,13 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.43, 0.33) * (0.7 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), cl.a * 0.75);
     #endif
   }`;
-function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null } = {}) {
+function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false } = {}) {
   return patchMaterial(mat, {
     sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -270,17 +275,18 @@ function buildPine(seed, kind = 'pine') {
     }
   }
   // each variant has its own habit: narrow spire-like subalpine firs to broad, heavy spruces
-  const spread = (kind === 'tall' ? 3.3 : kind === 'fir' ? 3.1 : 3.4) * (kind === 'fir' ? 0.62 + rnd() * 0.6 : 0.85 + rnd() * 0.3);
+  // (fuller firs: the narrow spires read as spindly spikes against the reference's broad, snow-loaded spruce)
+  const spread = (kind === 'tall' ? 3.3 : kind === 'fir' ? 3.2 : 3.4) * (kind === 'fir' ? 0.85 + rnd() * 0.45 : 0.85 + rnd() * 0.3);
   const tall = kind === 'tall';
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
     // forest giants: a ragged columnar crown — missing whorls, uneven limbs — rather than a perfect cone
-    if (tall && t < 0.85 && rnd() < 0.24) continue;      // open crowns: sky shows between the limbs (not so open they read as poles)
+    if (tall && t < 0.85 && rnd() < 0.15) continue;      // open crowns: sky shows between the limbs (not so open they read as poles)
     const r = tall
       ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
       : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
-    const n = tall ? 4 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
+    const n = tall ? 5 + Math.floor(rnd() * 4) : 9 + Math.floor(rnd() * 4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
@@ -545,6 +551,36 @@ const twigTexture = () => cardCanvas(256, 256, (g, r) => {
     else { g.fillStyle = `rgba(${150 + r() * 40},${140 + r() * 30},${90},0.8)`; g.fillRect(x2 - 2, y2 - 2, 4, 4); }
   };
   for (let i = 0; i < 7; i++) branch(128 + (r() - 0.5) * 40, 256, Math.PI / 2 + (r() - 0.5) * 1.2, 50 + r() * 30, 4, 4);
+});
+// a bunchgrass tuft: long dry blades fanning up and out of the crown, straw and ochre with grey dead blades
+const tuftTexture = () => cardCanvas(256, 256, (g, r) => {
+  g.lineCap = 'round';
+  for (let i = 0; i < 90; i++) {
+    const x0 = 128 + (r() - 0.5) * 50, a = Math.PI / 2 + (r() - 0.5) * 1.5, L = 120 + r() * 120;
+    const bend = (r() - 0.5) * 0.9 + (a - Math.PI / 2) * 0.8;
+    const dead = r() < 0.3, v = 0.75 + r() * 0.4;
+    g.strokeStyle = dead ? `rgb(${Math.round(118 * v)},${Math.round(110 * v)},${Math.round(98 * v)})` : `rgb(${Math.round(176 * v)},${Math.round(138 * v)},${Math.round(76 * v)})`;
+    g.lineWidth = 1.6 + r() * 1.8;
+    const x1 = x0 + Math.cos(a) * L * 0.55, y1 = 256 - Math.sin(a) * L * 0.55;
+    const x2 = x0 + Math.cos(a + bend) * L, y2 = 256 - Math.sin(a + bend) * L * 0.92;
+    g.beginPath(); g.moveTo(x0, 256); g.quadraticCurveTo(x1, y1, x2, y2); g.stroke();
+  }
+});
+// tall dead stalks (fireweed and dock gone to seed), with their seed heads
+const stalkTexture = () => cardCanvas(128, 512, (g, r) => {
+  g.lineCap = 'round';
+  for (let i = 0; i < 9; i++) {
+    const x0 = 64 + (r() - 0.5) * 30, L = 280 + r() * 210, lean = (r() - 0.5) * 50;
+    g.strokeStyle = `rgb(${92 + r() * 30},${76 + r() * 20},${60 + r() * 14})`; g.lineWidth = 2 + r() * 1.5;
+    g.beginPath(); g.moveTo(x0, 512); g.quadraticCurveTo(x0 + lean * 0.3, 512 - L * 0.5, x0 + lean, 512 - L); g.stroke();
+    // seed head and a few side shoots near the top
+    for (let k = 0; k < 6; k++) {
+      const t = 0.7 + k * 0.05, sx = x0 + lean * t * t, sy = 512 - L * t, sd = r() < 0.5 ? -1 : 1;
+      g.lineWidth = 1.2; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + sd * (8 + r() * 14), sy - 6 - r() * 10); g.stroke();
+    }
+    g.fillStyle = `rgb(${110 + r() * 30},${90 + r() * 20},${70})`;
+    g.beginPath(); g.ellipse(x0 + lean, 512 - L - 8, 4, 12, lean * 0.004, 0, 7); g.fill();
+  }
 });
 
 function buildCypress(seed) {
@@ -995,10 +1031,11 @@ function rockGeometry(seed, fractured = false, detail = 5) {
   return g;
 }
 
-function rockMaterial(surf = {}) {
+function rockMaterial(surf = {}, bare = false) {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0 });
   return patchMaterial(m, {
-    fragHead: /* glsl */ `uniform sampler2D tRockA; uniform sampler2D tRockN; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }
+    // bare: wind-scoured ledge granite (snow only in patches and cracks), for a lookout's own rock
+    fragHead: (bare ? '#define BARE_LEDGE\n' : '') + /* glsl */ `uniform sampler2D tRockA; uniform sampler2D tRockN; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }
       // triplanar scanned relief in world space (whiteout blend), so a boulder scaled up to a ledge keeps its grain
       vec3 rockTriN(vec3 p, vec3 n, float sc) {
         vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
@@ -1060,8 +1097,13 @@ function rockMaterial(surf = {}) {
       // (round grains of one size on a noise grid read as polka dots on a big ledge; these are torn, mixed-size flecks)
       // clean patches of old snow lying on the flats, with a ragged edge; elsewhere only a sparse frost of flecks
       float fleck = smoothstep(0.74, 0.8, vnoise(vWPos.xz * 7.0 + vWPos.y * 5.0) * 0.55 + vnoise(vWPos.xz * 19.0 - vWPos.y * 11.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
-      float drift = smoothstep(0.46, 0.56, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
-      rsnow *= max(drift, 0.7 * fleck);
+      float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
+      // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
+      #ifdef BARE_LEDGE
+      rsnow *= max(drift * 0.6, 0.6 * fleck);
+      #else
+      rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
+      #endif
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
       // and the warm ochre crust lichen of the reference's granite, in scattered rosettes
@@ -1090,7 +1132,7 @@ export class Vegetation {
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
     // (alpha to coverage softened the card edges but thinned every distant crown into a see-through snag)
-    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4, conifer = false) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark, conifer });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -1103,12 +1145,15 @@ export class Vegetation {
       ] });
     }
     // matte needles: no sky sheen; against the sun the boughs are dark but their thin edges glow olive-gold
-    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.32, 0.38, 0.15);
+    // (a warmer, deeper green than the old grey-blue)
+    const pineMat = leafMat(pineTex, 0x9fb088, false, 0.32, 0.38, 0.15, true);
+    // ponderosa and lodgepole carry their needles in tufts
+    const tuftTex = pineTuftTexture(7), tuftMat = leafMat(tuftTex, 0xa8b48a, false, 0.32, 0.38, 0.15, true);
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
         { geometry: b.wood, material: pineBark },
-        { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) },
+        { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) },
       ] });
     }
     const cypMat = leafMat(cypTex, 0xc8d0b0);
@@ -1126,7 +1171,7 @@ export class Vegetation {
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
     for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
-      addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: pineMat, depth: windDepthMaterial(pineTex, 1) }]);
+      addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) }]);
     }
     // dead snags, silver-grey and barkless
     const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: new THREE.Color(1.55, 1.5, 1.45), roughness: 0.95 }), 0);   // weathered silver-grey
@@ -1210,14 +1255,31 @@ export class Vegetation {
       tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
       bushBuilds.push({ parts: [{ geometry: tg, material: twigMat, castShadow: false }] });
     }
+    // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
+    {
+      const tuftT = tuftTexture(), stalkT = stalkTexture();
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
+      const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
+      const fan = (seed, n, w, h, tilt) => {
+        const rnd = mulberry32(seed), cs = [];
+        for (let k = 0; k < n; k++) { const g = new THREE.PlaneGeometry(w * (0.8 + rnd() * 0.4), h * (0.75 + rnd() * 0.5)); g.translate(0, g.parameters.height * 0.5, 0); g.rotateX((rnd() - 0.5) * tilt); g.rotateY((k / n) * Math.PI + rnd() * 0.5); cs.push(g); }
+        const tg = setSway(mergeGeometries(cs), (x, y) => y * 0.35), tp = tg.attributes.position, tc = new Float32Array(tp.count * 3);
+        for (let k = 0; k < tp.count; k++) tc[k * 3] = tc[k * 3 + 1] = tc[k * 3 + 2] = 0.6 + 0.4 * Math.min(1, tp.getY(k) / h);
+        tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+        return tg;
+      };
+      bushBuilds.push({ parts: [{ geometry: fan(1010, 6, 0.85, 0.7, 0.5), material: grassTuftMat, castShadow: false }] });
+      bushBuilds.push({ parts: [{ geometry: fan(1020, 3, 0.5, 1.2, 0.3), material: stalkMat, castShadow: false }] });
+    }
     this.bushes = new ScatterLayer(scene, bushBuilds, Math.round(6000 * Math.max(1, quality * quality)), 140 * Math.sqrt(quality));
     // fallen logs on forest floors
     const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: pineBark }] }));
     this.logs = new ScatterLayer(scene, logBuilds, 1200, 170 * Math.sqrt(quality));
 
     // rocks
-    const rMat = rockMaterial(surf);
-    const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3, i >= 2), material: rMat }] }));
+    const rMat = rockMaterial(surf), rMatBare = rockMaterial(surf, true);
+    // 4 and 5: the fractured blocks again in wind-scoured bare granite, for lookout ledges
+    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: rockGeometry((i >= 4 ? i - 2 : i) + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
@@ -1318,8 +1380,10 @@ export class Vegetation {
       }
       // (a flat background chance sprinkled lone trees evenly over open snow like pepper; up there trees keep to stands)
       // in the mountains a thinning forest ends in clean stand edges rather than an even stipple of lone trees
-      const fK = cl.snow > 0.45 ? Math.pow(sp.forest, 1.8) : sp.forest;
-      let p = fK * (cl.snow > 0.45 ? 0.9 : cl.jungle > 0.45 ? 0.95 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
+      // (and inside a stand the spruce grow close: a sparse stand left the darkened ground under it showing as grey
+      // camouflage patches across the mountainsides, with too few trees on them to read as forest)
+      const fK = cl.snow > 0.45 ? THREE.MathUtils.smoothstep(sp.forest, 0.22, 0.62) : sp.forest;
+      let p = fK * (cl.snow > 0.45 ? 1.0 : cl.jungle > 0.45 ? 0.95 : 0.6) + (cl.snow > 0.45 ? 0.0015 : 0.012);
       // trees grow in clumps and thickets with gaps between them, not one to every grid cell
       p *= 0.35 + 1.3 * THREE.MathUtils.smoothstep(w.n3.noise(px / 28 + 7.7, pz / 28 - 3.1), -0.45, 0.55);
       if (blocked(px, pz)) p = 0;
@@ -1342,7 +1406,7 @@ export class Vegetation {
         // the pine belt's middle storey: young full-skirted firs among the tall clear boles, and the mature pines
         // of mixed ages (one size of tall pine in an even stand read as planted poles)
         if (pz < -700 && cl.snow <= 0.45 && cl.jungle <= 0.45 && !swamp && !beach) {
-          if (rc() < 0.24) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.82 + rc() * 0.42;
+          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.82 + rc() * 0.42;
         }
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving
@@ -1377,7 +1441,7 @@ export class Vegetation {
         const nb = r() < 0.04 + 0.5 * brush ? 1 + Math.floor(r() * 3 * brush) : 0;
         for (let b = 0; b < nb; b++) {
           const bx = px + (r() - 0.5) * 5, bz = pz + (r() - 0.5) * 5;
-          this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, 7 + Math.floor(r() * 2));
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, [7, 8, 9, 9, 10][Math.floor(r() * 5)]);
         }
       } else if (pz < -700) {
         // undergrowth in patches: fern beds and scrub where light gets through, bare litter elsewhere
@@ -1437,12 +1501,15 @@ export class Vegetation {
     g.instanceCount = items.length;
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
     const mat = new THREE.ShaderMaterial({
-      uniforms: { ...U, uAtlas: { value: this.atlas.texture }, uCols: { value: this.treeBuilds.length }, uHeights: { value: hs }, uNear: { value: this.nearRadius } },
+      // cinematic: billboards carry on out to ~4 km (beyond the old 1.25 km the far forest was only a grey tint
+      // on the ground, which read as camouflage blotches with no trees on them)
+      uniforms: { ...U, uAtlas: { value: this.atlas.texture }, uCols: { value: this.treeBuilds.length }, uHeights: { value: hs }, uNear: { value: this.nearRadius }, uFar: { value: (this.quality || 1) >= 2 ? 4200 : 1250 } },
       vertexShader: /* glsl */ `
         attribute vec4 aTree;
         uniform float uCols;
         uniform float uHeights[${this.treeBuilds.length}];
         uniform float uNear;
+        uniform float uFar;
         uniform float uTime;
         varying vec2 vUv; varying vec3 vW; varying float vFade; varying float vVar; varying vec3 vBase;
         void main(){
@@ -1454,7 +1521,7 @@ export class Vegetation {
           float d = length(toCam);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vFade = smoothstep(uNear - 25.0, uNear, d);
-          h *= smoothstep(1250.0, 900.0, d); // far trees sink smoothly into the canopy-tinted terrain
+          h *= smoothstep(uFar, uFar * 0.72, d); // far trees sink smoothly into the canopy-tinted terrain
           vec3 p = base + right * position.x * h + vec3(0.0, (position.y * h) - 0.5 * s, 0.0);
           // gentle sway of top
           p += right * sin(uTime*1.2 + base.x*0.03) * 0.15 * position.y * position.y;

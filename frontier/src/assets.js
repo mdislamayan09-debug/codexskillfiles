@@ -6,7 +6,7 @@ import { mulberry32 } from './noise.js';
 
 const NAMES = ['grass', 'dirt', 'rock', 'snow', 'gravel', 'planks', 'riverbed', 'wood', 'stone', 'sand'];
 // terrain array layers (order is mirrored by the L_* defines in terrain.js)
-export const TERRAIN_LAYERS = ['grass', 'dirt', 'rock', 'snow', 'riverbed', 'gravel', 'sand', 'litter'];
+export const TERRAIN_LAYERS = ['grass', 'dirt', 'rock', 'snow', 'riverbed', 'gravel', 'sand', 'litter', 'needles'];
 const TS = 512;
 
 // Forest-floor litter: pine needles, cones, broad leaves and twigs over dark soil (neutral colour; the shader
@@ -64,6 +64,55 @@ function litterCanvas() {
   return c;
 }
 
+// the pine woods' floor: a dry duff of fallen needles over dusty soil, with cones, twig ends and grit, no broad
+// leaves (the broadleaf litter read as rust-brown leaf dots under ponderosa)
+function needleCanvas() {
+  const c = document.createElement('canvas'); c.width = c.height = TS;
+  const g = c.getContext('2d');
+  const r = mulberry32(5151);
+  g.fillStyle = '#6a5843'; g.fillRect(0, 0, TS, TS);
+  const wrap = (fn) => { for (const ox of [-TS, 0, TS]) for (const oy of [-TS, 0, TS]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
+  // soil showing through in patches, and darker damp hollows
+  for (let i = 0; i < 220; i++) {
+    const x = r() * TS, y = r() * TS, rad = 10 + r() * 40, dark = r() < 0.4;
+    wrap(() => {
+      const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+      gr.addColorStop(0, dark ? 'rgba(52,40,28,0.45)' : 'rgba(150,128,96,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    });
+  }
+  g.lineCap = 'round';
+  // needles in layers: old grey-brown underneath, fresher tan and rust on top
+  for (let pass = 0; pass < 3; pass++) {
+    // (the tile spans 1.6 m: ponderosa needles 10-20 cm long)
+    const n = pass === 0 ? 2200 : pass === 1 ? 1600 : 700;
+    for (let i = 0; i < n; i++) {
+      const x = r() * TS, y = r() * TS, a = r() * 6.28, L = 26 + r() * 40, v = 0.6 + r() * 0.55;
+      const col = pass === 0 ? [118, 100, 80] : pass === 1 ? [150, 120, 82] : [168, 112, 62];
+      g.strokeStyle = `rgba(${Math.round(col[0] * v)},${Math.round(col[1] * v)},${Math.round(col[2] * v)},${pass === 0 ? 0.8 : 0.92})`;
+      g.lineWidth = 1.3 + r() * 0.9;
+      // pine needles fall in pairs and threes, splayed from a sheath
+      wrap(() => { for (let k = 0; k < 2 + (r() < 0.4 ? 1 : 0); k++) { const b = a + (k - 1) * 0.12; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(b) * L, y + Math.sin(b) * L); g.stroke(); } });
+    }
+  }
+  // grit and small stones
+  for (let i = 0; i < 160; i++) {
+    const x = r() * TS, y = r() * TS, rad = 1 + r() * 3, v = 90 + r() * 70;
+    wrap(() => { g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x + 1, y + 1, rad, rad * 0.8, 0, 0, 7); g.fill(); g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.beginPath(); g.ellipse(x, y, rad, rad * 0.8, 0, 0, 7); g.fill(); });
+  }
+  // twig ends and bark flakes
+  for (let i = 0; i < 40; i++) {
+    const x = r() * TS, y = r() * TS, a = r() * 6.28, L = 16 + r() * 50;
+    g.strokeStyle = `rgb(${66 + r() * 30},${50 + r() * 20},${36})`; g.lineWidth = 1.6 + r() * 2.4;
+    wrap(() => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); });
+  }
+  for (let i = 0; i < 30; i++) {
+    const x = r() * TS, y = r() * TS, a = r() * 6.28, w = 4 + r() * 8;
+    wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgb(${104 + r() * 30},${70 + r() * 16},${44})`; g.fillRect(-w, -w * 0.4, w * 2, w * 0.8); g.restore(); });
+  }
+  return c;
+}
+
 function pixels(img) {
   const c = document.createElement('canvas'); c.width = c.height = TS;
   const g = c.getContext('2d', { willReadFrequently: true });
@@ -113,6 +162,7 @@ export async function loadSurfaces(renderer) {
   TERRAIN_LAYERS.forEach((name, l) => {
     let a, b;
     if (name === 'litter') { const c = litterCanvas(); a = pixels(c); b = normalFromHeight(a); }
+    else if (name === 'needles') { const c = needleCanvas(); a = pixels(c); b = normalFromHeight(a, 1.6); }
     else {
       a = out[name]?.image ? pixels(out[name].image) : new Uint8ClampedArray(TS * TS * 4).fill(128);
       b = out[name + 'N']?.image ? pixels(out[name + 'N'].image) : null;

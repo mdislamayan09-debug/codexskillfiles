@@ -68,6 +68,7 @@ uniform highp sampler2DArray tNrm;
 #define L_GRAVEL 5.0
 #define L_SAND 6.0
 #define L_LITTER 7.0
+#define L_NEEDLE 8.0
 vec3 srgb(vec3 c){ return pow(c/255.0, vec3(2.2)); }
 float lumi(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 float gTRough = 0.9;
@@ -133,7 +134,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // forest floor: needle and leaf litter, tinted per biome
   vec4 lA = texA(L_LITTER, xz, 1.8, 4.6);
   vec3 lN = texN(L_LITTER, xz, 1.8);
-  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(1.0, 0.86, 0.66), pineK);   // sun-dried tan needle duff, not orange
+  // the pine woods have their own needle duff
+  if (pineK > 0.01) {
+    lA = mix(lA, texA(L_NEEDLE, xz, 1.6, 4.1), pineK);
+    lN = mix(lN, texN(L_NEEDLE, xz, 1.6), pineK);
+  }
+  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.98, 0.94, 0.88), pineK);   // the needle scan carries its own tan
   litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
   litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
   vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
@@ -241,6 +247,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.85 * ribs;
+  // wind-scoured crests and summit knolls: the wind strips a convex top to rock and frozen turf with snow only in
+  // its hollows (a summit under an unbroken white blanket reads as a model, not a mountain)
+  float crest = smoothstep(0.7, 2.0, -lapS + 0.9 * (fbm2(xz / 9.0 + 4.4) - 0.5) + 0.3 * (vnoise(xz / 2.6) - 0.5)) * smoothstep(0.4, 0.75, snowC) * smoothstep(300.0, 420.0, wp.y);
+  snowAmt *= 1.0 - 0.75 * crest;
+  rockAmt = max(rockAmt, crest * 0.8);
   // a used track through the snow stays trampled and dirty: a dark line leading to the homestead
   snowAmt *= 1.0 - 0.55 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
   rockAmt = max(rockAmt, ribs * 0.9);
@@ -386,7 +397,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // the frozen creek in Frostwater Valley
   float cold = smoothstep(0.5, 0.8, snowC);
   // dark meltwater only in short open leads; most of the channel is iced and drifted over
-  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.3, 0.46, fbm2(xz / 60.0 + 3.3));
+  // the creek's corridor: willow scrub and gravel bars breaking through the snow along both banks, so from a
+  // lookout the river reads as a dark braided band winding down the valley, not a faint line
+  float corridor = smoothstep(0.12, 0.4, wet) * (1.0 - smoothstep(0.45, 0.6, wet)) * cold;
+  float willow = corridor * smoothstep(0.35, 0.65, fbm2(xz / 14.0 + 8.8) + 0.25 * (vnoise(xz / 3.0) - 0.5));
+  c = mix(c, mix(srgb(vec3(46,40,36)), srgb(vec3(84,78,72)), vnoise(xz / 2.3)) * (0.8 + 0.3 * micro), willow * 0.75);
+  float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.22, 0.4, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   c = mix(c, mix(srgb(vec3(112,128,140)), snow, 0.25 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);

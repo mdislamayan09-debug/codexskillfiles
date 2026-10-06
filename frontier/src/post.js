@@ -78,11 +78,13 @@ const GradeShader = {
       col = sat(col, 0.92 - uNight*0.3);
       col = mix(col, col*col*(3.0-2.0*col), 0.28);
       col = pow(max(col, 0.0), vec3(1.0)) * 1.02 + vec3(0.004, 0.0035, 0.002);   // (a bigger lift read as haze: keep true blacks)
-      // under the canopy: deeper shadows and richer greens, sun-warmed highlights (no milky lift)
+      // under the canopy: richer greens and sun-warmed highlights, with a shoulder on the highlights. The
+      // reference's woods keep true blacks but hold the hazy canopy gaps near 0.45 and their brightest 5% near
+      // 0.75; an S-curve here had blown the gaps to 0.6 and the top 5% to 0.9 (and a lifted toe went milky)
       {
-        vec3 c2 = col * col * (3.0 - 2.0 * col);
-        c2 = sat(c2, 1.15) * mix(vec3(0.94, 0.98, 0.94), vec3(1.06, 1.0, 0.88), smoothstep(0.2, 0.8, l));
-        col = mix(col, c2, uForest * 0.5);
+        vec3 c2 = sat(col, 1.12) * mix(vec3(0.94, 0.98, 0.94), vec3(1.06, 1.0, 0.88), smoothstep(0.2, 0.8, l));
+        c2 -= 0.32 * max(c2 - 0.3, 0.0);
+        col = mix(col, c2, uForest);
       }
       // storm: cold, blue-grey and low-saturation
       // storm: cool blue-grey shadows, but warm wood and rock keep some colour
