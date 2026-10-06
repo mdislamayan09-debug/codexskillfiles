@@ -356,7 +356,7 @@ export class World {
         h = lerp(h, s.h + 1.2 * n2.fbm(x / 20, z / 20, 3) + 0.4 * n.fbm(x / 6, z / 6, 2), s.w);
         // the creek: a shallow channel winding down the floor
         creekD = canyonCreekD(x, z);
-        if (creekD < 12) h -= 1.4 * smoothstep(9, 3, creekD) * s.w;
+        if (creekD < 16) h -= 1.6 * smoothstep(12, 4, creekD) * s.w;   // a channel wide enough to read from the ride
       }
     }
     // Desert: terraced red mesas over sand flats
@@ -438,7 +438,7 @@ export class World {
       // (valley distances are scaled by the widening, so keep the braid band narrow in those units)
       const braid = d && d.vd < 70 ? Math.max(smoothstep(9, 4, d.vd), 0.72 * smoothstep(70, 44, d.vd) * smoothstep(0.58, 0.68, n.noise(x / 34, z / 34) * 0.5 + 0.5)) : 0;
       // canyon creek: an open channel with iced side braids
-      const cbraid = creekD < 40 ? Math.max(smoothstep(5, 2.5, creekD), 0.7 * smoothstep(40, 26, creekD) * smoothstep(0.6, 0.7, n.noise(x / 28, z / 28) * 0.5 + 0.5)) : 0;
+      const cbraid = creekD < 60 ? Math.max(smoothstep(8, 3.5, creekD), 0.72 * smoothstep(60, 38, creekD) * smoothstep(0.58, 0.68, n.noise(x / 28, z / 28) * 0.5 + 0.5)) : 0;
       out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid, cbraid);
       out.town = Math.max(town, rnd * 0.32, cc, cb * 0.6);
       out.swamp = sw;

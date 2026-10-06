@@ -18,6 +18,7 @@ import { HUD } from './hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { Post } from './post.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const params = new URLSearchParams(location.search);
 // cinematic (the default) is tuned for an Apple-silicon laptop and favours image quality over frame rate;
@@ -249,7 +250,7 @@ async function init() {
     // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
     // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.45, -5.6], lookRel: [-0.6, 2.2, 22], turn: -0.55, trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: 'snow' }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: 'snow', snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // a longer lens, as the reference: the homestead reads as a building and the ranges stack up behind it
@@ -531,6 +532,35 @@ async function init() {
     }
     // trailside anchors, as a set dresser would place them: a mossy boulder and a fallen trunk off the left verge,
     // ferns and scrub around them
+    // an old trapper's drift fence angling across the snowfield ahead, half buried, with snow on its rails: a made
+    // thing to ride toward in an otherwise empty white
+    if (s.snowDress && !G.snowDressed) {
+      G.snowDressed = true;
+      const wood = patchMaterial(new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95 }), { fragColor: `#include <color_fragment>
+        { vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix); diffuseColor.rgb = mix(diffuseColor.rgb * (0.75 + 0.5 * vnoise(vWPos.xy * 9.0 + vWPos.z * 3.0)), vec3(0.8, 0.84, 0.9), smoothstep(0.55, 0.9, wn.y)); }` });
+      // laid out in the camera's frame (the lens is turned off the horse's heading): starting ahead and to the left,
+      // angling away across the view toward the valley
+      const cy = yaw - (s.turn || 0);
+      const f = [Math.sin(cy), Math.cos(cy)], lt = [Math.cos(cy), -Math.sin(cy)];
+      const geos = [];
+      const ang = cy - 1.05, dir = [Math.sin(ang), Math.cos(ang)];
+      const x0 = px + f[0] * 30 + lt[0] * 14, z0 = pz + f[1] * 30 + lt[1] * 14;
+      let prev = null;
+      for (let k = 0; k < 16; k++) {
+        const fx = x0 + dir[0] * k * 3.2, fz = z0 + dir[1] * k * 3.2, gy = world.heightAt(fx, fz);
+        const lean = (Math.sin(k * 2.3) * 0.12);
+        const post = new THREE.CylinderGeometry(0.07, 0.09, 1.5, 6); post.rotateZ(lean); post.translate(fx, gy + 0.45, fz); geos.push(post);
+        if (prev && k % 5 !== 3) for (const hh of [0.45, 0.95]) {   // a few spans have fallen
+          const ax = prev[0], az = prev[1], ay = prev[2] + hh, by = gy + hh;
+          const len = Math.hypot(fx - ax, fz - az, by - ay);
+          const rail = new THREE.CylinderGeometry(0.045, 0.05, len, 5); rail.rotateZ(Math.PI / 2);
+          rail.rotateY(-Math.atan2(fz - az, fx - ax)); rail.translate((ax + fx) / 2, (ay + by) / 2, (az + fz) / 2); geos.push(rail);
+        }
+        prev = [fx, fz, gy];
+      }
+      const fence = new THREE.Mesh(mergeGeometries(geos.map((g) => g.index ? g.toNonIndexed() : g)), wood);
+      fence.castShadow = true; fence.receiveShadow = true; scene.add(fence);
+    }
     if (s.trailDress && !G.trailDressed) {
       G.trailDressed = true;
       // (cos, -sin) points to the rider's left, so negative side offsets land on the right

@@ -365,3 +365,29 @@ The critic now asks for:
   - the snow ride framed off-centre toward the valley
   - snow-capped, half-buried rocks
   - broken-crust rings where the horse's legs enter deep snow
+
+**Rounds 34–36 critic:** pines 3, 3, 4; snowride 3, 3, 3; snowvista 2, 3, 3.
+
+### Rounds 35–37
+- **The snow-forest look turned around.** The distant snow canopy had been painting the mountainsides dark with
+  white glades, which the critic read as "camouflage" and "snow puddles on rock". It is now mostly white, flecked
+  dark, and darkens the ground far less, as the reference's slopes are. Stand edges are ragged at crown scale and
+  crisp. Distant snowy spruce impostors keep dark crowns; they had thinned to "pins".
+- **Crags.** Split granite blocks 4–16 m across break out of steep snowy faces and are drawn out to 2.6 km.
+- **Grade.** Smaller black lift, more contrast under the canopy, less forest haze and exposure.
+- **Pine forest.**
+  - fuller crowns (they had read as telephone poles)
+  - rounder root buttresses
+  - mossy boulders through the woods
+  - shrub and fern drifts over the whole floor, now also in tree cells (dense stands had left bare duff)
+  - fewer fallen sticks (they had carpeted the floor)
+  - dead snags with drooping dead limbs
+- **Horse.** Sturdier legs with defined knees, hocks and fetlocks. Snow rings at the hooves were tried and dropped:
+  they read as white saucers.
+- **Snow ride.**
+  - framed with the rider off-centre toward the valley
+  - snow-capped, half-buried rocks
+  - a wider frozen creek
+  - an old half-buried drift fence across the snowfield, as a made thing to ride toward
+- **Snow vista.** The lens is turned partway up the valley so the homestead sits on a third, and a trampled road
+  leads to it through the snow.

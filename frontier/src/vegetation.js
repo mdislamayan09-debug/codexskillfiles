@@ -1296,6 +1296,17 @@ export class Vegetation {
         if (sp.forest < 0.2 && cl.jungle < 0.4 && !swamp && cl.snow < 0.45 && pz > -700) v = pick(G.oak); // lone meadow oaks
         const s = cl.snow > 0.45 ? 0.5 + r() * r() * 1.1 + r() * 0.3 : 0.8 + r() * 0.5;   // spruce stands of mixed ages
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
+        // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving
+        // bare duff wherever the stand was dense)
+        if (pz < -700 && cl.snow < 0.4 && cl.desert < 0.3) {
+          const ur = rc();
+          const nu = ur < 0.55 ? 1 + Math.floor(rc() * 3) : 0;
+          for (let b = 0; b < nu; b++) {
+            const a = rc() * 6.28, d = 2 + rc() * 4, bx = px + Math.cos(a) * d, bz = pz + Math.sin(a) * d;
+            const t = rc();
+            this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, rc() * 6.28, t < 0.5 ? 0.45 + rc() * 0.5 : 0.6 + rc() * 0.8, t < 0.5 ? Math.floor(rc() * 3) : t < 0.9 ? 3 + Math.floor(rc() * 2) : 7 + Math.floor(rc() * 2));
+          }
+        }
         // closed-canopy stands on capable machines: a second, younger tree in every dense cell
         if ((this.quality || 1) >= 1.5 && sp.forest > 0.55 && !blocked(px, pz)) {
           const qx = x + ((px - x + cell * 0.5) % cell), qz = z + ((pz - z + cell * 0.5) % cell);
