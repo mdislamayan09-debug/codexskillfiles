@@ -62,7 +62,7 @@ export class Backdrop {
         // (the finer ridged layers give the near ranges spurs, gullies and arêtes instead of smooth snow domes;
         // the big massifs stay modest right at the map's edge so no single dome walls off the view up the valley,
         // and step up range behind range into the distance)
-        const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far) * (0.45 + 0.55 * sstep(1200, 9000, d))
+        const snowH = 260 + ridged(x / 9000 + 3.3, z / 9000 - 1.2) * 1750 * (0.55 + 0.45 * fbm(x / 26000, z / 26000, 3)) * (0.85 + 0.5 * far) * (0.32 + 0.68 * sstep(1500, 12000, d))
           + ridged(x / 2400, z / 2400 + 7.7, 4) * 460 + ridged(x / 900 - 2.2, z / 900, 3) * 170;
         // forested ridge country, rolling up into a far blue sierra
         const hillH = 110 + fbm(x / 6000 + 5.1, z / 6000, 5) * 520 + ridged(x / 2100, z / 2100, 4) * 150 + ridged(x / 11000, z / 11000, 5) * 900 * far;
@@ -74,7 +74,8 @@ export class Backdrop {
         // north of the map the real valley carries on: a broad snowy floor winding away between the ranges
         // for twenty kilometres, so looking up-valley the eye travels into the haze rather than into a wall
         const dn = Math.max(0, -HALF - z);
-        const vx = -725 + 520 * Math.sin(dn / 6000) * sstep(0, 5000, dn) - 800 * Math.sin(dn / 15000 + 1.2) * sstep(5000, 12000, dn);
+        // (bearing north-west: the summit lookout above the homestead looks that way, up the valley to the horizon)
+        const vx = -725 - 0.5 * dn + 450 * Math.sin(dn / 6000) * sstep(2000, 8000, dn) - 800 * Math.sin(dn / 15000 + 1.2) * sstep(6000, 14000, dn);
         const vw = 560 + 0.07 * dn;
         const floor = 210 + dn * 0.01 + 30 * fbm(x / 1500, z / 1500, 3);
         const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 2800, Math.abs(x - vx));

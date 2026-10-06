@@ -247,7 +247,7 @@ export class Snowfall {
           gl_Position = projectionMatrix * mv;
           float d = -mv.z;
           // a few big wet flakes among many fine ones; those passing close to the lens are soft, out-of-focus discs
-          float sz = 0.016 + 0.03 * aSeed.x * aSeed.x + 0.05 * step(0.93, aSeed.z) * aSeed.x;
+          float sz = 0.02 + 0.036 * aSeed.x * aSeed.x + 0.07 * step(0.9, aSeed.z) * aSeed.x;
           gl_PointSize = max(sz * uScale / max(d, 0.3) * (1.0 + 0.5 * smoothstep(3.0, 0.8, d)), 1.4);
           vA = uIntensity * step(aSeed.y, uIntensity * 1.2) * smoothstep(0.5, 1.4, d) * smoothstep(40.0, 16.0, d) * (0.55 + 0.45 * aSeed.z) * mix(0.35, 1.0, smoothstep(0.8, 3.0, d));
           if (vA <= 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);

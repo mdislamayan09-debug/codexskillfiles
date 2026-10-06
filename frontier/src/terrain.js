@@ -235,9 +235,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   }
   // (weighted to the broader scale and broken up hard: the fine scale alone lines every face with parallel
   // couloirs that read as a comb)
-  float ribs = smoothstep(0.3, 1.8, -lapS + 1.4 * (fbm2(xz / 22.0) - 0.5) + 0.5 * (vnoise(xz / 7.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
+  float ribs = smoothstep(0.15, 1.4, -lapS + 1.4 * (fbm2(xz / 22.0) - 0.5) + 0.5 * (vnoise(xz / 7.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
   // (a narrow band, broken by noise: a steep face breaks from snow to rock along a crisp, ragged line)
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.22, snowC), 0.3, hiSnow), mix(mix(0.5, 0.31, snowC), 0.5, hiSnow), slope + 0.12 * (fbm2(xz / 9.0) - 0.5) + 0.08 * (vnoise(xz / 2.0) - 0.5)));
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.17, snowC), 0.3, hiSnow), mix(mix(0.5, 0.27, snowC), 0.5, hiSnow), slope + 0.12 * (fbm2(xz / 9.0) - 0.5) + 0.08 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   // (tighter: broad soft scours and outcrops read as camouflage blotches across a whole mountainside)
   float scour = smoothstep(0.65, 0.74, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);

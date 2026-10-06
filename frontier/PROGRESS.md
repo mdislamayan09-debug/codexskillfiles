@@ -442,3 +442,34 @@ The critic now asks for:
     and a dusty tread.
   - Young, full-skirted firs make up a middle storey, and mature pines vary in size, so the stand no longer reads
     as a planted grid of poles.
+
+**Round 42 critic:** pines 5, snowride 4, snowvista 4. These are the best scores so far. The vista finally reads
+as a lookout over a valley.
+
+### Rounds 43–44: forests that read from afar, conifers with real boughs
+- **Far forest.** Tree billboards used to sink away by 1.25 km, leaving the far forest as a grey tint on the
+  ground. With no trees on it, that tint read as camouflage blotches across every mountainside. At cinematic
+  quality the billboards now carry on to ~4 km, and snow-country stands grow close inside crisp edges.
+- **Conifer cards.**
+  - Redrawn as dense, layered sprays: dark interior needles, lighter tips, a ragged tapering silhouette. The old
+    card was a few fronds on an empty card, so crowns read as see-through grey sheets.
+  - Ponderosa and lodgepole have their own bottlebrush-tuft card, cinnamon plated bark, and a separate
+    needle-duff ground layer.
+  - Fir crowns are fuller, and their standing cards carry snow along the upper half.
+- **Snow vista.**
+  - The ledge uses bare granite variants, with wind-scoured crests on the summit.
+  - Ochre bunchgrass tufts grow in the ledge's cracks.
+  - The frozen creek has a willow-and-gravel corridor so it reads from the lookout.
+  - The backdrop valley bears north-west along the lookout's line of sight.
+  - The exposure is lifted for clear-air storms. The vista had measured about 25% darker than the reference.
+  - The lens is narrowed to 40°.
+- **Snow ride.**
+  - Crag outcrops and spruce clusters fill the empty midground.
+  - The weather is now a falling-snow storm with bigger flakes rather than a total white-out.
+- **Grading.** The forest grade's S-curve became a highlight shoulder. The S-curve had blown the canopy gaps out
+  while crushing the floor.
+
+**Round 43 critic:** pines 4, snowride 3, snowvista 4.
+- The dense young firs crowded the pine trail into Christmas-tree walls, so there are now fewer of them.
+- The snow ride's air read as too clear.
+- The vista's mountains still lack rock faces.

@@ -919,6 +919,9 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= smoothstep(0.02, 0.28, field + 0.12);
       // under closed pine canopy the grass gives way to needle duff (it holds on in the light along the trail)
       dens *= 1.0 - 0.2 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));   // (much more and the floor went bare)
+      // and in the pine woods it grows in drifts where the light gets in, open duff between them (a clump every few
+      // metres everywhere read as tufts dotted over the floor at regular spacing)
+      dens *= mix(1.0, smoothstep(0.3, 0.55, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -1123,6 +1126,10 @@ export class Vegetation {
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
     const cb = conBarkTextures(6, [92, 76, 64], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
+    // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
+    // smooth grey poles down a sunlit forest)
+    const cbP = conBarkTextures(11, [134, 84, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)
@@ -1152,7 +1159,7 @@ export class Vegetation {
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
-        { geometry: b.wood, material: pineBark },
+        { geometry: b.wood, material: ponderosaBark },
         { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) },
       ] });
     }
@@ -1171,7 +1178,7 @@ export class Vegetation {
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
     for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
-      addB('tall', 'pine', b, [{ geometry: b.wood, material: pineBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) }]);
+      addB('tall', 'pine', b, [{ geometry: b.wood, material: ponderosaBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) }]);
     }
     // dead snags, silver-grey and barkless
     const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: new THREE.Color(1.55, 1.5, 1.45), roughness: 0.95 }), 0);   // weathered silver-grey

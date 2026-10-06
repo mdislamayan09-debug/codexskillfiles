@@ -249,12 +249,12 @@ async function init() {
     // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
     // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.45, -5.6], lookRel: [-0.6, 2.2, 22], turn: -0.55, trailDress: true }; },
-    // (a falling-snow storm, not a white-out: the reference keeps its cloud deck, ridges and fog banks readable)
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.55 }, snowDress: true }; },
+    // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
-    snowvista: () => { const v = G.findVista(); return { fov: 46, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -266,8 +266,8 @@ async function init() {
   // over the snowy north by marching rays through a trial frame from every ledge.
   G.findVista = () => {
     if (G.vistaCache) return G.vistaCache;
-    const cam = new THREE.PerspectiveCamera(46, 16 / 9, 0.5, 1e5), rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
-    const E = HALF - 12, PITCH = -0.13;
+    const cam = new THREE.PerspectiveCamera(40, 16 / 9, 0.5, 1e5), rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
+    const E = HALF - 12, PITCH = -0.12;
     const march = (o, r, max = 9000) => {
       for (let t = 25; t < max; t += t < 400 ? 8 : 30) {
         const x = o.x + r.x * t, z = o.z + r.z * t;
@@ -637,6 +637,20 @@ async function init() {
     }
     if (s.trailDress && !G.trailDressed) {
       G.trailDressed = true;
+      // the reference's trail runs between tall high-crowned trunks with scrub at their feet: no full-skirted young
+      // fir walling it in near the lens, and nothing standing between the lens and the rider
+      {
+        const firs = new Set(veg.groups.fir), L = veg.trees;
+        const near = (it) => firs.has(it.v) && Math.hypot(it.x - px, it.z - pz) < 34;
+        for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !near(it)));
+        L.items = L.items.filter((it) => !near(it));
+        const cy = yaw - (s.turn || 0), rel = s.camRel;
+        const camX = px + Math.cos(cy) * rel[0] + Math.sin(cy) * rel[2], camZ = pz - Math.sin(cy) * rel[0] + Math.cos(cy) * rel[2];
+        const B = veg.bushes, dx = px - camX, dz = pz - camZ, L2 = dx * dx + dz * dz;
+        const inLine = (it) => { const t = Math.max(0, Math.min(1.3, ((it.x - camX) * dx + (it.z - camZ) * dz) / L2)); return Math.hypot(camX + dx * t - it.x, camZ + dz * t - it.z) < 1.6 + it.s; };
+        for (const [k, list] of B.grid) B.grid.set(k, list.filter((it) => !inLine(it)));
+        B.items = B.items.filter((it) => !inLine(it));
+      }
       // (cos, -sin) points to the rider's left, so negative side offsets land on the right
       const f = [Math.sin(yaw), Math.cos(yaw)], lt = [Math.cos(yaw), -Math.sin(yaw)];
       const at = (ahead, side) => [px + f[0] * ahead - lt[0] * side, pz + f[1] * ahead - lt[1] * side];
@@ -896,7 +910,8 @@ async function init() {
       // (the open, sun-shafted canopy is bright enough now: no extra lift in the woods; snow under a storm sky in clear
       // air reads brighter than the eye wants it, so stop down a little there)
       const W = sky.weather;
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard)) * (1 - 0.14 * (G.forestK || 0));
+      // (a storm with clear air under it is not dim: the reference's storm vista sits ~25% brighter than ours did)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.14 * W.storm * (1 - W.blizzard)) * (1 - 0.14 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
