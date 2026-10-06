@@ -132,6 +132,10 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     float bank = smoothstep(70.0, 5.0, above) * (0.35 + 0.65 * smoothstep(0.35, 0.7, mistN(wpos.xz / 420.0)));
     float m = uMist * bank * (1.0 - exp(-dist / 1100.0));
     col = mix(col, mix(uFogColor * 1.15, fogCol, 0.4), clamp(m, 0.0, 0.85));
+    // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
+    float band = smoothstep(150.0, 240.0, above) * smoothstep(560.0, 380.0, above);
+    float rag = smoothstep(0.45, 0.75, mistN(wpos.xz / 650.0 + vec2(wpos.y / 400.0, 0.0)) * 0.65 + mistN(wpos.xz / 190.0 - 3.7) * 0.35);
+    col = mix(col, mix(uFogColor * 1.2, fogCol, 0.3), clamp(uMist * band * rag * 0.8 * (1.0 - exp(-dist / 1500.0)), 0.0, 0.8));
     // and the far ranges step back in pale blue-grey layers
     col = mix(col, uFogColor * vec3(0.95, 1.02, 1.15), uMist * 0.32 * (1.0 - exp(-dist / 3200.0)));
   }

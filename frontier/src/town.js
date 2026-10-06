@@ -666,6 +666,18 @@ export class Town {
     const shed = new THREE.Matrix4().makeTranslation(-W / 2 - 3.2, 0, 1.2).premultiply(m);
     B.add(M.bare2, box(2.6, 2.0, 2.4, 0, 1.0, 0), shed);
     for (const g of gableRoof(2.6, 2.4, 0.7, 0.35)) { g.translate(0, 2.0, 0); B.add(M.shingleDark, g, shed); }
+    // a smokehouse and a tack shed down the slope in front, and a split-rail fence round the yard: from the
+    // lookout the homestead reads as a little cluster of roofs, not one box
+    for (const [dx, dz, w, d, hh] of [[W / 2 + 4.2, D / 2 + 5.5, 2.4, 2.2, 2.1], [-W / 2 + 0.5, D / 2 + 7.5, 3.2, 2.6, 2.3]]) {
+      const sm = new THREE.Matrix4().makeTranslation(dx, 0, dz).premultiply(m);
+      B.add(M.bare2, box(w, hh, d, 0, hh / 2, 0), sm);
+      for (const g of gableRoof(w, d, 0.8, 0.3)) { g.translate(0, hh, 0); B.add(M.shingleDark, g, sm); }
+    }
+    for (let k = 0; k < 9; k++) {
+      const fx = -W / 2 - 2 + k * 2.4, fz = D / 2 + 11;
+      B.add(M.bare, box(0.14, 1.2, 0.14, fx, 0.6, fz), m);
+      if (k < 8) for (const yy of [0.55, 1.0]) B.add(M.bare, box(2.4, 0.09, 0.09, fx + 1.2, yy, fz), m);
+    }
     this.interactables.push({ type: 'rest', name: "Trapper's Cabin", pos: new THREE.Vector3(x, y, z) });
   }
 

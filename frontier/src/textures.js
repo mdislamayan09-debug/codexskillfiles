@@ -116,24 +116,36 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
   // horizontal cracks into long plates. Built from periodic functions so the tile wraps seamlessly.
   const TAU = Math.PI * 2;
   const ph = Array.from({ length: 8 }, () => r() * TAU);
+  // tileable value noise (a wrapping lattice): breaks the regularity of the periodic furrows so the bark reads
+  // as grown, not as a repeating wave pattern
+  const lattice = (fx, fy) => { const a = new Float32Array(fx * fy); for (let i = 0; i < a.length; i++) a[i] = r(); return { a, fx, fy }; };
+  const vn = (L, u, v) => {
+    const x = u * L.fx, y = v * L.fy, ix = Math.floor(x), iy = Math.floor(y), tx = x - ix, ty = y - iy;
+    const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    const g = (i, j) => L.a[(((j % L.fy) + L.fy) % L.fy) * L.fx + (((i % L.fx) + L.fx) % L.fx)];
+    return (g(ix, iy) * (1 - sx) + g(ix + 1, iy) * sx) * (1 - sy) + (g(ix, iy + 1) * (1 - sx) + g(ix + 1, iy + 1) * sx) * sy;
+  };
+  const N1 = lattice(5, 9), N2 = lattice(14, 26), N3 = lattice(9, 7), N4 = lattice(18, 9), N5 = lattice(40, 70);
   const hgt = new Float32Array(W * H), tone = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x / W, v = y / H;
-    // gentle, long wander only: higher-frequency warp made the furrows read as worms
-    const warp = 0.018 * Math.sin(TAU * 2 * v + ph[0]) + 0.008 * Math.sin(TAU * (3 * v + u) + ph[1]);
-    const r1 = Math.pow(Math.abs(Math.sin(Math.PI * 9 * (u + warp))), 0.55);
+    // a long, slow wander plus an irregular one (higher-frequency periodic warp made the furrows read as worms)
+    const warp = 0.012 * Math.sin(TAU * 2 * v + ph[0]) + 0.03 * (vn(N1, u, v) - 0.5) + 0.01 * (vn(N2, u, v) - 0.5);
+    const r1 = Math.pow(Math.abs(Math.sin(Math.PI * 9 * (u + warp))), 0.45 + 0.3 * vn(N3, u, v));
     const r2 = Math.pow(Math.abs(Math.sin(Math.PI * 14 * (u + 1.4 * warp + 0.031) + ph[3])), 0.7);
     let ridge = 0.68 * r1 + 0.32 * r2;
-    // horizontal cracks break the ridges into plates, staggered from ridge to ridge
+    // horizontal cracks break the ridges into plates of uneven length, staggered from ridge to ridge
     const col = Math.floor(9 * (u + warp) + 9) % 9;
-    const crackLine = Math.abs(Math.sin(Math.PI * (4 * v + 0.37 * col + 0.15 * Math.sin(TAU * 2 * u + ph[4]))));
-    const crack = Math.max(0, 1 - crackLine / 0.06);
+    const crackLine = Math.abs(Math.sin(Math.PI * (4 * v + 0.37 * col + 0.15 * Math.sin(TAU * 2 * u + ph[4]) + 0.5 * (vn(N4, u + warp, v) - 0.5))));
+    const crack = Math.max(0, 1 - crackLine / 0.07);
     ridge *= 1 - 0.75 * crack;
-    // fine fibrous grain along the ridges
-    const grain = 0.5 + 0.5 * Math.sin(TAU * (60 * u + 9 * Math.sin(TAU * 5 * v + ph[5])) );
+    // fine fibrous grain along the ridges, and flaky scale on the plate faces
+    const grain = 0.5 + 0.5 * Math.sin(TAU * (60 * u + 9 * Math.sin(TAU * 5 * v + ph[5])));
+    const flake = vn(N5, u, v);
     const k = y * W + x;
-    hgt[k] = ridge * (0.88 + 0.12 * grain);
-    tone[k] = 0.5 + 0.5 * Math.sin(TAU * (2 * u + 1 * v) + ph[6]) * Math.sin(TAU * 3 * v + ph[7]);
+    hgt[k] = ridge * (0.82 + 0.1 * grain + 0.12 * flake);
+    // each plate its own tone, from grey-brown to rusty orange
+    tone[k] = 0.25 + 0.75 * vn(N4, u + warp, v + 0.37 * col / 4);
   }
   const [c, g] = canvas(W, H), img = g.createImageData(W, H), d = img.data;
   for (let k = 0; k < W * H; k++) {

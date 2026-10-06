@@ -252,7 +252,7 @@ async function init() {
     snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [1.3, 2.35, -6.6], lookRel: [0.2, 1.75, 18], turn: -0.45, weather: 'snow' }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.78, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -266,10 +266,10 @@ async function init() {
     const upDir = Math.atan2(vh[0] - CABIN.x, vh[1] - CABIN.z);
     let best = null, bs = -1e9;
     // high on the valley side, as in the reference: well above the cabin, so the floor opens out below the lens
-    for (let r = 160; r <= 640; r += 20) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
+    for (let r = 150; r <= 420; r += 15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
       const cx = CABIN.x + Math.sin(a) * r, cz = CABIN.z + Math.cos(a) * r;
       const ch = world.heightAt(cx, cz) + 3.2, above = ch - cabY;
-      if (above < 50 || above > 280) continue;
+      if (above < 45 || above > 220) continue;
       const va = Math.atan2(CABIN.x - cx, CABIN.z - cz);
       // looking up-valley, toward the head of the valley and its peaks
       let dv = va - upDir; dv = Math.atan2(Math.sin(dv), Math.cos(dv));
@@ -287,7 +287,8 @@ async function init() {
       for (let b = -0.5; b <= 0.51; b += 0.1) for (let d = 15; d <= Math.min(r, 160); d += 15) {
         if (world.heightAt(cx + Math.sin(va + b) * d, cz + Math.cos(va + b) * d) > ch - 3 - d * 0.15) blocked++;
       }
-      const score = depth * 3 - blocked * 4 - Math.abs(above - 140) * 0.25 - Math.abs(r - 360) * 0.04;
+      // close enough that the cabin reads as a building (the reference's sits ~4% of the frame wide)
+      const score = depth * 3 - blocked * 4 - Math.abs(above - 105) * 0.25 - Math.abs(r - 230) * 0.06;
       if (score > bs) { bs = score; best = { cx, cz, ch, va, cab: r }; }
     }
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
@@ -546,11 +547,14 @@ async function init() {
       // clear the lookout itself, and a sightline down to the cabin, as a location artist would
       G.clearTreesNear(c.x, c.z, 40);
       G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 10, 0.8);
+      G.clearTreesNear(CABIN.x, CABIN.z, 20);          // the homestead's own clearing
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
       const g0 = world.heightAt(c.x, c.z);
       // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
       const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff, gh = world.heightAt(x, z); if (gh > g0 - 12) veg.rocks.add(x, gh - 0.35 * scale, z, f * 1.3, scale, v); };
       put(9.0, -7.5, 3.2, 0); put(11.5, -4.0, 2.2, 1); put(8.0, 6.8, 2.6, 3); put(13.0, 9.5, 2.0, 2); put(7.0, -11.0, 3.6, 1); put(15.0, -10.0, 2.4, 2);
+      // the lookout's own rock: a split granite outcrop filling the left edge and broken slabs along the lip below
+      put(5.5, -9.5, 5.0, 3); put(4.2, 1.8, 1.6, 2); put(4.8, -2.8, 1.9, 3); put(6.2, 4.6, 1.4, 2);
       for (let i = 0; i < 24; i++) { const x = c.x + d.x * (6 + (i % 8) * 1.1) + rt.x * (-11 + i * 0.95), z = c.z + d.z * (6 + (i % 8) * 1.1) + rt.z * (-11 + i * 0.95); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
@@ -583,7 +587,8 @@ async function init() {
       }
     }
     // a ride through deep snow has already ploughed a trench behind the horse
-    if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw); else snowTrail.clear();
+    // (only a few metres of it: run back under a chase camera it reads as a grey board lying in the snow)
+    if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw, G.camOverride && G.camOverride.rel ? 3.2 : 45); else snowTrail.clear();
     G.started = true;
     G.frame = 0;
     G.hold = false;
@@ -779,7 +784,7 @@ async function init() {
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     const coldGrade = Math.max(sky.weather.blizzard, 0.75 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 2.4 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;

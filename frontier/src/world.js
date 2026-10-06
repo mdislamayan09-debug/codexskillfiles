@@ -344,15 +344,17 @@ export class World {
           }
           h = lerp(h, rb + rise + 1.4 * n2.fbm(x / 24, z / 24, 3) + 0.5 * n.fbm(x / 7, z / 7, 2), realW);
           // the creek winds down the real valley floor
-          if (d && d.vd < 8) h -= 1.0 * smoothstep(4, 1.5, d.vd) * realW;
+          // (wide enough to read from the lookouts: an 18 m channel with a braided, iced flood plain beside it)
+          if (d && d.vd < 14) h -= 1.5 * smoothstep(10, 3, d.vd) * realW;
         }
       }
     }
     // the snowy north-west is a granite canyon: Yosemite Valley, sheer walls over a flat floor
-    let creekD = 1e9;
+    let creekD = 1e9, canyonW = 0;
     for (const p of PATCHES) if (p.region === 'canyon') {
       const s = patchSample(p, x, z, 300);
       if (s) {
+        canyonW = s.w;
         h = lerp(h, s.h + 1.2 * n2.fbm(x / 20, z / 20, 3) + 0.4 * n.fbm(x / 6, z / 6, 2), s.w);
         // the creek: a shallow channel winding down the floor
         creekD = canyonCreekD(x, z);
@@ -405,6 +407,14 @@ export class World {
     }
     // Roads soften fine relief and must stay dry
     const roadD = d ? d.roadD : 1e9;
+    // wind drifts on the open snow of the north: low dunes about a metre high, ridged across the wind, with
+    // scoops between, so the snowfields have shape under flat storm light instead of lying as a white sheet
+    const sk = Math.max(realW, canyonW);
+    if (sk > 0.01) {
+      const wa = x * 0.93 + z * 0.36, wb = -x * 0.36 + z * 0.93;   // along / across the wind
+      const flat = (1 - smoothstep(0.1, 0.28, this.realSlope(x, z))) * smoothstep(6, 26, Math.min(roadD, creekD, d ? d.vd : 1e9));
+      if (flat > 0) h += sk * flat * (0.85 * n.fbm(wa / 15, wb / 44, 3) + 0.3 * n2.fbm(x / 8, z / 8, 2));
+    }
     // Town plateau
     const tx = Math.abs(x - TOWN.x) / (TOWN.w * 0.5), tz = Math.abs(z - TOWN.z) / (TOWN.d * 0.5);
     const town = smoothstep(1.6, 0.9, Math.max(tx, tz));
@@ -427,7 +437,7 @@ export class World {
       out.road = smoothstep(3.9, 2.0, roadD + 1.2 * n2.noise(x / 9, z / 9));
       // main channel runs open (wet = 1); the braided side channels are iced over (wet ~0.7)
       // (valley distances are scaled by the widening, so keep the braid band narrow in those units)
-      const braid = d && d.vd < 36 ? Math.max(smoothstep(4, 1.5, d.vd), 0.7 * smoothstep(36, 22, d.vd) * smoothstep(0.62, 0.7, n.noise(x / 30, z / 30) * 0.5 + 0.5)) : 0;
+      const braid = d && d.vd < 70 ? Math.max(smoothstep(9, 4, d.vd), 0.72 * smoothstep(70, 44, d.vd) * smoothstep(0.58, 0.68, n.noise(x / 34, z / 34) * 0.5 + 0.5)) : 0;
       // canyon creek: an open channel with iced side braids
       const cbraid = creekD < 40 ? Math.max(smoothstep(5, 2.5, creekD), 0.7 * smoothstep(40, 26, creekD) * smoothstep(0.6, 0.7, n.noise(x / 28, z / 28) * 0.5 + 0.5)) : 0;
       out.wet = Math.max(smoothstep(rw * 1.9, rw * 0.9, rd), sw * 0.8, smoothstep(1.25, 0.95, ld), braid, cbraid);
@@ -537,6 +547,12 @@ export class World {
             const vd = D.vd[k];
             let fr = smoothstep(760, 690, h + 70 * n2.fbm(x / 180, z / 180, 3));     // tree line: ragged but sharp
             fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
+            // timber follows the water: thick in the draws and gullies, thin on the spurs and convex shoulders
+            {
+              const rh = this.realAt(x, z), q = 70;
+              const ra = this.realAt(x + q, z), rb = this.realAt(x - q, z), rc = this.realAt(x, z + q), rd2 = this.realAt(x, z - q);
+              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.45 + 0.9 * smoothstep(-5, 9, (ra + rb + rc + rd2) / 4 - rh);
+            }
             // stands and open snowfields in about equal measure, as the references' valley sides are: dark timber
             // in clumps and tongues with wide white glades between, not an even pepper of trees
             fr *= smoothstep(0.44, 0.56, forest.fbm(x / 260 + 8.1, z / 260 - 5.5, 4) * 0.5 + 0.5 + 0.08);   // clearings

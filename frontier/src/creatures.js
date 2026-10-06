@@ -163,7 +163,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         {
           vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.6, 0.95, wn.y) * (0.5 + 0.5 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * 0.16);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82), dust * ${kind === 'human' ? '0.16' : '0.4'});
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
@@ -842,6 +842,12 @@ function quadPrims(kind, QB) {
   add(RC([0, 1.58, 0.4], [0, 1.6, 0.1], 0.1, 0.09), QL.coat, 'body', 0.12); // withers
   add(EL([0, 1.38, -0.6], [0.35 * bw, 0.37, 0.36]), QL.coat, 'body', 0.1);
   add(RC([0, 1.6, -0.45], [0, 1.54, -0.86], 0.14, 0.11), QL.coat, 'body', 0.1); // croup
+  if (!sheep) for (const s of [-1, 1]) {
+    // the big muscle masses: from behind the quarters are two rounded lobes either side of the tail (a heart, not
+    // a capsule); the shoulder and forearm muscles stand proud of the barrel
+    add(EL([s * 0.17 * bw, 1.4, -0.72], [0.16 * bw, 0.24, 0.24]), QL.coat, 'body', 0.09);
+    add(EL([s * 0.21 * bw, 1.32, 0.45], [0.11 * bw, 0.26, 0.16]), QL.coat, 'body', 0.09);
+  }
   // neck
   if (sheep) {
     add(RC([0, 1.42, 0.6], [0, 1.52, 0.86], 0.24, 0.14), QL.coat, 'neck', 0.1);
@@ -999,20 +1005,28 @@ export class Quadruped {
       // tail: a dock plus fanned, curved hair cards with alpha strands
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.35).getHex(), 120, true);
-      const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.7, envMapIntensity: 0.5 });
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 120, true);
+      const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.6 });
       const tcards = [];
-      // a hanging switch of narrow locks: full at the dock, separating into wisps toward the hocks
-      for (let i = 0; i < 15; i++) {
-        const a = (i / 14 - 0.5) * 1.0 + (r() - 0.5) * 0.25;
-        const len = 0.85 + r() * 0.4;
-        const c = new THREE.PlaneGeometry(0.075 + r() * 0.035, len, 1, 8);
+      // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a
+      // round, layered bundle, full at the top and separating into wisps toward the hocks (not one flat card)
+      for (let i = 0; i < 34; i++) {
+        const th = r() * Math.PI * 2, rho = 0.015 + r() * 0.05;
+        const len = 0.75 + r() * 0.5 - rho * 2;
+        const c = new THREE.PlaneGeometry(0.05 + r() * 0.04, len, 1, 9);
         c.translate(0, -len / 2, 0);
+        const cp0 = c.attributes.position;
+        for (let k = 0; k < cp0.count; k++) { const y = -cp0.getY(k); cp0.setX(k, cp0.getX(k) * (1 + y * 0.7)); }
+        c.rotateZ((r() - 0.5) * 0.14);
+        c.rotateY(th);
+        c.translate(Math.sin(th) * rho, -0.02 - r() * 0.05, Math.cos(th) * rho - 0.03);
+        // arc back off the dock, then hang, the outer locks flaring a little wider below
         const cp = c.attributes.position;
-        for (let k = 0; k < cp.count; k++) { const y = -cp.getY(k); cp.setZ(k, -Math.sin(Math.min(y, 0.45) * 2.4) * 0.15 + y * 0.03); cp.setX(k, cp.getX(k) * (1 + y * 0.5)); }
-        c.rotateZ((r() - 0.5) * 0.18);
-        c.rotateY(a);
-        c.translate((r() - 0.5) * 0.04, -0.02 - r() * 0.04, -0.03 - r() * 0.03);
+        for (let k = 0; k < cp.count; k++) {
+          const y = -cp.getY(k);
+          cp.setZ(k, cp.getZ(k) - Math.sin(Math.min(y, 0.45) * 2.4) * 0.15 + y * 0.03);
+          cp.setX(k, cp.getX(k) * (1 + y * 0.35));
+        }
         tcards.push(c);
       }
       const tm = mesh(mergeGeometriesSafe(tcards), hairM); bones.tail.add(tm);

@@ -29,16 +29,21 @@ const ShaftShader = {
       float acc = 0.0, w = 1.0;
       float jitter = fract(sin(dot(vUv, vec2(12.9898,78.233))) * 43758.5453);
       p += stepv * jitter;
+      // the sky mask is taken over a small footprint across the ray (not one texel), so needle-thin gaps in the
+      // boughs give broad, soft beams rather than a starburst of hairline streaks
+      vec2 side = normalize(vec2(-d.y, d.x) + 1e-5) * 0.006;
       for (int i = 0; i < N; i++) {
         p += stepv;
-        float dep = texture2D(tDepth, p).r;
-        float sky = step(0.99999, dep);
+        float sky = step(0.99999, texture2D(tDepth, p).r) * 0.4
+                  + step(0.99999, texture2D(tDepth, p + side).r) * 0.3
+                  + step(0.99999, texture2D(tDepth, p - side).r) * 0.3;
         acc += sky * w;
         w *= 0.965;
       }
       acc /= float(N) * 0.5;
       float fall = exp(-dist * 2.2);
-      vec3 shafts = uSunColor * acc * fall * uStrength * uSunVis;
+      // capped, so the sun's own gap does not swell into a white blob
+      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.5);
       gl_FragColor = vec4(base.rgb + shafts, base.a);
     }`,
 };

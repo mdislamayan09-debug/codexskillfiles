@@ -117,7 +117,13 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec3 grass = mix(lush, dry, smoothstep(0.42, 0.68, macro + 0.15*patchy));
   grass = mix(grass, mix(srgb(vec3(88,96,58)), srgb(vec3(108,102,66)), mid), pineK * 0.6);      // high-country grass
   grass = mix(grass, mix(srgb(vec3(150,114,56)), srgb(vec3(172,126,60)), mid) * (0.9 + 0.2 * patchy), aut); // autumn gold
-  grass = mix(grass, mix(srgb(vec3(42,70,25)), srgb(vec3(62,90,32)), mid), jun);                // jungle
+  // jungle: not a lawn but a shrub and fern blanket, so from any distance it is mottled with the shade between
+  // bushes (a few metres) and the lit and shadowed swells of the thickets (tens of metres)
+  {
+    float sh = mix(0.5, vnoise(xz / 3.2 + 4.0), smoothstep(2.5, 0.8, fp)) * 0.55 + mix(0.5, fbm2(xz / 14.0 + 9.0), smoothstep(10.0, 3.0, fp)) * 0.45;
+    vec3 jg = mix(srgb(vec3(26,44,16)), srgb(vec3(56,78,28)), mid) * (0.55 + 0.85 * sh);
+    grass = mix(grass, jg, jun);
+  }
   grass *= mix(0.82 + 0.3*micro, clamp(lumi(gA.rgb) / 0.11, 0.4, 1.6), 0.8 * D);
   grass = mix(grass, srgb(vec3(150,140,90)), smoothstep(0.78,0.9, vnoise(xz*0.9+11.0))*0.3 * smoothstep(2.5, 0.8, fp) * (1.0 - jun));
 
@@ -294,6 +300,13 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
+    // glints: single crystals near the lens turned just right to mirror the sky (they wink as the view moves)
+    if (fp < 0.06) {
+      vec3 vv = normalize(cameraPosition - wp);
+      float glint = step(0.988, hash12(floor(xz * 48.0) + floor(vv.xz * 9.0) * 17.0)) * snowAmt * smoothstep(0.06, 0.015, fp);
+      c = mix(c, vec3(1.0), glint * 0.6);
+      rough = mix(rough, 0.03, glint);
+    }
     // animal tracks: lines of prints wandering across the open snow (deer, a fox, a horse gone before)
     if (fp < 0.25) {
       float tl = fbm2(xz / 34.0 + 9.3);
@@ -315,7 +328,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // the frozen creek in Frostwater Valley
   float cold = smoothstep(0.5, 0.8, snowC);
   // dark meltwater only in short open leads; most of the channel is iced and drifted over
-  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.4, 0.58, fbm2(xz / 60.0 + 3.3));
+  float openW = smoothstep(0.85, 0.97, wet) * cold * smoothstep(0.3, 0.46, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   c = mix(c, mix(srgb(vec3(112,128,140)), snow, 0.25 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);
@@ -359,7 +372,8 @@ export class Terrain {
             float g0 = fbm2(q / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2(q / 7.0);
             float gx = fbm2((q + vec2(E, 0.0)) / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2((q + vec2(E, 0.0)) / 7.0);
             float gz = fbm2((q + vec2(0.0, E)) / 22.0 + vec2(0.0, vWPos.y / 30.0)) + 0.5 * fbm2((q + vec2(0.0, E)) / 7.0);
-            nW = normalize(nW + vec3(g0 - gx, 0.0, g0 - gz) * steep * 3.5);
+            // (kept moderate: stronger, the gullies line up down every face into a comb of white and grey stripes)
+            nW = normalize(nW + vec3(g0 - gx, 0.0, g0 - gz) * steep * 2.0);
           }
         }
         float tr;

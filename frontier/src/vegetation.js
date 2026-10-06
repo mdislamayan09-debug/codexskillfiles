@@ -203,19 +203,21 @@ function buildOak(seed) {
   }
   grow(trunkTop, new THREE.Vector3(0, 1, 0), height * 0.26, 0.36, 3);
   // leaf clusters
-  const leafSize = 2.1 + rnd() * 0.6;
+  // many smaller sprays spread wide around each tip, so the crown is one broken, continuous mass of foliage with
+  // sky holes and ragged edges, not a bunch of round pom-poms on sticks
+  const leafSize = 1.35 + rnd() * 0.4;
   for (const t of tips) {
-    for (let k = 0; k < 5; k++) {
-      const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 1.8, (rnd() - 0.35) * 1.3, (rnd() - 0.5) * 1.8));
-      leaves.push(cardGeo(leafSize * (0.8 + rnd() * 0.5), c, canopyC, rnd));
+    for (let k = 0; k < 10; k++) {
+      const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 2.9, (rnd() - 0.4) * 1.9, (rnd() - 0.5) * 2.9));
+      leaves.push(cardGeo(leafSize * (0.7 + rnd() * 0.6), c, canopyC, rnd));
     }
   }
   // fill the crown interior so it reads as a mass, not lollipops
-  const crownR = Math.max(...tips.map((t) => Math.hypot(t.x, t.z))) * 0.75 + 1;
-  for (let k = 0; k < 26; k++) {
+  const crownR = Math.max(...tips.map((t) => Math.hypot(t.x, t.z))) * 0.8 + 1;
+  for (let k = 0; k < 60; k++) {
     const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * crownR;
-    const c = new THREE.Vector3(Math.cos(a) * rr, canopyC.y + (rnd() - 0.5) * height * 0.22, Math.sin(a) * rr);
-    leaves.push(cardGeo(leafSize * 1.1, c, canopyC, rnd));
+    const c = new THREE.Vector3(Math.cos(a) * rr, canopyC.y + (rnd() - 0.5) * height * 0.28, Math.sin(a) * rr);
+    leaves.push(cardGeo(leafSize * (0.8 + rnd() * 0.5), c, canopyC, rnd));
   }
   const woodG = setSway(mergeGeometries(wood), (x, y) => Math.max(0, y - 2) / height * 0.6);
   const leafG = leafAO(setSway(mergeGeometries(leaves), (x, y) => Math.max(0, y - 2) / height));
@@ -231,7 +233,12 @@ function buildPine(seed, kind = 'pine') {
   // lodgepole/ponderosa trunks: slim poles, not redwood columns
   const r0 = (kind === 'tall' ? 0.31 : 0.24) + rnd() * 0.09;
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
-  wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.4, height - 2.4, (rnd() - 0.5) * 0.4), r0, 0.05, 9));
+  wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.9, height - 2.4, (rnd() - 0.5) * 0.9), r0, 0.05, 9));
+  // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (2.2 + rnd() * 1.4);
+    wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.25, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.3, 0.9 + rnd() * 0.5, Math.sin(a) * r0 * 0.3), r0 * 0.22, r0 * 0.5, 5));
+  }
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
   const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
@@ -248,11 +255,11 @@ function buildPine(seed, kind = 'pine') {
     const t = w / whorls;
     const y = base + t * (height - base);
     // forest giants: a ragged columnar crown — missing whorls, uneven limbs — rather than a perfect cone
-    if (tall && t < 0.85 && rnd() < 0.22) continue;
+    if (tall && t < 0.85 && rnd() < 0.34) continue;      // open crowns: sky shows between the limbs
     const r = tall
       ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
       : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
-    const n = tall ? 4 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
+    const n = tall ? 3 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
@@ -748,12 +755,14 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
         ? 'max(sp.b * 0.8, max(smoothstep(0.3, 0.8, sp.r) * 0.7, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
         : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
+      // gathered in drifts and clusters (under a tree, along a runnel), bare between: never an even sprinkle
+      dens *= smoothstep(0.32, 0.72, fbm2(xz / 6.5 + ${(seed * 3.7).toFixed(2)})) * 1.9;
       vDes = cl.a;
       float keep = step(aOff.w, dens);
       float sc = mix(${smin.toFixed(3)}, ${smax.toFixed(3)}, fract(aOff.z * 13.7 + aOff.w * 7.1)) * keep;
       vec3 transformed = cRot * position * sc;
       transformed.xz += xz;
-      transformed.y += heightAt(xz) - 0.02;
+      transformed.y += heightAt(xz) - 0.02${mode === 'stone' ? ' - sc * 0.28' : ''};   ${mode === 'stone' ? '// stones half sunk in the duff' : ''}
     `,
   });
   const mesh = new THREE.Mesh(g, mat);
@@ -893,17 +902,28 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
 }
 
 // ---------------------------------------------------------------------------- rocks
-function rockGeometry(seed) {
+function rockGeometry(seed, fractured = false) {
   const n = new Simplex2(seed);
   // welded so the boulder gets smooth normals instead of a faceted, low-poly look
   const g = mergeVertices(new THREE.IcosahedronGeometry(1, 5).deleteAttribute('uv').deleteAttribute('normal'));
   const p = g.attributes.position;
   const v = new THREE.Vector3();
   const sx = 1 + (seed % 3) * 0.3, sz = 0.8 + (seed % 5) * 0.12;
+  // fractured granite: a handful of joint planes shear the boulder into flat faces and hard edges, like the split
+  // blocks and slabs in the references, instead of a pebble
+  const cuts = [];
+  if (fractured) {
+    const rr = mulberry32(seed * 7 + 1);
+    for (let k = 0; k < 7; k++) {
+      const th = rr() * Math.PI * 2, ph = (k === 0 ? 0.05 : 0.25 + rr() * 0.9);
+      cuts.push({ n: new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)), o: 0.62 + rr() * 0.28 });
+    }
+  }
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i);
-    const d = 1 + 0.32 * n.fbm(v.x * 1.4 + seed, v.y * 1.4 + v.z, 4) + 0.12 * n.noise(v.x * 5, v.z * 5 + v.y * 3);
+    const d = 1 + (fractured ? 0.22 : 0.32) * n.fbm(v.x * 1.4 + seed, v.y * 1.4 + v.z, 4) + (fractured ? 0.05 : 0.12) * n.noise(v.x * 5, v.z * 5 + v.y * 3);
     v.multiplyScalar(d);
+    for (const c of cuts) { const t = v.dot(c.n) - c.o; if (t > 0) v.addScaledVector(c.n, -t * 0.97); }
     // facet/strata flattening
     v.y = Math.round(v.y * 6) / 6 * 0.12 + v.y * 0.88;
     v.x *= sx; v.z *= sz;
@@ -977,7 +997,8 @@ export class Vegetation {
         { geometry: b.leaves, material: oakMats[i % 3], depth: windDepthMaterial(lt, 1) },
       ] });
     }
-    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.05, 0.6, 0.15);   // matte needles: no sky sheen
+    // matte needles: no sky sheen; against the sun the boughs are dark but their thin edges glow olive-gold
+    const pineMat = leafMat(pineTex, 0xa4b294, false, 0.32, 0.38, 0.15);
     for (let i = 0; i < 4; i++) {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
@@ -1073,7 +1094,7 @@ export class Vegetation {
 
     // rocks
     const rMat = rockMaterial(surf);
-    const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3), material: rMat }] }));
+    const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3, i >= 2), material: rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
 
     this.quality = quality;
@@ -1106,7 +1127,7 @@ export class Vegetation {
       this.clutter = [
         makeClutter(scene, cone, { spacing: 0.9 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
         makeClutter(scene, twig, { spacing: 1.6 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.6, color: 0x5a4632, flat: true, seed: 5 }),
-        makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x5e5a52, roughness: 0.9, mode: 'stone', seed: 9 }),
+        makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];
     }
   }
