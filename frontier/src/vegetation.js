@@ -963,10 +963,10 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
 }
 
 // ---------------------------------------------------------------------------- rocks
-function rockGeometry(seed, fractured = false) {
+function rockGeometry(seed, fractured = false, detail = 5) {
   const n = new Simplex2(seed);
   // welded so the boulder gets smooth normals instead of a faceted, low-poly look
-  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 5).deleteAttribute('uv').deleteAttribute('normal'));
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail).deleteAttribute('uv').deleteAttribute('normal'));
   const p = g.attributes.position;
   const v = new THREE.Vector3();
   const sx = 1 + (seed % 3) * 0.3, sz = 0.8 + (seed % 5) * 0.12;
@@ -1176,6 +1176,10 @@ export class Vegetation {
     const rMat = rockMaterial(surf);
     const rockBuilds = [0, 1, 2, 3].map((i) => ({ parts: [{ geometry: rockGeometry(i + 3, i >= 2), material: rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
+    // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
+    // the faces read as rock with snow on its ledges rather than a smooth heightfield
+    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd, true, 2), material: rMat }] }));
+    this.crags = new ScatterLayer(scene, cragBuilds, 6000, 2600);
 
     this.quality = quality;
     this.scatter();
@@ -1223,6 +1227,7 @@ export class Vegetation {
     ];
     const blocked = (x, z, pad = 0) => avoid.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar + pad);
     const pick = (list) => list[Math.floor(r() * list.length)];
+    const rc = w.rng(91);   // the crags draw from their own stream so the rest of the scatter is unchanged
     const range = HALF - 40;
     for (let z = -range; z < range; z += cell) for (let x = -range; x < range; x += cell) {
       const px = x + r() * cell, pz = z + r() * cell;
@@ -1247,6 +1252,7 @@ export class Vegetation {
       const boulders = ((pz < -700 ? 2.2 : 1) + cl.snow) * (1 + 7 * field);
       // firs cling to steeper ground in the mountains than broadleaf trees do lower down
       const steep = cl.snow > 0.4 ? 0.62 : cl.jungle > 0.4 ? 0.5 : 0.75;
+      if (n.y < 0.72 && cl.snow > 0.4 && rc() < 0.05 * (1 - n.y)) { const sc = 4 + rc() * 12; this.crags.add(px, h - sc * 0.62, pz, rc() * 6.28, sc, Math.floor(rc() * 3)); }
       if (n.y < steep) { if (r() < 0.012 * boulders) { const sc = 1 + r() * 3.5; this.rocks.add(px, h - 0.3 - sc * 0.55 * (1 - n.y), pz, r() * 6.28, sc, Math.floor(r() * 4)); } continue; } // sunk into the slope, not perched on it
       if (cl.snow > 0.4 && n.y < 0.75 && !blocked(px, pz) && r() < sp.forest * 0.5) {
         this.trees.add(px, h - 0.3, pz, r() * 6.28, 0.6 + r() * 0.7, pick(G.fir));
@@ -1421,7 +1427,7 @@ export class Vegetation {
           // snow on the upper boughs, fading out with distance: a few-pixel tree with a white cap is what turns a
           // far forest into salt-and-pepper speckle
           float dCam = length(cameraPosition - vW);
-          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.6 * smoothstep(520.0, 220.0, dCam));
+          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.32 * smoothstep(520.0, 220.0, dCam));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
@@ -1474,6 +1480,7 @@ export class Vegetation {
     this.trees.update(camPos, force);
     this.bushes.update(camPos, force);
     this.rocks.update(camPos, force);
+    this.crags.update(camPos, force);
     this.logs.update(camPos, force);
   }
 }

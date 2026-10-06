@@ -550,11 +550,11 @@ export class World {
             {
               const rh = this.realAt(x, z), q = 70;
               const ra = this.realAt(x + q, z), rb = this.realAt(x - q, z), rc = this.realAt(x, z + q), rd2 = this.realAt(x, z - q);
-              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.15 + 1.1 * smoothstep(-3, 8, (ra + rb + rc + rd2) / 4 - rh);
+              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.05 + 1.25 * smoothstep(-2, 7, (ra + rb + rc + rd2) / 4 - rh);
             }
             // stands and open snowfields in about equal measure, as the references' valley sides are: dark timber
             // in clumps and tongues with wide white glades between, not an even pepper of trees
-            fr *= smoothstep(0.44, 0.56, forest.fbm(x / 260 + 8.1, z / 260 - 5.5, 4) * 0.5 + 0.5 + 0.08);   // clearings
+            fr *= 0.5 + 0.5 * smoothstep(0.44, 0.56, forest.fbm(x / 260 + 8.1, z / 260 - 5.5, 4) * 0.5 + 0.5 + 0.08);   // clearings (the terrain does most of the shaping below)
             fr *= 1 - 0.85 * smoothstep(0.62, 0.7, n.noise(x / 60 + z / 900, z / 380) * 0.5 + 0.5) * smoothstep(0.25, 0.4, sl); // chutes
             let inCanyon = 0;
             for (const p of PATCHES) if (p.region === 'canyon') { const c = patchSample(p, x, z, 300); if (c) inCanyon = c.w; }

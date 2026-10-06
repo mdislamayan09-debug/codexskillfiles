@@ -456,7 +456,7 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
           // (from afar the snow caught on every crown and lying between them averages to a cold mid grey)
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.12 + 0.2 * smoothstep(2.0, 8.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.25 + 0.3 * smoothstep(2.0, 8.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
           // grazing angles), strongest where the canopy is closed and crowns span a few pixels
           if (canopyK > 0.01) {
@@ -466,6 +466,9 @@ export class Terrain {
             float lo = mix(0.72, 0.5, ccl0.g), hiK = mix(0.5, 0.8, ccl0.g);
             canopy *= mix(1.0, lo + hiK * smoothstep(0.25, 0.75, m) + 0.1 * (fbm2(vWPos.xz / 23.0) - 0.5), fade);
           }
+          // snow-country spruce stand apart with snow lying between them: from afar the slope stays mostly white,
+          // flecked dark (a closed dark canopy with white glades read as puddles of snow on black rock)
+          canopyK *= 1.0 - 0.45 * smoothstep(0.4, 0.8, ccl0.r);
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }

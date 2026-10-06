@@ -248,7 +248,7 @@ async function init() {
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
     // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.45, 2.7, -4.9], lookRel: [-0.3, 2.45, 22], turn: -0.52, trailDress: true }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.45, -5.6], lookRel: [-0.6, 2.2, 22], turn: -0.55, trailDress: true }; },
     snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [-2.4, 1.75, 18], turn: -0.56, weather: 'snow' }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
@@ -523,6 +523,7 @@ async function init() {
       const camX = px + rt[0] * rel[0] + f[0] * rel[2], camZ = pz + rt[1] * rel[0] + f[1] * rel[2];
       G.clearTreesNear(camX, camZ, 5);
       G.clearTreesNear(camX, camZ, 9, veg.rocks);   // and no boulder half-in the lens
+      G.clearTreesNear(camX, camZ, 30, veg.crags);
       G.clearTreesAlong(camX, camZ, px, pz, 2.5);
     }
     // trailside anchors, as a set dresser would place them: a mossy boulder and a fallen trunk off the left verge,
@@ -549,6 +550,7 @@ async function init() {
       G.clearTreesNear(c.x, c.z, 40);
       G.clearTreesAlong(c.x, c.z, CABIN.x, CABIN.z, 10, 0.8);
       G.clearTreesNear(CABIN.x, CABIN.z, 20);          // the homestead's own clearing
+      G.clearTreesNear(c.x, c.z, 60, veg.crags);       // no crag looming in front of the lens
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
       const g0 = world.heightAt(c.x, c.z);
       // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
