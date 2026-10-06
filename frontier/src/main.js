@@ -244,9 +244,9 @@ async function init() {
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.55, 3.05, -5.4], lookRel: [0, 3.4, 22], trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 3.0, -5.2], lookRel: [-0.9, 1.9, 18], weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.75, 2.85, -3.9], lookRel: [0.2, 3.0, 22], trailDress: true }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.7, 2.8, -4.0], lookRel: [-0.6, 1.9, 18], weather: 'snow' }; },
+    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.78, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -530,9 +530,9 @@ async function init() {
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
       const g0 = world.heightAt(c.x, c.z);
       // only on the lookout's own ground: a boulder past the lip would hang in the air over the drop
-      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff, gh = world.heightAt(x, z); if (gh > g0 - 4) veg.rocks.add(x, gh - 0.35 * scale, z, f * 1.3, scale, v); };
-      put(4.0, -3.6, 1.8, 0); put(5.5, 3.2, 1.4, 1); put(3.2, 0.8, 0.9, 2); put(6.8, -6.5, 2.4, 3); put(5.0, 6.2, 1.2, 2); put(2.6, -1.6, 0.6, 1);
-      for (let i = 0; i < 16; i++) { const x = c.x + d.x * (2.2 + (i % 8) * 0.8) + rt.x * (-6 + i * 0.8), z = c.z + d.z * (2.2 + (i % 8) * 0.8) + rt.z * (-6 + i * 0.8); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
+      const put = (f, sideOff, scale, v) => { const x = c.x + d.x * f + rt.x * sideOff, z = c.z + d.z * f + rt.z * sideOff, gh = world.heightAt(x, z); if (gh > g0 - 12) veg.rocks.add(x, gh - 0.35 * scale, z, f * 1.3, scale, v); };
+      put(9.0, -7.5, 3.2, 0); put(11.5, -4.0, 2.2, 1); put(8.0, 6.8, 2.6, 3); put(13.0, 9.5, 2.0, 2); put(7.0, -11.0, 3.6, 1); put(15.0, -10.0, 2.4, 2);
+      for (let i = 0; i < 24; i++) { const x = c.x + d.x * (6 + (i % 8) * 1.1) + rt.x * (-11 + i * 0.95), z = c.z + d.z * (6 + (i % 8) * 1.1) + rt.z * (-11 + i * 0.95); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');
@@ -697,7 +697,8 @@ async function init() {
     {
       const f3 = new THREE.Vector3(); camera.getWorldDirection(f3);
       const into = THREE.MathUtils.smoothstep(f3.dot(U.uSunDir.value), 0.55, 0.95) * (1 - U.uNight.value);
-      const target = 1.12 * (1 - 0.3 * into) * (1 + 0.12 * (G.forestK || 0) * (1 - into));
+      // (under a canopy the eye opens up even looking toward the sun: the hotspot is small)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.6 * (G.forestK || 0))) * (1 + 0.32 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value);

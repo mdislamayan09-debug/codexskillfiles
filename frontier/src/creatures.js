@@ -186,7 +186,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 // ===================================================================================== HUMANS
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
-  winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xa48c6c, furHat: true, furHatColor: 0x6a5238, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
+  winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x9a7a56, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
   arthur: { coat: 0x5a3c26, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
@@ -546,19 +546,19 @@ export class Human {
       const colFur = std({ map: hairTexture(o.fur || 0xa48c6c, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
       const hy = MH ? HA.hatY : 1.79, hz = MH ? HA.hatZ : -0.014;
       if (MH) {
-        const shell = new THREE.SphereGeometry(0.125, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.58);
-        shell.scale(1.12, 0.82, 1.18);                                      // a broad, low ushanka, not a stovepipe
+        const shell = new THREE.SphereGeometry(0.135, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
+        shell.scale(1.16, 0.95, 1.2);                                       // a broad, full fur cap that reads from behind
         const sm = mesh(shell, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         for (const sd of [-1, 1]) {   // ear flaps
-          const flap = new THREE.SphereGeometry(0.06, 12, 10); flap.scale(0.5, 1.15, 1.1);
+          const flap = new THREE.SphereGeometry(0.07, 12, 10); flap.scale(0.55, 1.25, 1.15);
           const fm = mesh(flap, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
           fm.position.copy(at(bones.head, sd * 0.11, hy - 0.04, hz - 0.01)); bones.head.add(fm);
         }
       }
       bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.135 : HA.headR, hy - 0.01, hy + (MH ? 0.06 : 0.14), 56, 0.06, bones.head), hatFur, false));
       bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.09 : 0.07, hy + (MH ? 0.07 : 0.14), hy + (MH ? 0.1 : 0.16), 20, 0.06, bones.head), hatFur, false));
-      bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.15, HA.collarY, HA.collarY + 0.07, 40, 0.06, bones.spine), colFur, false));
+      bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.17, HA.collarY - 0.01, HA.collarY + 0.09, 64, 0.075, bones.spine), colFur, false));
     }
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
     // (the sculpted skirt alone reads as a solid tube from behind)
