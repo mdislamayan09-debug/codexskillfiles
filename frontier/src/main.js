@@ -728,12 +728,18 @@ async function init() {
         const sc = Math.min(6.5, Math.max(1.4, (top - g) / 0.62));
         veg.rocks.add(x, g - 0.14 * sc, z, rot, sc, 5);
       }
+      // the homestead's place in the frame, kept clear of the ledge's dressing (bushes had hidden it)
+      let hNdc = null;
+      if (s.home) { const hp = new THREE.Vector3(s.home[0], world.heightAt(s.home[0], s.home[1]) + 3, s.home[1]).project(camera); if (hp.z < 1) hNdc = hp; }
+      const hidesHome = (nx, ny) => hNdc && Math.abs(nx - hNdc.x) < 0.16 && ny > hNdc.y - 0.3;
       // dry ochre bunchgrass, tall frosted stalks and a little frosted brush in the cracks of the ledge, in
       // mixed sizes
       // (scattered through depth in clumps, not one even row along the bottom edge)
       for (let i = 0; i < 60; i++) {
         const cl2 = Math.floor(i / 5), cx2 = -1.0 + ((cl2 * 0.37) % 1) * 2.0, cy2 = -0.98 + ((cl2 * 0.61) % 1) * 0.5;
-        const hit = groundAt(cx2 + (rr() - 0.5) * 0.18, cy2 + (rr() - 0.5) * 0.12, 24);
+        const bnx = cx2 + (rr() - 0.5) * 0.18, bny = cy2 + (rr() - 0.5) * 0.12;
+        if (hidesHome(bnx, bny)) continue;
+        const hit = groundAt(bnx, bny, 24);
         if (!hit) continue;
         const [x, g, z] = hit, k = rr();
         veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : k < 0.92 ? 7 + Math.floor(rr() * 2) : 10);
@@ -744,6 +750,7 @@ async function init() {
       for (let i = 0; i < 90; i++) {
         const f = 10 + rr() * 90, side = (rr() - 0.5) * (14 + f * 1.2);
         const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
+        if (hNdc) { const q = new THREE.Vector3(x, gh + 1, z).project(camera); if (hidesHome(q.x, q.y)) continue; }
         if (rr() < 0.4) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.5 + rr() * 1.6, 4 + Math.floor(rr() * 2));
         else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, [9, 9, 7, 8][Math.floor(rr() * 4)]); }
       }
@@ -890,7 +897,8 @@ async function init() {
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
       // (the forest haze once read as milk at 1.7x the reference's exposure; with the canopy now closed by full
       // crowns the woods went the other way, 0.6x in their upper two-thirds, and want the sunlit haze back)
-      G.mistK = 1 + (fo * 0.7 + morning * 1.5) * low;
+      // (the reference's woods are full of warm backlit haze: trunks 150 m off fade to pale gold-grey)
+      G.mistK = 1 + (fo * 1.7 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);

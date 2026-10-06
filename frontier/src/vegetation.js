@@ -1005,7 +1005,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
 }
 
 // ---------------------------------------------------------------------------- rocks
-function rockGeometry(seed, fractured = false, detail = 5) {
+function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth = 0) {
   const n = new Simplex2(seed);
   // welded so the boulder gets smooth normals instead of a faceted, low-poly look
   const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail).deleteAttribute('uv').deleteAttribute('normal'));
@@ -1017,9 +1017,9 @@ function rockGeometry(seed, fractured = false, detail = 5) {
   const cuts = [];
   if (fractured) {
     const rr = mulberry32(seed * 7 + 1);
-    for (let k = 0; k < 7; k++) {
+    for (let k = 0; k < cutsN; k++) {
       const th = rr() * Math.PI * 2, ph = (k === 0 ? 0.05 : 0.25 + rr() * 0.9);
-      cuts.push({ n: new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)), o: 0.62 + rr() * 0.28 });
+      cuts.push({ n: new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)), o: 0.62 - cutDepth + rr() * 0.28 });
     }
   }
   for (let i = 0; i < p.count; i++) {
@@ -1038,7 +1038,8 @@ function rockGeometry(seed, fractured = false, detail = 5) {
 }
 
 function rockMaterial(surf = {}, bare = false) {
-  const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0 });
+  // (dry granite is near-matte: at 0.88 with the full sky reflection the boulders read as shiny lumps)
+  const m = new THREE.MeshStandardMaterial({ roughness: 0.96, metalness: 0, envMapIntensity: 0.55 });
   return patchMaterial(m, {
     // bare: wind-scoured ledge granite (snow only in patches and cracks), for a lookout's own rock
     fragHead: (bare ? '#define BARE_LEDGE\n' : '') + /* glsl */ `uniform sampler2D tRockA; uniform sampler2D tRockN; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }
@@ -1289,7 +1290,9 @@ export class Vegetation {
     // rocks
     const rMat = rockMaterial(surf), rMatBare = rockMaterial(surf, true);
     // 4 and 5: the fractured blocks again in wind-scoured bare granite, for lookout ledges
-    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: rockGeometry((i >= 4 ? i - 2 : i) + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
+    // (the ledge blocks are cut by twice the joint planes, deeper: split granite with flat faces and hard edges, not
+    // rounded lumps)
+    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 5, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield

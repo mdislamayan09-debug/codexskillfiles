@@ -54,7 +54,8 @@ float cloudDen(vec3 p, float cov){
   // a storm deck: heavy, but torn with breaks of brighter sky between the cells
   float c = clamp(cov * (0.3 + 0.9 * weather) + 0.24 * uStorm * smoothstep(0.2, 0.6, weather), 0.0, 1.0);
   // flat dark bases, towering rounded tops
-  float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
+  // (in a storm the slab flattens into a low deck, a thin lumpy layer seen from beneath, not towering cumulus)
+  float prof = smoothstep(0.0, 0.08, h) * smoothstep(mix(1.0, 0.5, uStorm), mix(0.45 + 0.4 * weather, 0.16, uStorm), h);
   // (a tighter edge band and finer, stronger erosion: defined cauliflower cells rather than soft blobs)
   float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.15, 0.0, 1.0);
   if (d <= 0.0) return 0.0;
@@ -163,14 +164,14 @@ export class Sky {
             ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
             ambBot *= 1.0 - 0.6 * uStorm;
             ambTop *= 1.0 - 0.12 * uStorm;
-            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.55 * uStorm), ambTop, ambBot, uCloudCover);
+            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.72 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
             vec3 hz = stormSky(skyColor(d, s));
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
-            cl.rgb *= mix(1.0, mix(0.46, 0.85, far), uStorm * (1.0 - 0.45 * uBlizzard));
+            cl.rgb *= mix(1.0, mix(0.36, 0.82, far), uStorm * (1.0 - 0.45 * uBlizzard));
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
