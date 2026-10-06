@@ -67,7 +67,8 @@ const GradeShader = {
       // film grade: warm highlights, teal-olive shadows, gentle S-curve, slightly desaturated greens
       float l = dot(col, vec3(0.2126,0.7152,0.0722));
       vec3 shadowTint = vec3(0.92, 0.98, 1.02);
-      vec3 highTint = vec3(1.05, 1.0, 0.9);
+      // warm film highlights, cooled toward steel blue in a snow storm
+      vec3 highTint = mix(vec3(1.05, 1.0, 0.9), vec3(0.96, 1.0, 1.07), uStorm);
       col *= mix(shadowTint, highTint, smoothstep(0.1, 0.8, l));
       col = sat(col, 0.92 - uNight*0.3);
       col = mix(col, col*col*(3.0-2.0*col), 0.28);
