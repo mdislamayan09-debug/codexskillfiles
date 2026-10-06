@@ -16,3 +16,9 @@
   baked by `scripts/bake_patch.py`.
 - `terrain/jungle.png` (+ `.json`): the Na Pali Coast of Kauai, Hawaii (USGS 3DEP; offshore from the tiles' bathymetry
   sources), z13, turned 225 degrees so the sea lies to the south of the map, 0.5x horizontal, 0.55x vertical.
+
+# Character credits
+
+- `models/human.bin`: built by `scripts/build_human.py` from the MakeHuman base mesh, macro targets and default rig
+  (https://github.com/makehumancommunity/makehuman, `makehuman/data/3dobjs`, `targets/macrodetails`, `rigs`),
+  released as CC0 in 2020.

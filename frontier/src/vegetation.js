@@ -61,6 +61,10 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.5);
       #endif
     }
+    #ifdef FROST_ALL
+    // desert scrub is sun-bleached grey-tan, not dark twigs
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.43, 0.33) * (0.7 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), cl.a * 0.75);
+    #endif
   }`;
 function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null } = {}) {
   return patchMaterial(mat, {
@@ -717,7 +721,7 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
     `,
     fragHead: 'varying float vDes;',
     // in the desert the loose stones are pale sandstone, not dark forest-floor rock
-    fragColor: `#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.42, 0.3) * (0.8 + 0.4 * fract(vWPos.x * 3.7 + vWPos.z * 1.3)), vDes);`,
+    fragColor: `#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.27, 0.19) * (0.75 + 0.4 * fract(vWPos.x * 3.7 + vWPos.z * 1.3)), vDes);`,
     beginNormal: /* glsl */ `
       vec2 cam = cameraPosition.xz;
       vec2 xz = aOff.xy + floor((cam - aOff.xy) / TILE + 0.5) * TILE;

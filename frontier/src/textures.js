@@ -109,7 +109,7 @@ export function barkTexture(seed = 5, base = [70, 58, 46]) {
 export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024) {
   const r = mulberry32(seed);
   // jittered cell sites on a wrapped grid, cells tall and narrow like ponderosa/spruce plates
-  const CX = 9, CY = 7, sites = [];
+  const CX = 7, CY = 3, sites = [];
   for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) sites.push([(i + 0.15 + r() * 0.7) / CX, (j + 0.15 + r() * 0.7) / CY, r()]);
   const hgt = new Float32Array(W * H), tone = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -120,12 +120,14 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
       const ii = gi + di, jj = gj + dj, wi = (ii + CX) % CX, wj = (jj + CY) % CY;
       const [sx0, sy0, t] = sites[wj * CX + wi];
       const sx = sx0 + Math.floor(ii / CX), sy = sy0 + Math.floor(jj / CY);   // unwrap across the tile edge
-      const dx = u - sx, dy = (v - sy) * 0.45;                              // squash vertically: tall plates
+      const dx = u - sx, dy = (v - sy) * 0.32;                              // squash vertically: tall plates
       const d = Math.hypot(dx, dy);
       if (d < d1) { d2 = d1; d1 = d; id = t; } else if (d < d2) d2 = d;
     }
     const edge = d2 - d1;                                         // 0 on furrows
-    const plate = Math.min(1, edge * 34);
+    // long vertical fissures wander down the plates as well
+    const fis = Math.abs(Math.sin(u * Math.PI * 2 * 11 + Math.sin(v * 9 + id * 6) * 1.6 + id * 4));
+    const plate = Math.min(1, edge * 30) * (0.55 + 0.45 * Math.min(1, fis * 3));
     const k = y * W + x;
     // scaly flakes on the plate surface
     const flake = 0.5 + 0.5 * Math.sin(y * 0.9 + Math.sin(x * 0.35 + id * 30) * 2.5) * Math.sin(x * 0.6 + id * 11);

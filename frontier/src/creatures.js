@@ -179,7 +179,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xa48c6c, furHat: true, furHatColor: 0x6a5238, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x5a3c26, shirt: 0x6a7a8e, vest: 0x4a3828, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x5a3c26, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -285,9 +285,98 @@ function humanPrims(o) {
   return P;
 }
 
+// ---- the MakeHuman body (CC0): a real human form, rigged onto the game skeleton (scripts/build_human.py) ----
+let MH = null;
+export async function loadHumanModel(url = 'models/human.bin') {
+  try {
+    const buf = await (await fetch(url)).arrayBuffer();
+    const hl = new DataView(buf).getUint32(0, true);
+    const hdr = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl)));
+    const base = 4 + hl, A = {};
+    for (const a of hdr.arrays) {
+      const T = { position: Float32Array, normal: Float32Array, skinIndex: Uint8Array, skinWeight: Uint8Array, region: Uint8Array, index: Uint32Array }[a.name];
+      A[a.name] = new T(buf.slice(base + a.offset, base + a.offset + a.bytes));
+    }
+    MH = { ...hdr, ...A };
+    // the skeleton follows the real body
+    for (const b of HUMAN_BONES) if (MH.rest[b.name]) b.pos = MH.rest[b.name].slice();
+    // anchors for the accessories: crown of the head, the face, the base of the neck
+    const P = MH.position, R = MH.region;
+    let top = 0, sx = 0, sz = 0, n = 0;
+    for (let i = 0; i < MH.count; i++) if (R[i] === MH.regions.scalp) { top = Math.max(top, P[i * 3 + 1]); sx += P[i * 3]; sz += P[i * 3 + 2]; n++; }
+    MH.anchor = { headTop: top, headZ: sz / n, eyes: MH.eyes, neckY: MH.rest.neck[1], neckZ: MH.rest.neck[2] };
+    return true;
+  } catch (e) {
+    console.warn('human model unavailable; using sculpted figures', e);
+    return false;
+  }
+}
+// accessory anchors for whichever body is in use
+function headAnchors() {
+  if (!MH) return { hatY: 1.838, hatZ: -0.008, eyes: [[-0.033, 1.763, 0.082], [0.033, 1.763, 0.082]], eyeFwd: 0.0105, collarY: 1.5, collarZ: -0.02, headR: 0.112 };
+  const a = MH.anchor;
+  return { hatY: a.headTop - 0.05, hatZ: a.headZ + 0.005, eyes: a.eyes.map((e) => [e[0] < 0 ? e[0] : e[0], e[1], e[2] - 0.004]).sort((p, q) => p[0] - q[0]), eyeFwd: 0.0105,
+    collarY: a.neckY - 0.08, collarZ: a.neckZ - 0.03, headR: 0.105 };
+}
+// clothing on the real body: each region of skin becomes a garment for the outfit, pushed out along the normal
+function mhTemplate(outfit, o) {
+  const G = MH.regions, n = MH.count, P = MH.position, N = MH.normal, R = MH.region;
+  const lab = new Float32Array(n), pos = new Float32Array(n * 3);
+  const winter = !!o.winter;
+  const beltY = MH.rest.hips[1] + 0.03;
+  for (let i = 0; i < n; i++) {
+    const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2], r = R[i];
+    let L0 = L.skin, push = 0;
+    if (r === G.scalp) { L0 = L.hair; push = 0.005; }
+    else if (r === G.beard || r === G.face) {
+      // stubble on the jaw, chin and upper lip only; lips; the rest of the face is skin
+      const ey = MH.eyes[0][1], ez = MH.eyes[0][2];
+      const mouthY = ey - 0.085, mouthZ = ez + 0.012;
+      const lip = Math.abs(x) < 0.026 && Math.abs(y - mouthY) < 0.009 && z > mouthZ - 0.012;
+      const jaw = y < ey - 0.065 && z > ez - 0.12;
+      if (lip && outfit !== 'lady') L0 = L.lips;
+      else if (jaw && outfit !== 'lady' && !lip) { L0 = 12; push = 0.0012; }
+    }
+    else if (r === G.neck) {
+      if (o.bandana && y < MH.rest.neck[1] + 0.03) { L0 = L.bandana; push = winter ? 0.022 : 0.01; }
+      else if (o.coat && y < MH.rest.neck[1] - 0.01) { L0 = L.coat; push = 0.014; }
+    } else if (r === G.torso || r === G.uarm || r === G.farm) {
+      // open coat front: a V from the collar down to the belt shows the vest, and the shirt at the throat
+      const fz = z - MH.rest.spine[2];
+      const vHalf = 0.035 + Math.max(0, 1.52 - y) * 0.16;
+      const front = r === G.torso && fz > 0.04 && Math.abs(x) < vHalf && y > beltY - 0.01;
+      const throat = front && y > 1.38 && Math.abs(x) < 0.03 + (1.52 - y) * 0.25;
+      if (o.coat && !(front && !winter)) { L0 = L.coat; push = (winter ? 0.04 : 0.028) * (r === G.torso ? 1.15 : 1); }
+      else if (o.vest && r === G.torso && !throat) { L0 = L.vest; push = 0.012; }
+      else { L0 = L.shirt; push = 0.007; }
+      if (r === G.farm && y < MH.rest.wrL[1] + 0.05 && o.coat) push *= 1.3;     // cuffs
+    } else if (r === G.belt) { L0 = L.belt; push = 0.016; }
+    else if (r === G.pelvis) { L0 = o.dress ? L.pants : L.pants; push = 0.008; if (o.coat && z < 0.02) { L0 = L.coat; push = winter ? 0.032 : 0.022; } }
+    else if (r === G.thigh) {
+      L0 = L.pants; push = 0.011;
+      if (o.coat && y > 0.62 && (z < 0.04 || Math.abs(x) > 0.15)) { L0 = L.coat; push = winter ? 0.03 : 0.02; }   // coat skirt over the thighs
+    } else if (r === G.shin) { if (y < 0.4) { L0 = L.boots; push = 0.012; } else { L0 = L.pants; push = 0.007; } }
+    else if (r === G.foot) { L0 = L.boots; push = 0.009; }
+    else if (r === G.hand) { if (o.gloves) { L0 = L.gloves; push = 0.002; } }
+    lab[i] = L0;
+    pos[i * 3] = x + N[i * 3] * push; pos[i * 3 + 1] = y + N[i * 3 + 1] * push; pos[i * 3 + 2] = z + N[i * 3 + 2] * push;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aRest', new THREE.BufferAttribute(pos.slice(), 3));
+  geo.setAttribute('aLabel', new THREE.BufferAttribute(lab, 1));
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(Uint16Array.from(MH.skinIndex), 4));
+  const sw = new Float32Array(n * 4); for (let i = 0; i < n * 4; i++) sw[i] = MH.skinWeight[i] / 255;
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+  geo.setIndex(new THREE.BufferAttribute(MH.index, 1));
+  geo.computeVertexNormals();
+  return { geo, prims: [] };
+}
+
 const humanCache = new Map();
 function humanTemplate(outfit) {
   if (humanCache.has(outfit)) return humanCache.get(outfit);
+  if (MH) { humanCache.set(outfit, mhTemplate(outfit, OUTFITS[outfit])); return humanCache.get(outfit); }
   const o = OUTFITS[outfit];
   const prims = humanPrims(o);
   const geo = sculpt(prims, { cell: 0.0115 / DETAIL, pad: 0.03 });
@@ -349,11 +438,12 @@ export class Human {
     const metal = std({ color: 0x8a8580, metalness: 0.85, roughness: 0.35 });
     // eyes
     const sclera = std({ color: 0xd8d0c4, roughness: 0.18 }), iris = std({ color: 0x2e2218, roughness: 0.1 });
-    for (const s of [-1, 1]) {
-      const e = mesh(new THREE.SphereGeometry(0.0125, 12, 10), sclera, false);
-      e.position.copy(at(bones.head, s * 0.033, 1.763, 0.082)); bones.head.add(e);
-      const ir = mesh(new THREE.SphereGeometry(0.0062, 10, 8), iris, false);
-      ir.position.copy(at(bones.head, s * 0.032, 1.763, 0.0925)); bones.head.add(ir);
+    const HA = headAnchors();
+    for (const ep of HA.eyes) {
+      const e = mesh(new THREE.SphereGeometry(0.0122, 14, 12), sclera, false);
+      e.position.copy(at(bones.head, ep[0], ep[1], ep[2])); bones.head.add(e);
+      const ir = mesh(new THREE.SphereGeometry(0.0062, 12, 10), iris, false);
+      ir.position.copy(at(bones.head, ep[0] * 0.97, ep[1], ep[2] + HA.eyeFwd)); bones.head.add(ir);
     }
     // cartridge loops around the gunbelt
     const brass = std({ color: 0xb08a48, metalness: 0.8, roughness: 0.35 });
@@ -371,17 +461,44 @@ export class Human {
       brim.rotateX(-Math.PI / 2);
       const bp = brim.attributes.position;
       // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
-      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.9 * Math.pow(Math.abs(x) / rr, 3) + (z > 0 ? -z / rr * 0.16 : -z / rr * 0.05) * Math.max(0, rr - 0.11); };
+      // sides roll up, front and back dip slightly: from behind and above the brim reads as a wide ellipse
+      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.75 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.12 * Math.max(0, rr - 0.11); };
       for (let i = 0; i < bp.count; i++) bp.setY(i, brimY(bp.getX(i), bp.getZ(i)));
       brim.computeVertexNormals();
       const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
-      const bm = mesh(brim, hatM); bm.position.copy(at(bones.head, 0, 1.838, -0.008)); bones.head.add(bm);
+      const bm = mesh(brim, hatM); bm.position.copy(at(bones.head, 0, HA.hatY, HA.hatZ)); bones.head.add(bm);
+      if (MH) {
+        // the crown (on the sculpted figures it is part of the body): a pinched, creased felt crown
+        const prof = [[0.106, 0], [0.106, 0.025], [0.102, 0.08], [0.096, 0.115], [0.072, 0.13], [0.0, 0.124]].map(([r0, y0]) => new THREE.Vector2(r0, y0));
+        const crown = new THREE.LatheGeometry(prof, 28);
+        const cp = crown.attributes.position;
+        for (let i = 0; i < cp.count; i++) {
+          const x = cp.getX(i), y = cp.getY(i), z = cp.getZ(i);
+          const crease = Math.exp(-(x * x) / 0.0012) * Math.max(0, y - 0.06) * 0.6;          // centre dent
+          const pinch = Math.exp(-((Math.abs(x) - 0.05) ** 2) / 0.0006) * Math.max(0, z) * Math.max(0, y - 0.05) * 1.6;
+          cp.setY(i, y - crease); cp.setX(i, x - Math.sign(x) * pinch * 0.4); cp.setZ(i, z * 1.08);
+        }
+        crown.computeVertexNormals();
+        const cm = mesh(crown, hatM); cm.position.copy(at(bones.head, 0, HA.hatY - 0.002, HA.hatZ)); bones.head.add(cm);
+      }
       const edge = new THREE.TorusGeometry(0.235, 0.005, 4, 40); edge.rotateX(Math.PI / 2);
       const ep = edge.attributes.position;
       for (let i = 0; i < ep.count; i++) ep.setY(i, ep.getY(i) + brimY(ep.getX(i), ep.getZ(i)));
       const em = mesh(edge, hatM); em.position.copy(bm.position); bones.head.add(em);
       const band = new THREE.CylinderGeometry(0.099, 0.1, 0.022, 24, 1, true);
-      const bandM = mesh(band, leather); bandM.position.copy(at(bones.head, 0, 1.85, -0.008)); bones.head.add(bandM);
+      if (MH) band.scale(1.05, 1, 1.13);
+      const bandM = mesh(band, leather); bandM.position.copy(at(bones.head, 0, HA.hatY + 0.012, HA.hatZ)); bones.head.add(bandM);
+    }
+    // turned-down coat collar and lapel edges on the real body
+    if (MH && o.coat) {
+      const nk = MH.rest.neck, ny = nk[1] - 0.05;
+      const prof = [[0.075, 0.035], [0.095, 0.02], [0.12, -0.01], [0.14, -0.045]].map(([r0, y0]) => new THREE.Vector2(r0, y0));
+      const col = new THREE.LatheGeometry(prof, 28, Math.PI * 0.62, Math.PI * 1.76);   // open at the front
+      col.scale(1.05, 1, 1.0);
+      col.translate(0, ny, nk[2] - 0.035);
+      col.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
+      const colM = std({ map: leatherTexture(r), color: new THREE.Color(o.winter ? (o.fur || 0xa48c6c) : o.coat).multiplyScalar(o.winter ? 1.6 : 1.9), roughness: o.winter ? 0.95 : 0.62, side: THREE.DoubleSide });
+      bones.spine.add(mesh(col, colM));
     }
     // holster + revolver grip on the hip
     const holster = new THREE.BoxGeometry(0.06, 0.2, 0.08); holster.translate(0.19, -0.14, 0.02);
@@ -407,9 +524,21 @@ export class Human {
       };
       const hatFur = std({ map: hairTexture(o.furHatColor || 0x6a5238, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
       const colFur = std({ map: hairTexture(o.fur || 0xa48c6c, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
-      bones.head.add(mesh(furCards(0, 0, -0.014, 0.112, 1.79, 1.93, 46, 0.055, bones.head), hatFur, false));
-      bones.head.add(mesh(furCards(0, 0, -0.014, 0.07, 1.93, 1.95, 14, 0.06, bones.head), hatFur, false));
-      bones.spine.add(mesh(furCards(0, 0, -0.02, 0.15, 1.5, 1.57, 40, 0.06, bones.spine), colFur, false));
+      const hy = MH ? HA.hatY : 1.79, hz = MH ? HA.hatZ : -0.014;
+      if (MH) {
+        const shell = new THREE.SphereGeometry(0.112, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
+        shell.scale(1, 0.95, 1.1);
+        const sm = mesh(shell, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
+        sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
+        for (const sd of [-1, 1]) {   // ear flaps
+          const flap = new THREE.SphereGeometry(0.045, 12, 10); flap.scale(0.45, 1.1, 1);
+          const fm = mesh(flap, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
+          fm.position.copy(at(bones.head, sd * 0.095, hy - 0.05, hz - 0.005)); bones.head.add(fm);
+        }
+      }
+      bones.head.add(mesh(furCards(0, 0, hz, HA.headR, hy, hy + 0.14, 46, 0.055, bones.head), hatFur, false));
+      bones.head.add(mesh(furCards(0, 0, hz, 0.07, hy + 0.14, hy + 0.16, 14, 0.06, bones.head), hatFur, false));
+      bones.spine.add(mesh(furCards(0, 0, HA.collarZ, 0.15, HA.collarY, HA.collarY + 0.07, 40, 0.06, bones.spine), colFur, false));
     }
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
     // (the sculpted skirt alone reads as a solid tube from behind)
@@ -535,7 +664,7 @@ const SPECIES = {
   sheep: { scale: 0.55, coat: 'sheep', cell: 0.024 },
 };
 const COATS = {
-  bay: { coat: 0x432616, points: 0x16100c, mane: 0x120c08, belly: 0x51301c, pinto: 0 },
+  bay: { coat: 0x56301a, points: 0x15100c, mane: 0x110b07, belly: 0x4a2a18, pinto: 0, dapple: 1 },
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
@@ -672,6 +801,17 @@ export class Quadruped {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.86, 0.82), bl);
       }
       diffuseColor.rgb *= 0.92 + 0.08 * sin(rp.z * 60.0 + rp.y * 20.0) * body; // hair flow
+      // bay countershading: dark topline, warm red flanks catching the light, darker belly and inner legs
+      {
+        float top = smoothstep(1.35, 1.75, rp.y) * smoothstep(0.22, 0.05, abs(rp.x));
+        float flank = smoothstep(0.08, 0.3, abs(rp.x)) * smoothstep(1.0, 1.35, rp.y) * smoothstep(1.75, 1.45, rp.y);
+        diffuseColor.rgb *= mix(1.0, 0.72, top * body);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.22, 1.02, 0.86), flank * body);
+        // muscle grooves: the line behind the shoulder, the flank hollow, the croup
+        float groove = smoothstep(0.05, 0.0, abs(rp.z - 0.42 + 0.25 * (rp.y - 1.3))) * smoothstep(1.0, 1.25, rp.y)
+                     + smoothstep(0.06, 0.0, abs(rp.z + 0.38 - 0.2 * (rp.y - 1.2))) * smoothstep(0.95, 1.2, rp.y) * 0.7;
+        diffuseColor.rgb *= 1.0 - 0.18 * clamp(groove, 0.0, 1.0) * body;
+      }
     `, uni, kind === 'horse', kind);
     mat.roughness = kind === 'sheep' ? 1 : 0.7;
     const root = (this.root = new THREE.Group());

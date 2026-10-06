@@ -1,7 +1,7 @@
 // Dust & Redemption — bootstrap, game rules and main loop.
 import './style.css';
 import * as THREE from 'three';
-import { setCreatureDetail } from './creatures.js';
+import { setCreatureDetail, loadHumanModel } from './creatures.js';
 import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, setWorldResolution, loadRealTerrain } from './world.js';
 import { U, patchMaterial } from './shared.js';
 import { Terrain } from './terrain.js';
@@ -58,7 +58,7 @@ async function init() {
   setWorldResolution(QUALITY >= 2 ? 4096 : QUALITY > 1 ? 3072 : QUALITY >= 1 ? 2560 : 2048);
   setCreatureDetail(QUALITY);
   U.uRes.value = RES;
-  await loadRealTerrain();
+  await Promise.all([loadRealTerrain(), loadHumanModel()]);
   const world = new World(1899);
   await world.generate((p) => setLoad(0.02 + p * 0.5, 'Raising mountains and cutting rivers…'));
   console.log(`world ${RES}² generated in ${Math.round(world.genMs)} ms`);

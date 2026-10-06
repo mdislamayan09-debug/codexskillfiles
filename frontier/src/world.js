@@ -473,7 +473,8 @@ export class World {
         climate[k * 4 + 0] = snow * 255;
         climate[k * 4 + 1] = o.jungle * (1 - o.ocean * 0.5) * 255;
         climate[k * 4 + 2] = o.autumn * (1 - snow) * 255;
-        climate[k * 4 + 3] = o.desert * 255;
+        // the boundary ranges beside the desert are red rock too
+        climate[k * 4 + 3] = Math.max(o.desert, o.edge * smoothstep(700, 1400, o.bz) * (x < 0 ? 1 : 0)) * 255;
       }
     }
     return { j0, j1, heights, splat, climate };

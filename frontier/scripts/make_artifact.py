@@ -15,6 +15,6 @@ page = f'''<title>Dust &amp; Redemption</title>
 '''
 (out / 'index.html').write_text(page)
 files = {str(p.relative_to(dist)): str(p.resolve())
-         for d in ('assets', 'textures', 'terrain') if (dist / d).exists() for p in (dist / d).iterdir()}
+         for d in ('assets', 'textures', 'terrain', 'models') if (dist / d).exists() for p in (dist / d).iterdir()}
 (out / 'files.json').write_text(json.dumps(files, indent=1))
 print(len(files), 'files;', css, js)
