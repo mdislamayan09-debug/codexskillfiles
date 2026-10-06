@@ -1017,7 +1017,7 @@ function rockMaterial(surf = {}) {
       // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
       float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.6, 0.85, wn.y + (n1 - 0.5) * 0.6 + 0.25 * (n2 - 0.5)) * 0.9;
       // in patches and grains, not a smooth white cap: the grey stone and its lichen show through
-      rsnow *= 0.35 + 0.65 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
+      rsnow *= 0.55 + 0.45 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -1302,7 +1302,7 @@ export class Vegetation {
         if (r() < under * 2.6) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.1, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
       } else if (cl.snow > 0.5) {
         // dark boulders standing out of the snow, and dry alpine brush poking through in clumps
-        if (r() < 0.012 + 0.05 * field) this.rocks.add(px, h - 0.4, pz, r() * 6.28, 0.6 + r() * 1.8, Math.floor(r() * 4));
+        if (r() < 0.012 + 0.05 * field) { const sc = 0.6 + r() * 1.8; this.rocks.add(px, h - 0.35 - sc * 0.3, pz, r() * 6.28, sc, Math.floor(r() * 4)); }   // half buried in the snow
         const brush = THREE.MathUtils.smoothstep(w.n.noise(px / 45 - 2.2, pz / 45 + 5.3), 0.1, 0.6);
         const nb = r() < 0.04 + 0.5 * brush ? 1 + Math.floor(r() * 3 * brush) : 0;
         for (let b = 0; b < nb; b++) {
