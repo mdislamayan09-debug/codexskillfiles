@@ -316,17 +316,35 @@ async function init() {
   // a point on the Frostwater Valley floor, heading up-valley
   G.alongValley = (t) => {
     const v = world.valley;
-    // walk up-valley from t until the rider and the camera behind them have no trees in the way
-    for (let tt = t; tt < 0.95; tt += 0.01) {
-      const i = Math.min(v.length - 2, Math.floor((1 - tt) * (v.length - 1)));
+    // the most dramatic stretch of the valley: steep walls rising close on both sides and ahead (a cliff-walled
+    // trough, as in the reference ride), with a clear spot on dry snow for the rider and the camera
+    let best = null, bs = -1e9;
+    for (let i = 2; i < v.length - 3; i++) {
       const [ax, az] = v[i + 1], [bx, bz] = v[i];
       const yaw = Math.atan2(bx - ax, bz - az);
-      for (const side of [12, -12, 25, -25]) {
+      const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      const fl = world.heightAt(ax, az);
+      if (az < -3500 || az > -2250 || world.climateAt(ax, az).snow < 0.7) continue;   // deep in the snow country, not the closing ridge
+      if (world.heightAt(ax + fx * 80, az + fz * 80) - fl > 8) continue;   // level floor ahead of the rider
+      // wall rise and steepness within the view cone, 120-700 m out
+      let wall = 0;
+      for (const side of [-1, 1]) for (let d = 120; d <= 700; d += 60) for (let a = 0.25; a <= 0.85; a += 0.2) {
+        const px = ax + (fx * Math.cos(a) + side * rx * Math.sin(a)) * d, pz = az + (fz * Math.cos(a) + side * rz * Math.sin(a)) * d;
+        const rise = world.heightAt(px, pz) - fl;
+        wall += Math.min(rise / d, 0.9) * (1 - world.normalAt(px, pz).y > 0.25 ? 1.5 : 1);
+      }
+      if (wall > bs) { bs = wall; best = i; }
+    }
+    // search outward from the best stretch for a clear, dry spot
+    for (let off = 0; off < v.length; off++) for (const i of [best + off, best - off]) {
+      if (i < 1 || i > v.length - 2) continue;
+      const [ax, az] = v[i + 1], [bx, bz] = v[i];
+      const yaw = Math.atan2(bx - ax, bz - az);
+      for (const side of [12, -12, 25, -25, 40, -40]) {
         const x = ax + Math.cos(yaw) * side, z = az - Math.sin(yaw) * side;
         const cx = x - Math.sin(yaw) * 6.5, cz = z - Math.cos(yaw) * 6.5;
-        // on snow, not the iced braids of the creek: the rider, the camera and the ground just ahead
-        const dry = [[x, z], [cx, cz], [x + Math.sin(yaw) * 8, z + Math.cos(yaw) * 8]].every(([qx, qz]) => world.splatAt(qx, qz).wet < 0.12);
-        if (dry && G.treesNear(x, z, 6) === 0 && G.treesNear(cx, cz, 5) === 0 && G.treesNear(x + Math.sin(yaw) * 12, z + Math.cos(yaw) * 12, 4) === 0) return [x, z, yaw];
+        const dry = [[x, z], [cx, cz], [x + Math.sin(yaw) * 8, z + Math.cos(yaw) * 8]].every(([qx, qz]) => world.splatAt(qx, qz).wet < 0.12 && world.normalAt(qx, qz).y > 0.96);
+        if (dry && world.climateAt(x, z).snow > 0.7 && G.treesNear(x, z, 6) === 0 && G.treesNear(cx, cz, 5) === 0 && G.treesNear(x + Math.sin(yaw) * 12, z + Math.cos(yaw) * 12, 4) === 0) return [x, z, yaw];
       }
     }
     const [ax, az] = v[v.length - 2]; return [ax, az, 0];
