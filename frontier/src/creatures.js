@@ -65,7 +65,15 @@ function leatherTexture(r) {
 let DETAIL = 1;
 export function setCreatureDetail(q) { DETAIL = q >= 2 ? 1.45 : q > 1 ? 1.2 : 1; }
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
-const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }));
+// accessories (hats, tack, bedrolls) catch a light dusting of snow on their upper faces in the cold country
+const DUST_FRAG = /* glsl */ `
+  #include <color_fragment>
+  {
+    vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
+    float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * (0.55 + 0.45 * vnoise(vWPos.xz * 40.0 + vWPos.y * 13.0));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.85), dust * 0.45);
+  }`;
+const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }), { fragColor: DUST_FRAG });
 function mesh(geo, mat, cast = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; return m; }
 
 // Build a bone hierarchy from a spec: [{name, parent, pos:[x,y,z] (rest, model space)}]

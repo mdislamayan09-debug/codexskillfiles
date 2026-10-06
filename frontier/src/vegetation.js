@@ -653,11 +653,13 @@ function grassClumpTexture() {
   const c = document.createElement('canvas'); c.width = 512; c.height = 512;
   const g = c.getContext('2d');
   const r = mulberry32(77);
-  for (let i = 0; i < 70; i++) {
-    const x0 = 30 + r() * 452;
-    const h = 220 + r() * 280;
-    const lean = (r() - 0.5) * 140;
-    const w = 3 + r() * 4;
+  for (let i = 0; i < 120; i++) {
+    // a dome-shaped clump: tall blades in the middle, short ones at the sides, so no card shows a square edge
+    const x0 = 256 + (r() + r() + r() - 1.5) * 150;
+    const cx = (x0 - 256) / 226;
+    const h = (180 + r() * 300) * Math.max(0.25, 1 - 0.75 * cx * cx);
+    const lean = (r() - 0.5) * 140 + cx * 90;
+    const w = 2.2 + r() * 3.2;
     const dry = r() < 0.3;
     const gr = g.createLinearGradient(0, 512, 0, 512 - h);
     if (dry) { gr.addColorStop(0, '#4a4826'); gr.addColorStop(0.5, '#a09058'); gr.addColorStop(1, '#c8b880'); }
@@ -683,11 +685,13 @@ let CLUMP_TEX = null;
 function clumpGeometry() {
   const pos = [], uv = [], idx = [];
   const rows = 3;
-  for (let q = 0; q < 2; q++) {
+  // three cards at 60 degrees: a round clump from every side and from above
+  for (let q = 0; q < 3; q++) {
     const base = pos.length / 3;
+    const ca = Math.cos(q * Math.PI / 3), sa = Math.sin(q * Math.PI / 3);
     for (let j = 0; j <= rows; j++) for (let i = 0; i <= 1; i++) {
       const x = i - 0.5, y = j / rows;
-      if (q === 0) pos.push(x, y, 0); else pos.push(0, y, x);
+      pos.push(x * ca, y, x * sa);
       uv.push(i, y);
     }
     for (let j = 0; j < rows; j++) { const a = base + j * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }

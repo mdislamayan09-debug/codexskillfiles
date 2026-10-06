@@ -279,7 +279,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6 * (1.0 - jun) * (1.0 - des) * (1.0 - aut));
   c = mix(c, rock, rockAmt); tn = mix(tn, rN, rockAmt);
   rough = mix(rough, 0.82, rockAmt);
-  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), texN(L_SNOW, xz, 4.0), 0.5), snowAmt);
+  // two scales of the snow scan, the second turned 37 degrees, blended by noise so the dimples never tile
+  vec2 xzr = mat2(0.8, 0.6, -0.6, 0.8) * xz;
+  vec3 snN = mix(texN(L_SNOW, xz, 4.0), texN(L_SNOW, xzr, 11.0), smoothstep(0.3, 0.7, fbm2(xz / 17.0 + 4.4)));
+  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), snN, 0.42), snowAmt);
   rough = mix(rough, 0.6, snowAmt);
   if (snowAmt > 0.01) {
     // wind-packed ripples and soft drifts, so open snow reads as a surface rather than a white sheet
