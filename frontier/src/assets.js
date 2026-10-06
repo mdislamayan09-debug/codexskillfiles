@@ -70,7 +70,7 @@ function needleCanvas() {
   const c = document.createElement('canvas'); c.width = c.height = TS;
   const g = c.getContext('2d');
   const r = mulberry32(5151);
-  g.fillStyle = '#6a5843'; g.fillRect(0, 0, TS, TS);
+  g.fillStyle = '#4e3f2f'; g.fillRect(0, 0, TS, TS);
   const wrap = (fn) => { for (const ox of [-TS, 0, TS]) for (const oy of [-TS, 0, TS]) { g.save(); g.translate(ox, oy); fn(); g.restore(); } };
   // soil showing through in patches, and darker damp hollows
   for (let i = 0; i < 220; i++) {
@@ -88,7 +88,7 @@ function needleCanvas() {
     const n = pass === 0 ? 2200 : pass === 1 ? 1600 : 700;
     for (let i = 0; i < n; i++) {
       const x = r() * TS, y = r() * TS, a = r() * 6.28, L = 26 + r() * 40, v = 0.6 + r() * 0.55;
-      const col = pass === 0 ? [118, 100, 80] : pass === 1 ? [150, 120, 82] : [168, 112, 62];
+      const col = pass === 0 ? [92, 74, 56] : pass === 1 ? [128, 96, 64] : [150, 98, 56];
       g.strokeStyle = `rgba(${Math.round(col[0] * v)},${Math.round(col[1] * v)},${Math.round(col[2] * v)},${pass === 0 ? 0.8 : 0.92})`;
       g.lineWidth = 1.3 + r() * 0.9;
       // pine needles fall in pairs and threes, splayed from a sheath

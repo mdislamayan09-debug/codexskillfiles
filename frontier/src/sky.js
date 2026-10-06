@@ -299,7 +299,9 @@ export class Sky {
     U.uFogColor.value.lerp(new THREE.Color(0.5, 0.56, 0.65).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.6, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
-    U.uFogDensity.value *= (1 + 0.2 * W.blizzard + 0.45 * W.humid - 0.4 * W.dry) * (1 - 0.2 * W.storm * (1 - W.blizzard));   // humid air hazes, but the sea still reads blue to the horizon
+    // (falling snow greys out the far side of a valley within a kilometre or two: the reference's ridges fade layer
+    // by layer, ours stood crisp and bright at 1.5 km)
+    U.uFogDensity.value *= (1 + 0.6 * W.blizzard + 0.45 * W.humid - 0.4 * W.dry) * (1 - 0.2 * W.storm * (1 - W.blizzard));   // humid air hazes, but the sea still reads blue to the horizon
     // storm fog fills the valleys to the ridgelines; fair weather keeps it low
     U.uFogFalloff.value = 0.022 * (1 - 0.8 * W.blizzard) * (1 - 0.3 * W.humid);
     this.uniforms.uHaze.value.copy(U.uFogColor.value);

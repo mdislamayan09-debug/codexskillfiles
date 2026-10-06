@@ -620,9 +620,25 @@ async function init() {
       // the midground the reference's valley is built from: split granite outcrops breaking the snow either side
       // of the open lane, and clusters of snow-laden spruce of mixed sizes stepping back up the valley
       for (let gi = 0; gi < 9; gi++) {
-        const ahead = 35 + rr() * 140, side = (gi % 2 ? 1 : -1) * (18 + ahead * 0.22 + rr() * 30);
+        // (inside the lens's field: at 40-170 m out a crag 40 m aside was already past the frame edge)
+        const ahead = 40 + rr() * 130, side = (gi % 2 ? 1 : -1) * (9 + ahead * 0.12 + rr() * 18);
         const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, sc = 2.5 + rr() * 4.5;
         veg.crags.add(x, world.heightAt(x, z) - sc * 0.45, z, rr() * 6.28, sc, Math.floor(rr() * 3));
+      }
+      // the near snowfield: frosted sage and small rocks poking through out to forty metres, either side of the
+      // horse's line (the lower half of the frame was one blank plane)
+      for (let i = 0; i < 26; i++) {
+        const ahead = 6 + rr() * 34, side = (rr() < 0.5 ? -1 : 1) * (3.5 + rr() * (6 + ahead * 0.55));
+        const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, gh = world.heightAt(x, z);
+        if (rr() < 0.3) veg.rocks.add(x, gh - 0.25, z, rr() * 6.28, 0.3 + rr() * 0.6, 2 + Math.floor(rr() * 2));
+        else for (let k = 0; k < 1 + Math.floor(rr() * 3); k++) { const bx = x + (rr() - 0.5) * 2, bz = z + (rr() - 0.5) * 2; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.08, bz, rr() * 6.28, 0.4 + rr() * 0.5, [7, 8, 9][Math.floor(rr() * 3)]); }
+      }
+      // and a few dead snags among the living stands, as the reference's valley has
+      const snags = veg.groups.snag;
+      if (snags.length) for (let i = 0; i < 5; i++) {
+        const ahead = 30 + rr() * 110, side = (rr() < 0.5 ? -1 : 1) * (10 + ahead * 0.25 + rr() * 25);
+        const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
+        veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.6 + rr() * 0.5, snags[Math.floor(rr() * snags.length)]);
       }
       const firs = veg.groups.fir;
       if (firs.length) for (let gi = 0; gi < 12; gi++) {
@@ -677,7 +693,7 @@ async function init() {
         world.stampPad(hx, hz, 28, 34);
         town.addHomestead(hx, hz, hr);
         G.clearTreesNear(hx, hz, 36); G.clearTreesNear(hx, hz, 40, veg.rocks); G.clearTreesNear(hx, hz, 50, veg.crags);
-        G.clearTreesAlong(c.x, c.z, hx, hz, 7, 0.9);
+        G.clearTreesAlong(c.x, c.z, hx, hz, 14, 0.92);
       }
       // the frame as the lens will see it, to set the ledge's rocks against
       camera.position.copy(c); camera.fov = s.fov || camera.fov; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -714,8 +730,10 @@ async function init() {
       }
       // dry ochre bunchgrass, tall frosted stalks and a little frosted brush in the cracks of the ledge, in
       // mixed sizes
-      for (let i = 0; i < 70; i++) {
-        const hit = groundAt(-1.05 + rr() * 2.1, -0.98 + rr() * 0.4, 18);
+      // (scattered through depth in clumps, not one even row along the bottom edge)
+      for (let i = 0; i < 60; i++) {
+        const cl2 = Math.floor(i / 5), cx2 = -1.0 + ((cl2 * 0.37) % 1) * 2.0, cy2 = -0.98 + ((cl2 * 0.61) % 1) * 0.5;
+        const hit = groundAt(cx2 + (rr() - 0.5) * 0.18, cy2 + (rr() - 0.5) * 0.12, 24);
         if (!hit) continue;
         const [x, g, z] = hit, k = rr();
         veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : k < 0.92 ? 7 + Math.floor(rr() * 2) : 10);
@@ -730,6 +748,7 @@ async function init() {
         else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
       }
     }
+    veg.refreshImpostors();
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');
     document.getElementById('loading').classList.add('done');
@@ -866,7 +885,9 @@ async function init() {
       for (const rr of [12, 30]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; fo = Math.max(fo, 0.85 * world.splatAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr).forest); }
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 0.35 + morning * 1.5) * low;   // (the forest haze read as milk: keep it to the shafts)
+      // (the forest haze once read as milk at 1.7x the reference's exposure; with the canopy now closed by full
+      // crowns the woods went the other way, 0.6x in their upper two-thirds, and want the sunlit haze back)
+      G.mistK = 1 + (fo * 0.7 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -911,7 +932,7 @@ async function init() {
       // air reads brighter than the eye wants it, so stop down a little there)
       const W = sky.weather;
       // (a storm with clear air under it is not dim: the reference's storm vista sits ~25% brighter than ours did)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.14 * W.storm * (1 - W.blizzard)) * (1 - 0.14 * (G.forestK || 0));
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.14 * W.storm * (1 - W.blizzard)) * (1 + 0.08 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
@@ -983,7 +1004,7 @@ async function init() {
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     // (in clear air under a storm the cold grade is lighter: warm rock and dry grass keep some colour against the snow)
     const coldGrade = Math.max(sky.weather.blizzard, 0.6 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.1 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;

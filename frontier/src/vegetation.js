@@ -58,9 +58,10 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       #if defined(CONIFER_SNOW) && defined(USE_MAP)
       // a spruce bough carries a load of snow along its upper side: on the standing cards the half above the
       // stem is white too, so each bough reads as a white shelf over dark needles
-      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.5, 0.62, vMapUv.y + 0.08 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)));
+      // (in clumps along the bough, not a full coat: evenly coated firs read as frosted Christmas trees)
+      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.54, 0.66, vMapUv.y + 0.1 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)) * smoothstep(0.3, 0.6, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)));
       #endif
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.92);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.5);
@@ -1128,7 +1129,7 @@ export class Vegetation {
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = conBarkTextures(11, [134, 84, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const cbP = conBarkTextures(11, [118, 80, 60], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
     const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
@@ -1221,7 +1222,7 @@ export class Vegetation {
     }
     this.nearRadius = 190 * Math.sqrt(quality);
     this.trees = new ScatterLayer(scene, this.treeBuilds, 2600, this.nearRadius);
-    this.trees.lean = 0.045;
+    this.trees.lean = 0.065;   // (more: a stand of plumb trunks read as a colonnade)
 
     // bushes / ferns
     const bushBuilds = [];
@@ -1413,7 +1414,7 @@ export class Vegetation {
         // the pine belt's middle storey: young full-skirted firs among the tall clear boles, and the mature pines
         // of mixed ages (one size of tall pine in an even stand read as planted poles)
         if (pz < -700 && cl.snow <= 0.45 && cl.jungle <= 0.45 && !swamp && !beach) {
-          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.82 + rc() * 0.42;
+          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.68 + rc() * 0.62;
         }
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving
@@ -1448,7 +1449,7 @@ export class Vegetation {
         const nb = r() < 0.04 + 0.5 * brush ? 1 + Math.floor(r() * 3 * brush) : 0;
         for (let b = 0; b < nb; b++) {
           const bx = px + (r() - 0.5) * 5, bz = pz + (r() - 0.5) * 5;
-          this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, [7, 8, 9, 9, 10][Math.floor(r() * 5)]);
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.08, bz, r() * 6.28, 0.5 + r() * 0.7, [7, 8, 9, 9, 7][Math.floor(r() * 5)]);   // (no lone dead stalks: out on the snow they read as black stakes)
         }
       } else if (pz < -700) {
         // undergrowth in patches: fern beds and scrub where light gets through, bare litter elsewhere
@@ -1594,6 +1595,16 @@ export class Vegetation {
     mesh.frustumCulled = false;
     scene.add(mesh);
     this.impostors = mesh;
+  }
+
+  // after a shot's dressing clears trees or sets new ones down, re-pack the billboards from the current list (the
+  // far forest is all billboards: a cleared sightline or a cleared homestead yard otherwise kept its distant trees)
+  refreshImpostors() {
+    if (!this.impostors) return;
+    const items = this.trees.items, g = this.impostors.geometry, a = new Float32Array(Math.max(1, items.length) * 4);
+    items.forEach((it, i) => { a[i * 4] = it.x; a[i * 4 + 1] = it.y; a[i * 4 + 2] = it.z; a[i * 4 + 3] = it.v + Math.min(it.s, 3.99) / 4; });
+    g.setAttribute('aTree', new THREE.InstancedBufferAttribute(a, 4));
+    g.instanceCount = items.length;
   }
 
   // push a circle out of tree trunks and big rocks

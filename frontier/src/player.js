@@ -108,11 +108,12 @@ export class Player {
 
     // horse pose
     this.horse.root.position.copy(this.hpos);
-    // hooves sink into deep snow up to the fetlocks
+    // legs sink into deep powder to the cannons, as the reference's horse wades (at the fetlocks the hooves still
+    // stood on top of the snow)
     const coldK = W.climateAt(this.hpos.x, this.hpos.z).snow;
     this.snowDepth = THREE.MathUtils.smoothstep(coldK, 0.45, 0.8);
     if (coldK > 0.55) this.setOutfit('winter'); else if (coldK < 0.4) this.setOutfit('arthur');
-    this.horse.root.position.y -= 0.24 * this.snowDepth;
+    this.horse.root.position.y -= 0.42 * this.snowDepth;
     // (snow rings round the legs read as white saucers under the hooves: left off)
     this.horse.root.rotation.y = this.hyaw;
     // pitch horse to terrain slope
