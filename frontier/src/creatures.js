@@ -64,6 +64,19 @@ function leatherTexture(r) {
 // sculpt resolution: finer surface nets on capable machines (smoother faces, folds and muscle)
 let DETAIL = 1;
 export function setCreatureDetail(q) { DETAIL = q >= 2 ? 1.45 : q > 1 ? 1.2 : 1; }
+// opaque fur: a base pelt colour with lighter tips and darker underfur in short strokes
+function furTexture(col) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), base = new THREE.Color(col), r = mulberry32(19);
+  g.fillStyle = '#' + base.getHexString(); g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    const l = 0.55 + r() * 0.9, x = r() * 256, y = r() * 256, a = Math.PI / 2 + (r() - 0.5) * 0.9, L = 5 + r() * 10;
+    g.strokeStyle = `rgba(${Math.min(255, base.r * 255 * l)},${Math.min(255, base.g * 255 * l)},${Math.min(255, base.b * 255 * l)},0.55)`;
+    g.lineWidth = 1 + r() * 1.5;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
 // accessories (hats, tack, bedrolls) catch a light dusting of snow on their upper faces in the cold country
 const DUST_FRAG = /* glsl */ `
@@ -548,11 +561,11 @@ export class Human {
       if (MH) {
         const shell = new THREE.SphereGeometry(0.135, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
         shell.scale(1.16, 0.95, 1.2);                                       // a broad, full fur cap that reads from behind
-        const sm = mesh(shell, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
+        const sm = mesh(shell, std({ map: furTexture(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         for (const sd of [-1, 1]) {   // ear flaps
           const flap = new THREE.SphereGeometry(0.07, 12, 10); flap.scale(0.55, 1.25, 1.15);
-          const fm = mesh(flap, std({ map: hairTexture(o.furHatColor || 0x6a5238, 260), color: 0xd0c0a8, roughness: 0.95 }));
+          const fm = mesh(flap, std({ map: furTexture(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
           fm.position.copy(at(bones.head, sd * 0.11, hy - 0.04, hz - 0.01)); bones.head.add(fm);
         }
       }

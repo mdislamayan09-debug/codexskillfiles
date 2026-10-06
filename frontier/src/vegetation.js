@@ -811,7 +811,9 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
-      dens *= 1.0 - 0.9 * snowG;    // mostly buried under snow; a few dry tufts poke through
+      // under snow: only a sparse random few full-height dry tufts poke through (a low density would squash
+      // every clump flat into dark stars on the snow)
+      dens = mix(dens, dens * step(aOff.w, 0.07) * step(0.25, field + 0.3), snowG);
       dens *= 1.0 - 0.9 * gcl.a;    // desert: sparse bunch grass
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       float field = fbm2(xz/26.0);
