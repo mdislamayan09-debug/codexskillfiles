@@ -614,7 +614,7 @@ class ScatterLayer {
     const R = this.radius, R2 = R * R;
     const counts = this.variants.map(() => 0);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
+    const up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
     const c0x = Math.floor((pos.x - R) / this.cell), c1x = Math.floor((pos.x + R) / this.cell);
     const c0z = Math.floor((pos.z - R) / this.cell), c1z = Math.floor((pos.z + R) / this.cell);
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
@@ -625,7 +625,11 @@ class ScatterLayer {
         if (dx * dx + dz * dz > R2) continue;
         const v = it.v;
         if (counts[v] >= this.capacity) continue;
-        q.setFromAxisAngle(up, it.ry);
+        if (this.lean) {
+          // trees stand a little off plumb, each its own way (a stand of perfectly vertical poles reads as planted)
+          const hx = Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453, hz = Math.sin(it.x * 39.346 + it.z * 11.135) * 24634.6345;
+          q.setFromEuler(eul.set((hx - Math.floor(hx) - 0.5) * 2 * this.lean, it.ry, (hz - Math.floor(hz) - 0.5) * 2 * this.lean, 'YXZ'));
+        } else q.setFromAxisAngle(up, it.ry);
         m.compose(p.set(it.x, it.y, it.z), q, sc.setScalar(it.s));
         for (const mesh of this.meshes[v]) mesh.setMatrixAt(counts[v], m);
         counts[v]++;
@@ -1021,9 +1025,8 @@ export class Vegetation {
     const pineTex = pineCardTexture(3);
     const cypTex = leafCardTexture(21, 100);
     const mossTex = mossTexture();
-    // alpha to coverage on the multisampled target: needle and leaf card edges resolve soft instead of a jagged,
-    // crawling fringe
-    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
+    // (alpha to coverage softened the card edges but thinned every distant crown into a see-through snag)
+    const leafMat = (map, color = 0xc4ccb0, autumn = false, trans = null, backDark = null, env = 0.4) => windMaterial(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color, vertexColors: true, envMapIntensity: env }), 1, leafExtra, { autumn, trans, backDark });
 
     this.treeBuilds = [];
     const oakMats = oakTex.map((t) => leafMat(t, 0xc4ccb0, true));
@@ -1099,6 +1102,7 @@ export class Vegetation {
     }
     this.nearRadius = 190 * Math.sqrt(quality);
     this.trees = new ScatterLayer(scene, this.treeBuilds, 2600, this.nearRadius);
+    this.trees.lean = 0.045;
 
     // bushes / ferns
     const bushBuilds = [];
@@ -1177,8 +1181,9 @@ export class Vegetation {
         st.computeVertexNormals(); st.translate(0, 0.12, 0); return st;
       })();
       this.clutter = [
-        makeClutter(scene, cone, { spacing: 0.9 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
-        makeClutter(scene, twig, { spacing: 1.6 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.6, color: 0x5a4632, flat: true, seed: 5 }),
+        // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
+        makeClutter(scene, cone, { spacing: 0.62 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
+        makeClutter(scene, twig, { spacing: 1.05 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.9, color: 0x5a4632, flat: true, seed: 5 }),
         makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];
     }
@@ -1294,7 +1299,7 @@ export class Vegetation {
         }
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
       // saplings and young firs filling the gaps between the big trees
-      if (sp.forest > 0.3 && cl.jungle < 0.4 && cl.desert < 0.3 && (pz < -700 || cl.snow > 0.4) && r() < 0.05 * sp.forest) {
+      if (sp.forest > 0.3 && cl.jungle < 0.4 && cl.desert < 0.3 && (pz < -700 || cl.snow > 0.4) && r() < (pz < -700 && cl.snow < 0.4 ? 0.1 : 0.05) * sp.forest) {
         this.trees.add(px, h - 0.1, pz, r() * 6.28, 0.22 + r() * 0.3, r() < 0.6 ? pick(G.fir) : pick(G.pine));
         continue;
       }

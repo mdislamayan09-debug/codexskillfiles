@@ -206,7 +206,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
-  snow = mix(snow, snowT * 1.15, 0.6);
+  // the scan only close up (tiled out to the distance it repeats visibly); broad wind-polish and powder variation
+  snow = mix(snow, snowT * 1.15, 0.2 + 0.4 * D);
+  snow *= 0.93 + 0.1 * fbm2(xz / 37.0 + 2.1) + 0.04 * fbm2(xz / 8.0 - 5.5);
   // snow settles on gentle ground; cliffs and steep faces stay bare rock with snow on ledges
   // snow follows the slope: it holds on ledges and benches (where the relief normal flattens) and sheds off
   // steep faces, instead of lying in noise-shaped blotches

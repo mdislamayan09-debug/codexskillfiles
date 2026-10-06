@@ -556,6 +556,18 @@ async function init() {
       put(9.0, -7.5, 3.2, 0); put(11.5, -4.0, 2.2, 1); put(8.0, 6.8, 2.6, 3); put(13.0, 9.5, 2.0, 2); put(7.0, -11.0, 3.6, 1); put(15.0, -10.0, 2.4, 2);
       // the lookout's own rock: a split granite outcrop filling the left edge and broken slabs along the lip below
       put(5.5, -9.5, 5.0, 3); put(4.2, 1.8, 1.6, 2); put(4.8, -2.8, 1.9, 3); put(6.2, 4.6, 1.4, 2);
+      // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the way
+      // down the near ground, so it reads as a mountainside rather than a blank white wedge
+      {
+        let sd = 77;
+        const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 70; i++) {
+          const f = 7 + rr() * 60, side = (rr() - 0.5) * (12 + f * 0.9);
+          const x = c.x + d.x * f + rt.x * side, z = c.z + d.z * f + rt.z * side, gh = world.heightAt(x, z);
+          if (rr() < 0.35) veg.rocks.add(x, gh - 0.3, z, rr() * 6.28, 0.35 + rr() * 1.1, 2 + Math.floor(rr() * 2));
+          else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, 7 + Math.floor(rr() * 2)); }
+        }
+      }
       for (let i = 0; i < 24; i++) { const x = c.x + d.x * (6 + (i % 8) * 1.1) + rt.x * (-11 + i * 0.95), z = c.z + d.z * (6 + (i % 8) * 1.1) + rt.z * (-11 + i * 0.95); veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, i, 0.6 + (i % 3) * 0.2, 7 + (i % 2)); }
     }
     hud.root.classList.toggle('on', !!s.hud);
