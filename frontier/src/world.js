@@ -712,6 +712,10 @@ export class World {
       if (d > R) continue;
       const k = (j * RES + i) * 4 + 2;
       this.splat[k] = Math.round(this.splat[k] * (1 - smoothstep(R, r, d)));
+      // and trampled: a yard worked every day is churned, dirty snow round the buildings, so from a lookout the
+      // homestead reads as a lived-in clearing rather than a white box on a white shelf
+      const yard = smoothstep(r * 1.05, r * 0.45, d + 6 * Math.sin(i * 0.9 + j * 1.3));
+      this.splat[k - 2] = Math.max(this.splat[k - 2], Math.round(150 * yard));
     }
     this.splatTex.needsUpdate = true;
     return h0;
