@@ -462,7 +462,7 @@ export class Human {
       const bp = brim.attributes.position;
       // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
       // sides roll up, front and back dip slightly: from behind and above the brim reads as a wide ellipse
-      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.75 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.12 * Math.max(0, rr - 0.11); };
+      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.45 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.1 * Math.max(0, rr - 0.11); };
       for (let i = 0; i < bp.count; i++) bp.setY(i, brimY(bp.getX(i), bp.getZ(i)));
       brim.computeVertexNormals();
       const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
@@ -861,8 +861,8 @@ export class Quadruped {
       // tail: a dock plus fanned, curved hair cards with alpha strands
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x7a5a3e), 0.55).getHex(), 120, true);
-      const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.45 });
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.35).getHex(), 120, true);
+      const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.7, envMapIntensity: 0.5 });
       const tcards = [];
       // a hanging switch of narrow locks: full at the dock, separating into wisps toward the hocks
       for (let i = 0; i < 15; i++) {

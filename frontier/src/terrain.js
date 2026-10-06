@@ -164,13 +164,13 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     // shadowed cracks and paler weathered blocks; this is what makes distant granite read as rock, not rubber
     {
       vec2 fq = vec2(dot(wp.xz, vec2(0.8, 0.6)), wp.y * 1.6);
-      float joints = smoothstep(0.08, 0.0, abs(fract(fq.x / 23.0 + 0.3 * fbm2(fq / 60.0)) - 0.5) - 0.42)
-                   + smoothstep(0.06, 0.0, abs(fract(fq.y / 17.0 + 0.4 * fbm2(fq / 45.0 + 3.0)) - 0.5) - 0.44);
+      float joints = smoothstep(0.08, 0.0, abs(fract(fq.x / 23.0 + 0.9 * fbm2(fq / 60.0)) - 0.5) - 0.42) * smoothstep(0.3, 0.6, fbm2(fq / 80.0 + 2.0))
+                   + smoothstep(0.06, 0.0, abs(fract(fq.y / 17.0 + 0.7 * fbm2(fq / 45.0 + 3.0)) - 0.5) - 0.44);
       float blockT = fbm2(floor(fq / vec2(23.0, 17.0)) * 1.7 + 0.5);
       rock *= mix(1.0, (0.82 + 0.38 * blockT) * (1.0 - 0.45 * clamp(joints, 0.0, 1.0)), (1.0 - D) * 0.85 * smoothstep(0.3, 0.55, slope));
       // desert varnish / water streaks down steep faces
-      float streak = smoothstep(0.55, 0.8, vnoise(vec2(dot(wp.xz, vec2(0.6, -0.8)) / 3.5, wp.y / 90.0)));
-      rock *= 1.0 - 0.22 * streak * smoothstep(0.45, 0.7, slope);
+      float streak = smoothstep(0.55, 0.85, fbm2(vec2(dot(wp.xz, vec2(0.6, -0.8)) / 9.0, wp.y / 70.0)));
+      rock *= 1.0 - 0.14 * streak * smoothstep(0.45, 0.7, slope);
     }
     rN = triN(L_ROCK, wp, n, 5.5);
   } else rock *= 0.75 + 0.4*micro;

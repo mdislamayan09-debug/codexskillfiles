@@ -244,7 +244,12 @@ export class World {
       const soft = smoothstep(0.1, 0.5, R.autumn) * (R.edge > R.range ? 1 : 0);
       const alp = Math.pow(ridge, 1.35) * 950 * massif + 150 * massif + 60 * n2.fbm(x / 350, z / 350, 4);
       const old = 140 + 260 * Math.pow(n.fbm(wx / 1300 + 3, wz / 1300, 5) * 0.5 + 0.5, 1.6) + 40 * n2.fbm(x / 300, z / 300, 4);
-      h += mt * lerp(alp, old, soft);
+      // beside the desert the boundary is a stepped sandstone escarpment, like the walls around Monument Valley
+      const dry = smoothstep(700, 1400, R.bz) * (x < 0 ? 1 : 0) * (R.edge > R.range ? 1 : 0);
+      const esc0 = 120 + 220 * smoothstep(-0.1, 0.25, n.fbm(wx / 900 + 7, wz / 900, 4)) + 8 * n2.fbm(x / 60, z / 60, 3);
+      const escT = esc0 / 38, escF = Math.floor(escT);
+      const esc = (escF + smoothstep(0.7, 0.92, escT - escF)) * 38;
+      h += mt * lerp(lerp(alp, old, soft), esc, dry);
     }
     // erosion-like ridges and gullies on high ground
     const hi = smoothstep(110, 420, h);
@@ -296,7 +301,8 @@ export class World {
           const rise = smoothstep(-3700, -4090, z) * (260 + 160 * n3.fbm(x / 600, 3.3, 3));
           let rb = r;
           const sl = this.realSlope(x, z);
-          const cw = smoothstep(0.22, 0.42, sl) * smoothstep(0.35, 0.6, n3.fbm(x / 500 + 2.2, z / 500 - 7.1, 3) + 0.5);
+          // (not on the summits: steps along a skyline read as a sawtooth)
+          const cw = smoothstep(0.22, 0.42, sl) * smoothstep(0.35, 0.6, n3.fbm(x / 500 + 2.2, z / 500 - 7.1, 3) + 0.5) * (1 - smoothstep(560, 760, r));
           if (cw > 0.01) {
             const S = 11 + 8 * (0.5 + 0.5 * n2.fbm(x / 300 + 4.4, z / 300, 2));
             const t = r / S + 0.7 * n.fbm(x / 120 - 1.3, z / 120 + 6.6, 3);
@@ -443,7 +449,7 @@ export class World {
         heights[k] = h;
         // climate: cold north and high peaks carry snow; the other regions come straight from the weights
         const snowLat = smoothstep(-1750, -2350, o.bz + 90 * n2.noise(x / 300, z / 300));
-        const snowAlt = smoothstep(820, 1000, h + 110 * n.noise(x / 500, z / 500));
+        const snowAlt = smoothstep(820, 1000, h + 110 * n.noise(x / 500, z / 500)) * (1 - o.desert) * (1 - o.jungle) * (1 - (x < 0 ? smoothstep(700, 1400, o.bz) : 0));
         const snow = Math.max(snowLat, snowAlt) * (1 - o.ocean);
         // forest density: patches, a dense pine belt, jungle, autumn woods; none on roads, towns, water, peaks
         let f = smoothstep(0.05, 0.45, forest.fbm(x / 520, z / 520, 4) + 0.7 * o.pine * (1 - 0.55 * snowLat) + 0.45 * o.swamp
