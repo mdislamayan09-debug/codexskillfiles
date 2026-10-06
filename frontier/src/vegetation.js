@@ -257,8 +257,8 @@ function buildPine(seed, kind = 'pine') {
   wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.9, height - 2.4, (rnd() - 0.5) * 0.9), r0, 0.05, 9));
   // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
   for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (2.2 + rnd() * 1.4);
-    wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.25, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.3, 0.9 + rnd() * 0.5, Math.sin(a) * r0 * 0.3), r0 * 0.22, r0 * 0.5, 5));
+    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (1.6 + rnd() * 0.9);
+    wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.3, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.35, 0.7 + rnd() * 0.4, Math.sin(a) * r0 * 0.35), r0 * 0.28, r0 * 0.45, 7));   // rounder, lower buttresses
   }
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
   const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
@@ -276,11 +276,11 @@ function buildPine(seed, kind = 'pine') {
     const t = w / whorls;
     const y = base + t * (height - base);
     // forest giants: a ragged columnar crown — missing whorls, uneven limbs — rather than a perfect cone
-    if (tall && t < 0.85 && rnd() < 0.34) continue;      // open crowns: sky shows between the limbs
+    if (tall && t < 0.85 && rnd() < 0.24) continue;      // open crowns: sky shows between the limbs (not so open they read as poles)
     const r = tall
       ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
       : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
-    const n = tall ? 3 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
+    const n = tall ? 4 + Math.floor(rnd() * 4) : 8 + Math.floor(rnd() * 3);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
@@ -1323,10 +1323,13 @@ export class Vegetation {
         // undergrowth in patches: fern beds and scrub where light gets through, bare litter elsewhere
         const patch = THREE.MathUtils.smoothstep(w.n.noise(px / 30 + 1.7, pz / 30 - 4.4), -0.2, 0.5);
         const qd = (this.quality || 1) >= 2 ? 1.8 : 1;   // cinematic: lush, layered understorey
-        const nb = r() < Math.min(0.95, under * (0.6 + 2.4 * patch) * qd) ? 1 + Math.floor(r() * (3 + qd) * patch) : 0;
+        // (denser, and a mix: low leafy huckleberry-like shrubs, fern beds, a little dead brush, in drifts across the
+        // whole floor rather than lining the trail)
+        const nb = r() < Math.min(0.97, (under + 0.18) * (0.7 + 2.4 * patch) * qd) ? 1 + Math.floor(r() * (4 + qd) * (0.35 + patch)) : 0;
         for (let b = 0; b < nb; b++) {
-          const bx = px + (r() - 0.5) * 6, bz = pz + (r() - 0.5) * 6;
-          this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, 0.6 + r() * 0.8, r() < 0.8 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
+          const bx = px + (r() - 0.5) * 7, bz = pz + (r() - 0.5) * 7;
+          const t = r();
+          this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, t < 0.45 ? 0.45 + r() * 0.5 : 0.6 + r() * 0.8, t < 0.45 ? Math.floor(r() * 3) : t < 0.87 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));
         }
       } else if (r() < under) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.6 + r() * 0.8, Math.floor(r() * 3));
       // saplings and young firs filling the gaps between the big trees
@@ -1336,7 +1339,8 @@ export class Vegetation {
       }
       // fallen logs under forest
       if (sp.forest > 0.35 && cl.jungle < 0.5 && cl.snow < 0.4 && r() < (pz < -700 ? 0.04 : 0.018) * sp.forest) this.logs.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 0.5, Math.floor(r() * 3));
-      if (r() < (0.006 + (1 - n.y) * 0.05) * boulders) this.rocks.add(px, h - 0.25, pz, r() * 6.28, 0.4 + r() * 2.2, Math.floor(r() * 4));
+      // (the pine woods are strewn with mossy granite: boulders half sunk in the duff)
+      if (r() < ((pz < -700 && cl.snow < 0.4 ? 0.016 : 0.006) + (1 - n.y) * 0.05) * boulders) { const sc = 0.4 + r() * 2.2; this.rocks.add(px, h - 0.2 - sc * 0.25, pz, r() * 6.28, sc, Math.floor(r() * 4)); }
     }
   }
 
