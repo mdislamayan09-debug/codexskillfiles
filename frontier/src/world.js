@@ -527,7 +527,7 @@ export class World {
           if (rw > 0 && this.realAt(x, z) !== null) {
             const sl = this.realSlope(x, z);
             const vd = D.vd[k];
-            let fr = smoothstep(820, 640, h + 60 * n2.fbm(x / 180, z / 180, 3));     // tree line, ragged
+            let fr = smoothstep(760, 690, h + 70 * n2.fbm(x / 180, z / 180, 3));     // tree line: ragged but sharp
             fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
             fr *= smoothstep(0.32, 0.46, forest.fbm(x / 210 + 8.1, z / 210 - 5.5, 3) * 0.5 + 0.5 + 0.15);   // clearings
             fr *= 1 - 0.85 * smoothstep(0.62, 0.7, n.noise(x / 60 + z / 900, z / 380) * 0.5 + 0.5) * smoothstep(0.25, 0.4, sl); // chutes
