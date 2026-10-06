@@ -113,7 +113,7 @@ export class Player {
     this.snowDepth = THREE.MathUtils.smoothstep(coldK, 0.45, 0.8);
     if (coldK > 0.55) this.setOutfit('winter'); else if (coldK < 0.4) this.setOutfit('arthur');
     this.horse.root.position.y -= 0.24 * this.snowDepth;
-    if (this.horse.snowRings) for (const m of this.horse.snowRings) m.visible = this.snowDepth > 0.4;
+    // (snow rings round the legs read as white saucers under the hooves: left off)
     this.horse.root.rotation.y = this.hyaw;
     // pitch horse to terrain slope
     const fwd = tmp.set(Math.sin(this.hyaw), 0, Math.cos(this.hyaw));

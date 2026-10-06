@@ -903,16 +903,17 @@ function quadPrims(kind, QB) {
       // muscled forearm tapering hard into a flat, bony cannon
       add(RC([x * 0.95, 1.3, 0.52], [x, 0.92, 0.53], 0.15 * lw, 0.1 * lw), QL.coat, nb(0), 0.08);
       add(RC([x, 0.92, 0.53], [x, 0.53, 0.53], 0.1 * lw, 0.055 * lw), QL.coat, nb(1), 0.05);
-      add(EL([x, 0.51, 0.535], [0.055 * lw, 0.06 * lw, 0.06 * lw]), QL.points, nb(2), 0.03);
-      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.043 * lw, 0.038 * lw), QL.points, nb(2), 0.02);
+      add(EL([x, 0.51, 0.535], [0.066 * lw, 0.072 * lw, 0.07 * lw]), QL.points, nb(2), 0.03);     // knee
+      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.052 * lw, 0.046 * lw), QL.points, nb(2), 0.02);
     } else {
       add(EL([x * 0.95, 1.15, -0.6], [0.18 * lw * bw, 0.34, 0.27]), QL.coat, nb(0), 0.1);   // big quarters and stifle
       add(RC([x, 0.97, -0.66], [x, 0.58, -0.74], 0.13 * lw, 0.06 * lw), QL.coat, nb(1), 0.06);
-      add(EL([x, 0.56, -0.74], [0.05 * lw, 0.075 * lw, 0.07 * lw]), QL.points, nb(2), 0.03);
-      add(RC([x, 0.55, -0.74], [x, 0.18, -0.72], 0.043 * lw, 0.038 * lw), QL.points, nb(2), 0.02);
+      add(EL([x, 0.56, -0.745], [0.06 * lw, 0.088 * lw, 0.092 * lw]), QL.points, nb(2), 0.03);    // hock
+      add(EL([x, 0.6, -0.815], [0.035 * lw, 0.05 * lw, 0.035 * lw]), QL.points, nb(2), 0.02);       // point of hock
+      add(RC([x, 0.55, -0.74], [x, 0.18, -0.72], 0.052 * lw, 0.046 * lw), QL.points, nb(2), 0.02);
     }
     const zf = front ? 0.54 : -0.72;
-    add(EL([x, 0.17, zf], [0.05 * lw, 0.05 * lw, 0.06 * lw]), QL.points, nb(3), 0.025);
+    add(EL([x, 0.17, zf - 0.005], [0.062 * lw, 0.062 * lw, 0.072 * lw]), QL.points, nb(3), 0.025);   // fetlock
     add(RC([x, 0.16, zf + 0.005], [x, 0.065, zf + 0.04], 0.042 * lw, 0.05 * lw), QL.points, nb(3), 0.02);
     add(RC([x, 0.065, zf + 0.035], [x, 0.018, zf + 0.06], 0.058 * lw, 0.066 * lw), QL.hoof, nb(3), 0.008, { rigid: true });
   };

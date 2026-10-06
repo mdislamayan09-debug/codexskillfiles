@@ -295,7 +295,10 @@ async function init() {
     if (!best) { const cx = CABIN.x + 200, cz = CABIN.z + 150; best = { cx, cz, ch: world.heightAt(cx, cz) + 3.2, va: Math.atan2(CABIN.x - cx, CABIN.z - cz), cab: 250 }; }
     // pitch so the cabin sits in the lower third with the valley and the sky above it
     const pitch = Math.atan2(cabY - best.ch, best.cab) + 0.2;
-    const D = 1200, lx = best.cx + Math.sin(best.va) * D, lz = best.cz + Math.cos(best.va) * D;
+    // turn the lens partway up the valley: the homestead lands on a third line and the valley recedes beside it
+    let dv0 = upDir - best.va; dv0 = Math.atan2(Math.sin(dv0), Math.cos(dv0));
+    const la = best.va + Math.sign(dv0 || 1) * Math.min(Math.abs(dv0) * 0.7 + 0.1, 0.24);
+    const D = 1200, lx = best.cx + Math.sin(la) * D, lz = best.cz + Math.cos(la) * D;
     return { cx: best.cx, cz: best.cz, tx: lx, tz: lz, th: best.ch + Math.tan(pitch) * D - world.heightAt(lx, lz) };
   };
   // desert: a rider on the flat valley floor with a tall butte standing 500-1400 m ahead, sun low behind the camera
