@@ -309,28 +309,31 @@ async function init() {
     }
     return best;
   };
-  // jungle coast: a ridge lookout 120-320 m up, looking along the cliffs with the sea to one side
+  // jungle coast: on the cliff tops near the sea, looking along the coast (the classic Na Pali view): ridges
+  // marching away on one side, the sea on the other
   G.findCoastVista = () => {
     let best = null, bs = -1e9;
-    for (let z = 1900; z < 3300; z += 50) for (let x = -500; x < 2400; x += 50) {
+    for (let z = 1900; z < 3400; z += 40) for (let x = -500; x < 2500; x += 40) {
       const h = world.heightAt(x, z);
-      if (h < 110 || h > 340 || world.normalAt(x, z).y < 0.8) continue;
-      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-        // the view should hold sea (low) and land (high) and not be blocked close in
-        let sea = 0, land = 0, block = 0;
-        for (let d = 300; d <= 2400; d += 300) for (const b of [-0.35, 0, 0.35]) {
+      if (h < 90 || h > 320 || world.normalAt(x, z).y < 0.85) continue;
+      // the sea within 700 m to the south
+      let seaD = 1e9; for (let d = 60; d <= 700; d += 40) if (world.heightAt(x, z + d) < 0) { seaD = d; break; }
+      if (seaD > 700) continue;
+      for (const a of [Math.PI / 2 - 0.4, -Math.PI / 2 + 0.4]) {
+        let land = 0, block = 0, sea = 0;
+        for (let d = 300; d <= 2400; d += 150) for (const b of [-0.3, 0, 0.3]) {
           const q = world.heightAt(x + Math.sin(a + b) * d, z + Math.cos(a + b) * d);
-          if (q < 0) sea++; else if (q > h * 0.6) land++;
+          if (q < 0) sea++; else if (q > 60) land++;
         }
-        for (let d = 20; d < 260; d += 30) block = Math.max(block, world.heightAt(x + Math.sin(a) * d, z + Math.cos(a) * d) - h);
-        if (sea < 6 || land < 5) continue;   // the cliffs running along the sea, not an inland hillside
-        const score = Math.min(sea, 12) + Math.min(land, 10) - block * 0.5;
+        for (let d = 15; d < 200; d += 15) block = Math.max(block, world.heightAt(x + Math.sin(a) * d, z + Math.cos(a) * d) - h + d * 0.08);
+        if (sea < 4 || land < 6) continue;
+        const score = land + sea * 0.6 - Math.max(0, block) * 0.6 - seaD * 0.01;
         if (score > bs) { bs = score; best = { x, z, a, h }; }
       }
     }
     if (!best) return { px: 900, pz: 2600, yaw: 0, cx: 900, cz: 2600, tx: 900, tz: 3600, th: 0 };
     const D = 1500, tx = best.x + Math.sin(best.a) * D, tz = best.z + Math.cos(best.a) * D;
-    const th = best.h + 2.2 - D * 0.1 - world.heightAt(tx, tz);
+    const th = best.h + 2.2 - D * 0.08 - world.heightAt(tx, tz);
     return { px: best.x - Math.sin(best.a) * 30, pz: best.z - Math.cos(best.a) * 30, yaw: best.a, cx: best.x, cz: best.z, tx, tz, th };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
@@ -399,8 +402,8 @@ async function init() {
     }
     const [ax, az] = v[v.length - 2]; return [ax, az, 0];
   };
-  G.clearTreesNear = (x, z, r) => {
-    const L = veg.trees, cx = Math.floor(x / L.cell), cz = Math.floor(z / L.cell), gone = new Set();
+  G.clearTreesNear = (x, z, r, L = veg.trees) => {
+    const cx = Math.floor(x / L.cell), cz = Math.floor(z / L.cell), gone = new Set();
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
       const k = (cx + dx) + ',' + (cz + dz), list = L.grid.get(k);
       if (!list) continue;
@@ -457,7 +460,7 @@ async function init() {
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
       G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz) };
-      if (s.clearView) { G.clearTreesNear(cx, cz, 30); G.clearTreesAlong(cx, cz, lx, lz, 16, 0.15); }
+      if (s.clearView) { G.clearTreesNear(cx, cz, 30); G.clearTreesNear(cx, cz, 9, veg.bushes); G.clearTreesAlong(cx, cz, lx, lz, 16, 0.15); }
     } else if (s.camRel) {
       const rel = s.camRel.slice();
       if (s.water) {

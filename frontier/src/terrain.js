@@ -128,6 +128,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
   litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
   vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
+  // rainforest floor: ferns, mosses and seedlings over the litter, deep green
+  forestFloor = mix(forestFloor, mix(srgb(vec3(34,54,22)), srgb(vec3(52,74,30)), patchy) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), jun * 0.75);
   // moss and low green growth in damp hollows of the pine floor
   forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.58, 0.75, fbm2(xz / 9.0 + 12.0)) * pineK * 0.7);
   // dirt and roads straight from the scans (slightly graded toward the palette)
@@ -358,7 +360,7 @@ export class Terrain {
           vec4 ccl0 = climateAt(vWPos.xz);
           // under snow-country spruce the ground is shade and needles, not open snow: the stands close up sooner
           float canopyK = smoothstep(0.3, 0.65, fo) * mix(smoothstep(180.0, 420.0, camD) * (0.55 + 0.45 * smoothstep(850.0, 1250.0, camD)),
-                                                          smoothstep(30.0, 200.0, camD) * 0.92, smoothstep(0.4, 0.8, ccl0.r));
+                                                          smoothstep(30.0, 200.0, camD) * 0.92, max(smoothstep(0.4, 0.8, ccl0.r), smoothstep(0.3, 0.7, ccl0.g)));
           float cfp = length(fwidth(vWPos.xz));
           vec3 canopy = mix(srgb(vec3(34,46,26)), srgb(vec3(52,62,32)), mix(0.47, fbm2(vWPos.xz/18.0), smoothstep(14.0, 5.0, cfp)))
                       * mix(0.95, 0.7 + 0.5*vnoise(vWPos.xz/4.0), smoothstep(5.0, 1.5, cfp));

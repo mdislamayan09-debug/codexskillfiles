@@ -1284,6 +1284,8 @@ export class Vegetation {
             vec3 tint = th < 0.3 ? vec3(1.0, 0.42, 0.1) : th < 0.55 ? vec3(0.95, 0.72, 0.16) : vec3(0.8, 0.22, 0.08);
             alb = mix(alb, dot(alb, vec3(0.3, 0.59, 0.11)) * tint * 2.5, icl.b * step(th, 0.75));
           }
+          // rainforest crowns read lush and mid-green from afar, not black
+          alb = mix(alb, alb * vec3(0.9, 1.25, 0.8) * 1.6, icl.g);
           alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.6);
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));

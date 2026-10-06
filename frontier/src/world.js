@@ -442,6 +442,14 @@ export class World {
           // stands of spruce out on the floor, with open snow meadows between them
           f = Math.max(f, snowLat * 0.85 * smoothstep(0.5, 0.62, forest.fbm(x / 170 - 6.6, z / 170 + 2.9, 3) * 0.5 + 0.5) * smoothstep(12, 30, vd) * smoothstep(2.5, 6.5, o.roadD));
         }
+        // Real jungle coast: rainforest from the shore to the crests, bare only on the sheerest cliffs and the beaches
+        for (const p of PATCHES) if (p.region === 'jungle' && o.jungle > 0.2) {
+          const ps = patchSample(p, x, z, 380);
+          if (!ps) continue;
+          let fj = smoothstep(2.5, 9, h) * smoothstep(2.5, 6.5, o.roadD);
+          fj *= 0.85 + 0.15 * smoothstep(0.3, 0.6, forest.fbm(x / 150, z / 150, 3) * 0.5 + 0.5);
+          f = lerp(f, fj, ps.w * smoothstep(0.2, 0.6, o.jungle));
+        }
         // Real ground: a subalpine forest as it grows there — continuous spruce-fir on the valley walls below the
         // tree line, thinning into krummholz above it, broken by avalanche chutes, cliffs and wet meadows on the floor
         if (REAL) {

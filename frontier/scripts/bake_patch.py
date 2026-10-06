@@ -14,7 +14,7 @@ from PIL import Image
 ap = argparse.ArgumentParser()
 ap.add_argument('out')
 for k, d in [('lat', None), ('lon', None), ('gx', None), ('gz', None), ('hw', None), ('hh', None), ('rot', 0.0), ('hs', 0.55), ('vs', 0.9),
-             ('ref-elev', None), ('base', 0.0), ('zoom', 14), ('cell', 4.0), ('smooth', 1.3)]:
+             ('ref-elev', None), ('base', 0.0), ('floor', -40.0), ('zoom', 14), ('cell', 4.0), ('smooth', 1.3)]:
     ap.add_argument('--' + k, type=float, default=d)
 ap.add_argument('--name', default='')
 ap.add_argument('--tiles', default='tiles')
@@ -68,6 +68,7 @@ if A.smooth > 0:
     E = np.apply_along_axis(lambda r: np.convolve(np.pad(r, R, mode='edge'), k, mode='valid'), 0, E)
 ref = E.min() if A.ref_elev is None else A.ref_elev
 G = A.base + (E - ref) * A.vs
+G = np.maximum(G, A.floor)   # the sea is a shelf, not the abyss the deep-water tiles carry
 OFF = 400.0
 enc = np.clip(np.round((G + OFF) * 10), 0, 65535).astype(np.uint32)
 img = np.zeros((H, W, 3), np.uint8); img[..., 0] = enc >> 8; img[..., 1] = enc & 255
