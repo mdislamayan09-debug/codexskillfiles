@@ -267,6 +267,16 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     snowAmt *= 1.0 - 0.8 * ribE;
     rockAmt = max(rockAmt, ribE * 0.85);
   }
+  // cliff strata in the snow country: the steep faces are bedded rock, each ledge holding a broken band of snow
+  // and the beds between darker and lighter (a bare face read as one smooth grey slab with white smears)
+  float ledgeSnow = 0.0;
+  if (snowC > 0.35 && slope > 0.33) {
+    float sy = wp.y / 7.5 + 1.3 * fbm2(xz / 55.0) + 0.3 * vnoise(xz / 9.0);
+    float ledge = smoothstep(0.8, 0.93, fract(sy)) * smoothstep(0.3, 0.6, fbm2(xz / 14.0 + 3.0));
+    ledgeSnow = ledge * 0.85 * smoothstep(0.35, 0.7, snowC) * smoothstep(0.33, 0.5, slope) * smoothstep(9.0, 2.0, fp);
+    rock *= mix(1.0, 0.78 + 0.34 * smoothstep(0.25, 0.75, fract(sy * 0.5 + 0.2)), smoothstep(0.35, 0.55, slope) * smoothstep(0.35, 0.7, snowC));
+  }
+  snowAmt = max(snowAmt, ledgeSnow);
   // a used track through the snow stays trampled and dirty: a dark line leading to the homestead
   snowAmt *= 1.0 - 0.55 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
   rockAmt = max(rockAmt, ribs * 0.9);
