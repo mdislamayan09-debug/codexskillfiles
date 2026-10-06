@@ -68,7 +68,10 @@ export class Water {
           }
           N = normalize(N);
           vec3 V = normalize(cameraPosition - vW);
-          float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+          // open ocean: a wind-roughened surface averages a much weaker grazing mirror than calm water, so the sea
+          // keeps its deep blue body colour out to the horizon instead of turning into a sheet of white sky
+          float ocean = smoothstep(4.0, 20.0, depth) * (1.0 - swampy);
+          float fres = (0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0)) * mix(1.0, 0.5, ocean * smoothstep(60.0, 500.0, camD));
           vec3 sun = normalize(uSunDir);
           // reflection
           vec2 ruv = vProj.xy / vProj.w + N.xz * 0.035;
@@ -76,7 +79,7 @@ export class Water {
           vec3 skyFallback = mix(uFogColor * 0.9, uFogSunColor, pow(max(dot(reflect(-V,N), sun),0.0), 4.0));
           refl = mix(skyFallback, refl, uHasRefl);
           // body colour
-          vec3 deep = mix(vec3(0.016, 0.03, 0.024), vec3(0.03, 0.022, 0.01), swampy);
+          vec3 deep = mix(mix(vec3(0.016, 0.03, 0.024), vec3(0.03, 0.022, 0.01), swampy), vec3(0.006, 0.03, 0.062), ocean);
           vec3 shallow = mix(vec3(0.09, 0.095, 0.06), vec3(0.085, 0.065, 0.035), swampy);
           float dk = 1.0 - exp(-depth * 1.1);
           vec3 body = mix(shallow, deep, dk) * (0.3 + 0.7 * dot(uSunColor, vec3(0.3)));

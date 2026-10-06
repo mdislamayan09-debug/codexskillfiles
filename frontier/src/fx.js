@@ -309,6 +309,8 @@ export class SnowTrail {
     this.mesh.frustumCulled = false;
     this.mesh.receiveShadow = true;
     this.mesh.renderOrder = 1;
+    // the trough is carved into the terrain's own snow shading now (uTrail); the strip mesh read as a grey board
+    this.mesh.visible = false;
     scene.add(this.mesh);
   }
   add(x, z) {
@@ -347,6 +349,17 @@ export class SnowTrail {
       }
     }
     g.setDrawRange(0, Math.max(0, n - 1) * 6);
+    // the last 48 points, resampled about a metre apart, feed the terrain shader
+    {
+      const T = U.uTrail.value, out = [];
+      for (let i = n - 1; i >= 0 && out.length < 48; i--) {
+        const p = this.pts[i], last = out[out.length - 1];
+        if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) >= 0.95 || i === 0) out.push(p);
+      }
+      out.reverse();
+      for (let i = 0; i < 48; i++) { const p = out[Math.min(i, out.length - 1)] || [0, 0]; T[i].set(p[0], p[1]); }
+      U.uTrailN.value = out.length;
+    }
     g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true; g.attributes.uv.needsUpdate = true;
   }
 }

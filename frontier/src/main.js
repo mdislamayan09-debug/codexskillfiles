@@ -248,8 +248,8 @@ async function init() {
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     // both rides as the references frame them: camera behind and to the left (+x of the frame is screen left), the
     // horse bearing right so its neck and ears show past the rider's shoulder, the whole horse in frame
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.75, -4.9], lookRel: [-0.3, 2.5, 22], turn: -0.36, trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [1.3, 2.35, -6.6], lookRel: [0.2, 1.75, 18], turn: -0.45, weather: 'snow' }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.45, 2.7, -4.9], lookRel: [-0.3, 2.45, 22], turn: -0.52, trailDress: true }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [0.2, 1.75, 18], turn: -0.56, weather: 'snow' }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
@@ -566,7 +566,7 @@ async function init() {
       for (let i = 0; i < 70; i++) {
         const h = Math.random() * 14;
         particles.emit(cp.clone().add(new THREE.Vector3(h * 0.35 + (Math.random() - 0.5) * (0.3 + h * 0.2), h, (Math.random() - 0.5) * (0.3 + h * 0.2))),
-          new THREE.Vector3(0.2, 0.5, 0), { color: [0.72, 0.72, 0.74], alpha: 0.3 * (1 - h / 16), size: 0.7 + h * 0.4, life: 6, grow: 0.25, drag: 0.4 });
+          new THREE.Vector3(0.2, 0.5, 0), { color: [0.5, 0.5, 0.53], alpha: 0.38 * (1 - h / 16), size: 0.8 + h * 0.45, life: 6, grow: 0.25, drag: 0.4 });
       }
     }
     for (const c of campfires) {
@@ -588,7 +588,7 @@ async function init() {
     }
     // a ride through deep snow has already ploughed a trench behind the horse
     // (only a few metres of it: run back under a chase camera it reads as a grey board lying in the snow)
-    if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw, G.camOverride && G.camOverride.rel ? 3.2 : 45); else snowTrail.clear();
+    if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw); else snowTrail.clear();
     G.started = true;
     G.frame = 0;
     G.hold = false;
@@ -727,7 +727,7 @@ async function init() {
       const target = 1.12 * (1 - 0.3 * into * (1 - 0.6 * (G.forestK || 0))) * (1 + 0.32 * (G.forestK || 0));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
-    town.update(dt, U.uNight.value);
+    town.update(dt, U.uNight.value, sky.weather.storm);
     veg.update(camera.position);
     terrain.update(camera);
     npcs.update(dt, player);
@@ -738,7 +738,7 @@ async function init() {
     for (const cp of town.chimneys || []) {
       if (cp.distanceToSquared(camera.position) > 400 * 400 || Math.random() > dt * 9) continue;
       particles.emit(cp.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3)),
-        new THREE.Vector3(U.uWind.value.x * 0.6, 1.1 + Math.random() * 0.4, U.uWind.value.y * 0.6), { color: [0.72, 0.72, 0.74], alpha: 0.32, size: 0.7, life: 9, grow: 0.55, drag: 0.25 });
+        new THREE.Vector3(U.uWind.value.x * 0.6, 1.1 + Math.random() * 0.4, U.uWind.value.y * 0.6), { color: [0.5, 0.5, 0.53], alpha: 0.4, size: 0.8, life: 9, grow: 0.6, drag: 0.25 });   // wood smoke: a grey that reads against snow
     }
     // sunlit motes / insects drifting around the camera
     if (U.uNight.value < 0.6 && Math.random() < rdt * 6) {

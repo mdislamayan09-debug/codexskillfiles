@@ -264,49 +264,63 @@ function buildPine(seed, kind = 'pine') {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
       const lr = tall ? r * (0.6 + rnd() * 0.65) : r;
-      // cross cards: one lying along the branch, one standing on its edge, so the
-      // silhouette reads from the side and from above
+      // cross cards: one lying along the branch, one standing on its edge, so the silhouette reads from the side
+      // and from above; each bough is three sprays along its length (sagging further out), so it reads as tufts
+      // with sky between them rather than one flat sheet
       for (const vert of [false, true]) {
         const r = lr;
-        const g = new THREE.PlaneGeometry(r * 0.95, r * (vert ? 0.34 : 0.5));
-        g.translate(r * 0.5, 0, 0);
-        if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.4);
-        else g.rotateX((rnd() - 0.5) * 0.3);
-        g.rotateZ(-droop);
-        g.rotateY(a);
-        g.translate(0, y, 0);
-        const p = g.attributes.position, nn = g.attributes.normal;
-        for (let k = 0; k < p.count; k++) {
-          const v = new THREE.Vector3(p.getX(k), 0, p.getZ(k)).normalize();
-          v.y = 0.75; v.normalize();
-          nn.setXYZ(k, v.x, v.y, v.z);
+        for (let sgi = 0; sgi < 3; sgi++) {
+          const t0 = 0.08 + sgi * 0.3, Ls = r * (0.5 - sgi * 0.07), Ws = r * (vert ? 0.28 : 0.4) * (1 - sgi * 0.14);
+          const g = new THREE.PlaneGeometry(Ls, Ws);
+          g.translate(r * t0 + Ls * 0.5, -sgi * sgi * 0.05 * r, 0);
+          g.rotateY((rnd() - 0.5) * 0.35);
+          if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.5);
+          else g.rotateX((rnd() - 0.5) * 0.4);
+          g.rotateZ(-droop);
+          g.rotateY(a);
+          g.translate(0, y, 0);
+          const p = g.attributes.position, nn = g.attributes.normal;
+          for (let k = 0; k < p.count; k++) {
+            const v = new THREE.Vector3(p.getX(k), 0, p.getZ(k)).normalize();
+            v.y = 0.75; v.normalize();
+            nn.setXYZ(k, v.x, v.y, v.z);
+          }
+          leaves.push(g);
         }
-        leaves.push(g);
       }
     }
   }
   // top tuft: a ring of short up-swept shoots around a needled leader, so the crown ends in a
   // dense point rather than a bare pole with a blob on it
-  for (let i = 0; i < 7; i++) {
-    const L = 1.1 + rnd() * 0.5, y = height - 2.4 + (i / 7) * 1.6;
-    const g = new THREE.PlaneGeometry(L, L * 0.5);
+  // (short, close shoots: a long up-swept ring forked above the crown and every tree ended in the same spike)
+  for (let i = 0; i < 6; i++) {
+    const L = 0.6 + rnd() * 0.35, y = height - 1.9 + (i / 6) * 1.1;
+    const g = new THREE.PlaneGeometry(L, L * 0.55);
     g.translate(L * 0.5, 0, 0);
     g.rotateX((rnd() - 0.5) * 0.6);
-    g.rotateZ(0.75 + (i / 7) * 0.45);
-    g.rotateY((i / 7) * Math.PI * 2 * 1.6 + rnd());
+    g.rotateZ(0.35 + (i / 6) * 0.35);
+    g.rotateY((i / 6) * Math.PI * 2 * 1.6 + rnd());
     g.translate(0, y, 0);
     leaves.push(g);
   }
   for (let i = 0; i < 2; i++) {
-    const g = new THREE.PlaneGeometry(1.5, 0.6);
-    g.translate(0.75, 0, 0);
-    g.rotateZ(Math.PI / 2);
-    g.rotateY(i * Math.PI / 2);
-    g.translate(0, height - 1.3, 0);
+    const g = new THREE.PlaneGeometry(0.85 + rnd() * 0.4, 0.42);
+    g.translate(0.4, 0, 0);
+    g.rotateZ(Math.PI / 2 - (rnd() - 0.5) * 0.3);
+    g.rotateY(i * Math.PI / 2 + rnd() * 0.4);
+    g.translate(0, height - 1.2, 0);
     leaves.push(g);
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => (y / height) ** 2 * 0.5);
   const leafG = leafAO(setSway(mergeGeometries(leaves), (x, y, z) => (y / height) ** 2 * 0.6 + Math.hypot(x, z) * 0.05), true);
+  // every spray its own shade: new growth yellower and lighter, old needles darker and bluer
+  {
+    const col = leafG.attributes.color;
+    for (let q = 0; q + 3 < col.count; q += 4) {
+      const v = 0.82 + rnd() * 0.32, y2 = rnd();
+      for (let k = q; k < q + 4; k++) col.setXYZ(k, col.getX(k) * v * (1.02 + 0.06 * y2), col.getY(k) * v * (1.0 + 0.04 * y2), col.getZ(k) * v * (1.04 - 0.1 * y2));
+    }
+  }
   return { wood: woodG, leaves: leafG, height, radius: 3.5 };
 }
 
@@ -954,7 +968,7 @@ function rockMaterial(surf = {}) {
       }
       base *= 0.85 + 0.2*n2;
       vec4 rcl = climateAt(vWPos.xz);
-      float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - rcl.r);
+      float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
       // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
@@ -962,7 +976,7 @@ function rockMaterial(surf = {}) {
       // in patches and grains, not a smooth white cap: the grey stone and its lichen show through
       rsnow *= 0.35 + 0.65 * max(smoothstep(0.42, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.4 + 7.0)), step(0.8, vnoise(vWPos.xz * 11.0 + vWPos.y * 7.0)));
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,152,118)), lichen * 0.55);
+      base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,
@@ -1199,7 +1213,9 @@ export class Vegetation {
         else if (cl.jungle > 0.45) v = r() < 0.28 ? pick(G.palm) : pick(G.jungle);
         else if (swamp) v = pick(G.cypress);
         else if (cl.snow > 0.45) v = pick(G.fir);
-        else if (pz < -700) v = r() < 0.6 ? pick(G.tall) : r() < 0.7 ? pick(G.pine) : pick(G.fir);
+        // the pine belt is open lodgepole/ponderosa forest: tall clear boles with high crowns, a few full-skirted
+        // spruce and young firs among them
+        else if (pz < -700) v = r() < 0.8 ? pick(G.tall) : r() < 0.65 ? pick(G.pine) : pick(G.fir);
         else if (cl.autumn > 0.4) v = r() < 0.78 ? pick(G.oak) : pick(G.pine);
         else if (h > 70) v = pick(G.pine);
         else v = r() < 0.75 ? pick(G.oak) : pick(G.pine);

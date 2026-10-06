@@ -90,6 +90,9 @@ vec3 triN(float l, vec3 wp, vec3 n, float s){
   return (texture(tNrm, vec3(wp.zy / s, l)).xyz * w.x + texture(tNrm, vec3(wp.xz / s, l)).xyz * w.y + texture(tNrm, vec3(wp.xy / s, l)).xyz * w.z) * 2.0 - 1.0;
 }
 vec3 gDbg = vec3(0.0);   // debug view: snow, rock, slope
+// the trail ploughed by the horse through deep snow (recent path, oldest first), carved into the snow shading
+uniform vec2 uTrail[48];
+uniform float uTrailN;
 vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   vec2 xz = wp.xz;
   vec4 sp = splatAt(xz);
@@ -216,9 +219,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float e1 = 14.0, e2 = 40.0;
     float l1 = (heightAt(xz + vec2(e1, 0.0)) + heightAt(xz - vec2(e1, 0.0)) + heightAt(xz + vec2(0.0, e1)) + heightAt(xz - vec2(0.0, e1))) * 0.25 - h0;
     float l2 = (heightAt(xz + vec2(e2, 0.0)) + heightAt(xz - vec2(e2, 0.0)) + heightAt(xz + vec2(0.0, e2)) + heightAt(xz - vec2(0.0, e2))) * 0.25 - h0;
-    lapS = l1 * 0.6 + l2 * 0.25;   // metres: negative on ribs and crests, positive in gullies
+    lapS = l1 * 0.35 + l2 * 0.45;   // metres: negative on ribs and crests, positive in gullies
   }
-  float ribs = smoothstep(0.15, 1.4, -lapS + 0.9 * (fbm2(xz / 30.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
+  // (weighted to the broader scale and broken up hard: the fine scale alone lines every face with parallel
+  // couloirs that read as a comb)
+  float ribs = smoothstep(0.3, 1.8, -lapS + 1.4 * (fbm2(xz / 22.0) - 0.5) + 0.5 * (vnoise(xz / 7.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
   float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.17, snowC), 0.3, hiSnow), mix(mix(0.5, 0.35, snowC), 0.5, hiSnow), slope + 0.1 * (fbm2(xz / 9.0) - 0.5) + 0.06 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   float scour = smoothstep(0.6, 0.72, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
@@ -300,6 +305,35 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
+    // the horse's trail: a churned trough about a metre wide with thrown-up lips and hoof pits, shaded by its walls
+    if (uTrailN > 1.5 && fp < 0.5) {
+      float dmin = 1e9, sAt = 0.0, acc = 0.0; vec2 toC = vec2(0.0), tAt = vec2(1.0, 0.0);
+      for (int i = 0; i < 47; i++) {
+        if (float(i) >= uTrailN - 1.0) break;
+        vec2 a0 = uTrail[i], b0 = uTrail[i + 1], ab = b0 - a0;
+        float L = max(length(ab), 1e-3);
+        float t = clamp(dot(xz - a0, ab) / (L * L), 0.0, 1.0);
+        vec2 q = a0 + ab * t;
+        float dd = length(xz - q);
+        if (dd < dmin) { dmin = dd; sAt = acc + t * L; toC = (q - xz) / max(dd, 1e-3); tAt = ab / L; }
+        acc += L;
+      }
+      if (dmin < 1.3) {
+        float trough = smoothstep(0.62, 0.12, dmin), lip = smoothstep(1.2, 0.75, dmin) * smoothstep(0.5, 0.75, dmin);
+        // hoof pits staggered left and right down the middle
+        float stp = floor(sAt / 0.72);
+        float lat = dot(-toC * dmin, vec2(-tAt.y, tAt.x));    // signed distance from the centre line
+        float pit = smoothstep(0.17, 0.05, length(vec2(fract(sAt / 0.72) - 0.5, (lat - (mod(stp, 2.0) - 0.5) * 0.34) / 0.72) * 0.72)) * trough;
+        // the walls lean in toward the centre line, the lips lean out
+        float wall = smoothstep(0.7, 0.25, dmin) * smoothstep(0.0, 0.3, dmin);
+        vec2 g = -toC * (wall * 0.9 - lip * 0.5);
+        tn = normalize(tn + vec3(g, 0.0) * snowAmt);
+        c *= mix(1.0, 0.7, trough * snowAmt) * (1.0 - 0.25 * pit * snowAmt);
+        c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt);   // compacted, shadowed blue
+        c *= 1.0 + 0.06 * lip * snowAmt;
+        rough = mix(rough, 0.75, trough * snowAmt);
+      }
+    }
     // glints: single crystals near the lens turned just right to mirror the sky (they wink as the view moves)
     if (fp < 0.06) {
       vec3 vv = normalize(cameraPosition - wp);

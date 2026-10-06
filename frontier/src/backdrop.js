@@ -110,7 +110,7 @@ export class Backdrop {
     // dark forest with autumn rust in the ridge country, deep water off the coast
     const SNOW = [0.74, 0.77, 0.82], ROCK = [0.1, 0.098, 0.095], TIMBER = [0.02, 0.03, 0.027], SNOWTIMBER = [0.2, 0.22, 0.23];
     const FOREST = [0.03, 0.045, 0.022], RUST = [0.11, 0.045, 0.014], MEADOW = [0.1, 0.095, 0.045];
-    const SAND = [0.4, 0.22, 0.11], REDROCK = [0.26, 0.1, 0.04], SEA = [0.012, 0.03, 0.045];
+    const SAND = [0.4, 0.22, 0.11], REDROCK = [0.26, 0.1, 0.04], SEA = [0.008, 0.032, 0.062];
     const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
     for (let v = 0; v < nV; v++) {
       const x = pos[v * 3], h = pos[v * 3 + 1], z = pos[v * 3 + 2], ny = nrm.getY(v);

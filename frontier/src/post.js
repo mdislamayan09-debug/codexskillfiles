@@ -43,7 +43,7 @@ const ShaftShader = {
       acc /= float(N) * 0.5;
       float fall = exp(-dist * 2.2);
       // capped, so the sun's own gap does not swell into a white blob
-      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.5);
+      vec3 shafts = min(uSunColor * acc * fall * uStrength * uSunVis, uSunColor * 0.9);
       gl_FragColor = vec4(base.rgb + shafts, base.a);
     }`,
 };
@@ -90,6 +90,8 @@ const GradeShader = {
       // and the whole frame steps down into steel blue, as in the references (their snow sits near 0.6/0.75/0.9
       // R/G/B of ours): red and green pulled down hardest in the shadows, the whites keep a little more
       col *= mix(vec3(1.0), mix(vec3(0.6, 0.8, 1.02), vec3(0.74, 0.88, 1.03), smoothstep(0.2, 0.85, l)), uStorm);
+      // and a firmer S-curve, so the storm frame has true darks in rock and timber and bright snow, not one mid band
+      col = mix(col, col * col * (3.0 - 2.0 * col) * 1.08, uStorm * 0.25);
       // night: blue shift
       col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse
@@ -176,7 +178,7 @@ export class Post {
     sh.uSunUV.value.set(s.x * 0.5 + 0.5, s.y * 0.5 + 0.5);
     sh.uSunVis.value = facing * onScreen * sunUp;
     sh.uSunColor.value.copy(U.uSunColor.value).multiplyScalar(0.25);
-    sh.uStrength.value = 0.35 * Math.max(0, state.shaftK ?? 1);
+    sh.uStrength.value = 0.55 * Math.max(0, state.shaftK ?? 1);
     // the RenderPass draws into whatever readBuffer is at frame start
     const depth = this.composer.readBuffer.depthTexture;
     sh.tDepth.value = depth;

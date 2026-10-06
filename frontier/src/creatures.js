@@ -1074,18 +1074,48 @@ export class Quadruped {
     const cant = new THREE.CylinderGeometry(0.17, 0.17, 0.045, 16, 1, false, Math.PI / 2, Math.PI);
     cant.rotateX(Math.PI / 2); cant.scale(1, 0.55, 1); cant.rotateX(-0.35); cant.translate(0, 1.78, -0.35); body.add(mesh(cant, leather));
     // bedroll: a canvas-and-hide roll with the wool blanket showing in the ends
-    const roll = new THREE.CylinderGeometry(0.13, 0.13, 0.78, 14, 1, true); roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.84, -0.52);
+    // the roll bulges between its straps and is cinched in under them, a little sagging and lumpy
+    const roll = new THREE.CylinderGeometry(0.13, 0.13, 0.78, 18, 24, true);
+    {
+      const rp = roll.attributes.position;
+      for (let k = 0; k < rp.count; k++) {
+        const yy = rp.getY(k), x0 = rp.getX(k), z0 = rp.getZ(k);
+        const cinch = 1 - 0.2 * Math.exp(-((Math.abs(yy) - 0.24) ** 2) / 0.0012) + 0.03 * Math.sin(yy * 23 + Math.atan2(z0, x0) * 3);
+        rp.setXYZ(k, x0 * cinch, yy, z0 * cinch);
+      }
+      roll.computeVertexNormals();
+    }
+    roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.84, -0.52);
     body.add(mesh(roll, std({ map: canvasTexture(r), roughness: 0.95 })));
+    // the ends show the roll's layers: canvas wrapped round a wool blanket, in a spiral
+    const spiral = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = '#5a2a1c'; g.fillRect(0, 0, 128, 128);
+      for (let k = 0; k < 7; k++) {
+        g.strokeStyle = k % 2 ? '#7a6248' : '#8a3a26'; g.lineWidth = 4 + (k % 3);
+        g.beginPath();
+        for (let t = 0; t < Math.PI * 2; t += 0.1) { const rr = 8 + k * 8 + t * 1.3; g.lineTo(64 + Math.cos(t) * rr, 64 + Math.sin(t) * rr); }
+        g.stroke();
+      }
+      g.strokeStyle = 'rgba(20,10,6,0.6)'; g.lineWidth = 2; g.beginPath(); g.arc(64, 64, 61, 0, 7); g.stroke();
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    })();
     for (const sx of [-0.39, 0.39]) {
-      const end = new THREE.CircleGeometry(0.128, 14); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.84, -0.52);
-      body.add(mesh(end, std({ color: 0x6a2e20, roughness: 1 })));
+      const end = new THREE.CircleGeometry(0.128, 18); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.84, -0.52);
+      body.add(mesh(end, std({ map: spiral, roughness: 1 })));
     }
     for (const sx of [-0.24, 0.24]) { const st = new THREE.TorusGeometry(0.133, 0.016, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.92, 1); st.translate(sx, 1.84, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
     for (const s of [-1, 1]) {
       // a soft, bulging leather bag (a five-point sweep, rounded at both ends) with a flap and two buckled straps
-      const bag = sweep([{ p: V(s * 0.41, 1.52, -0.7), rx: 0.03, ry: 0.07 }, { p: V(s * 0.43, 1.5, -0.64), rx: 0.075, ry: 0.15 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.09, ry: 0.18 },
-        { p: V(s * 0.43, 1.5, -0.3), rx: 0.075, ry: 0.15 }, { p: V(s * 0.41, 1.52, -0.24), rx: 0.03, ry: 0.07 }], 14);
+      // a squarish stitched leather bag (superelliptic section), soft at the corners, with buckles on its straps
+      const bag = sweep([{ p: V(s * 0.41, 1.52, -0.69), rx: 0.04, ry: 0.1, sq: 0.6 }, { p: V(s * 0.43, 1.5, -0.65), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.085, ry: 0.175, sq: 0.42 },
+        { p: V(s * 0.43, 1.5, -0.29), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.41, 1.52, -0.25), rx: 0.04, ry: 0.1, sq: 0.6 }], 16);
       body.add(mesh(bag, leather));
+      for (const zz of [-0.56, -0.38]) {
+        const bk = new THREE.BoxGeometry(0.012, 0.032, 0.03); bk.translate(s * 0.535, 1.5, zz);
+        body.add(mesh(bk, std({ color: 0x9a8a6a, metalness: 0.7, roughness: 0.4 })));
+      }
       const flap = sweep([{ p: V(s * 0.5, 1.62, -0.66), rx: 0.012, ry: 0.06 }, { p: V(s * 0.535, 1.6, -0.47), rx: 0.014, ry: 0.075 }, { p: V(s * 0.5, 1.62, -0.28), rx: 0.012, ry: 0.06 }], 10);
       body.add(mesh(flap, leather));
       for (const zz of [-0.56, -0.38]) {

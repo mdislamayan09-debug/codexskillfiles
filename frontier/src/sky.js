@@ -55,10 +55,11 @@ float cloudDen(vec3 p, float cov){
   float c = clamp(cov * (0.3 + 0.9 * weather) + 0.24 * uStorm * smoothstep(0.2, 0.6, weather), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
-  float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
+  // (a tighter edge band and finer, stronger erosion: defined cauliflower cells rather than soft blobs)
+  float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.15, 0.0, 1.0);
   if (d <= 0.0) return 0.0;
-  float det = texture(tCloud, p / 1100.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
-  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * 0.55, 1.0, 0.0, 1.0);
+  float det = texture(tCloud, p / 760.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
+  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * 0.68, 1.0, 0.0, 1.0);
   return d * c;
 }
 float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }
@@ -274,7 +275,7 @@ export class Sky {
     this.sun.target.position.copy(f);
     this.sun.position.sub(focus).add(f);
     const W = this.weather;
-    this.sun.intensity *= 1 - (0.62 + 0.08 * W.blizzard) * W.storm;
+    this.sun.intensity *= 1 - (0.62 + 0.16 * W.blizzard) * W.storm;   // a blizzard is lit mostly by the sky: soft, faint shadows
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uBlizzard.value = W.blizzard;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);

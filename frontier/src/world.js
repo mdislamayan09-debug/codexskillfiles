@@ -546,12 +546,12 @@ export class World {
             const sl = this.realSlope(x, z);
             const vd = D.vd[k];
             let fr = smoothstep(760, 690, h + 70 * n2.fbm(x / 180, z / 180, 3));     // tree line: ragged but sharp
-            fr *= 1 - smoothstep(0.5, 0.68, sl);                                        // cliffs stay bare
+            fr *= 1 - smoothstep(0.4, 0.56, sl);                                        // cliffs and steep faces stay bare
             // timber follows the water: thick in the draws and gullies, thin on the spurs and convex shoulders
             {
               const rh = this.realAt(x, z), q = 70;
               const ra = this.realAt(x + q, z), rb = this.realAt(x - q, z), rc = this.realAt(x, z + q), rd2 = this.realAt(x, z - q);
-              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.45 + 0.9 * smoothstep(-5, 9, (ra + rb + rc + rd2) / 4 - rh);
+              if (rh !== null && ra !== null && rb !== null && rc !== null && rd2 !== null) fr *= 0.15 + 1.1 * smoothstep(-3, 8, (ra + rb + rc + rd2) / 4 - rh);
             }
             // stands and open snowfields in about equal measure, as the references' valley sides are: dark timber
             // in clumps and tongues with wide white glades between, not an even pepper of trees

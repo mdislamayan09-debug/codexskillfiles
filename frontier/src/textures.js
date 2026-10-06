@@ -156,9 +156,9 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
     d[k * 4] = R; d[k * 4 + 1] = G; d[k * 4 + 2] = B; d[k * 4 + 3] = 255;
   }
   g.putImageData(img, 0, 0);
-  // lichen and moss patches, more toward the bottom (north side is implied by tiling)
+  // lichen and moss patches, spread over the whole tile height (bunched in one half they repeat up the trunk as bands)
   for (let i = 0; i < 70; i++) {
-    const y = H * (0.45 + 0.55 * r());
+    const y = H * r();
     g.fillStyle = r() < 0.6 ? `rgba(120,132,96,${0.1 + r() * 0.18})` : `rgba(160,168,140,${0.08 + r() * 0.12})`;
     g.beginPath(); g.ellipse(r() * W, y, 6 + r() * 26, 4 + r() * 16, r(), 0, 7); g.fill();
   }

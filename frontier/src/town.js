@@ -769,9 +769,10 @@ export class Town {
     if (wires.length) this.scene.add(new THREE.Mesh(mergeGeometries(wires), wireM));
   }
 
-  update(dt, night) {
+  update(dt, night, storm = 0) {
     for (const w of this.windmills) w.rotation.z += dt * 1.6;
-    this.windowMat.emissiveIntensity = night * 2.2;
+    // lamps are lit at dusk, and on a dark storm afternoon: warm windows are what a homestead reads by in the snow
+    this.windowMat.emissiveIntensity = Math.max(night * 2.2, storm * 1.6);
     this.lampMat.emissiveIntensity = night * 9;
   }
 

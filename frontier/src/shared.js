@@ -21,6 +21,8 @@ export const U = {
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
   uNight: { value: 0 },
+  uTrail: { value: Array.from({ length: 48 }, () => new THREE.Vector2()) },   // horse trail through snow (terrain)
+  uTrailN: { value: 0 },
 };
 
 export const GLSL_COMMON = /* glsl */ `
