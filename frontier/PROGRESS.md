@@ -272,3 +272,35 @@ What's limiting the remaining distance:
 - **Winter rider.** A rolled sheepskin collar standing up round the neck replaces the flat patch the critic called
   a "gold placeholder". The trapper hat is tufted rather than a smooth dome.
 - **Forest.** Slimmer, greyer lodgepole and ponderosa trunks instead of redwood columns.
+
+**Round 28 critic** (ours vs reference, 10 = indistinguishable): pines 3, snowride 2, snowvista 2, all "clearly".
+The critic asked for:
+- **Pines:** a horse and rider that don't read as placeholders; translucent, open canopy instead of a black wall;
+  broad volumetric shafts instead of a radial starburst; clustered ground scatter; tapered trunks with root flare;
+  a decayed log.
+- **Snow ride:** drifts and a hoof trail in the snow; no clipping slab; dark rock structure on the far walls.
+- **Snow vista:** forest in draws and stands rather than pepper; erosion-shaped rock instead of streaks; valley fog;
+  a foreground ledge; a readable cabin and river.
+
+### Round 29: canopy, drifts, river, kit (scores 3, 2, 4; the vista is up two)
+- **Light and canopy.** Shafts sample a footprint across the ray, so beams are broad and soft. Needles transmit
+  backlight, tall crowns are open, trunks have root flares, and the bark is plated and irregular, built from
+  tileable noise.
+- **Snow ride.** Metre-high wind drifts in the real heightmap of the snowfields, and crystal glints near the lens.
+- **Snow vista.**
+  - A wide braided river on the valley floor.
+  - Timber follows the draws.
+  - Low cloud rags cling to the mountainsides.
+  - The lookout is closer to the homestead, which gains a smokehouse, a tack shed and a fence.
+  - Split-granite outcrops anchor the foreground.
+- **Horse.** A volumetric tail, muscle lobes, and snow on its back. The pre-filled trench (the "clipping slab") is
+  gone from chase shots.
+- **Other biomes.** Mottled shrub cover on the jungle slopes, a blue open ocean, and finer broadleaf sprays (the
+  autumn trees no longer read as pom-poms).
+- **Remaining asks:**
+  - fur and hair shading on the horse, real tack detail, cloth folds on the rider
+  - a deformable snow trail
+  - fir boughs that read as sprays, not sheets
+  - true darks in the storm frame
+  - forest by gully and treeline across the whole valley
+  - a bigger, warmer cabin focal point

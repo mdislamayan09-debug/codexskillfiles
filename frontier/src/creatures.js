@@ -186,7 +186,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             int lab = int(vLab + 0.5);
             float hgt = 0.0;
             ${quad
-              ? 'hgt = vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 60.0, vRest.y * 25.0 + vRest.x * 30.0)) * 0.0012 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
+              // broad muscle swells, the coat's hair lying in streaks along the body (catching the light in bands),
+              // and the groove down the croup
+              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 95.0, vRest.y * 32.0 + vRest.x * 42.0)) * 0.0032 + vnoise(vec2(vRest.z * 300.0, vRest.y * 90.0 + vRest.x * 120.0)) * 0.0009 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -204,10 +206,11 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         #include <emissivemap_fragment>
         {
           vec3 Vv = normalize(vViewPosition);
-          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), 5.0);
+          // (a coat of hair scatters light at grazing angles: a softer, wider rim on animals)
+          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '5.0'});
           vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           float back = smoothstep(-0.2, 0.8, dot(-Vv, wsun));
-          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * fres * back * 0.35 + diffuseColor.rgb * uFogColor * fres * 0.15;
+          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * fres * back * ${quad ? '0.5' : '0.35'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.3' : '0.15'};
         }`);
     },
   });

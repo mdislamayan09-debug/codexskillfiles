@@ -412,8 +412,9 @@ export class World {
     const sk = Math.max(realW, canyonW);
     if (sk > 0.01) {
       const wa = x * 0.93 + z * 0.36, wb = -x * 0.36 + z * 0.93;   // along / across the wind
-      const flat = (1 - smoothstep(0.1, 0.28, this.realSlope(x, z))) * smoothstep(6, 26, Math.min(roadD, creekD, d ? d.vd : 1e9));
-      if (flat > 0) h += sk * flat * (0.85 * n.fbm(wa / 15, wb / 44, 3) + 0.3 * n2.fbm(x / 8, z / 8, 2));
+      // (flat ground only: on the mountainsides the same relief reads from afar as a rumpled sheet)
+      const flat = (1 - smoothstep(0.04, 0.13, this.realSlope(x, z))) * smoothstep(6, 26, Math.min(roadD, creekD, d ? d.vd : 1e9));
+      if (flat > 0) h += sk * flat * (0.7 * n.fbm(wa / 15, wb / 44, 3) + 0.25 * n2.fbm(x / 8, z / 8, 2));
     }
     // Town plateau
     const tx = Math.abs(x - TOWN.x) / (TOWN.w * 0.5), tz = Math.abs(z - TOWN.z) / (TOWN.d * 0.5);

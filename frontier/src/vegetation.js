@@ -450,10 +450,24 @@ function buildCactus(seed) {
 function buildLog(seed) {
   const rnd = mulberry32(seed);
   const L = 5 + rnd() * 8, r = 0.28 + rnd() * 0.22;
-  const parts = [branchGeo(new THREE.Vector3(-L / 2, r * 0.7, 0), new THREE.Vector3(L / 2, r * 0.6, 0), r, r * 0.8, 9)];
-  for (let i = 0; i < 4; i++) { // snapped branch stubs
+  // settled into the duff (not resting on top of it), the bole sagging a little where it spans a hollow
+  const parts = [branchGeo(new THREE.Vector3(-L / 2, r * 0.42, 0), new THREE.Vector3(0, r * 0.3, 0), r, r * 0.9, 9),
+    branchGeo(new THREE.Vector3(0, r * 0.3, 0), new THREE.Vector3(L / 2, r * 0.4, (rnd() - 0.5) * 0.4), r * 0.9, r * 0.78, 9)];
+  for (let i = 0; i < 5; i++) { // snapped branch stubs
     const x = (rnd() - 0.5) * L * 0.8, a = rnd() * 6.28;
-    parts.push(branchGeo(new THREE.Vector3(x, r, 0), new THREE.Vector3(x + 0.3, r + Math.cos(a) * 0.9, Math.sin(a) * 0.9), 0.07, 0.03, 4));
+    parts.push(branchGeo(new THREE.Vector3(x, r * 0.8, 0), new THREE.Vector3(x + 0.3, r * 0.8 + Math.cos(a) * 0.9, Math.sin(a) * 0.9), 0.07, 0.03, 4));
+  }
+  // the broken end: long splinters standing out of the snapped wood
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + rnd() * 0.5, rr = r * (0.55 + rnd() * 0.35);
+    const p0 = new THREE.Vector3(L / 2, r * 0.4 + Math.sin(a) * rr, Math.cos(a) * rr);
+    parts.push(branchGeo(p0, p0.clone().add(new THREE.Vector3(0.25 + rnd() * 0.55, (rnd() - 0.5) * 0.12, (rnd() - 0.5) * 0.12)), 0.05 + rnd() * 0.03, 0.006, 4));
+  }
+  // the other end: a windthrown root plate standing up out of the ground
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + rnd() * 0.4, len = r * (2.4 + rnd() * 1.6);
+    const p0 = new THREE.Vector3(-L / 2, r * 0.42, 0);
+    parts.push(branchGeo(p0, p0.clone().add(new THREE.Vector3(-0.15 - rnd() * 0.25, Math.max(-r * 0.4, Math.sin(a) * len), Math.cos(a) * len)), r * 0.28, 0.02, 5));
   }
   return setSway(mergeGeometries(parts.map((g) => g.index ? g.toNonIndexed() : g)), () => 0);
 }
@@ -842,6 +856,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.9 * gcl.a;    // desert: sparse bunch grass
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       dens *= smoothstep(0.02, 0.28, field + 0.12);
+      // under closed pine canopy the grass gives way to needle duff (it holds on in the light along the trail)
+      dens *= 1.0 - 0.65 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -875,7 +891,13 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vGCol = mix(vGCol, mix(srgbV(vec3(240,196,110)), srgbV(vec3(222,160,86)), aOff.z) * 1.35, gcl.b * 0.85); // autumn gold
       vGCol = mix(vGCol, mix(srgbV(vec3(120,165,80)), srgbV(vec3(100,150,70)), aOff.w) * 1.2, gcl.g);           // jungle
       vGCol = mix(vGCol, srgbV(vec3(232,214,168)) * 1.3, gcl.a);                                                 // desert straw
-      vGCol = mix(vGCol, mix(srgbV(vec3(112,140,66)), srgbV(vec3(138,156,80)), aOff.w) * 1.25 * (0.75 + 0.5 * midV), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85); // shaded pine-belt grass stays green
+      // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
+      {
+        vec3 pg = mix(srgbV(vec3(112,128,66)), srgbV(vec3(140,148,84)), aOff.w);
+        vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
+        vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 1.2 * (0.75 + 0.5 * midV);
+        vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
+      }
       vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
       vGY = y;
       vGFar = smoothstep(9.0, 48.0, dist);

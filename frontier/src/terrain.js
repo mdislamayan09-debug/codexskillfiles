@@ -258,6 +258,20 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des);
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
+  // a used trail up close: hoofprints pressed into it, stones bedded in the tread, roots snaking across in the woods
+  if (rr > 0.05 && fp < 0.2) {
+    float near = rr * smoothstep(0.2, 0.06, fp) * (1.0 - town);
+    vec2 hc = floor(xz / 0.55), hf = fract(xz / 0.55) - 0.5 - (hash22(hc) - 0.5) * 0.4;
+    float print = step(0.55, hash12(hc + 3.1)) * smoothstep(0.16, 0.08, length(hf * vec2(1.0, 1.3)));
+    c *= 1.0 - 0.28 * print * near;
+    vec2 sc = floor(xz / 1.3), sf = fract(xz / 1.3) - 0.5 - (hash22(sc + 9.0) - 0.5) * 0.5;
+    float stoneR = 0.08 + 0.12 * hash12(sc + 5.5), sd = length(sf * 1.3);
+    float stone = step(0.8, hash12(sc + 7.7)) * smoothstep(stoneR, stoneR * 0.6, sd);
+    c = mix(c, srgb(vec3(104,100,92)) * (0.8 + 0.4 * hash12(sc)), stone * near);
+    tn = mix(tn, normalize(vec3(sf * 2.0, 1.0)), stone * near * 0.8);
+    float rootL = smoothstep(0.045, 0.0, abs(fbm2(xz / 2.6 + 17.0) - 0.5)) * smoothstep(0.5, 0.65, fbm2(xz / 9.0 - 3.0));
+    c = mix(c, srgb(vec3(70,52,36)), rootL * pineK * near * 0.85);
+  }
   // town street: twin wheel ruts per lane, hoof-churned mud and puddles
   float street = smoothstep(0.5, 0.9, town) * smoothstep(11.0, 8.0, abs(xz.y)) * step(abs(xz.x), 150.0);
   float lanes = 0.0;
@@ -326,11 +340,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         float pit = smoothstep(0.17, 0.05, length(vec2(fract(sAt / 0.72) - 0.5, (lat - (mod(stp, 2.0) - 0.5) * 0.34) / 0.72) * 0.72)) * trough;
         // the walls lean in toward the centre line, the lips lean out
         float wall = smoothstep(0.7, 0.25, dmin) * smoothstep(0.0, 0.3, dmin);
-        vec2 g = -toC * (wall * 0.9 - lip * 0.5);
+        vec2 g = -toC * (wall * 1.5 - lip * 0.8);
         tn = normalize(tn + vec3(g, 0.0) * snowAmt);
-        c *= mix(1.0, 0.7, trough * snowAmt) * (1.0 - 0.25 * pit * snowAmt);
+        c *= mix(1.0, 0.6, trough * snowAmt) * (1.0 - 0.3 * pit * snowAmt);
         c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt);   // compacted, shadowed blue
-        c *= 1.0 + 0.06 * lip * snowAmt;
+        c *= 1.0 + 0.1 * lip * snowAmt;
         rough = mix(rough, 0.75, trough * snowAmt);
       }
     }

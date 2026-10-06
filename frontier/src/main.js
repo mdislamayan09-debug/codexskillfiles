@@ -252,7 +252,8 @@ async function init() {
     snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.35, -6.6], lookRel: [0.2, 1.75, 18], turn: -0.56, weather: 'snow' }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
-    snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
+    // a longer lens, as the reference: the homestead reads as a building and the ranges stack up behind it
+    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -504,7 +505,7 @@ async function init() {
     G.weatherOverride = s.weather && typeof s.weather === 'object' ? s.weather : null;
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
-      G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz) };
+      G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz), fov: s.fov };
       if (s.clearView) { G.clearTreesNear(cx, cz, 30); G.clearTreesNear(cx, cz, 9, veg.bushes); G.clearTreesAlong(cx, cz, lx, lz, 16, 0.15); }
     } else if (s.camRel) {
       const rel = s.camRel.slice();
@@ -515,7 +516,7 @@ async function init() {
         if (hm < hp) rel[0] = -rel[0];
       }
       // turn: the horse heads off at an angle to the lens, so its neck and head show beside the rider
-      G.camOverride = { rel, lookRel: s.lookRel, turn: s.turn || 0 };
+      G.camOverride = { rel, lookRel: s.lookRel, turn: s.turn || 0, fov: s.fov };
       // keep the lens clear: no boughs between the camera and the rider
       const cy = yaw - (s.turn || 0);
       const f = [Math.sin(cy), Math.cos(cy)], rt = [Math.cos(cy), -Math.sin(cy)];
@@ -651,7 +652,7 @@ async function init() {
         camera.position.y = Math.max(camera.position.y, world.heightAt(camera.position.x, camera.position.z) + 0.4);
         camera.lookAt(base.clone().addScaledVector(r, o.lookRel[0]).addScaledVector(f, o.lookRel[2]).add(new THREE.Vector3(0, o.lookRel[1], 0)));
       }
-      camera.fov = 50; camera.updateProjectionMatrix();
+      camera.fov = o.fov || 50; camera.updateProjectionMatrix();
     } else {
       // title flyover
       titleT += rdt * 0.03;
@@ -691,7 +692,7 @@ async function init() {
       for (const rr of [12, 30]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; fo = Math.max(fo, 0.85 * world.splatAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr).forest); }
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
-      G.mistK = 1 + (fo * 0.85 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 0.6 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -724,7 +725,10 @@ async function init() {
       const f3 = new THREE.Vector3(); camera.getWorldDirection(f3);
       const into = THREE.MathUtils.smoothstep(f3.dot(U.uSunDir.value), 0.55, 0.95) * (1 - U.uNight.value);
       // (under a canopy the eye opens up even looking toward the sun: the hotspot is small)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.6 * (G.forestK || 0))) * (1 + 0.32 * (G.forestK || 0));
+      // (the open, sun-shafted canopy is bright enough now: no extra lift in the woods; snow under a storm sky in clear
+      // air reads brighter than the eye wants it, so stop down a little there)
+      const W = sky.weather;
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard));
       renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
@@ -784,7 +788,7 @@ async function init() {
     if (G.started) hud.update(rdt, G);
     audio.update(rdt, { night: U.uNight.value, speed: player.mounted ? player.hspeed : player.speed, nearWater: Math.max(0, 1 - Math.max(0, world.heightAt(focus.x, focus.z)) / 4), riding: player.mounted && player.hspeed > 4, listener: focus, deadEye: G.deadEyeK });
     const coldGrade = Math.max(sky.weather.blizzard, 0.75 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.1 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;
