@@ -104,6 +104,61 @@ export function barkTexture(seed = 5, base = [70, 58, 46]) {
   return tex(c, { repeat: true });
 }
 
+// Conifer bark: irregular vertical plates split by deep furrows (stretched Voronoi), scaly plate tops, lichen.
+// Returns { map, normalMap } from one height field so light catches the plate edges.
+export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024) {
+  const r = mulberry32(seed);
+  // jittered cell sites on a wrapped grid, cells tall and narrow like ponderosa/spruce plates
+  const CX = 9, CY = 7, sites = [];
+  for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) sites.push([(i + 0.15 + r() * 0.7) / CX, (j + 0.15 + r() * 0.7) / CY, r()]);
+  const hgt = new Float32Array(W * H), tone = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = y / H;
+    let d1 = 9, d2 = 9, id = 0;
+    const gi = Math.floor(u * CX), gj = Math.floor(v * CY);
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+      const ii = gi + di, jj = gj + dj, wi = (ii + CX) % CX, wj = (jj + CY) % CY;
+      const [sx0, sy0, t] = sites[wj * CX + wi];
+      const sx = sx0 + Math.floor(ii / CX), sy = sy0 + Math.floor(jj / CY);   // unwrap across the tile edge
+      const dx = u - sx, dy = (v - sy) * 0.45;                              // squash vertically: tall plates
+      const d = Math.hypot(dx, dy);
+      if (d < d1) { d2 = d1; d1 = d; id = t; } else if (d < d2) d2 = d;
+    }
+    const edge = d2 - d1;                                         // 0 on furrows
+    const plate = Math.min(1, edge * 34);
+    const k = y * W + x;
+    // scaly flakes on the plate surface
+    const flake = 0.5 + 0.5 * Math.sin(y * 0.9 + Math.sin(x * 0.35 + id * 30) * 2.5) * Math.sin(x * 0.6 + id * 11);
+    hgt[k] = plate * plate * (0.8 + 0.2 * flake) + 0.04 * r();
+    tone[k] = id;
+  }
+  const [c, g] = canvas(W, H), img = g.createImageData(W, H), d = img.data;
+  for (let k = 0; k < W * H; k++) {
+    const h = hgt[k], t = tone[k];
+    const lit = 0.32 + 0.85 * h;
+    const warm = 0.9 + 0.25 * t;                                  // plates vary from grey-brown to rusty
+    let R = base[0] * lit * warm * 1.08, G = base[1] * lit * (0.95 + 0.1 * t), B = base[2] * lit * 0.95;
+    if (h < 0.15) { R = 26 + 20 * h; G = 18 + 14 * h; B = 13 + 10 * h; }   // deep furrow shadow
+    d[k * 4] = R; d[k * 4 + 1] = G; d[k * 4 + 2] = B; d[k * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  // lichen and moss patches, more toward the bottom (north side is implied by tiling)
+  for (let i = 0; i < 70; i++) {
+    const y = H * (0.45 + 0.55 * r());
+    g.fillStyle = r() < 0.6 ? `rgba(120,132,96,${0.1 + r() * 0.18})` : `rgba(160,168,140,${0.08 + r() * 0.12})`;
+    g.beginPath(); g.ellipse(r() * W, y, 6 + r() * 26, 4 + r() * 16, r(), 0, 7); g.fill();
+  }
+  const [cn, gn] = canvas(W, H), ni = gn.createImageData(W, H), nd = ni.data;
+  const Hs = (x, y) => hgt[((y + H) % H) * W + ((x + W) % W)];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (Hs(x + 1, y) - Hs(x - 1, y)) * 3.2, dy = (Hs(x, y + 1) - Hs(x, y - 1)) * 3.2;
+    const n = Math.hypot(dx, dy, 1), k = (y * W + x) * 4;
+    nd[k] = (-dx / n * 0.5 + 0.5) * 255; nd[k + 1] = (dy / n * 0.5 + 0.5) * 255; nd[k + 2] = (1 / n * 0.5 + 0.5) * 255; nd[k + 3] = 255;
+  }
+  gn.putImageData(ni, 0, 0);
+  return { map: tex(c, { repeat: true }), normalMap: tex(cn, { srgb: false, repeat: true }) };
+}
+
 // Weathered clapboard siding: long horizontal boards, soft grain, lap shadows, optional peeling paint.
 export function plankTexture(seed = 7, paint = null, vertical = false) {
   const [c, g] = canvas(512, 512);

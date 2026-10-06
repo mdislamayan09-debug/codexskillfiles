@@ -169,6 +169,15 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     vec3 red = mix(srgb(vec3(160,88,54)), srgb(vec3(200,138,90)), band) * (0.85 + 0.3 * fbm2(vec2(xz.x + xz.y, wp.y * 4.0) / 11.0)) * (1.0 - 0.28 * streak);
     rock = mix(rock, red * clamp(lumi(rock) / 0.09, 0.5, 1.5), des);
   }
+  // jungle ridges: dark wet basalt furred with moss and ferns; vegetation clings to all but the sheerest faces,
+  // with red volcanic earth where slides have stripped it
+  if (jun > 0.01) {
+    vec3 basalt = mix(srgb(vec3(46,48,40)), srgb(vec3(64,72,44)), fbm2(xz / 6.0));
+    vec3 redEarth = mix(srgb(vec3(120,62,40)), srgb(vec3(150,84,52)), fbm2(xz / 4.0));
+    float slide = smoothstep(0.62, 0.78, fbm2(vec2(xz.x + xz.y * 0.3, wp.y * 0.5) / 22.0)) * smoothstep(0.3, 0.5, slope);
+    rock = mix(rock, mix(basalt, redEarth, slide), jun);
+    rockAmt *= mix(1.0, smoothstep(0.55, 0.75, slope) + slide * 0.8, jun);
+  }
   // cold granite reads darker and bluer under snow, like wet rock in a storm
   rock = mix(rock, rock * vec3(0.56, 0.6, 0.68), snowC);
 

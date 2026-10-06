@@ -5,7 +5,7 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
-import { leafCardTexture, pineCardTexture, barkTexture } from './textures.js';
+import { leafCardTexture, pineCardTexture, barkTexture, conBarkTextures } from './textures.js';
 
 // ---------------------------------------------------------------------------- wind
 const WIND_VERT = /* glsl */ `
@@ -713,7 +713,11 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       #define TILE ${tile.toFixed(2)}
       #define RADIUS ${radius.toFixed(2)}
       mat3 cRot;
+      varying float vDes;
     `,
+    fragHead: 'varying float vDes;',
+    // in the desert the loose stones are pale sandstone, not dark forest-floor rock
+    fragColor: `#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.42, 0.3) * (0.8 + 0.4 * fract(vWPos.x * 3.7 + vWPos.z * 1.3)), vDes);`,
     beginNormal: /* glsl */ `
       vec2 cam = cameraPosition.xz;
       vec2 xz = aOff.xy + floor((cam - aOff.xy) / TILE + 0.5) * TILE;
@@ -731,6 +735,7 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
         ? 'max(sp.b * 0.8, max(smoothstep(0.3, 0.8, sp.r) * 0.7, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
         : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
+      vDes = cl.a;
       float keep = step(aOff.w, dens);
       float sc = mix(${smin.toFixed(3)}, ${smax.toFixed(3)}, fract(aOff.z * 13.7 + aOff.w * 7.1)) * keep;
       vec3 transformed = cRot * position * sc;
@@ -795,7 +800,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
       dens *= 1.0 - snowG;          // buried under snow
-      dens *= 1.0 - 0.72 * gcl.a;   // desert: sparse bunch grass
+      dens *= 1.0 - 0.9 * gcl.a;    // desert: sparse bunch grass
       dens *= 1.0 - 0.55 * gcl.g * smoothstep(0.2, 0.6, sp.b); // jungle floor is litter and big leaves, not lawn
       float field = fbm2(xz/26.0);
       dens *= smoothstep(0.02, 0.28, field + 0.12);
@@ -928,7 +933,8 @@ export class Vegetation {
     this.world = world;
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
-    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(6, [74, 50, 36]), roughness: 0.95 }), 0);
+    const cb = conBarkTextures(6, [96, 72, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)
@@ -1038,7 +1044,7 @@ export class Vegetation {
       tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
       bushBuilds.push({ parts: [{ geometry: tg, material: twigMat, castShadow: false }] });
     }
-    this.bushes = new ScatterLayer(scene, bushBuilds, 6000, 140 * Math.sqrt(quality));
+    this.bushes = new ScatterLayer(scene, bushBuilds, Math.round(6000 * Math.max(1, quality * quality)), 140 * Math.sqrt(quality));
     // fallen logs on forest floors
     const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: pineBark }] }));
     this.logs = new ScatterLayer(scene, logBuilds, 1200, 170 * Math.sqrt(quality));
@@ -1115,10 +1121,16 @@ export class Vegetation {
       const field = cl.snow > 0.3 ? THREE.MathUtils.smoothstep(w.n2.noise(px / 70 + 3.1, pz / 70 - 7.7), 0.15, 0.55) : 0;
       const boulders = ((pz < -700 ? 2.2 : 1) + cl.snow) * (1 + 7 * field);
       // firs cling to steeper ground in the mountains than broadleaf trees do lower down
-      const steep = cl.snow > 0.4 ? 0.62 : 0.75;
+      const steep = cl.snow > 0.4 ? 0.62 : cl.jungle > 0.4 ? 0.5 : 0.75;
       if (n.y < steep) { if (r() < 0.012 * boulders) { const sc = 1 + r() * 3.5; this.rocks.add(px, h - 0.3 - sc * 0.55 * (1 - n.y), pz, r() * 6.28, sc, Math.floor(r() * 4)); } continue; } // sunk into the slope, not perched on it
       if (cl.snow > 0.4 && n.y < 0.75 && !blocked(px, pz) && r() < sp.forest * 0.5) {
         this.trees.add(px, h - 0.3, pz, r() * 6.28, 0.6 + r() * 0.7, pick(G.fir));
+        continue;
+      }
+      // jungle ridges: rainforest clings to steep ground, with ferns and big-leaf plants beneath
+      if (cl.jungle > 0.4 && n.y < 0.75 && !blocked(px, pz)) {
+        if (r() < 0.55) this.trees.add(px, h - 0.4, pz, r() * 6.28, 0.7 + r() * 0.6, r() < 0.15 ? pick(G.palm) : pick(G.jungle));
+        else if (r() < 0.7) this.bushes.add(px, h - 0.1, pz, r() * 6.28, 0.8 + r() * 1.0, r() < 0.6 ? 5 + Math.floor(r() * 2) : 3 + Math.floor(r() * 2));
         continue;
       }
       const swamp = w.splatAt(px, pz).wet > 0.3 && px > 500 && pz > 600 && cl.jungle < 0.5;
@@ -1172,7 +1184,8 @@ export class Vegetation {
       } else if (pz < -700) {
         // undergrowth in patches: fern beds and scrub where light gets through, bare litter elsewhere
         const patch = THREE.MathUtils.smoothstep(w.n.noise(px / 30 + 1.7, pz / 30 - 4.4), -0.2, 0.5);
-        const nb = r() < under * (0.6 + 2.4 * patch) ? 1 + Math.floor(r() * 3 * patch) : 0;
+        const qd = (this.quality || 1) >= 2 ? 1.8 : 1;   // cinematic: lush, layered understorey
+        const nb = r() < Math.min(0.95, under * (0.6 + 2.4 * patch) * qd) ? 1 + Math.floor(r() * (3 + qd) * patch) : 0;
         for (let b = 0; b < nb; b++) {
           const bx = px + (r() - 0.5) * 6, bz = pz + (r() - 0.5) * 6;
           this.bushes.add(bx, w.heightAt(bx, bz) - 0.05, bz, r() * 6.28, 0.6 + r() * 0.8, r() < 0.8 ? 3 + Math.floor(r() * 2) : 7 + Math.floor(r() * 2));

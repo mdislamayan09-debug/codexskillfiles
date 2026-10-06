@@ -247,9 +247,9 @@ async function init() {
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.6, 2.3, -5.6], lookRel: [0, 3.6, 22], trailDress: true }; },
     snowride: () => { const [x, z, yaw] = G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.8, 2.5, -5.4], lookRel: [-0.9, 1.6, 18], weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.9, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
-    jungle: () => { const [x, z, yaw] = G.onRoad(2, 0.83); return { time: 10.5, player: [x, z, yaw], camRel: [0.8, 2.4, -6.0], lookRel: [0, 2.0, 14] }; },
+    jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
-    desert: () => { const [x, z, yaw] = G.onRoad(3, 0.86); return { time: 17.4, player: [x, z, yaw], camRel: [0.8, 2.3, -6.0], lookRel: [0, 2.2, 14] }; },
+    desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
   };
   // an outcrop above the trapper's cabin with a clear line of sight over it and down Frostwater Valley
   G.findVista = () => {
@@ -282,6 +282,56 @@ async function init() {
     const pitch = Math.atan2(cabY - best.ch, best.cab) + 0.2;
     const D = 1200, lx = best.cx + Math.sin(best.va) * D, lz = best.cz + Math.cos(best.va) * D;
     return { cx: best.cx, cz: best.cz, tx: lx, tz: lz, th: best.ch + Math.tan(pitch) * D - world.heightAt(lx, lz) };
+  };
+  // desert: a rider on the flat valley floor with a tall butte standing 500-1400 m ahead, sun low behind the camera
+  G.findButte = () => {
+    let best = [-2700, 2480, 0], bs = -1e9;
+    const sun = U.uSunDir.value;
+    for (let z = 1700; z < 3750; z += 60) for (let x = -3800; x < -1700; x += 60) {
+      const h = world.heightAt(x, z);
+      if (world.climateAt(x, z).desert < 0.8 || world.normalAt(x, z).y < 0.985) continue;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+        let peak = 0;
+        let outside = false;
+        for (let d = 500; d <= 1400; d += 100) {
+          const qx = x + Math.sin(a) * d, qz = z + Math.cos(a) * d;
+          if (qx < -3980 || qx > -1520 || qz < 1440 || qz > 3960 || world.climateAt(qx, qz).desert < 0.75) { outside = true; break; }
+          peak = Math.max(peak, world.heightAt(qx, qz) - h);
+        }
+        if (outside) continue;
+        // nothing blocking the near view
+        let block = 0; for (let d = 20; d < 400; d += 40) block = Math.max(block, world.heightAt(x + Math.sin(a) * d, z + Math.cos(a) * d) - h);
+        // golden light on the faces: the low sun behind the camera, a little to one side
+        const back = -(Math.sin(a) * sun.x + Math.cos(a) * sun.z) / Math.hypot(sun.x, sun.z);
+        const score = Math.min(peak, 300) - block * 3 - Math.abs(peak - 240) * 0.2 + 80 * Math.min(back, 0.85);
+        if (score > bs) { bs = score; best = [x, z, a]; }
+      }
+    }
+    return best;
+  };
+  // jungle coast: a ridge lookout 120-320 m up, looking along the cliffs with the sea to one side
+  G.findCoastVista = () => {
+    let best = null, bs = -1e9;
+    for (let z = 1900; z < 3300; z += 50) for (let x = -500; x < 2400; x += 50) {
+      const h = world.heightAt(x, z);
+      if (h < 110 || h > 340 || world.normalAt(x, z).y < 0.8) continue;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+        // the view should hold sea (low) and land (high) and not be blocked close in
+        let sea = 0, land = 0, block = 0;
+        for (let d = 300; d <= 2400; d += 300) for (const b of [-0.35, 0, 0.35]) {
+          const q = world.heightAt(x + Math.sin(a + b) * d, z + Math.cos(a + b) * d);
+          if (q < 0) sea++; else if (q > h * 0.6) land++;
+        }
+        for (let d = 20; d < 260; d += 30) block = Math.max(block, world.heightAt(x + Math.sin(a) * d, z + Math.cos(a) * d) - h);
+        if (sea < 6 || land < 5) continue;   // the cliffs running along the sea, not an inland hillside
+        const score = Math.min(sea, 12) + Math.min(land, 10) - block * 0.5;
+        if (score > bs) { bs = score; best = { x, z, a, h }; }
+      }
+    }
+    if (!best) return { px: 900, pz: 2600, yaw: 0, cx: 900, cz: 2600, tx: 900, tz: 3600, th: 0 };
+    const D = 1500, tx = best.x + Math.sin(best.a) * D, tz = best.z + Math.cos(best.a) * D;
+    const th = best.h + 2.2 - D * 0.1 - world.heightAt(tx, tz);
+    return { px: best.x - Math.sin(best.a) * 30, pz: best.z - Math.cos(best.a) * 30, yaw: best.a, cx: best.x, cz: best.z, tx, tz, th };
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -407,6 +457,7 @@ async function init() {
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
       G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz) };
+      if (s.clearView) { G.clearTreesNear(cx, cz, 30); G.clearTreesAlong(cx, cz, lx, lz, 16, 0.15); }
     } else if (s.camRel) {
       const rel = s.camRel.slice();
       if (s.water) {
@@ -611,6 +662,13 @@ async function init() {
     sky.update(!G.freezeTime && G.started ? dt : 0, shadowFocus);
     sky.mesh.position.copy(camera.position);
     U.uFogDensity.value *= G.mistK || 1;
+    // eye adaptation: stop down when looking into a low sun, open up a little in deep forest shade
+    {
+      const f3 = new THREE.Vector3(); camera.getWorldDirection(f3);
+      const into = THREE.MathUtils.smoothstep(f3.dot(U.uSunDir.value), 0.55, 0.95) * (1 - U.uNight.value);
+      const target = 1.12 * (1 - 0.3 * into) * (1 + 0.12 * (G.forestK || 0) * (1 - into));
+      renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
+    }
     town.update(dt, U.uNight.value);
     veg.update(camera.position);
     terrain.update(camera);

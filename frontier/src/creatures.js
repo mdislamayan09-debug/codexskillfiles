@@ -388,6 +388,50 @@ export class Human {
     bones.hips.add(mesh(holster, leather));
     const grip = new THREE.BoxGeometry(0.03, 0.08, 0.04); grip.rotateZ(-0.3); grip.translate(0.2, -0.01, 0.03);
     bones.hips.add(mesh(grip, std({ color: 0x5a3a24 })));
+    // fur fringe: short hair cards around the trapper hat and the collar so the silhouette reads as pelt, not a shell
+    if (o.furHat) {
+      const furCards = (cx, cy, cz, rad, y0, y1, n, len, bone) => {
+        const cards = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + r() * 0.3, y = y0 + r() * (y1 - y0);
+          const g = new THREE.PlaneGeometry(len * (0.8 + r() * 0.5), len * (1.1 + r() * 0.5));
+          g.translate(0, -len * 0.25, 0);
+          g.rotateX(0.5 + r() * 0.5);                 // lean outward and down like lying fur
+          g.rotateY(a);
+          g.translate(cx + Math.sin(a) * rad, y, cz + Math.cos(a) * rad);
+          cards.push(g);
+        }
+        const geo = mergeGeometriesSafe(cards);
+        geo.translate(-bone.userData.rest.x, -bone.userData.rest.y, -bone.userData.rest.z);
+        return geo;
+      };
+      const hatFur = std({ map: hairTexture(o.furHatColor || 0x6a5238, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
+      const colFur = std({ map: hairTexture(o.fur || 0xa48c6c, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
+      bones.head.add(mesh(furCards(0, 0, -0.014, 0.112, 1.79, 1.93, 46, 0.055, bones.head), hatFur, false));
+      bones.head.add(mesh(furCards(0, 0, -0.014, 0.07, 1.93, 1.95, 14, 0.06, bones.head), hatFur, false));
+      bones.spine.add(mesh(furCards(0, 0, -0.02, 0.15, 1.5, 1.57, 40, 0.06, bones.spine), colFur, false));
+    }
+    // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
+    // (the sculpted skirt alone reads as a solid tube from behind)
+    if (o.coat && (outfit === 'arthur' || outfit === 'winter')) {
+      const tailM = std({ map: leatherTexture(r), color: new THREE.Color(o.coat).multiplyScalar(2.1), roughness: 0.62, side: THREE.DoubleSide });
+      for (const sd of [-1, 1]) {
+        const W = 0.2, L = outfit === 'winter' ? 0.62 : 0.56, segX = 6, segY = 10;
+        const g = new THREE.PlaneGeometry(W, L, segX, segY);
+        const pp = g.attributes.position;
+        for (let k = 0; k < pp.count; k++) {
+          const u = pp.getX(k) / W + 0.5, v = 0.5 - pp.getY(k) / L;     // u across, v down the panel
+          // hangs from the waist at the back, flares outward over the horse, with a few soft folds
+          const x = sd * (0.06 + u * W * 0.9 + v * v * 0.17);
+          const y = 1.0 - v * L * 0.92;
+          const z = -0.14 - v * 0.09 - Math.sin(u * Math.PI * 2.5 + sd) * 0.012 * v;
+          pp.setXYZ(k, x, y, z);
+        }
+        g.computeVertexNormals();
+        g.translate(-bones.hips.userData.rest.x, -bones.hips.userData.rest.y, -bones.hips.userData.rest.z);
+        bones.hips.add(mesh(g, tailM));
+      }
+    }
     // satchel strap for the hero
     if (outfit === 'arthur' || outfit === 'winter') {
       const strap = new THREE.TorusGeometry(0.2, 0.012, 4, 24, Math.PI * 0.9);
@@ -741,7 +785,7 @@ export class Quadruped {
       const end = new THREE.CircleGeometry(0.128, 14); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.84, -0.52);
       body.add(mesh(end, std({ color: 0x6a2e20, roughness: 1 })));
     }
-    for (const sx of [-0.22, 0.22]) { const st = new THREE.TorusGeometry(0.125, 0.012, 5, 16); st.rotateY(Math.PI / 2); st.translate(sx, 1.83, -0.52); body.add(mesh(st, leather)); }
+    for (const sx of [-0.24, 0.24]) { const st = new THREE.TorusGeometry(0.133, 0.016, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.92, 1); st.translate(sx, 1.84, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
     for (const s of [-1, 1]) {
       const bag = sweep([{ p: V(s * 0.42, 1.52, -0.66), rx: 0.07, ry: 0.15 }, { p: V(s * 0.44, 1.5, -0.47), rx: 0.085, ry: 0.18 }, { p: V(s * 0.42, 1.52, -0.28), rx: 0.07, ry: 0.15 }], 8);
       body.add(mesh(bag, leather));

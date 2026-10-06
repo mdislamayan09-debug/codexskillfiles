@@ -73,7 +73,10 @@ const ROAD_SCALE = [1, 1, 1, 1, 1.15, 1.8];
 // horizontal and 0.75x vertical scale. Real erosion carves the ridges, cirques, talus fans and the broad glacial
 // floor that noise can only imitate. The generated world takes over at the patch edges.
 export let REAL = null; // { meta, h: Float32Array }
-export function setRealTerrain(real) {
+// further real ground laid over whole regions: [{ meta, h, region: 'desert' | 'jungle' }]
+export let PATCHES = [];
+export function setRealTerrain(real, patches = null) {
+  if (patches) PATCHES = patches;
   REAL = real;
   if (!real) return;
   const m = real.meta;
@@ -94,24 +97,38 @@ export function setRealTerrain(real) {
   for (let z = -1680; z > CABIN.z + 90; z -= 230) road.push([vx(z) + side * 75, z]);
   road.push([CABIN.x, CABIN.z]);
 }
-// Fetch and decode the baked heightmap (RGB PNG: R*256+G in 0.1 m steps). Falls back to generated mountains.
-export async function loadRealTerrain(base = 'terrain/kawuneeche') {
-  try {
-    const meta = await (await fetch(base + '.json')).json();
-    const blob = await (await fetch(base + '.png')).blob();
-    const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
-    const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(bmp.width, bmp.height) : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
-    const g = cv.getContext('2d', { willReadFrequently: true });
-    g.drawImage(bmp, 0, 0);
-    const px = g.getImageData(0, 0, bmp.width, bmp.height).data;
-    const h = new Float32Array(meta.w * meta.h);
-    for (let i = 0; i < h.length; i++) h[i] = (px[i * 4] * 256 + px[i * 4 + 1]) * meta.step - meta.offset;
-    setRealTerrain({ meta, h });
-    return true;
-  } catch (e) {
-    console.warn('real terrain unavailable; using generated mountains', e);
-    return false;
-  }
+// Fetch and decode a baked heightmap (RGB PNG: R*256+G in 0.1 m steps).
+async function loadPatch(base) {
+  const meta = await (await fetch(base + '.json')).json();
+  const blob = await (await fetch(base + '.png')).blob();
+  const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(bmp.width, bmp.height) : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  g.drawImage(bmp, 0, 0);
+  const px = g.getImageData(0, 0, bmp.width, bmp.height).data;
+  const h = new Float32Array(meta.w * meta.h);
+  for (let i = 0; i < h.length; i++) h[i] = (px[i * 4] * 256 + px[i * 4 + 1]) * meta.step - meta.offset;
+  return { meta, h };
+}
+// The north (Kawuneeche Valley), the desert (Monument Valley) and the jungle coast (Na Pali, Kauai) are real
+// ground; anything that fails to load falls back to generated terrain.
+export async function loadRealTerrain() {
+  const [north, ...rest] = await Promise.all([
+    loadPatch('terrain/kawuneeche').catch((e) => (console.warn('north terrain unavailable', e), null)),
+    loadPatch('terrain/desert').then((p) => ({ ...p, region: 'desert' })).catch(() => null),
+    loadPatch('terrain/jungle').then((p) => ({ ...p, region: 'jungle' })).catch(() => null),
+  ]);
+  setRealTerrain(north, rest.filter(Boolean));
+  return !!north;
+}
+// bilinear sample of a patch plus a 0..1 weight that fades out over `fade` metres inside its border
+function patchSample(p, x, z, fade = 260) {
+  const m = p.meta, fx = (x - m.x0) / m.cell, fz = (z - m.z0) / m.cell;
+  if (fx < 0 || fz < 0 || fx > m.w - 1.001 || fz > m.h - 1.001) return null;
+  const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j, H = p.h, k = j * m.w + i;
+  const h = lerp(lerp(H[k], H[k + 1], tx), lerp(H[k + m.w], H[k + m.w + 1], tx), tz);
+  const edge = Math.min(fx, fz, m.w - 1 - fx, m.h - 1 - fz) * m.cell;
+  return { h, w: smoothstep(0, fade, edge) };
 }
 
 // Smooth the polylines with Catmull-Rom so rivers and roads meander naturally.
@@ -280,6 +297,10 @@ export class World {
       const dh = 12 + 8 * n.fbm(x / 600, z / 600, 3) + 75 * smoothstep(0.1, 0.15, m) + 60 * smoothstep(0.31, 0.35, m) + 2.5 * n.fbm(x / 40, z / 40, 3);
       h = lerp(h, dh, R.desert);
     }
+    for (const p of PATCHES) if (p.region === 'desert' && R.desert > 0) {
+      const s = patchSample(p, x, z);
+      if (s) h = lerp(h, s.h + 0.8 * n.fbm(x / 9, z / 9, 2), R.desert * s.w);
+    }
     // Jungle: steep karst hills
     if (R.jungle > 0) {
       const jh = 22 + 55 * (0.5 + 0.5 * n.fbm(x / 500, z / 500, 4)) + 210 * Math.pow(n3.ridged(x / 640 + 7, z / 640 - 3, 4), 2.2);
@@ -295,6 +316,11 @@ export class World {
     }
     // Ocean
     if (R.ocean > 0) h = lerp(h, -16 + 4 * n.fbm(x / 400, z / 400, 3), R.ocean);
+    // the jungle coast and its sea are real ground (cliffs, ridges and the shelf below the waves)
+    for (const p of PATCHES) if (p.region === 'jungle') {
+      const s = patchSample(p, x, z, 380);
+      if (s) h = lerp(h, s.h + 0.8 * n.fbm(x / 9, z / 9, 2) * (s.h > 0 ? 1 : 0), Math.max(R.jungle, R.ocean) * s.w);
+    }
     // Lake
     const ld = Math.hypot(x - LAKE.x, z - LAKE.z) / LAKE.r + 0.25 * n2.noise(x / 160, z / 160);
     if (ld < 1.4) h = lerp(h, Math.min(h, -6 + ld * 7), smoothstep(1.35, 0.85, ld));
@@ -487,7 +513,7 @@ export class World {
             if (next >= bands.length) { w.terminate(); return; }
             const [a, b] = bands[next++];
             // each worker gets the real heightmap with its first band
-            w.postMessage({ seed: this.seed, res: RES, j0: a, j1: b, real: w.gotReal ? null : REAL });
+            w.postMessage({ seed: this.seed, res: RES, j0: a, j1: b, real: w.gotReal ? null : REAL, patches: w.gotReal ? null : PATCHES });
             w.gotReal = true;
           };
           for (let k = 0; k < nW; k++) {
