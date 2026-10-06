@@ -1301,7 +1301,8 @@ export class Vegetation {
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
-    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd, true, 2), material: rMat }] }));
+    // (bare-ledge granite: with the snowfield boulders' full snow crown, crags on a cliff read as white pills)
+    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd, true, 2), material: rMatBare }] }));
     this.crags = new ScatterLayer(scene, cragBuilds, 6000, 2600);
 
     this.quality = quality;

@@ -170,7 +170,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (caught in clumps on the hat, shoulders, bedroll and rump, as in the reference's storm; a faint even
           // dusting read as no snow at all)
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.45, 0.9, wn.y) * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 60.0 + vRest.y * 20.0) + 0.4 * vnoise(vRest.xz * 13.0 - vRest.y * 7.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.6'});
+          // (lighter on the horse: clumped white on a chestnut coat read as pinto speckles)
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.5' : '0.22'});
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));

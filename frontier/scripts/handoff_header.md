@@ -99,8 +99,22 @@ are older RDR2 frames from the earlier world v1.
 | 46 | 4 | 4 | 3.5 | |
 | 47 | 4 | 5 | 3 | vista went milky (haze); fixes are in later commits |
 
-The commits after round 47 (rounds 48 and 49) have **never been captured or scored**; capture them first. They
-add:
+**Round 49** (the latest frames in `latest_frames/w49_*.jpg`, rendered supersampled at `ss=1.5`) has been
+captured but **not yet critiqued**; run the blind critic on it first. By eye:
+- The vista made a clear step forward: a dark flat storm deck with breaks of light, crisper mountains, textured
+  forests, and the homestead with chimney smoke in the lower centre.
+- The pines frame is lusher (ferns and shrub drifts along a softer trail) but darker, with the sun hidden.
+- The rider still shows a dark triangle on the coat's upper back, and a pale bar beside the saddle (the rifle
+  scabbard or stock area in `addTack`). Investigate both.
+- The snow ride moved to a new canyon spot (the creek-seeking search). It shows:
+  - a big pale cliff wall on the left, and a thin white line running across it. Find out what draws that line;
+    suspects are a road splat, a frozen-fall streak or a rib.
+  - white "pill" crags on the cliff face. Fixed afterwards: crags now use the bare-granite material.
+  - pinto-like snow speckles on the horse's rump. Fixed afterwards: lighter snow on animals.
+
+  The valley, firs and snowfield read well.
+
+The commits captured in round 49 (rounds 48 and 49) add:
 - a low storm deck
 - warm forest haze and longer shafts
 - matte split granite
@@ -112,6 +126,11 @@ add:
 - fixes to the tail, coat and tack
 - a creek-seeking snow ride location
 - 2× snowfall
+
+Committed after the round 49 capture started, so not yet rendered:
+- bedded strata and snow lying on the ledges of snow-country cliffs (`terrain.js`)
+- a trampled, dirty-snow yard round the vista homestead (`world.stampPad`)
+- crags in bare granite, and lighter snow on the horse
 
 ## 4. The working method: the gauntlet loop
 
