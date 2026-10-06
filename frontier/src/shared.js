@@ -153,7 +153,7 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
       }`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${GLSL_FOG_PARS}\n${GLSL_SUNSHADOW}\nvarying vec3 vWPos;\n${fragHead}`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n gl_FragColor.rgb = applyAtmosphere(gl_FragColor.rgb, vWPos);`);
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>\n gl_FragColor.rgb = applyAtmosphere(min(gl_FragColor.rgb, vec3(4.0)), vWPos);`);   // clamp specular fireflies before bloom
     if (fragColor) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', fragColor);
     if (sunShadow) {
       shader.fragmentShader = shader.fragmentShader
