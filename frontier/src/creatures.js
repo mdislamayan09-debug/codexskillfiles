@@ -960,9 +960,16 @@ export class Quadruped {
     }
     for (const sx of [-0.24, 0.24]) { const st = new THREE.TorusGeometry(0.133, 0.016, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.92, 1); st.translate(sx, 1.84, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
     for (const s of [-1, 1]) {
-      const bag = sweep([{ p: V(s * 0.42, 1.52, -0.66), rx: 0.07, ry: 0.15 }, { p: V(s * 0.44, 1.5, -0.47), rx: 0.085, ry: 0.18 }, { p: V(s * 0.42, 1.52, -0.28), rx: 0.07, ry: 0.15 }], 8);
+      // a soft, bulging leather bag (a five-point sweep, rounded at both ends) with a flap and two buckled straps
+      const bag = sweep([{ p: V(s * 0.41, 1.52, -0.7), rx: 0.03, ry: 0.07 }, { p: V(s * 0.43, 1.5, -0.64), rx: 0.075, ry: 0.15 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.09, ry: 0.18 },
+        { p: V(s * 0.43, 1.5, -0.3), rx: 0.075, ry: 0.15 }, { p: V(s * 0.41, 1.52, -0.24), rx: 0.03, ry: 0.07 }], 14);
       body.add(mesh(bag, leather));
-      const flap = new THREE.BoxGeometry(0.03, 0.12, 0.36); flap.translate(s * 0.51, 1.6, -0.47); body.add(mesh(flap, leather));
+      const flap = sweep([{ p: V(s * 0.5, 1.62, -0.66), rx: 0.012, ry: 0.06 }, { p: V(s * 0.535, 1.6, -0.47), rx: 0.014, ry: 0.075 }, { p: V(s * 0.5, 1.62, -0.28), rx: 0.012, ry: 0.06 }], 10);
+      body.add(mesh(flap, leather));
+      for (const zz of [-0.56, -0.38]) {
+        const st = new THREE.TorusGeometry(0.17, 0.008, 4, 18, Math.PI); st.rotateY(Math.PI / 2); st.rotateX(Math.PI / 2); st.scale(1, 1, 0.55); st.translate(s * 0.44, 1.5, zz);
+        body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 })));
+      }
       const strap = new THREE.BoxGeometry(0.02, 0.5, 0.05); strap.translate(s * 0.38, 1.43, 0.05); body.add(mesh(strap, leather));
       const stir = new THREE.TorusGeometry(0.06, 0.012, 4, 10); stir.translate(s * 0.42, 1.14, 0.05);
       body.add(mesh(stir, std({ color: 0x3a3632, metalness: 0.6 })));

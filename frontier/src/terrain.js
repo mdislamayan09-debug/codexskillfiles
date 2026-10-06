@@ -202,7 +202,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // snow follows the slope: it holds on ledges and benches (where the relief normal flattens) and sheds off
   // steep faces, instead of lying in noise-shaped blotches
   // high faces are wind-plastered: snow clings to steeper ground up there
-  float hiSnow = 0.5 * smoothstep(480.0, 760.0, wp.y + 60.0 * (fbm2(xz / 90.0) - 0.5)) * smoothstep(0.5, 0.8, snowC);
+  float hiSnow = 0.3 * smoothstep(480.0, 760.0, wp.y + 60.0 * (fbm2(xz / 90.0) - 0.5)) * smoothstep(0.5, 0.8, snowC);
   // curvature: wind strips the convex ribs and crests to rock and packs the snow into gullies and couloirs
   float lapS = 0.0;
   {

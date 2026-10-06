@@ -244,8 +244,8 @@ async function init() {
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.75, 2.85, -3.9], lookRel: [0.2, 3.0, 22], trailDress: true }; },
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-0.7, 2.8, -4.0], lookRel: [-0.6, 1.9, 18], weather: 'snow' }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [1.25, 2.9, -4.1], lookRel: [0.1, 2.9, 22], trailDress: true }; },
+    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [-1.25, 2.85, -4.2], lookRel: [-0.3, 1.9, 18], weather: 'snow' }; },
     snowvista: () => { const v = G.findVista(); return { foreground: true, weather: { storm: 0.78, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, 3.2], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
@@ -671,7 +671,9 @@ async function init() {
     U.uWindStrength.value = 0.8 + Math.sin(U.uTime.value * 0.11) * 0.3;
     // local mist: denser among trees and in the early morning
     {
-      const fo = world.splatAt(camera.position.x, camera.position.z).forest;
+      // forest around the camera, not just under it (a trail through deep woods has no forest on the trail itself)
+      let fo = world.splatAt(camera.position.x, camera.position.z).forest;
+      for (const rr of [12, 30]) for (let k = 0; k < 8; k++) { const a = k * 0.785 + rr; fo = Math.max(fo, 0.85 * world.splatAt(camera.position.x + Math.cos(a) * rr, camera.position.z + Math.sin(a) * rr).forest); }
       const morning = Math.max(0, 1 - Math.abs(sky.time - 7.5) / 2.5);
       const low = 1 - THREE.MathUtils.smoothstep(camera.position.y - world.heightAt(camera.position.x, camera.position.z), 6, 20);
       G.mistK = 1 + (fo * 0.85 + morning * 1.5) * low;

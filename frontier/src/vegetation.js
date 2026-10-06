@@ -936,7 +936,10 @@ function rockMaterial(surf = {}) {
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - rcl.r);
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
-      float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.25, 0.65, wn.y + (n1 - 0.5) * 0.5);
+      // snow only lodges on flat tops and ledges, broken up; the faces stay rock with pale lichen
+      float rsnow = smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.6, 0.85, wn.y + (n1 - 0.5) * 0.6 + 0.25 * (n2 - 0.5)) * 0.9;
+      float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(150,152,118)), lichen * 0.55);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,

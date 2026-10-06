@@ -119,7 +119,8 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
   const hgt = new Float32Array(W * H), tone = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x / W, v = y / H;
-    const warp = 0.035 * Math.sin(TAU * 3 * v + ph[0]) + 0.02 * Math.sin(TAU * (7 * v + 2 * u) + ph[1]) + 0.012 * Math.sin(TAU * (13 * v - 3 * u) + ph[2]);
+    // gentle, long wander only: higher-frequency warp made the furrows read as worms
+    const warp = 0.018 * Math.sin(TAU * 2 * v + ph[0]) + 0.008 * Math.sin(TAU * (3 * v + u) + ph[1]);
     const r1 = Math.pow(Math.abs(Math.sin(Math.PI * 9 * (u + warp))), 0.55);
     const r2 = Math.pow(Math.abs(Math.sin(Math.PI * 14 * (u + 1.4 * warp + 0.031) + ph[3])), 0.7);
     let ridge = 0.68 * r1 + 0.32 * r2;
