@@ -287,9 +287,21 @@ function humanPrims(o) {
 
 // ---- the MakeHuman body (CC0): a real human form, rigged onto the game skeleton (scripts/build_human.py) ----
 let MH = null;
-export async function loadHumanModel(url = 'models/human.bin') {
+// the model ships as a lossless PNG (3 bytes per pixel, a uint32 length first) so any static host serves it
+async function fetchPackedBytes(url) {
+  const bmp = await createImageBitmap(await (await fetch(url)).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(bmp.width, bmp.height) : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  g.drawImage(bmp, 0, 0);
+  const px = g.getImageData(0, 0, bmp.width, bmp.height).data;
+  const rgb = new Uint8Array((px.length / 4) * 3);
+  for (let i = 0, j = 0; i < px.length; i += 4) { rgb[j++] = px[i]; rgb[j++] = px[i + 1]; rgb[j++] = px[i + 2]; }
+  const n = rgb[0] | (rgb[1] << 8) | (rgb[2] << 16) | (rgb[3] << 24);
+  return rgb.slice(4, 4 + n).buffer;
+}
+export async function loadHumanModel(url = 'models/human.png') {
   try {
-    const buf = await (await fetch(url)).arrayBuffer();
+    const buf = url.endsWith('.png') ? await fetchPackedBytes(url) : await (await fetch(url)).arrayBuffer();
     const hl = new DataView(buf).getUint32(0, true);
     const hdr = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl)));
     const base = 4 + hl, A = {};

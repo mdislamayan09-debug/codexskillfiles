@@ -209,3 +209,14 @@ with open(OUT, 'wb') as f:
 print('vertices', len(P), 'triangles', len(tris), 'height %.3f' % P[:, 1].max(), 'bytes', 4 + len(hj) + off)
 print('rest', json.dumps(hdr['rest']))
 print('eyes', hdr['eyes'], 'regions', np.bincount(reg).tolist())
+
+# ---------------------------------------------------------------- also packed as a lossless PNG (3 bytes per pixel)
+# web hosts that only serve media types (the published artifact) take this copy; the game reads either
+from PIL import Image
+raw = open(OUT, 'rb').read()  # the .bin is a build intermediate; the game ships the .png
+Wp = 1024
+Hp = (len(raw) + 4 + Wp * 3 - 1) // (Wp * 3)
+buf = struct.pack('<I', len(raw)) + raw
+buf += b'\0' * (Wp * Hp * 3 - len(buf))
+Image.frombytes('RGB', (Wp, Hp), buf).save(OUT.rsplit('.', 1)[0] + '.png', optimize=True)
+print('png', Wp, Hp)
