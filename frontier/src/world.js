@@ -240,7 +240,11 @@ export class World {
       const wx = x + 420 * n2.fbm(x / 1700, z / 1700, 3), wz = z + 420 * n2.fbm(x / 1700 + 5.3, z / 1700, 3);
       const ridge = n.ridged(wx / 1650 + 10, wz / 1650, 6);
       const massif = 0.6 + 0.4 * n.fbm(wx / 3000, wz / 3000, 3);
-      h += mt * (Math.pow(ridge, 1.35) * 950 * massif + 150 * massif + 60 * n2.fbm(x / 350, z / 350, 4));
+      // beside the autumn hills the boundary is old, rounded Appalachian-style ridges rather than alpine spires
+      const soft = smoothstep(0.1, 0.5, R.autumn) * (R.edge > R.range ? 1 : 0);
+      const alp = Math.pow(ridge, 1.35) * 950 * massif + 150 * massif + 60 * n2.fbm(x / 350, z / 350, 4);
+      const old = 140 + 260 * Math.pow(n.fbm(wx / 1300 + 3, wz / 1300, 5) * 0.5 + 0.5, 1.6) + 40 * n2.fbm(x / 300, z / 300, 4);
+      h += mt * lerp(alp, old, soft);
     }
     // erosion-like ridges and gullies on high ground
     const hi = smoothstep(110, 420, h);

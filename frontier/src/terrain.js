@@ -370,7 +370,7 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(26,50,20)), srgb(vec3(40,68,26)), cn), ccl.g);                       // jungle
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.55, 0.85, vnoise(vWPos.xz / 3.0)) * smoothstep(5.0, 1.5, cfp) * 0.6 + 0.12), smoothstep(0.4, 0.8, ccl.r));
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.45 + 0.1), smoothstep(0.4, 0.8, ccl.r));
           // crown relief: the canopy is a field of domes (sunlit tops, shaded gaps), not a flat green skin
           if (canopyK > 0.01) {
             float cs = mix(5.5, 8.0, ccl0.g);                       // rainforest crowns are broader
@@ -388,7 +388,7 @@ export class Terrain {
             float fade = smoothstep(9.0, 2.5, cfp);                  // relief only where a crown spans pixels
             vec3 cn = normalize(vec3(-grad.x, 0.9, -grad.y));
             nW = normalize(mix(nW, normalize(nW * 0.4 + cn), canopyK * fade * 0.9));
-            canopy *= mix(1.0, 0.55 + 0.75 * smoothstep(0.0, 0.35, dome), fade);
+            canopy *= mix(1.0, 0.78 + 0.36 * smoothstep(0.0, 0.35, dome) + 0.12 * (fbm2(vWPos.xz / 23.0) - 0.5), fade);
           }
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);

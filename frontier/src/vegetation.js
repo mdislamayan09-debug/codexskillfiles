@@ -203,16 +203,16 @@ function buildOak(seed) {
   }
   grow(trunkTop, new THREE.Vector3(0, 1, 0), height * 0.26, 0.36, 3);
   // leaf clusters
-  const leafSize = 3.0 + rnd() * 0.9;
+  const leafSize = 2.1 + rnd() * 0.6;
   for (const t of tips) {
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < 5; k++) {
       const c = t.clone().add(new THREE.Vector3((rnd() - 0.5) * 1.8, (rnd() - 0.35) * 1.3, (rnd() - 0.5) * 1.8));
       leaves.push(cardGeo(leafSize * (0.8 + rnd() * 0.5), c, canopyC, rnd));
     }
   }
   // fill the crown interior so it reads as a mass, not lollipops
   const crownR = Math.max(...tips.map((t) => Math.hypot(t.x, t.z))) * 0.75 + 1;
-  for (let k = 0; k < 14; k++) {
+  for (let k = 0; k < 26; k++) {
     const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * crownR;
     const c = new THREE.Vector3(Math.cos(a) * rr, canopyC.y + (rnd() - 0.5) * height * 0.22, Math.sin(a) * rr);
     leaves.push(cardGeo(leafSize * 1.1, c, canopyC, rnd));
@@ -227,13 +227,16 @@ function buildPine(seed, kind = 'pine') {
   const rnd = mulberry32(seed);
   const wood = [], leaves = [];
   const height = kind === 'tall' ? 26 + rnd() * 9 : kind === 'fir' ? 11 + rnd() * 7 : 14 + rnd() * 9;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, height - 2.4, 0), (kind === 'tall' ? 0.78 : 0.38) + rnd() * 0.12, 0.06, 8));
+  // trunk in two tapering sections (flared base, then a steady taper to the leader)
+  const r0 = (kind === 'tall' ? 0.5 : 0.34) + rnd() * 0.12;
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
+  wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.4, height - 2.4, (rnd() - 0.5) * 0.4), r0, 0.05, 9));
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
   const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
     // dead lower branch stubs on the bare trunk
-    for (let i = 0; i < 9; i++) {
-      const y = 2 + rnd() * (base - 2), a = rnd() * 6.28, L = 0.6 + rnd() * 1.4;
+    for (let i = 0; i < 16; i++) {
+      const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.5 + rnd() * 1.6 * (y / base);
       wood.push(branchGeo(new THREE.Vector3(0, y, 0), new THREE.Vector3(Math.cos(a) * L, y - 0.2 - rnd() * 0.4, Math.sin(a) * L), 0.06, 0.02, 4));
     }
   }
@@ -1088,7 +1091,7 @@ export class Vegetation {
       this.clutter = [
         makeClutter(scene, cone, { spacing: 0.9 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
         makeClutter(scene, twig, { spacing: 1.6 / Math.sqrt(q), radius: 34, smin: 0.5, smax: 1.6, color: 0x5a4632, flat: true, seed: 5 }),
-        makeClutter(scene, stone, { spacing: 2.2 / Math.sqrt(q), radius: 40, smin: 0.12, smax: 0.55, color: 0x8a8278, roughness: 0.85, mode: 'stone', seed: 9 }),
+        makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x5e5a52, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];
     }
   }

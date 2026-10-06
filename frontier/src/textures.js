@@ -24,11 +24,12 @@ export function leafCardTexture(seed = 1, hue = 85) {
   const r = mulberry32(seed);
   g.clearRect(0, 0, 512, 512);
   // irregular sub-clusters joined by twigs
+  // many small sprays with sky between them: a lacy silhouette instead of a solid blob
   const clusters = [];
-  const n = 6 + Math.floor(r() * 4);
+  const n = 14 + Math.floor(r() * 6);
   for (let i = 0; i < n; i++) {
-    const a = r() * Math.PI * 2, d = 40 + r() * 160;
-    clusters.push([256 + Math.cos(a) * d, 250 + Math.sin(a) * d * 0.85, 45 + r() * 55]);
+    const a = r() * Math.PI * 2, d = 30 + Math.pow(r(), 0.8) * 190;
+    clusters.push([256 + Math.cos(a) * d, 250 + Math.sin(a) * d * 0.85, 22 + r() * 30]);
   }
   g.strokeStyle = 'rgba(58,44,30,1)'; g.lineCap = 'round';
   for (const [x, y] of clusters) {
@@ -37,15 +38,18 @@ export function leafCardTexture(seed = 1, hue = 85) {
     g.quadraticCurveTo(256 + (x - 256) * 0.3, 380, x, y); g.stroke();
   }
   for (const [cx, cy, cr] of clusters) {
-    const count = Math.floor(cr * cr * 0.09);
+    const count = Math.floor(cr * cr * 0.11);
     for (let i = 0; i < count; i++) {
-      const a = r() * Math.PI * 2, rad = Math.pow(r(), 0.7) * cr;
+      const a = r() * Math.PI * 2, rad = Math.pow(r(), 0.55) * cr;
       const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad * 0.85;
       const top = 1 - (y - (cy - cr)) / (2 * cr); // lighter on top (sky lit)
       const l = 14 + top * 20 + (rad / cr) * 8 + r() * 10;
       g.fillStyle = hsl(hue + (r() - 0.5) * 22, 24 + r() * 18, l * 0.85);
-      g.save(); g.translate(x, y); g.rotate(r() * Math.PI);
-      g.beginPath(); g.ellipse(0, 0, 6 + r() * 5, 3 + r() * 2.2, 0, 0, Math.PI * 2); g.fill();
+      // a pointed leaf with a darker midrib, hanging from the spray at its own angle
+      const L = 7 + r() * 6, Wd = 2.6 + r() * 2;
+      g.save(); g.translate(x, y); g.rotate(a + (r() - 0.5) * 1.2);
+      g.beginPath(); g.moveTo(-L, 0); g.quadraticCurveTo(0, -Wd * 1.6, L, 0); g.quadraticCurveTo(0, Wd * 1.6, -L, 0); g.fill();
+      g.strokeStyle = 'rgba(30,26,14,0.35)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-L * 0.8, 0); g.lineTo(L * 0.8, 0); g.stroke();
       g.restore();
     }
   }

@@ -51,7 +51,8 @@ float cloudDen(vec3 p, float cov){
   float weather = texture(tCloud, vec3(p.xz / 26000.0, 0.37)).b;
   vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
   // a storm closes the gaps into a continuous, lumpy deck
-  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.22 * uStorm, 0.0, 1.0);
+  // a storm deck: heavy, but torn with breaks of brighter sky between the cells
+  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.16 * uStorm * smoothstep(0.25, 0.6, weather), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   float prof = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.45 + 0.4 * weather, h);
   float d = remap(lo.r * prof, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
