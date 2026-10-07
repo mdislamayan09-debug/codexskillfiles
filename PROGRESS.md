@@ -638,3 +638,22 @@ Stills (`?capture`) are unaffected and keep every setting at its highest.
 What it names now: pines floor litter (cones, twigs, branches, stones in a continuous layer), uniform trunk bark
 and flared bases, one symmetric young fir, hard radial rays; snow ride cliffs as slabs, a single mid-blue value
 band; vista terracing bands, thresholded-looking cloud, no aerial layering.
+
+### Rounds 56-57: timber in the valley, litter on the pine floor
+- **Snow vista.** Closed spruce stands planted over the whole view below a treeline (about 19,000 trees, as
+  billboards beyond 270 m), in broad masses with meadows between, with the ground under them shaded as forest
+  floor: the mountainsides now carry dark timber up to a line, as the reference's do. The valley's creek is
+  widened to a frozen river. The strata pass cuts true cliffs only (steeper than about 40 degrees); on ordinary
+  valley sides it had drawn contour lines. The storm cloud's underside is modelled by its own density. The
+  lookout's granite blocks have hard creased edges where joint planes meet. The yard is trodden and a sled track
+  leaves it. River ice is matte (as a mirror it came out paler than the snow from above).
+- **Pines.** Open ground in the pine belt is needle duff, not lawn. Forked twigs and fallen boughs lie in drifts,
+  and close to the lens the ground shader draws a litter of sticks and needle clusters. The log is weathered and
+  mossy along its top. Shrubs each take their own shade and glow a little against the sun. The light shafts have
+  feathered edges and uneven dust; the haze reaches up into the crowns. A rim light draws rider and horse against
+  the sun. A lighter, weathered hat.
+- **Round 56 critic** (before the pines floor work): pines 4, snowride 4, snowvista 3, all "clearly".
+
+Scores have stayed in the 3-4.5 band for seven rounds while the frames have changed a great deal; the critic's
+notes have moved from composition and lighting to asset fidelity (bark, needles, rock, cloth, coat, cloud
+volume). That is where the remaining distance is.

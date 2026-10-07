@@ -71,6 +71,10 @@ const VolumetricShader = {
     varying vec2 vUv;
     float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
     float hg(float g, float mu){ float g2 = g*g; return (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0*g*mu, 1.5)); }
+    float h31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
+      return mix(mix(mix(h31(i), h31(i+vec3(1,0,0)), f.x), mix(h31(i+vec3(0,1,0)), h31(i+vec3(1,1,0)), f.x), f.y),
+                 mix(mix(h31(i+vec3(0,0,1)), h31(i+vec3(1,0,1)), f.x), mix(h31(i+vec3(0,1,1)), h31(i+vec3(1,1,1)), f.x), f.y), f.z); }
     void main(){
       vec4 base = texture2D(tDiffuse, vUv);
       if (uStrength <= 0.001) { gl_FragColor = base; return; }
@@ -100,8 +104,11 @@ const VolumetricShader = {
         vec3 p = uCamPos + rd * t;
         vec4 sc = uShadowMatrix * vec4(p, 1.0);
         float s = 1.0;
-        if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) s = texture(tShadow, vec3(sc.xy, sc.z - 0.0006));
-        float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff);
+        // (the sun is a disc and the canopy moves: each step looks up the shadow a little to one side, which feathers
+        // the beams' edges; and the dust hangs unevenly, in drifts, so a beam is not one even streak)
+        vec2 so = (vec2(ign(gl_FragCoord.xy + float(i) * 7.3), ign(gl_FragCoord.yx + float(i) * 3.1)) - 0.5) * 0.0022;
+        if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) s = texture(tShadow, vec3(sc.xy + so, sc.z - 0.0006));
+        float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff) * (0.45 + 1.1 * n3(p * 0.11 + vec3(uTime * 0.02, 0.0, uTime * 0.013)));
         float a = den * dt;
         lit += T * s * a;
         amb += T * a;
@@ -151,7 +158,7 @@ const GradeShader = {
       {
         // (cool teal-green in the shade against warm gold in the light: an even olive cast read as grey-green mud)
         // (true blacks under the boughs and a cool shade: an even yellow-green wash read as one flat tone)
-        vec3 c2 = sat(col, 1.08) * mix(vec3(0.86, 0.95, 1.0), vec3(1.04, 0.99, 0.92), smoothstep(0.1, 0.65, l));
+        vec3 c2 = sat(col, 1.22) * mix(vec3(0.84, 0.95, 1.03), vec3(1.05, 0.99, 0.9), smoothstep(0.1, 0.65, l));
         c2 = max(c2 - 0.03, 0.0) * 1.04;
         c2 -= 0.34 * max(c2 - 0.33, 0.0);
         col = mix(col, c2, uForest);
@@ -271,7 +278,7 @@ export class Post {
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
         v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.15);
-        v.uDensity.value = state.volDensity ?? 0.006; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
+        v.uDensity.value = state.volDensity ?? 0.0034; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

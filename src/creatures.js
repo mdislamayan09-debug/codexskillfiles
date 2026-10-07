@@ -228,10 +228,12 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         {
           vec3 Vv = normalize(vViewPosition);
           // (a coat of hair scatters light at grazing angles: a softer, wider rim on animals)
-          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '5.0'});
+          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '3.5'});
           vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           float back = smoothstep(-0.2, 0.8, dot(-Vv, wsun));
-          totalEmissiveRadiance += diffuseColor.rgb * uSunColor * fres * back * ${quad ? '0.5' : '0.35'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.3' : '0.15'};
+          // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
+          // dark they are face on)
+          totalEmissiveRadiance += (diffuseColor.rgb + 0.035) * uSunColor * fres * back * ${quad ? '0.3' : '0.6'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.3' : '0.15'};
         }`);
     },
   });
@@ -241,7 +243,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x9a7a56, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x503522, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x3e352c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x503522, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x5c4b3a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },

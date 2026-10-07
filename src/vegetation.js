@@ -42,6 +42,15 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
   #include <color_fragment>
   {
     vec4 cl = climateAt(${pos}.xz);
+    #ifndef CONIFER_SNOW
+    #ifdef USE_MAP
+    {
+      // every shrub and broadleaf crown its own shade: yellow-green new growth, dark old leaf, a few going brown
+      float pv = hash12(floor(${pos}.xz * 1.7) + 2.3);
+      diffuseColor.rgb *= mix(vec3(0.7, 0.76, 0.7), vec3(1.08, 1.02, 0.74), pv) * mix(vec3(1.0), vec3(1.1, 0.86, 0.62), step(0.86, fract(pv * 7.31)));
+    }
+    #endif
+    #endif
     #ifdef AUTUMN_LEAVES
     if (cl.b > 0.02) {
       float th = hash12(floor(${pos}.xz * 0.37) + 7.0);
@@ -848,6 +857,10 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       vec3 objectNormal = cRot * normal;
     `,
     vertexBody: /* glsl */ `
+      {
+        vec4 cp = projectionMatrix * (viewMatrix * vec4(xz.x, heightAt(xz) + 0.1, xz.y, 1.0));
+        if (cp.w < -3.5 || abs(cp.x) > cp.w * 1.15 + 4.0 || abs(cp.y) > cp.w * 1.25 + 4.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      }
       vec4 sp = splatAt(xz);
       vec4 cl = climateAt(xz);
       float dist = length(xz - cam);
@@ -1262,7 +1275,8 @@ export class Vegetation {
       const c = new THREE.Vector3(0, 0.5, 0);
       for (let k = 0; k < 7; k++) cards.push(cardGeo(1.3 + rnd() * 0.6, new THREE.Vector3((rnd() - 0.5) * 1.2, 0.45 + rnd() * 0.5, (rnd() - 0.5) * 1.2), c, rnd, 1, 0.9));
       const g = leafAO(setSway(mergeGeometries(cards), (x, y) => y * 0.25));
-      bushBuilds.push({ parts: [{ geometry: g, material: oakMats[i % 3], depth: windDepthMaterial(oakTex[i % 3], 1) }] });
+      // (thin leaves that glow when the sun is behind them)
+      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0xb4bca0, true, 0.3, 0.16), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
     }
     // ferns (3, 4), big-leaf jungle plants (5, 6), dry scrub (7, 8)
     const fernT = fernTexture(), fernMat = leafMat(fernT, 0xb8bc9e);   // (muted: a saturated card green reads as pasted on)
@@ -1311,7 +1325,18 @@ export class Vegetation {
     }
     this.bushes = new ScatterLayer(scene, bushBuilds, Math.round(6000 * Math.max(1, quality * quality)), 140 * Math.sqrt(quality));
     // fallen logs on forest floors
-    const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: pineBark }] }));
+    // an old fallen trunk: grey weathered bark, moss and lichen along its upper side (the trees' own bark, laid on
+    // its side, read as a striped tube)
+    const logMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.4, 1.4), color: new THREE.Color(0.95, 0.9, 0.86), roughness: 0.96 }), 0, {
+      fragColor: `#include <color_fragment>
+        {
+          vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
+          float n1 = fbm2(vWPos.xz * 1.6 + vWPos.y * 2.0), n2 = vnoise(vWPos.xz * 9.0 + vWPos.y * 7.0);
+          diffuseColor.rgb *= 0.75 + 0.5 * n1;
+          float moss = smoothstep(0.25, 0.75, wn.y + (n1 - 0.5) * 0.9) * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.06, 0.085, 0.03) * (0.7 + 0.7 * n2), moss * 0.7);
+        }` });
+    const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: logMat }] }));
     this.logs = new ScatterLayer(scene, logBuilds, 1200, 170 * Math.sqrt(quality));
 
     // rocks
@@ -1354,7 +1379,11 @@ export class Vegetation {
         for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.16 * v; col[i * 3 + 1] = 0.1 * v; col[i * 3 + 2] = 0.055 * v; }
         c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
       })();
-      const twig = (() => { const t = new THREE.CylinderGeometry(0.018, 0.03, 1.0, 5); t.rotateZ(Math.PI / 2); t.translate(0, 0.02, 0); return t; })();
+      // a fallen twig: a bent stick with two side shoots (a plain cylinder read as a dropped dowel), and a longer
+      // dead bough with its branchlets
+      const stick = (segs) => mergeGeometries(segs.map(([ax, az, bx, bz, r0, r1, y]) => { const L = Math.hypot(bx - ax, bz - az); const t = new THREE.CylinderGeometry(r1, r0, L, 5); t.rotateZ(Math.PI / 2); t.rotateY(-Math.atan2(bz - az, bx - ax)); t.translate((ax + bx) / 2, y ?? 0.018, (az + bz) / 2); return t; }));
+      const twig = stick([[-0.5, 0, 0.04, 0.035, 0.016, 0.013], [0.04, 0.035, 0.5, -0.05, 0.013, 0.006], [-0.12, 0.01, 0.16, 0.2, 0.009, 0.004], [0.14, 0.03, 0.36, -0.17, 0.008, 0.003]]);
+      const bough = stick([[-1.4, 0, -0.3, 0.1, 0.045, 0.036, 0.04], [-0.3, 0.1, 0.8, -0.05, 0.036, 0.024, 0.035], [0.8, -0.05, 1.5, 0.12, 0.024, 0.01, 0.03], [-0.7, 0.05, -0.2, 0.55, 0.02, 0.008, 0.05], [0.1, 0.06, 0.7, -0.5, 0.018, 0.007, 0.06], [0.5, -0.02, 0.95, 0.4, 0.014, 0.005, 0.07], [-1.0, 0.02, -0.75, -0.4, 0.016, 0.006, 0.05]]);
       const stone = (() => {
         const st = new THREE.IcosahedronGeometry(0.5, 1), p = st.attributes.position;
         for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.6, p.getZ(i) * k); }
@@ -1363,7 +1392,9 @@ export class Vegetation {
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
         makeClutter(scene, cone, { spacing: 0.8 / Math.sqrt(q), radius: 26, smin: 0.7, smax: 1.15, color: 0xffffff, seed: 3 }),
-        makeClutter(scene, twig, { spacing: 1.9 / Math.sqrt(q), radius: 34, smin: 0.4, smax: 1.3, color: 0x5a4632, flat: true, seed: 5 }),
+        // (weathered grey-brown and plentiful: the reference's floor is strewn with them)
+        makeClutter(scene, twig, { spacing: 1.05 / Math.sqrt(q), radius: 30, smin: 0.35, smax: 1.25, color: 0x8a7964, flat: true, seed: 5 }),
+        makeClutter(scene, bough, { spacing: 4.6 / Math.sqrt(q), radius: 44, smin: 0.6, smax: 1.3, color: 0x74624e, flat: true, seed: 11 }),
         makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];
     }

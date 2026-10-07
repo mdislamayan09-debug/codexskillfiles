@@ -150,6 +150,23 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.6, 0.78, fbm2(xz / 9.0 + 12.0)) * pineK * 0.45);
   // the open pine floor: a dry duff the low sun rakes across, mottled darker where it lies thick and damp
   forestFloor *= 1.0 - 0.28 * pineK * smoothstep(0.35, 0.7, fbm2(xz / 6.0 + 2.2));
+  // close to the lens the duff is a litter of fallen twigs and rusty needle clusters lying every way (drawn here, by
+  // the thousand, where the modelled twigs and cones could only ever be a sprinkle on a smooth floor)
+  if (pineK > 0.01 && fp < 0.09) {
+    float nearK = pineK * smoothstep(0.09, 0.03, fp);
+    for (int L = 0; L < 3; L++) {
+      float cs = L == 0 ? 0.47 : L == 1 ? 0.21 : 0.11;
+      vec2 gc = floor(xz / cs + float(L) * 3.7), gf = fract(xz / cs + float(L) * 3.7) - 0.5;
+      vec2 hh = hash22(gc + float(L) * 17.3);
+      float ang = hh.x * 6.2832;
+      vec2 dir = vec2(cos(ang), sin(ang));
+      vec2 q = gf - (hh.yx - 0.5) * 0.3;
+      float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x)) + 0.05 * sin(along * 9.0 + hh.y * 6.0);
+      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : 0.35, hash12(gc + 5.1));
+      vec3 sc2 = L == 0 ? srgb(vec3(126,110,90)) : L == 1 ? srgb(vec3(104,74,46)) : srgb(vec3(60,46,34));
+      forestFloor = mix(forestFloor, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8));
+    }
+  }
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
@@ -281,7 +298,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
 
   vec3 c = grass; rough = 0.92;
   vec3 tn = gN;
-  float ff = smoothstep(0.25, 0.75, forest);
+  // (in the pine belt the open ground along a trail is needle duff too, with grass standing on it in tufts: as
+  // lawn it lay beside the tread like a green carpet)
+  float ff = max(smoothstep(0.25, 0.75, forest), pineK * 0.88);
   c = mix(c, forestFloor, ff); tn = mix(tn, lN, ff);
   // desert flats: sand with scattered dry scrub ground
   float desG = des * (1.0 - 0.35 * smoothstep(0.55, 0.75, patchy));
