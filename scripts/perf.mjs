@@ -10,7 +10,8 @@ page.on('pageerror', (e) => errs.push('[pageerror] ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/404/.test(m.text())) errs.push(m.text().slice(0, 300)); });
 const t0 = Date.now();
 await page.goto(url, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 600000, polling: 500 });
+await page.waitForFunction(() => (window.__game && window.__game.ready) || /^Error/.test(document.querySelector('#loading .status')?.textContent || ''), null, { timeout: 600000, polling: 500 });
+{ const st = await page.evaluate(() => (window.__game && window.__game.ready) ? '' : document.querySelector('#loading .status').textContent); if (st) { console.log('GAME FAILED TO START: ' + st); await browser.close(); process.exit(1); } }
 console.log(`ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 await page.keyboard.press('Enter');
 await page.waitForTimeout(2500);

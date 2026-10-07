@@ -82,7 +82,7 @@ const VolumetricShader = {
       // sky seen up through the trees is bright haze, as the reference's: the air between here and the clouds is
       // full of the same lit dust (a hard-edged cumulus showing through the canopy read as a glowing blob)
       if (z >= 0.99999) {
-        vec3 hz = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 0.98, 0.86), 0.55) * (0.1 + 0.2 * pow(max(dot(rd0, uSunDir), 0.0), 4.0));
+        vec3 hz = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.02, 1.0, 0.95), 0.85) * (0.1 + 0.2 * pow(max(dot(rd0, uSunDir), 0.0), 4.0));
         base.rgb = mix(base.rgb, hz, 0.72 * min(uStrength, 1.0));
       }
       vec3 rd = normalize((uCamWorld * vec4(normalize(v.xyz), 0.0)).xyz);
@@ -108,7 +108,7 @@ const VolumetricShader = {
         T *= exp(-a * 0.6);
       }
       // (dust scatters the sun paler than its disc: a pale gold, not the low sun's orange)
-      vec3 sunC = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 0.98, 0.86), 0.55);
+      vec3 sunC = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.06, 1.0, 0.88), 0.8);   // (a warm white: gold haze under a warm grade went sepia)
       vec3 L = sunC * phase * lit * 12.566 + uAmbient * amb;
       // the haze stands in front of what is behind it: a little of the scene is lost to it as well
       gl_FragColor = vec4(base.rgb * mix(1.0, T, 0.5) + L * uStrength, base.a);
@@ -151,7 +151,7 @@ const GradeShader = {
       {
         // (cool teal-green in the shade against warm gold in the light: an even olive cast read as grey-green mud)
         // (true blacks under the boughs and a cool shade: an even yellow-green wash read as one flat tone)
-        vec3 c2 = sat(col, 1.26) * mix(vec3(0.84, 0.94, 1.0), vec3(1.09, 0.98, 0.86), smoothstep(0.1, 0.65, l));
+        vec3 c2 = sat(col, 1.08) * mix(vec3(0.86, 0.95, 1.0), vec3(1.04, 0.99, 0.92), smoothstep(0.1, 0.65, l));
         c2 = max(c2 - 0.03, 0.0) * 1.04;
         c2 -= 0.34 * max(c2 - 0.33, 0.0);
         col = mix(col, c2, uForest);
@@ -270,8 +270,8 @@ export class Post {
         v.uInvProj.value.copy(this.camera.projectionMatrixInverse); v.uCamWorld.value.copy(this.camera.matrixWorld);
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
-        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
-        v.uDensity.value = state.volDensity ?? 0.0031; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
+        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.15);
+        v.uDensity.value = state.volDensity ?? 0.006; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

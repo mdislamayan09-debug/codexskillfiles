@@ -9,7 +9,8 @@ const browser = await launch();
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.goto(url, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 900000, polling: 1000 });
+await page.waitForFunction(() => (window.__game && window.__game.ready) || /^Error/.test(document.querySelector('#loading .status')?.textContent || ''), null, { timeout: 900000, polling: 1000 });
+{ const st = await page.evaluate(() => (window.__game && window.__game.ready) ? '' : document.querySelector('#loading .status').textContent); if (st) { console.log('GAME FAILED TO START: ' + st); await browser.close(); process.exit(1); } }
 await page.evaluate((s) => window.__game.setShot(s), shot);
 await page.waitForFunction(() => window.__game.frame >= 2, null, { timeout: 900000, polling: 500 });
 for (let i = 0; i < views.length; i++) {

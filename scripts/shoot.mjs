@@ -18,7 +18,8 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 const t0 = Date.now();
 await page.goto(url, { waitUntil: 'load' });
 try {
-  await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 600000, polling: 1000 });
+  await page.waitForFunction(() => (window.__game && window.__game.ready) || /^Error/.test(document.querySelector('#loading .status')?.textContent || ''), null, { timeout: 600000, polling: 1000 });
+{ const st = await page.evaluate(() => (window.__game && window.__game.ready) ? '' : document.querySelector('#loading .status').textContent); if (st) { console.log('GAME FAILED TO START: ' + st); await browser.close(); process.exit(1); } }
 } catch (e) {
   console.log(logs.slice(-40).join('\n'));
   throw e;

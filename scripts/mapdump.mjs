@@ -7,7 +7,8 @@ const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.goto(url, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 600000, polling: 1000 });
+await page.waitForFunction(() => (window.__game && window.__game.ready) || /^Error/.test(document.querySelector('#loading .status')?.textContent || ''), null, { timeout: 600000, polling: 1000 });
+{ const st = await page.evaluate(() => (window.__game && window.__game.ready) ? '' : document.querySelector('#loading .status').textContent); if (st) { console.log('GAME FAILED TO START: ' + st); await browser.close(); process.exit(1); } }
 const data = await page.evaluate(([x0, z0, x1, z1, W, marks]) => {
   const { world } = window.__game.dbg;
   const H = Math.round(W * (z1 - z0) / (x1 - x0));

@@ -259,7 +259,7 @@ async function init() {
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
-      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, player: [x, z, yaw], camRel: [0.7, 2.4, -6.6], lookRel: [-2.4, 1.6, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.4, -6.6], lookRel: [-2.4, 1.6, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -593,6 +593,7 @@ async function init() {
     const [px, pz, yaw] = s.player;
     player.spawn(px, pz, yaw);
     player.setOutfit(world.climateAt(px, pz).snow > 0.5 ? 'winter' : 'arthur');
+    player.horse.setCoat(s.coat || 'bay');
     player.hspeed = s.gallop ? 13 : 0;
     G.forceGallop = !!s.gallop;
     G.camOverride = null;
@@ -738,6 +739,17 @@ async function init() {
       {
         const pines = veg.groups.pine, cy = yaw - (s.turn || 0), cf = [Math.sin(cy), Math.cos(cy)], cr = [Math.cos(cy), -Math.sin(cy)];
         const rel = s.camRel, camX = px + cr[0] * rel[0] + cf[0] * rel[2], camZ = pz + cr[1] * rel[0] + cf[1] * rel[2];
+        // The stand itself, as the reference's: big old pines close on both sides of the trail, their boles bare for
+        // ten metres and more, so that trunks run up out of the top of the frame, crowns close overhead, the sun comes
+        // through between them in separate beams and their shadows lie in bars across the floor. (The scattered stand
+        // has a tree every twelve metres or so, and the whole of each one sits inside the frame like a model.)
+        const talls = veg.groups.tall;
+        if (talls.length) for (const [fw, sd2, sc] of [[9, -5.6, 1.15], [15, -9.5, 1.3], [20, -4.4, 0.95], [28, -8, 1.2], [37, -5.2, 1.05], [47, -10.5, 1.25], [59, -6.2, 1.1], [72, -9, 1.2],
+          [11, 5.2, 1.2], [18, 9, 1.0], [25, 4.6, 1.3], [34, 9.5, 1.1], [43, 5.6, 1.25], [53, 11.5, 1.0], [65, 6.8, 1.2], [78, 10, 1.1],
+          [31, -15, 1.3], [44, -17, 1.1], [29, 16, 1.25], [48, 18, 1.15], [62, -16, 1.2], [70, 17, 1.3]]) {
+          const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
+          veg.trees.add(x, world.heightAt(x, z) - 0.25, z, fw * 2.3 + sd2, sc, talls[Math.abs(Math.round(fw + sd2)) % talls.length]);
+        }
         if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1]]) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
@@ -1112,7 +1124,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.02 * (G.forestK || 0));
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
