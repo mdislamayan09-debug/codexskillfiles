@@ -92,7 +92,9 @@ vec4 marchClouds(vec3 d, vec3 s, vec3 sunC, vec3 ambTop, vec3 ambBot, float cov)
       float Tl = max(exp(-ld * sig), 0.14 * exp(-ld * sig * 0.3));
       float powder = 1.0 - exp(-den * 1800.0 * sig);
       float h = (p.y - CB) / (CT - CB);
-      vec3 S = sunC * Tl * ph * mix(0.6, 1.0, powder) + mix(ambBot, ambTop, smoothstep(0.0, 0.9, h));
+      // (the sky's own light inside the cloud falls off toward its dense cores, so a storm deck's underside is
+      // modelled in lumps and hollows of grey rather than one flat dark tone)
+      vec3 S = sunC * Tl * ph * mix(0.6, 1.0, powder) + mix(ambBot, ambTop, smoothstep(0.0, 0.9, h)) * mix(1.0, mix(1.35, 0.5, smoothstep(0.08, 0.6, den)), uStorm);
       float a = exp(-den * sig * dt);
       L += T * S * (1.0 - a);
       T *= a;
@@ -166,8 +168,8 @@ export class Sky {
             vec3 ambTop = zen * 0.62 + hor * 0.14 + vec3(0.006, 0.008, 0.014);
             vec3 ambBot = mix(hor, vec3(0.30, 0.27, 0.2) * day, 0.5) * 0.16 + vec3(0.003, 0.004, 0.008);
             ambTop = mix(ambTop, vec3(dot(ambTop, vec3(0.3, 0.59, 0.11))) * vec3(0.85, 0.9, 1.0) * 0.8, uStorm);
-            ambBot *= 1.0 - 0.72 * uStorm;
-            ambTop *= 1.0 - 0.45 * uStorm;
+            ambBot *= 1.0 - 0.3 * uStorm;
+            ambTop *= 1.0 - 0.2 * uStorm;
             // (a storm's cloud is lit as hard as any other: its body is dark because it is thick, and its thin torn edges
             // and the walls of its breaks blaze: the silver linings a dimmed, even grey deck never had)
             vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.25 * uStorm), ambTop, ambBot, uCloudCover);

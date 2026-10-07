@@ -720,7 +720,9 @@ export class World {
         const k = j * RES + i, snow = C[k * 4] / 255;
         if (snow < 0.35) continue;
         const g = Math.hypot(src[k + R] - src[k - R], src[k + R * RES] - src[k - R * RES]) * inv;   // rise over run
-        let amt = smoothstep(0.62, 1.1, g) * smoothstep(0.35, 0.65, snow);   // faces steeper than ~35 degrees
+        // (true cliffs only, steeper than about 40 degrees: cut into the ordinary valley sides as well, the benches
+        // drew contour lines round every mountain seen from a lookout)
+        let amt = smoothstep(0.82, 1.3, g) * smoothstep(0.35, 0.65, snow);
         if (amt <= 0) continue;
         const x = i * CELL - HALF, h = src[k];
         // not every part of a face shows its bedding: gullies and aprons of scree and drift run down between the
@@ -825,6 +827,30 @@ export class World {
       }
     }
     this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
+  }
+
+  // Set-building: timber. The forest channel of the splat raised to v within r metres of a point (the ground
+  // under a planted stand is then shaded as forest floor, not open snow). Call touchSplat() when done.
+  paintForest(x, z, r, v = 220) {
+    const i0 = Math.max(0, Math.round((x - r + HALF) / CELL)), i1 = Math.min(RES - 1, Math.round((x + r + HALF) / CELL));
+    const j0 = Math.max(0, Math.round((z - r + HALF) / CELL)), j1 = Math.min(RES - 1, Math.round((z + r + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = (j * RES + i) * 4 + 2; if (this.splat[k] < v) this.splat[k] = v; }
+  }
+  touchSplat() { this.splatTex.needsUpdate = true; }
+  // Set-building: a used track or a trampled yard (the splat's road channel) along a line of points.
+  paintTrack(pts, half = 2.2) {
+    for (let s = 0; s < pts.length - 1; s++) {
+      const [ax, az] = pts[s], [bx, bz] = pts[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, R = half + 3;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - R + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((Math.max(ax, bx) + R + HALF) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(az, bz) - R + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((Math.max(az, bz) + R + HALF) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * CELL - HALF, z = j * CELL - HALF, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+        const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)) + 1.5 * this.n3.noise(x / 6, z / 6), k = (j * RES + i) * 4;
+        const v = Math.round(240 * smoothstep(R, half * 0.5, d));
+        if (v > this.splat[k]) this.splat[k] = v;
+      }
+    }
+    this.splatTex.needsUpdate = true;
   }
 
   heightAt(x, z) {

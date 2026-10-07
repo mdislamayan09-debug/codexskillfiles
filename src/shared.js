@@ -157,7 +157,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 fogCol = mix(mix(cool, uFogColor, 0.5 + 0.5 * mu), uFogSunColor, sunAmt);
   // Extinction tints far colours blue-grey before full fog (aerial perspective)
   // (cold storm air is thick with ice haze: every ridge stands a tone paler and bluer than the one in front of it)
-  vec3 ext = exp(-dist * vec3(0.00019, 0.00013, 0.00008) * (1.0 - uNight*0.5) * (1.0 + 0.9 * uMist));
+  vec3 ext = exp(-dist * vec3(0.00019, 0.00013, 0.00008) * (1.0 - uNight*0.5) * (1.0 + 0.55 * uMist));
   col = col * ext + fogCol * (1.0 - ext) * 0.72;
   col = mix(col, fogCol, fogF);
   // falling snow: the far walls and peaks fade out into the snowfall, to the tone of the sky behind them (a range
@@ -171,7 +171,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     float bankN = smoothstep(0.5, 0.7, mistN(wpos.xz / 560.0 + 1.7) * 0.65 + mistN(wpos.xz / 190.0 - 4.1) * 0.35);
     float bank = smoothstep(110.0, 15.0, above) * bankN;
     float m = uMist * bank * (1.0 - exp(-dist / 650.0)) * 1.25;
-    col = mix(col, mix(uFogColor * 1.22, fogCol, 0.3), clamp(m, 0.0, 0.9));
+    col = mix(col, mix(uFogColor * 1.36, fogCol, 0.2), clamp(m * 0.8, 0.0, 0.9));   // (pale banks: at the air's own tone they did not read as fog at all)
     // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
     float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
     // (torn into separate rags with clear air between: a continuous band read as one white sheet over the slopes)

@@ -428,8 +428,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.22, 0.4, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   c = mix(c, mix(srgb(vec3(74,94,112)), snow, 0.3 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);   // (dark grey-blue ice: paler, the creek vanished into the snow from the saddle) tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
-  rough = mix(rough, 0.1, ice);
-  c = mix(c, srgb(vec3(22,30,36)), openW); tn = mix(tn, vec3(0.0, 0.0, 1.0), openW); rough = mix(rough, 0.04, openW);
+  // (river ice is scuffed and snow-dusted, not a mirror: glossy, it threw back the bright horizon and a river
+  // seen from a height came out paler than the snow round it)
+  rough = mix(rough, 0.55, ice);
+  c = mix(c, srgb(vec3(22,30,36)), openW); tn = mix(tn, vec3(0.0, 0.0, 1.0), openW); rough = mix(rough, 0.3, openW);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));
   gDbg = vec3(snowAmt, rockAmt, slope * 2.0);
   return c;
@@ -512,7 +514,8 @@ export class Terrain {
             float res = smoothstep(4.5, 1.2, cfp);
             vec3 crownC = srgb(vec3(26,36,32)) * (0.6 + 0.8 * lit);
             crownC = mix(crownC, srgb(vec3(170,180,192)), 0.22 * smoothstep(0.1, 0.5, lit));
-            vec3 gapC = srgb(vec3(128,140,156));
+            // (inside a stand the snow between the crowns lies in their shade: dark, so the stand reads as one mass)
+            vec3 gapC = mix(srgb(vec3(128,140,156)), srgb(vec3(58,72,90)), smoothstep(0.5, 0.8, fo));
             vec3 snowForest = mix(mix(srgb(vec3(34,44,46)), gapC, 0.26), mix(gapC, crownC, crown), res);
             canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
           }

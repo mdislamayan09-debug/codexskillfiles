@@ -1,7 +1,7 @@
 // Vegetation: GPU grass fields, procedural trees (oak / pine / cypress) with distant impostors,
 // bushes, ferns and rocks. Everything is instanced and streamed around the camera.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
@@ -66,6 +66,9 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       #if defined(FROST_ALL) && defined(USE_MAP)
       // and snow lodged in the upper crown of the brush, in clumps (snowless brush read as grey pom-poms on the snow)
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
+      #endif
+      #ifdef CONIFER_SNOW
+      sk *= 0.62;   // dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
@@ -1052,6 +1055,8 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
     let top = 0, wide = 0;
     for (let i = 0; i < p.count; i++) { top = Math.max(top, p.getY(i)); wide = Math.max(wide, Math.hypot(p.getX(i), p.getZ(i))); }
     g.scale(0.56 / wide, 0.62 / top, 0.56 / wide);   // a block about as tall as it is broad
+    // hard edges where the joint planes meet (smoothed across them, a split block shaded as a rounded lump)
+    return toCreasedNormals(g, 0.55);
   }
   g.computeVertexNormals();
   return g;
@@ -1128,13 +1133,13 @@ function rockMaterial(surf = {}, bare = false) {
       float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
-      rsnow *= max(drift * 0.6, 0.6 * fleck);
-      base *= vec3(1.34, 1.24, 1.08);   // sun-bleached, lichen-warmed ledge granite
+      rsnow *= max(drift * 0.9, 0.7 * fleck);
+      base *= vec3(1.5, 1.36, 1.14);   // sun-bleached, lichen-warmed ledge granite
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
       float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
+      base = mix(base, srgbR(vec3(146,142,130)), lichen * 0.28);               // pale grey crust lichen (stronger and greener it read as algae)
       // and the warm ochre crust lichen of the reference's granite, in scattered rosettes
       float ochre = smoothstep(0.7, 0.82, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(150,128,82)), ochre * 0.45);

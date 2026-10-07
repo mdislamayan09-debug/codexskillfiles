@@ -848,6 +848,56 @@ async function init() {
       // (only ever raised), what grows there is lifted with it, and the yard is levelled on its crown.
       if (!G.homePlaced) {
         G.homePlaced = true;
+        // The valley's timber. The reference looks down on a valley whose floor and lower slopes are dark with
+        // spruce up to a treeline, broken by open snowfields; ours had a thin scatter that read as specks on
+        // white. As a forester would have it: closed stands planted over the whole view below the treeline, in
+        // broad masses with meadows left between, the ground beneath them shaded as forest floor.
+        {
+          const firs = veg.groups.fir, n = world.n3;
+          let sdf = 2027, added = 0;
+          const rf = () => ((sdf = (sdf * 16807) % 2147483647) / 2147483647);
+          // how thick the timber stands at a point: full below the treeline, thinning out through it, in broad
+          // masses with meadows between
+          const stand = (x, z, h) => {
+            const alt = 1 - THREE.MathUtils.smoothstep(h + 40 * n.noise(x / 170, z / 170), 440, 585);
+            if (alt <= 0) return 0;
+            return alt * THREE.MathUtils.smoothstep(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.3, 0.12);
+          };
+          // the ground under the stands first, as one continuous field (stamped round each tree it came out in blocks)
+          for (let f = 150; f < 3700; f += 4) {
+            const half = 260 + f * 0.5;
+            for (let r = -half; r < half; r += 4) {
+              const x = c.x + d0.x * f + rt0.x * r, z = c.z + d0.z * f + rt0.z * r;
+              if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
+              const D = stand(x, z, world.heightAt(x, z));
+              if (D > 0.3) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
+            }
+          }
+          if (firs.length) for (let f = 150; f < 3700; f += 8.5) {
+            const half = 260 + f * 0.5;
+            for (let r = -half; r < half; r += 8.5) {
+              const x = c.x + d0.x * f + rt0.x * r + (rf() - 0.5) * 8, z = c.z + d0.z * f + rt0.z * r + (rf() - 0.5) * 8, pick = rf(), sc = rf() * rf();
+              if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
+              const h = world.heightAt(x, z);
+              if (world.climateAt(x, z).snow < 0.5 || pick > stand(x, z, h) * 0.9) continue;
+              const sp = world.splatAt(x, z);
+              if (world.normalAt(x, z).y < 0.74 || sp.wet > 0.25 || sp.road > 0.2) continue;
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.6 + sc * 1.3, firs[Math.floor(pick * 977) % firs.length]);
+              added++;
+            }
+          }
+          world.touchSplat();
+          G.vistaTimber = added;
+        }
+        // the river: the valley's creek widened to a frozen river winding down its floor, as the reference's (a
+        // creek a few metres across cannot be seen from a summit)
+        {
+          const line = world.valley.filter((q) => q[1] < -1900 && q[1] > -4000).map((q) => [q[0], q[1]]);
+          if (line.length > 2) {
+            world.paintCreek(line, 13, 1.2);
+            for (const L of [veg.trees, veg.rocks]) { const wetIt = (it) => it.z < -1850 && world.splatAt(it.x, it.z).wet > 0.4; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
+          }
+        }
         const KD = 205, kx = c.x + d0.x * KD + rt0.x * 34, kz = c.z + d0.z * KD + rt0.z * 34;
         const kTop = c.y - KD * Math.tan(0.12 + Math.atan(0.44 * Math.tan(THREE.MathUtils.degToRad((s.fov || 40) / 2))));
         const ax = c.x + d0.x * 34 + rt0.x * 10, az = c.z + d0.z * 34 + rt0.z * 10, aTop = Math.min(world.heightAt(ax, az) + 2, c.y - 24);
@@ -859,6 +909,12 @@ async function init() {
         world.stampPad(kx, kz, 27, 24);
         const hr = Math.atan2(c.x - kx, c.z - kz) + 0.6;
         town.addHomestead(kx, kz, hr);
+        // the yard trodden to dirty snow between the buildings, and a sled track leaving it down the back of the knoll
+        {
+          const K = (f, r) => [kx + d0.x * f + rt0.x * r, kz + d0.z * f + rt0.z * r];
+          world.paintTrack([K(-6, -16), K(2, -4), K(-2, 10), K(6, 18)], 7);
+          world.paintTrack([K(2, -4), K(26, 2), K(52, -8), K(84, 4), K(120, -6), K(170, 10), K(230, 0)], 2.4);
+        }
         s.home = [kx, kz, hr];
         G.clearTreesNear(kx, kz, 38); G.clearTreesNear(kx, kz, 42, veg.rocks); G.clearTreesNear(kx, kz, 60, veg.crags); G.clearTreesNear(kx, kz, 30, veg.bushes);
         G.clearTreesAlong(c.x, c.z, kx, kz, 16, 0.9);
@@ -1177,7 +1233,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
