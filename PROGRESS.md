@@ -682,3 +682,30 @@ volume). That is where the remaining distance is.
 
 **Critic scores.** Round 57: 4 / 5 / 4. Round 58: 4 / 4 / 3. Round 59: 4 / 4 / 3. Round 60: 4 / 5 / 4.
 (pines / snowride / snowvista; all "clearly".) The best total is 13 against 12 at the handoff.
+
+### Rounds 62-63: canopy-gap light, and two swallowed lines
+- **Canopy-gap light** (`canopyGaps` in `shared.js`, shared with the volumetric pass). A forest roof lets the sun
+  through in openings far smaller than a shadow map of the whole stand can hold. One noise pattern laid across the
+  sun's own direction now gates both the lit haze and the direct light on every surface under trees, so the air
+  breaks into separate shafts and each ends in its own pool of sun on the floor. `U.uCanopy` follows the forest
+  cover round the camera. The oak-wood `forest` shot gains rays and dapples from it too.
+- **Pines.** A high afternoon sun (15:00) and no lane cut toward it: the crowns over the trail dapple the floor.
+  Thick lit dust and a wide exposure are now asked for by the shot (`volDensity`, `volFalloff`, `expK` on a shot),
+  not global defaults: as defaults they washed out the ranch, the autumn road, the oak wood and the bayou.
+- **A pitfall, relearned.** Section 7 of the handoff warns that a comment on the same line can swallow code. It
+  did, twice: a trailing comment in `post.js` had cut off `v.uBase.value = ...` since round 57 (the haze layer
+  was measured from sea level, not from the ground under the camera) and then `v.uFalloff.value = ...`; another in
+  `terrain.js` had cut off the creek ice's normal. Both restored. An audit script for the pattern found no others.
+  Never append a comment to a line that holds more than one statement.
+- **Play performance re-measured.** The visual work of rounds 54-62 had slowed play from 15 to 10.5 fps at
+  1512x982: the volumetric pass had grown to 19 ms a frame (64 steps, a 3-D dust noise and the gap pattern at
+  every step). In play it now takes 22 steps without the dust noise (2 ms); stills are unchanged. Back to
+  13.5 fps at 1512x982, 22-25 fps where the frame governor settles (render scale about 0.5).
+  `scripts/proftoggle.mjs` measures what each part of the frame costs.
+- **Other biomes checked** (autumn, desert, jungle, town, ranch, oak forest, heartland vista, bayou, gallop): no
+  regressions after the fixes above.
+
+**Critic scores.** Round 61: 4 / 4 / 3. Round 62: 4 / 5 / 3. Fourteen scored rounds this session; every one
+between 3 and 5 on every shot, every one "clearly". The critic's notes are about asset fidelity now: bark,
+needle cards, rock surface, cloth, the horse's coat and anatomy, cloud volume. The frames have changed a great
+deal and the score has not, which says the remaining distance is in the assets, not the staging.

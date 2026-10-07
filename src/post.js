@@ -126,7 +126,10 @@ const VolumetricShader = {
         vec2 so = (vec2(ign(gl_FragCoord.xy + float(i) * 7.3), ign(gl_FragCoord.yx + float(i) * 3.1)) - 0.5) * 0.0022;
         if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) s = texture(tShadow, vec3(sc.xy + so, sc.z - 0.0006));
         s *= canopyGaps(p);
-        float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff) * (0.45 + 1.1 * n3(p * 0.11 + vec3(uTime * 0.02, 0.0, uTime * 0.013)));
+        float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff);
+        #ifdef VOL_DUST
+        den *= 0.45 + 1.1 * n3(p * 0.11 + vec3(uTime * 0.02, 0.0, uTime * 0.013));
+        #endif
         float a = den * dt;
         lit += T * s * a;
         amb += T * a;
@@ -216,7 +219,7 @@ const GradeShader = {
 };
 
 export class Post {
-  constructor(renderer, scene, camera, { ao = true, bloom = true, smaa = false, samples = 4, volSteps = 48 } = {}) {
+  constructor(renderer, scene, camera, { ao = true, bloom = true, smaa = false, samples = 4, volSteps = 48, volDust = true } = {}) {
     this.renderer = renderer;
     this.camera = camera;
     const size = renderer.getSize(new THREE.Vector2());
@@ -227,7 +230,7 @@ export class Post {
     this.composer = new EffectComposer(renderer, rt);
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
-    this.vol = new ShaderPass(new THREE.ShaderMaterial({ ...VolumetricShader, uniforms: VolumetricShader.uniforms, defines: { VOL_STEPS: volSteps } }));
+    this.vol = new ShaderPass(new THREE.ShaderMaterial({ ...VolumetricShader, uniforms: VolumetricShader.uniforms, defines: { VOL_STEPS: volSteps, ...(volDust ? { VOL_DUST: 1 } : {}) } }));
     this.vol.material.depthTest = false;
     this.vol.material.depthWrite = false;
     this.composer.addPass(this.vol);
@@ -298,7 +301,10 @@ export class Post {
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
         v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
-        v.uDensity.value = state.volDensity ?? 0.0105; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
+        // (the everyday air; a shot can ask for thick dust standing up into the crowns)
+        v.uDensity.value = state.volDensity ?? 0.003;
+        v.uFalloff.value = state.volFalloff ?? 0.03;
+        v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

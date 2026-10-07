@@ -118,7 +118,7 @@ async function init() {
   const hud = new HUD(world);
   // in play the shadow map and the water's mirror are each redrawn on alternate frames; stills take both every frame
   sky.shadowEvery = CAPTURE ? 1 : 3; water.every = CAPTURE ? 1 : 2;
-  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: QUALITY >= 2 ? 64 : QUALITY > 1 ? 40 : 24, samples: params.has('msaa') ? +params.get('msaa') : 4, smaa: params.get('msaa') === '0' });
+  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: CAPTURE ? (QUALITY >= 2 ? 64 : 40) : (QUALITY >= 2 ? 22 : 16), volDust: CAPTURE,   /* (stills march the air finely; in play a third of the steps, dithered, costs a few ms not twenty) */ samples: params.has('msaa') ? +params.get('msaa') : 4, smaa: params.get('msaa') === '0' });
   // pooled lamp lights for night
   const lamps = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffa850, 0, 18, 1.8); scene.add(l); return l; });
 
@@ -256,7 +256,7 @@ async function init() {
     // half again the rider's width and he read as a toy on its back)
     // (a high afternoon sun, as the reference's: it comes down steeply through the gaps between the crowns in separate
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
-    return { time: 15.0, fov: 35, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
+    return { time: 15.0, fov: 35, volDensity: 0.0105, volFalloff: 0.016, expK: 1.42, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -600,6 +600,8 @@ async function init() {
     G.forceGallop = !!s.gallop;
     G.camOverride = null;
     G.weatherOverride = s.weather && typeof s.weather === 'object' ? s.weather : null;
+    // a shot's own air and exposure (thick lit dust under a closed stand washes out open country, so it is asked for)
+    G.volDensity = s.volDensity; G.volFalloff = s.volFalloff; G.expK = s.expK;
     if (s.cam) {
       const [cx, cy, cz, ch] = s.cam, [lx, ly, lz, lh] = s.look;
       G.camOverride = { pos: new THREE.Vector3(cx, world.heightAt(cx, cz) + ch, cz), look: new THREE.Vector3(lx, world.heightAt(lx, lz) + lh, lz), fov: s.fov };
@@ -1255,7 +1257,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 1.0 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.2 * (G.forestK || 0));   // (the eye opens up a little under a canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);
@@ -1335,7 +1337,7 @@ async function init() {
     // (in clear air under a storm the cold grade is lighter: warm rock and dry grass keep some colour against the snow)
     // (a clear-air storm keeps more colour: warm rock and dry grass against the cool snow, as the reference's vista)
     const coldGrade = Math.max(sky.weather.blizzard, 0.42 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { sun: sky.sun, vol: G.volK ?? ((G.forestK || 0) * (1 - U.uNight.value) * (1 - sky.weather.storm)), volDensity: G.volDensity, volDist: G.volDist, volAmbient: G.volAmbient, storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 - (G.forestK || 0) * 0.85 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { sun: sky.sun, vol: G.volK ?? ((G.forestK || 0) * (1 - U.uNight.value) * (1 - sky.weather.storm)), volDensity: G.volDensity, volFalloff: G.volFalloff, volDist: G.volDist, volAmbient: G.volAmbient, storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 - (G.forestK || 0) * 0.85 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;
