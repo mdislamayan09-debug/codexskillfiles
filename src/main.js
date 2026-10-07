@@ -627,6 +627,59 @@ async function init() {
     // of the open ground ahead, thinning toward the line the rider is taking
     if (s.snowDress && !G.snowDressed) {
       G.snowDressed = true;
+      // The ground itself, built as a set before anything is stood on it (what already grows there is lifted with
+      // it): wind drifts over the open floor; a rock-walled bench on the left of the lens with timber on its top,
+      // the reference's dark cliff band; and a frozen creek winding away up the middle of the view.
+      {
+        const cy = yaw - (s.turn || 0), f = [Math.sin(cy), Math.cos(cy)], lt = [Math.cos(cy), -Math.sin(cy)];
+        const P = (ahead, side) => [px + f[0] * ahead + lt[0] * side, pz + f[1] * ahead + lt[1] * side];
+        const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
+        const near = (it) => (it.x - px) ** 2 + (it.z - pz) ** 2 < 420 * 420;
+        const before = layers.map((L) => L.items.filter(near).map((it) => [it, world.heightAt(it.x, it.z)]));
+        // the rider on the brow of a low rise, the floor falling gently away ahead of him (from a hollow the ground
+        // in front hid the whole middle distance)
+        {
+          const [m0x, m0z] = P(-40, 0), [m1x, m1z] = P(6, 0), mh = world.heightAt(px, pz) + 6.5;
+          world.raiseSpur(m0x, m0z, mh - 0.5, m1x, m1z, mh, { side: 0.11, round: 0.0005, top: 16, flat0: 12, reach: 170, rough: 0.25, sag: 0 });
+        }
+        world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 0.5);
+        const [b0x, b0z] = P(62, 50), [b1x, b1z] = P(215, 66);
+        const bh = Math.max(world.heightAt(b0x, b0z), world.heightAt(b1x, b1z)) + 21;
+        world.raiseSpur(b0x, b0z, bh, b1x, b1z, bh + 6, { side: 2.6, round: 0, top: 26, flat0: 20, reach: 70, rough: 1.4, sag: 0 });
+        const creek = [];
+        for (let k = 0; k <= 14; k++) { const a = 38 + k * 30; creek.push(P(a, -19 - 13 * Math.sin(k * 0.62) * Math.min(1, k / 2) - k * 0.3)); }   // (right of the rider, as the reference's: dead ahead he hides it)
+        world.paintCreek(creek, 6.5, 0.9);
+        G.snowCreek = creek;
+        for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
+        // nothing left standing in the creek's bed
+        for (const L of [veg.trees, veg.rocks, veg.bushes]) { const wetIt = (it) => near(it) && world.splatAt(it.x, it.z).wet > 0.35; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
+        // the bench's wall: broken rock standing along its face, and spruce along its rim
+        let sd2 = 77;
+        const r2 = () => ((sd2 = (sd2 * 16807) % 2147483647) / 2147483647);
+        for (let a = 54; a <= 226; a += 9 + r2() * 7) {
+          const side = 50 + (a - 62) * 0.105 - 22 - r2() * 4, [x, z] = P(a, side), sc = 4.5 + r2() * 5;
+          veg.crags.add(x, world.heightAt(x, z) - sc * 0.35, z, r2() * 6.28, sc, Math.floor(r2() * 3));
+        }
+        // willow and dead brush crowding the creek's banks in clumps, and stones along its edge: from the saddle it is
+        // the dark broken line of the banks that draws the creek across the snow
+        for (let k = 0; k < creek.length - 1; k++) {
+          const [ax, az] = creek[k], [bx, bz] = creek[k + 1], L = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / L, nz = (bx - ax) / L;
+          for (let t = 0; t < 1; t += 5 / L) for (const sgn of [-1, 1]) {
+            if (r2() > 0.62) continue;
+            const cx = ax + (bx - ax) * t, cz = az + (bz - az) * t;
+            for (let q = 0, nq = 1 + Math.floor(r2() * 4); q < nq; q++) {
+              const off = sgn * (7.5 + r2() * 4.5), x = cx + nx * off + (r2() - 0.5) * 3, z = cz + nz * off + (r2() - 0.5) * 3;
+              veg.bushes.add(x, world.heightAt(x, z) - 0.06, z, r2() * 6.28, 0.6 + r2() * 0.9, [7, 8, 7, 8, 9][Math.floor(r2() * 5)]);
+            }
+            if (r2() < 0.18) { const off = sgn * (6.5 + r2() * 2.5), x = cx + nx * off, z = cz + nz * off, sc = 0.7 + r2() * 1.3; veg.rocks.add(x, world.heightAt(x, z) - 0.45 * sc, z, r2() * 6.28, sc, 2 + Math.floor(r2() * 2)); }
+          }
+        }
+        const firs = veg.groups.fir;
+        if (firs.length) for (let i = 0; i < 26; i++) {
+          const a = 58 + r2() * 165, [x, z] = P(a, 50 + (a - 62) * 0.105 - 14 + r2() * 30);
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, r2() * 6.28, 0.5 + r2() * 1.0, firs[Math.floor(r2() * firs.length)]);
+        }
+      }
       {
         const sn = new Set(veg.groups.snag), L = veg.trees, near = (it) => sn.has(it.v) && Math.hypot(it.x - px, it.z - pz) < 400;
         for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !near(it)));

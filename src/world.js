@@ -760,7 +760,7 @@ export class World {
 
   // Set-building: raise a spur, a rounded crest running out from (ax, az) at height ah and down to a knoll standing
   // at (bx, bz), height bh. Ground is only ever raised. Returns the box of ground that may have changed.
-  raiseSpur(ax, az, ah, bx, bz, bh, { side = 0.52, round = 0.0032, top = 30, reach = 230, rough = 1, sag = 8 } = {}) {
+  raiseSpur(ax, az, ah, bx, bz, bh, { side = 0.52, round = 0.0032, top = 30, reach = 230, rough = 1, sag = 8, flat0 = 5 } = {}) {
     const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
     const x0 = Math.min(ax, bx) - reach, x1 = Math.max(ax, bx) + reach, z0 = Math.min(az, bz) - reach, z1 = Math.max(az, bz) + reach;
     const i0 = Math.max(0, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x1 + HALF) / CELL));
@@ -774,7 +774,7 @@ export class World {
       // (the crest runs down to a saddle lying below the knoll's top and climbs the last stretch onto it, so the top
       // stands clear of its own approach when seen from up the crest)
       const crest = lerp(ah, bh - sag, Math.min(1, t / 0.7)) + sag * smoothstep(0.7, 1, t);
-      const flat = lerp(5, top, smoothstep(0.72, 1, t));
+      const flat = lerp(flat0, top, smoothstep(0.72, 1, t));
       const target = crest - side * Math.max(0, d - flat) - round * d * d + rough * (3.2 * n.noise(x / 34 + 4.2, z / 34 - 7.7) + 1.3 * n.noise(x / 13 - 1.1, z / 13 + 3.9) + 0.4 * n.noise(x / 5 + 2.3, z / 5 - 6.1));
       const k = j * RES + i;
       if (target > this.heights[k]) {
@@ -786,6 +786,45 @@ export class World {
     }
     this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
     return [x0, z0, x1, z1];
+  }
+
+  // Set-building: wind drifts. Open snow within R of a point is heaped into long drifts lying across the wind
+  // with scoops between them (real relief the light can rake, where the heightfield was a billiard table).
+  sculptDrifts(cx, cz, R, amp = 0.45) {
+    const n = this.n2;
+    const i0 = Math.max(1, Math.floor((cx - R + HALF) / CELL)), i1 = Math.min(RES - 2, Math.ceil((cx + R + HALF) / CELL));
+    const j0 = Math.max(1, Math.floor((cz - R + HALF) / CELL)), j1 = Math.min(RES - 2, Math.ceil((cz + R + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = i * CELL - HALF, z = j * CELL - HALF, d = Math.hypot(x - cx, z - cz), k = j * RES + i;
+      if (d > R || this.climate[k * 4] < 150) continue;
+      const g = Math.hypot(this.heights[k + 1] - this.heights[k - 1], this.heights[k + RES] - this.heights[k - RES]) / (2 * CELL);
+      const w = smoothstep(R, R * 0.65, d) * (1 - smoothstep(0.12, 0.3, g)) * (1 - smoothstep(60, 120, this.splat[k * 4 + 1]));
+      if (w <= 0) continue;
+      const u = x * 0.93 + z * 0.36, v = -x * 0.36 + z * 0.93;
+      const ridge = 1 - Math.abs(n.noise(u / 13, v / 34));   // sharp-backed drifts
+      this.heights[k] += amp * w * (1.5 * (ridge * ridge - 0.45) + 0.6 * n.noise(u / 5 + 3.1, v / 11 - 2.2) + 1.6 * n.noise(u / 47 - 1.3, v / 60 + 4.4));
+    }
+    this.heightTex.needsUpdate = true;
+  }
+  // Set-building: a frozen creek along a line of points: the splat's wet channel painted (ice down the middle,
+  // willow and gravel along the banks, from the ground shader) and the bed sunk a little into the snow.
+  paintCreek(pts, half = 4.5, depth = 0.7) {
+    for (let s = 0; s < pts.length - 1; s++) {
+      const [ax, az] = pts[s], [bx, bz] = pts[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz, R = half + 5;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - R + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((Math.max(ax, bx) + R + HALF) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(az, bz) - R + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((Math.max(az, bz) + R + HALF) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * CELL - HALF, z = j * CELL - HALF, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+        const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)) + 1.2 * this.n3.noise(x / 9, z / 9), k = j * RES + i;
+        if (d > R) continue;
+        const wet = Math.round(235 * smoothstep(R, half * 0.35, d));
+        if (wet > this.splat[k * 4 + 1]) { this.splat[k * 4 + 1] = wet; this.splat[k * 4 + 2] = Math.round(this.splat[k * 4 + 2] * (1 - wet / 255)); }
+        const bed = (this.creekBed || (this.creekBed = new Map()));
+        const cut = depth * smoothstep(half + 3, half * 0.3, d);
+        if (cut > (bed.get(k) || 0)) { this.heights[k] -= cut - (bed.get(k) || 0); bed.set(k, cut); }
+      }
+    }
+    this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
   }
 
   heightAt(x, z) {

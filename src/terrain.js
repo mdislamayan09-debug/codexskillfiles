@@ -346,7 +346,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // two scales of the snow scan, the second turned 37 degrees, blended by noise so the dimples never tile
   vec2 xzr = mat2(0.8, 0.6, -0.6, 0.8) * xz;
   vec3 snN = mix(texN(L_SNOW, xz, 4.0), texN(L_SNOW, xzr, 11.0), smoothstep(0.3, 0.7, fbm2(xz / 17.0 + 4.4)));
-  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), snN, 0.42), snowAmt);
+  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), snN, 0.24), snowAmt);   // (lighter: at 0.42 the scan's dimples tiled across the whole snowfield)
   rough = mix(rough, 0.6, snowAmt);
   if (snowAmt > 0.01) {
     // wind-packed ripples and soft drifts, so open snow reads as a surface rather than a white sheet
@@ -427,7 +427,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   c = mix(c, mix(srgb(vec3(46,40,36)), srgb(vec3(84,78,72)), vnoise(xz / 2.3)) * (0.8 + 0.3 * micro), willow * 0.75);
   float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.22, 0.4, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
-  c = mix(c, mix(srgb(vec3(112,128,140)), snow, 0.25 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice); tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
+  c = mix(c, mix(srgb(vec3(74,94,112)), snow, 0.3 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);   // (dark grey-blue ice: paler, the creek vanished into the snow from the saddle) tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);
   rough = mix(rough, 0.1, ice);
   c = mix(c, srgb(vec3(22,30,36)), openW); tn = mix(tn, vec3(0.0, 0.0, 1.0), openW); rough = mix(rough, 0.04, openW);
   gTN = normalize(mix(vec3(0.0, 0.0, 1.0), tn, 0.9 * D));

@@ -613,3 +613,28 @@ Now: **about 15 fps at 1512x982, 28 fps at half scale; the governor settles at a
 0.56** on this machine. Native retina is still about 6 fps. The game is playable but soft; it is not yet the
 "4K" the brief asks for at a playable rate. The remaining cost is shadows, terrain and grass in about equal parts.
 Stills (`?capture`) are unaffected and keep every setting at its highest.
+
+### Rounds 54-55: the horse, a real pine stand, the snow ride built as a set
+- **Horse.** Hindquarters resculpted: a rump no taller than the back, two buttocks with a cleft under the tail,
+  soft hip points, thighs that stand apart with daylight between them. The tail is a switch (narrow at the dock,
+  fullest a third down, loose ends), not a fan. Coats: a dark bay for the forest, a blood bay for the snow ride
+  (`setCoat`, a shot option), with the regular hair-stripe pattern replaced by noise. In snow the horse sinks to
+  the cannons, not the hocks.
+- **Rider and tack.** The stray ring strap and box satchel left over from the old sculpted body are gone from the
+  real body (they stood out of the neck as a hook). A plain dark strap. The fur cap is turned down over the nape.
+  Dark saddle leather. The bedroll is a rolled patterned blanket.
+- **Pines.** Twenty-two big old pines placed by hand close along both sides of the trail (bare boles for ten
+  metres and more), so trunks run out of the top of the frame, the sun comes through in separate beams and shadows
+  lie in bars across the floor. The haze is a warm white, the eye opens up under the canopy. Tone numbers are now
+  within a few points of the reference in every band.
+- **Snow ride, built as a set** (`world.sculptDrifts`, `world.paintCreek`, `raiseSpur` with `flat0`): wind drifts
+  with sharp backs over the open floor; the rider on the brow of a low rise so the floor falls away ahead; a
+  rock-walled bench on the left with broken rock along its face and spruce on its rim; a frozen creek winding up
+  the valley right of the rider, its banks lined with willow brush and stones; a heavy dark storm ceiling.
+- **Tools.** Captures and probes now stop at once with the game's own error message when it fails to start
+  (a start-up error used to hang a capture for ten minutes). `scripts/errlog.mjs` prints runtime errors for a shot.
+
+**Round 54 critic** (before the snow ride set): pines 4, snowride 4, snowvista 3. Still "clearly" in all three.
+What it names now: pines floor litter (cones, twigs, branches, stones in a continuous layer), uniform trunk bark
+and flared bases, one symmetric young fir, hard radial rays; snow ride cliffs as slabs, a single mid-blue value
+band; vista terracing bands, thresholded-looking cloud, no aerial layering.
