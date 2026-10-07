@@ -5,7 +5,7 @@ import { mergeGeometries, mergeVertices, toCreasedNormals } from 'three/addons/u
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
-import { leafCardTexture, pineCardTexture, pineTuftTexture, barkTexture, conBarkTextures, plateBarkTextures } from './textures.js';
+import { leafCardTexture, pineCardTexture, pineTuftTexture, barkTexture, conBarkTextures } from './textures.js';
 
 // ---------------------------------------------------------------------------- wind
 const WIND_VERT = /* glsl */ `
@@ -1227,8 +1227,8 @@ export class Vegetation {
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = plateBarkTextures(11, [88, 68, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(2.6, 2.6), roughness: 0.93 }), 0);
+    const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)
@@ -1434,7 +1434,7 @@ export class Vegetation {
         const c = new THREE.SphereGeometry(0.036, 7, 5); c.scale(1.75, 0.95, 1); c.translate(0, 0.03, 0);
         const p = c.attributes.position, col = new Float32Array(p.count * 3);
         // (vertex colours are linear: these are dark, weathered cone browns, not the pale chips they read as before)
-        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.16 * v; col[i * 3 + 1] = 0.1 * v; col[i * 3 + 2] = 0.055 * v; }
+        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.2 * v; col[i * 3 + 1] = 0.135 * v; col[i * 3 + 2] = 0.085 * v; }
         c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
       })();
       // a fallen twig: a bent stick with two side shoots (a plain cylinder read as a dropped dowel), and a longer
@@ -1449,7 +1449,7 @@ export class Vegetation {
       })();
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
-        makeClutter(scene, cone, { spacing: 0.5 / Math.sqrt(q), radius: 24, smin: 0.7, smax: 1.25, color: 0xffffff, seed: 3 }),
+        makeClutter(scene, cone, { spacing: 0.8 / Math.sqrt(q), radius: 24, smin: 0.6, smax: 1.3, color: 0xffffff, seed: 3 }),
         // (weathered grey-brown and plentiful: the reference's floor is strewn with them)
         makeClutter(scene, twig, { spacing: 0.62 / Math.sqrt(q), radius: 28, smin: 0.3, smax: 1.3, color: 0x8a7964, flat: true, seed: 5 }),
         makeClutter(scene, bough, { spacing: 4.6 / Math.sqrt(q), radius: 44, smin: 0.6, smax: 1.3, color: 0x74624e, flat: true, seed: 11 }),

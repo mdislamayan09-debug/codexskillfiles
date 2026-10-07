@@ -84,7 +84,7 @@ const VolumetricShader = {
       vec3 L = normalize(uSunDir);
       vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
       vec2 q = vec2(dot(wp, R), dot(wp, Up));
-      float n = mistN(q / 3.1) * 0.55 + mistN(q / 1.1 + 7.3) * 0.3 + mistN(q / 9.0 - 2.9) * 0.15;
+      float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
       return mix(1.0, 0.06 + 0.94 * smoothstep(0.46, 0.56, n), uCanopy);
     }
     

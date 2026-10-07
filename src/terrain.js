@@ -140,7 +140,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     lN = mix(lN, texN(L_NEEDLE, xz, 1.6), pineK);
   }
   // (the needle scan carries its own colour; pulled toward brown, the duff is a dark layered floor, not beige sand)
-  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.86, 0.74, 0.62), pineK);
+  vec3 litTint = mix(vec3(0.95, 0.82, 0.7), vec3(0.66, 0.6, 0.53), pineK);   // (a dark grey-brown duff: redder and paler, the sunlit floor was an orange sheet)
   litTint = mix(litTint, vec3(1.3, 0.72, 0.34), aut);
   litTint = mix(litTint, vec3(0.5, 0.62, 0.32), jun);
   vec3 forestFloor = mix(mix(srgb(vec3(66,56,38)), srgb(vec3(58,66,34)), patchy) * (0.8 + 0.3*micro), lA.rgb * litTint * 1.15, 0.85 * max(D, 0.45));
