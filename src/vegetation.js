@@ -5,7 +5,7 @@ import { mergeGeometries, mergeVertices, toCreasedNormals } from 'three/addons/u
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
-import { leafCardTexture, pineCardTexture, pineTuftTexture, barkTexture, conBarkTextures } from './textures.js';
+import { leafCardTexture, pineCardTexture, pineTuftTexture, barkTexture, conBarkTextures, plateBarkTextures } from './textures.js';
 
 // ---------------------------------------------------------------------------- wind
 const WIND_VERT = /* glsl */ `
@@ -135,7 +135,9 @@ const LEAF_EMISSIVE = /* glsl */ `
     diffuseColor.rgb *= 1.0 - UNDERSIDE_DARK * smoothstep(0.0, -0.5, dot(normalize(vNormal), normalize(vViewPosition)));
     // seen against the sun a bough is mostly its own shadow: card normals alone would light the near side
     diffuseColor.rgb *= 1.0 - BACKLIT_DARK * pow(max(dot(vdir, normalize(uSunDir)), 0.0), 1.5) * smoothstep(-0.05, 0.15, uSunDir.y);
-    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS;
+    // (most where the foliage is thin: the fringe of a spray lights up against the sun while its dense middle stays dark)
+    float thinK = 1.0 + 2.6 * (1.0 - smoothstep(0.5, 0.98, diffuseColor.a));
+    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS * thinK;
   }
 `;
 
@@ -280,7 +282,11 @@ function buildPine(seed, kind = 'pine') {
   // lodgepole/ponderosa trunks: slim poles, not redwood columns
   const r0 = (kind === 'tall' ? 0.31 : 0.24) + rnd() * 0.09;
   wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
-  wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.9, height - 2.4, (rnd() - 0.5) * 0.9), r0, 0.05, 9));
+  // (the bole in five sections, wandering a little off its line as it climbs: one straight taper read as a turned pole)
+  const topX = (rnd() - 0.5) * 0.9, topZ = (rnd() - 0.5) * 0.9, bendA = rnd() * 6.28, bend = (kind === 'tall' ? 0.35 : 0.18) * (0.4 + rnd());
+  const bole = (t) => new THREE.Vector3(topX * t + Math.cos(bendA) * bend * Math.sin(t * Math.PI) + Math.cos(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3), 1.4 + (height - 3.8) * t, topZ * t + Math.sin(bendA) * bend * Math.sin(t * Math.PI) + Math.sin(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3));
+  const boleR = (t) => 0.05 + (r0 - 0.05) * Math.pow(1 - t, 0.8);
+  for (let k = 0; k < 5; k++) wood.push(branchGeo(bole(k / 5), bole((k + 1) / 5), boleR(k / 5), boleR((k + 1) / 5), 10));
   // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (kind === 'tall' ? 1.2 + rnd() * 0.45 : 1.6 + rnd() * 0.9);   // (a slight swell on the old boles, not a tent skirt)
@@ -292,7 +298,16 @@ function buildPine(seed, kind = 'pine') {
     // dead lower branch stubs on the bare trunk
     for (let i = 0; i < 16; i++) {
       const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.5 + rnd() * 1.6 * (y / base);
-      wood.push(branchGeo(new THREE.Vector3(0, y, 0), new THREE.Vector3(Math.cos(a) * L, y - 0.2 - rnd() * 0.4, Math.sin(a) * L), 0.06, 0.02, 4));
+      const b0 = bole((y - 1.4) / (height - 3.8));
+      wood.push(branchGeo(b0, new THREE.Vector3(b0.x + Math.cos(a) * L, y - 0.2 - rnd() * 0.4, b0.z + Math.sin(a) * L), 0.06, 0.02, 4));
+    }
+    // and a few real dead limbs: thick at the bole, drooping, snapped short or ending in a fork of bare twigs
+    for (let i = 0; i < 5; i++) {
+      const y = base * (0.35 + rnd() * 0.6), a = rnd() * 6.28, L = 1.6 + rnd() * 2.6, b0 = bole((y - 1.4) / (height - 3.8));
+      const mid = new THREE.Vector3(b0.x + Math.cos(a) * L * 0.55, y - 0.15 - rnd() * 0.3, b0.z + Math.sin(a) * L * 0.55);
+      const tip = new THREE.Vector3(b0.x + Math.cos(a + 0.25) * L, y - 0.6 - rnd() * 0.9, b0.z + Math.sin(a + 0.25) * L);
+      wood.push(branchGeo(b0, mid, 0.085, 0.05, 5), branchGeo(mid, tip, 0.05, 0.016, 4));
+      if (rnd() < 0.7) wood.push(branchGeo(mid, new THREE.Vector3(mid.x + Math.cos(a - 0.9) * L * 0.4, mid.y + 0.1, mid.z + Math.sin(a - 0.9) * L * 0.4), 0.03, 0.008, 3));
     }
   }
   // each variant has its own habit: narrow spire-like subalpine firs to broad, heavy spruces
@@ -326,7 +341,7 @@ function buildPine(seed, kind = 'pine') {
           else g.rotateX((rnd() - 0.5) * 0.4);
           g.rotateZ(-droop);
           g.rotateY(a);
-          g.translate(0, y, 0);
+          { const bq = bole(Math.min(1, Math.max(0, (y - 1.4) / (height - 3.8)))); g.translate(bq.x, y, bq.z); }   // (on the bole where it stands at this height)
           const p = g.attributes.position, nn = g.attributes.normal;
           for (let k = 0; k < p.count; k++) {
             const v = new THREE.Vector3(p.getX(k), 0, p.getZ(k)).normalize();
@@ -348,7 +363,7 @@ function buildPine(seed, kind = 'pine') {
     g.rotateX((rnd() - 0.5) * 0.6);
     g.rotateZ(0.35 + (i / 6) * 0.35);
     g.rotateY((i / 6) * Math.PI * 2 * 1.6 + rnd());
-    g.translate(0, y, 0);
+    g.translate(topX, y, topZ);
     leaves.push(g);
   }
   for (let i = 0; i < 2; i++) {
@@ -356,7 +371,7 @@ function buildPine(seed, kind = 'pine') {
     g.translate(0.4, 0, 0);
     g.rotateZ(Math.PI / 2 - (rnd() - 0.5) * 0.3);
     g.rotateY(i * Math.PI / 2 + rnd() * 0.4);
-    g.translate(0, height - 1.2, 0);
+    g.translate(topX, height - 1.2, topZ);
     leaves.push(g);
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => (y / height) ** 2 * 0.5);
@@ -1212,8 +1227,8 @@ export class Vegetation {
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
+    const cbP = plateBarkTextures(11, [88, 68, 56], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(2.6, 2.6), roughness: 0.93 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)

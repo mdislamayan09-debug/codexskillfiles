@@ -245,6 +245,66 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
 }
 
 // Weathered clapboard siding: long horizontal boards, soft grain, lap shadows, optional peeling paint.
+// Old pine bark: big irregular plates, longer than they are wide, each a little domed and flaking in layers, with
+// deep dark furrows between them (the furrowed ridge bark above, wrapped round a ponderosa, read as painted
+// stripes). Plates are the cells of a jittered lattice that wraps, so the tile repeats seamlessly.
+export function plateBarkTextures(seed = 11, base = [112, 78, 56], W = 512, H = 1024) {
+  const r = mulberry32(seed);
+  const CX = 8, CY = 9;                       // plates across and up one tile: about 12 cm x 20 cm on a trunk
+  const pts = [];
+  for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) pts.push([(i + 0.15 + r() * 0.7) / CX, (j + 0.1 + r() * 0.8 + (i % 2) * 0.5) / CY, r(), r()]);
+  const lat = (fx, fy) => { const a = new Float32Array(fx * fy); for (let i = 0; i < a.length; i++) a[i] = r(); return { a, fx, fy }; };
+  const vn = (L, u, v) => {
+    const x = u * L.fx, y = v * L.fy, ix = Math.floor(x), iy = Math.floor(y), tx = x - ix, ty = y - iy, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    const g = (i, j) => L.a[(((j % L.fy) + L.fy) % L.fy) * L.fx + (((i % L.fx) + L.fx) % L.fx)];
+    return (g(ix, iy) * (1 - sx) + g(ix + 1, iy) * sx) * (1 - sy) + (g(ix, iy + 1) * (1 - sx) + g(ix + 1, iy + 1) * sx) * sy;
+  };
+  const N1 = lat(7, 13), N2 = lat(23, 41), N3 = lat(60, 110), N4 = lat(4, 7);
+  const hgt = new Float32Array(W * H), tone = new Float32Array(W * H), edge = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let u = x / W, v = y / H;
+    // the plate edges wander
+    u += 0.035 * (vn(N1, u, v) - 0.5); v += 0.02 * (vn(N1, u + 0.37, v + 0.11) - 0.5);
+    let d1 = 1e9, d2 = 1e9, id = 0;
+    for (let k = 0; k < pts.length; k++) {
+      let du = Math.abs(u - pts[k][0]); du = Math.min(du, 1 - du);
+      let dv = Math.abs(v - pts[k][1]); dv = Math.min(dv, 1 - dv);
+      const d = Math.hypot(du * CX * 1.3, dv * CY * 0.72);      // plates stretched up the trunk
+      if (d < d1) { d2 = d1; d1 = d; id = k; } else if (d < d2) d2 = d;
+    }
+    const e = d2 - d1;                                         // 0 on a furrow, growing into the plate
+    const k = y * W + x;
+    // (furrows of uneven width, some no more than a crack)
+    const plate = Math.min(1, e / (0.07 + 0.2 * vn(N1, u * 2.0 + 0.3, v * 2.0)));
+    // domed plate, stepped where its layers have flaked, pitted and grained
+    const flake = Math.floor((vn(N2, u, v) * 0.6 + vn(N4, u, v) * 0.4 + pts[id][2] * 0.5) * 5) / 5;
+    hgt[k] = Math.pow(plate, 0.55) * (0.62 + 0.26 * flake + 0.12 * vn(N3, u, v));
+    tone[k] = pts[id][3] * 0.35 + flake * 0.45 + 0.2 * vn(N2, u + 0.5, v);
+    edge[k] = plate;
+  }
+  const [c, g] = canvas(W, H), img = g.createImageData(W, H), d = img.data;
+  for (let k = 0; k < W * H; k++) {
+    const h = hgt[k], t = tone[k], lit = 0.26 + 0.86 * Math.pow(h, 0.9);
+    // plates run from cinnamon to pale grey-buff, the furrows near black with a red-brown cast
+    const R = base[0] * lit * (0.84 + 0.36 * t), G = base[1] * lit * (0.86 + 0.32 * t), B = base[2] * lit * (0.9 + 0.3 * t);
+    d[k * 4] = Math.min(255, R); d[k * 4 + 1] = Math.min(255, G); d[k * 4 + 2] = Math.min(255, B); d[k * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  for (let i = 0; i < 40; i++) {   // a little grey-green lichen
+    g.fillStyle = `rgba(128,138,104,${0.06 + r() * 0.12})`;
+    g.beginPath(); g.ellipse(r() * W, r() * H, 5 + r() * 20, 4 + r() * 14, r(), 0, 7); g.fill();
+  }
+  const [cn, gn] = canvas(W, H), ni = gn.createImageData(W, H), nd = ni.data;
+  const Hs = (x, y) => hgt[((y + H) % H) * W + ((x + W) % W)];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (Hs(x + 1, y) - Hs(x - 1, y)) * 3.2, dy = (Hs(x, y + 1) - Hs(x, y - 1)) * 3.2;
+    const n = Math.hypot(dx, dy, 1), k = (y * W + x) * 4;
+    nd[k] = (-dx / n * 0.5 + 0.5) * 255; nd[k + 1] = (dy / n * 0.5 + 0.5) * 255; nd[k + 2] = (1 / n * 0.5 + 0.5) * 255; nd[k + 3] = 255;
+  }
+  gn.putImageData(ni, 0, 0);
+  return { map: tex(c, { repeat: true }), normalMap: tex(cn, { srgb: false, repeat: true }) };
+}
+
 export function plankTexture(seed = 7, paint = null, vertical = false) {
   const [c, g] = canvas(512, 512);
   const r = mulberry32(seed);

@@ -256,7 +256,7 @@ async function init() {
     // half again the rider's width and he read as a toy on its back)
     // (a high afternoon sun, as the reference's: it comes down steeply through the gaps between the crowns in separate
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
-    return { time: 15.0, fov: 35, volDensity: 0.0105, volFalloff: 0.016, expK: 1.42, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
+    return { time: 15.0, fov: 35, volDensity: 0.008, volFalloff: 0.016, expK: 1.42, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
