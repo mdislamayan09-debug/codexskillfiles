@@ -77,13 +77,14 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= 0.62;   // dark green under a dusting: heavier, every spruce stood as a white cone
+      sk *= 0.45;   // dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.22);
+      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3);
       #endif
     }
     #ifdef FROST_ALL
@@ -282,7 +283,7 @@ function buildPine(seed, kind = 'pine') {
   wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.9, height - 2.4, (rnd() - 0.5) * 0.9), r0, 0.05, 9));
   // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
   for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (1.6 + rnd() * 0.9);
+    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (kind === 'tall' ? 1.2 + rnd() * 0.45 : 1.6 + rnd() * 0.9);   // (a slight swell on the old boles, not a tent skirt)
     wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.3, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.35, 0.7 + rnd() * 0.4, Math.sin(a) * r0 * 0.35), r0 * 0.28, r0 * 0.45, 7));   // rounder, lower buttresses
   }
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
@@ -498,8 +499,21 @@ function buildLog(seed) {
   const rnd = mulberry32(seed);
   const L = 5 + rnd() * 8, r = 0.28 + rnd() * 0.22;
   // settled into the duff (not resting on top of it), the bole sagging a little where it spans a hollow
-  const parts = [branchGeo(new THREE.Vector3(-L / 2, r * 0.42, 0), new THREE.Vector3(0, r * 0.3, 0), r, r * 0.9, 9),
-    branchGeo(new THREE.Vector3(0, r * 0.3, 0), new THREE.Vector3(L / 2, r * 0.4, (rnd() - 0.5) * 0.4), r * 0.9, r * 0.78, 9)];
+  // (a swollen, knotted, out-of-round bole, flattened where it lies: two smooth cylinders read as a striped tube)
+  const trunk = new THREE.CylinderGeometry(r * 0.78, r, L, 16, 22, true).toNonIndexed();
+  {
+    const tp = trunk.attributes.position, tu = trunk.attributes.uv, ph = rnd() * 6.28;
+    for (let k = 0; k < tp.count; k++) {
+      const t = tp.getY(k), a = Math.atan2(tp.getZ(k), tp.getX(k)), rad = Math.hypot(tp.getX(k), tp.getZ(k));
+      const kn = 1 + 0.1 * Math.sin(a * 2 + t * 0.9 + ph) + 0.07 * Math.sin(a * 5 - t * 2.3) + 0.09 * Math.sin(t * 3.7 + ph) * Math.sin(a * 3 + ph) + 0.16 * Math.exp(-((t - L * 0.18) ** 2) / 0.05) + 0.12 * Math.exp(-((t + L * 0.27) ** 2) / 0.04);
+      let y = Math.sin(a) * rad * kn, z = Math.cos(a) * rad * kn;
+      y = Math.max(y, -rad * 0.6);                                   // settled into the duff
+      tp.setXYZ(k, t, y + r * 0.36 - 0.05 * Math.cos(t / L * Math.PI), z);
+      tu.setXY(k, tu.getX(k) * 4, tu.getY(k) * L * 1.1);
+    }
+    trunk.computeVertexNormals();
+  }
+  const parts = [trunk];
   for (let i = 0; i < 5; i++) { // snapped branch stubs
     const x = (rnd() - 0.5) * L * 0.8, a = rnd() * 6.28;
     parts.push(branchGeo(new THREE.Vector3(x, r * 0.8, 0), new THREE.Vector3(x + 0.3, r * 0.8 + Math.cos(a) * 0.9, Math.sin(a) * 0.9), 0.07, 0.03, 4));
@@ -866,7 +880,7 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       float dist = length(xz - cam);
       float dens = ${mode === 'stone'
         ? 'max(sp.b * 0.55, max(smoothstep(0.3, 0.8, sp.r) * 0.22, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
-        : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
+        : 'max(smoothstep(0.25, 0.6, sp.b), 0.85 * smoothstep(-700.0, -1250.0, xz.y)) * (1.0 - smoothstep(0.3, 0.62, sp.r)) * (1.0 - cl.a)'};
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
       // gathered in drifts and clusters (under a tree, along a runnel), bare between: never an even sprinkle
       dens *= smoothstep(0.32, 0.72, fbm2(xz / 6.5 + ${(seed * 3.7).toFixed(2)})) * 1.9;
@@ -1276,7 +1290,7 @@ export class Vegetation {
       for (let k = 0; k < 7; k++) cards.push(cardGeo(1.3 + rnd() * 0.6, new THREE.Vector3((rnd() - 0.5) * 1.2, 0.45 + rnd() * 0.5, (rnd() - 0.5) * 1.2), c, rnd, 1, 0.9));
       const g = leafAO(setSway(mergeGeometries(cards), (x, y) => y * 0.25));
       // (thin leaves that glow when the sun is behind them)
-      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0xb4bca0, true, 0.3, 0.16), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
+      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0xb4bca0, true, 0.42, 0.14), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
     }
     // ferns (3, 4), big-leaf jungle plants (5, 6), dry scrub (7, 8)
     const fernT = fernTexture(), fernMat = leafMat(fernT, 0xb8bc9e);   // (muted: a saturated card green reads as pasted on)
@@ -1310,7 +1324,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: true });   // (frosted and pale in the snow: bare straw read as cloned orange rosettes)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];
@@ -1351,7 +1365,9 @@ export class Vegetation {
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
-    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd, true, 2), material: rMat }] }));
+    // (jointed blocks with hard edges and flat tops for the snow to lie on: the rounded boulder, scaled up to a crag,
+    // was a pillow with a white cap)
+    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd + 40, true, 5, 22, 0.28).scale(1.7, 1.5, 1.7), material: rMat }] }));
     this.crags = new ScatterLayer(scene, cragBuilds, 6000, 2600);
 
     this.quality = quality;

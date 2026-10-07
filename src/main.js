@@ -263,7 +263,7 @@ async function init() {
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
-    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 15.4, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 13.3, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -733,7 +733,9 @@ async function init() {
         const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
         for (let k = 0, n = 2 + Math.floor(rr() * 5); k < n; k++) {
           const x = gx + (rr() - 0.5) * 16, z = gz + (rr() - 0.5) * 16;
-          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.3 + rr() * rr() * 1.6, firs[Math.floor(rr() * firs.length)]);
+          // (tall, ragged pines of every height among the spruce, not one cone model over and over)
+          const tl = veg.groups.tall, old = tl.length && rr() < 0.45;
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, old ? 0.45 + rr() * 0.55 : 0.3 + rr() * rr() * 1.6, old ? tl[Math.floor(rr() * tl.length)] : firs[Math.floor(rr() * firs.length)]);
         }
       }
       veg.update(player.hpos, true);
@@ -876,13 +878,14 @@ async function init() {
           if (firs.length) for (let f = 150; f < 3700; f += 8.5) {
             const half = 260 + f * 0.5;
             for (let r = -half; r < half; r += 8.5) {
-              const x = c.x + d0.x * f + rt0.x * r + (rf() - 0.5) * 8, z = c.z + d0.z * f + rt0.z * r + (rf() - 0.5) * 8, pick = rf(), sc = rf() * rf();
+              const jx = (rf() - 0.5) * 17, jz = (rf() - 0.5) * 17;   // (thrown well off the grid: half a cell's jitter left rows showing on thin slopes)
+              const x = c.x + d0.x * (f + jx) + rt0.x * (r + jz), z = c.z + d0.z * (f + jx) + rt0.z * (r + jz), pick = rf(), sc = rf() * rf();
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const h = world.heightAt(x, z);
               if (world.climateAt(x, z).snow < 0.5 || pick > stand(x, z, h) * 0.9) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.74 || sp.wet > 0.25 || sp.road > 0.2) continue;
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.6 + sc * 1.3, firs[Math.floor(pick * 977) % firs.length]);
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.5 + sc * 0.9, firs[Math.floor(pick * 977) % firs.length]);
               added++;
             }
           }
@@ -927,14 +930,21 @@ async function init() {
           const x = kx + d0.x * f + rt0.x * r, z = kz + d0.z * f + rt0.z * r, list = tall && talls.length ? talls : firs;
           if (list.length) veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rk() * 6.28, sc, list[Math.floor(rk() * list.length)]);
         };
+        // (to scale with the cabin: at twice this size the buildings were toys under them)
         for (const [f, r, sc, tall] of [[6, -34, 1.5, 0], [-4, -40, 1.15, 0], [14, -44, 1.8, 0], [22, -30, 1.3, 0], [-10, -52, 0.9, 0],
           [2, 33, 1.7, 0], [12, 40, 1.25, 0], [-6, 44, 1.45, 0], [20, 30, 1.0, 0], [-14, 36, 0.8, 0],
-          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc, tall);
+          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 0.6, tall);
+        // the knoll's own slopes broken with rock and brush, so it is ground and not an iced dome
+        for (let i = 0; i < 70; i++) {
+          const a = rk() * 6.28, rr3 = 30 + rk() * 55, x = kx + Math.cos(a) * rr3, z = kz + Math.sin(a) * rr3, gh = world.heightAt(x, z);
+          if (rk() < 0.35) { const sc = 0.8 + rk() * 2.2; veg.rocks.add(x, gh - 0.4 * sc, z, rk() * 6.28, sc, 2 + Math.floor(rk() * 2)); }
+          else for (let q = 0; q < 3; q++) { const bx = x + (rk() - 0.5) * 4, bz = z + (rk() - 0.5) * 4; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.06, bz, rk() * 6.28, 0.6 + rk() * 0.9, [7, 8, 9][Math.floor(rk() * 3)]); }
+        }
         for (let i = 0; i < 46; i++) {
           // and timber thickening down the knoll's far and side slopes
           const a = rk() * 6.28, rr2 = 58 + rk() * 95, f = Math.cos(a) * rr2, r = Math.sin(a) * rr2;
           if (f < -20 && Math.abs(r) < 46) continue;
-          plant(f, r, 0.6 + rk() * 1.1, 0);
+          plant(f, r, 0.4 + rk() * 0.7, 0);
         }
       }
       // and the light: the shot waits for a break in the deck to lie on the homestead and the ledge, with cloud
@@ -1233,7 +1243,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.2 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);

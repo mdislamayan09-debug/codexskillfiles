@@ -115,7 +115,7 @@ const VolumetricShader = {
         T *= exp(-a * 0.6);
       }
       // (dust scatters the sun paler than its disc: a pale gold, not the low sun's orange)
-      vec3 sunC = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.06, 1.0, 0.88), 0.8);   // (a warm white: gold haze under a warm grade went sepia)
+      vec3 sunC = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.92), 0.85);   // (a warm white: gold haze under a warm grade went sepia)
       vec3 L = sunC * phase * lit * 12.566 + uAmbient * amb;
       // the haze stands in front of what is behind it: a little of the scene is lost to it as well
       gl_FragColor = vec4(base.rgb * mix(1.0, T, 0.5) + L * uStrength, base.a);
@@ -165,10 +165,12 @@ const GradeShader = {
       }
       // storm: cold, blue-grey and low-saturation
       // storm: cool blue-grey shadows, but warm wood and rock keep some colour
-      col = mix(col, sat(col, 0.82) * mix(vec3(0.86, 0.95, 1.12), vec3(1.0), smoothstep(0.15, 0.6, l)), uStorm * 0.7);
+      col = mix(col, sat(col, 0.82) * mix(vec3(0.95, 0.98, 1.05), vec3(1.0), smoothstep(0.15, 0.6, l)), uStorm * 0.7);
       // and the whole frame steps down into steel blue, as in the references (their snow sits near 0.6/0.75/0.9
       // R/G/B of ours): red and green pulled down hardest in the shadows, the whites keep a little more
-      col *= mix(vec3(1.0), mix(vec3(0.66, 0.82, 1.0), vec3(0.8, 0.9, 1.02), smoothstep(0.2, 0.85, l)), uStorm);   // (shadows less saturated: the pool under the horse read as dyed blue)
+      // (the snow takes the blue, the darks stay near neutral: tinted hardest in the shadows the whole frame went
+      // cobalt and rock, timber and coat all read as blue)
+      col *= mix(vec3(1.0), mix(vec3(0.9, 0.93, 0.98), vec3(0.78, 0.89, 1.03), smoothstep(0.12, 0.7, l)), uStorm);   // (shadows less saturated: the pool under the horse read as dyed blue)
       // and a firmer S-curve, so the storm frame has true darks in rock and timber and bright snow, not one mid band
       col = mix(col, col * col * (3.0 - 2.0 * col) * 1.08, uStorm * 0.25);
       // night: blue shift
@@ -277,8 +279,8 @@ export class Post {
         v.uInvProj.value.copy(this.camera.projectionMatrixInverse); v.uCamWorld.value.copy(this.camera.matrixWorld);
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
-        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.15);
-        v.uDensity.value = state.volDensity ?? 0.0034; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
+        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
+        v.uDensity.value = state.volDensity ?? 0.003; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

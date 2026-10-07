@@ -150,23 +150,6 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.6, 0.78, fbm2(xz / 9.0 + 12.0)) * pineK * 0.45);
   // the open pine floor: a dry duff the low sun rakes across, mottled darker where it lies thick and damp
   forestFloor *= 1.0 - 0.28 * pineK * smoothstep(0.35, 0.7, fbm2(xz / 6.0 + 2.2));
-  // close to the lens the duff is a litter of fallen twigs and rusty needle clusters lying every way (drawn here, by
-  // the thousand, where the modelled twigs and cones could only ever be a sprinkle on a smooth floor)
-  if (pineK > 0.01 && fp < 0.09) {
-    float nearK = pineK * smoothstep(0.09, 0.03, fp);
-    for (int L = 0; L < 3; L++) {
-      float cs = L == 0 ? 0.47 : L == 1 ? 0.21 : 0.11;
-      vec2 gc = floor(xz / cs + float(L) * 3.7), gf = fract(xz / cs + float(L) * 3.7) - 0.5;
-      vec2 hh = hash22(gc + float(L) * 17.3);
-      float ang = hh.x * 6.2832;
-      vec2 dir = vec2(cos(ang), sin(ang));
-      vec2 q = gf - (hh.yx - 0.5) * 0.3;
-      float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x)) + 0.05 * sin(along * 9.0 + hh.y * 6.0);
-      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : 0.35, hash12(gc + 5.1));
-      vec3 sc2 = L == 0 ? srgb(vec3(126,110,90)) : L == 1 ? srgb(vec3(104,74,46)) : srgb(vec3(60,46,34));
-      forestFloor = mix(forestFloor, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8));
-    }
-  }
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
@@ -285,7 +268,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     rockAmt = max(rockAmt, ribE * 0.5);
   }
   // a used track through the snow stays trampled and dirty: a dark line leading to the homestead
-  snowAmt *= 1.0 - 0.55 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
+  snowAmt *= 1.0 - 0.8 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
   rockAmt = max(rockAmt, ribs * 0.55);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
@@ -313,6 +296,24 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float rr = smoothstep(0.35, 0.75, road - 0.2 * pineK + (micro-0.5)*0.25);
   c = mix(c, roadC, rr); tn = mix(tn, dN, rr);
   c = mix(c, forestFloor * 0.92, rr * pineK * 0.75 * smoothstep(0.4, 0.62, fbm2(xz / 2.7 + 5.0) + 0.2 * (micro - 0.5)));
+  // (over the tread as well as the duff: litter falls on a trail too)
+  // close to the lens the duff is a litter of fallen twigs and rusty needle clusters lying every way (drawn here, by
+  // the thousand, where the modelled twigs and cones could only ever be a sprinkle on a smooth floor)
+  if (pineK > 0.01 && fp < 0.09) {
+    float nearK = pineK * smoothstep(0.09, 0.03, fp);
+    for (int L = 0; L < 3; L++) {
+      float cs = L == 0 ? 0.47 : L == 1 ? 0.21 : 0.11;
+      vec2 gc = floor(xz / cs + float(L) * 3.7), gf = fract(xz / cs + float(L) * 3.7) - 0.5;
+      vec2 hh = hash22(gc + float(L) * 17.3);
+      float ang = hh.x * 6.2832;
+      vec2 dir = vec2(cos(ang), sin(ang));
+      vec2 q = gf - (hh.yx - 0.5) * 0.3;
+      float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x)) + 0.05 * sin(along * 9.0 + hh.y * 6.0);
+      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : 0.35, hash12(gc + 5.1));
+      vec3 sc2 = L == 0 ? srgb(vec3(126,110,90)) : L == 1 ? srgb(vec3(104,74,46)) : srgb(vec3(60,46,34));
+      c = mix(c, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8) * (1.0 - 0.35 * rr));
+    }
+  }
   float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des);
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
@@ -365,7 +366,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // two scales of the snow scan, the second turned 37 degrees, blended by noise so the dimples never tile
   vec2 xzr = mat2(0.8, 0.6, -0.6, 0.8) * xz;
   vec3 snN = mix(texN(L_SNOW, xz, 4.0), texN(L_SNOW, xzr, 11.0), smoothstep(0.3, 0.7, fbm2(xz / 17.0 + 4.4)));
-  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), snN, 0.24), snowAmt);   // (lighter: at 0.42 the scan's dimples tiled across the whole snowfield)
+  c = mix(c, snow, snowAmt); tn = mix(tn, mix(vec3(0.0, 0.0, 1.0), snN, 0.13), snowAmt);   // (lighter: at 0.42 the scan's dimples tiled across the whole snowfield)
   rough = mix(rough, 0.6, snowAmt);
   if (snowAmt > 0.01) {
     // wind-packed ripples and soft drifts, so open snow reads as a surface rather than a white sheet

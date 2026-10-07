@@ -1044,7 +1044,7 @@ export class Quadruped {
       const ringG = new THREE.TorusGeometry(0.085, 0.05, 6, 14);
       ringG.rotateX(Math.PI / 2); ringG.scale(1, 0.8, 1);
       { const rp = ringG.attributes.position; for (let k = 0; k < rp.count; k++) { const a = Math.atan2(rp.getZ(k), rp.getX(k)); rp.setY(k, rp.getY(k) * (0.7 + 0.5 * Math.abs(Math.sin(a * 3 + 1.3)))); } ringG.computeVertexNormals(); }
-      this.snowRings = this.legs.map((l) => { const m = mesh(ringG, ringM, false); m.position.set(0, 0.08, 0); m.visible = false; l.j4.add(m); return m; });
+      this.snowRings = this.legs.map((l) => { const m = mesh(ringG, ringM, false); m.position.set(0, 0.2, 0); m.scale.set(1.5, 1.1, 1.5); m.visible = false; l.j4.add(m); return m; });   // (at the snow's surface, where the leg goes in)
     }
     const at = (bone, x, y, z) => V(x, y, z).sub(bone.userData.rest);
     // eyes

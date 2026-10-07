@@ -180,6 +180,12 @@ export class Sky {
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
             cl.rgb *= mix(1.0, mix(0.62, 0.9, far), uStorm * (1.0 - 0.45 * uBlizzard));
+            // (and its underside modelled in cells: heavier, darker bellies and paler thin places between them)
+            {
+              vec2 cuv2 = d.xz / (d.y + 0.14) * 0.9 + uCloudOffset * 2.0;
+              float cell = fbm(cuv2 * 1.3) * 0.6 + fbm(cuv2 * 3.1 + 5.2) * 0.4;
+              cl.rgb *= mix(1.0, mix(0.5, 1.45, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
+            }
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;
             col = col * mix(1.0, cl.a, fade) + cl.rgb * fade;
@@ -326,7 +332,7 @@ export class Sky {
     U.uFogSunColor.value.setRGB(1.0, 0.62 + 0.3 * warm, 0.36 + 0.5 * warm).multiplyScalar(day * 0.75 + 0.02);
     U.uFogDensity.value = 0.0009 + 0.0006 * dusk + 0.0004 * night;
     // weather: blue-grey snow haze, warm green humidity, crisp dry desert air
-    U.uFogColor.value.lerp(new THREE.Color(0.38, 0.5, 0.7).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.8, W.blizzard * 0.85));
+    U.uFogColor.value.lerp(new THREE.Color(0.38, 0.5, 0.7).lerp(new THREE.Color(0.5, 0.55, 0.63), W.blizzard).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.8, W.blizzard * 0.85));   // (falling snow is grey-blue, not cobalt)
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
     // (falling snow greys out the far side of a valley within a kilometre or two: the reference's ridges fade layer
