@@ -78,6 +78,13 @@ const VolumetricShader = {
       vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
       v.xyz /= v.w;
       float dist = z >= 0.99999 ? uMaxDist : min(length(v.xyz), uMaxDist);
+      vec3 rd0 = normalize((uCamWorld * vec4(normalize(v.xyz), 0.0)).xyz);
+      // sky seen up through the trees is bright haze, as the reference's: the air between here and the clouds is
+      // full of the same lit dust (a hard-edged cumulus showing through the canopy read as a glowing blob)
+      if (z >= 0.99999) {
+        vec3 hz = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 0.98, 0.86), 0.55) * (0.1 + 0.2 * pow(max(dot(rd0, uSunDir), 0.0), 4.0));
+        base.rgb = mix(base.rgb, hz, 0.72 * min(uStrength, 1.0));
+      }
       vec3 rd = normalize((uCamWorld * vec4(normalize(v.xyz), 0.0)).xyz);
       const int N = VOL_STEPS;
       // steps bunch up near the lens (where a beam's edge is sharpest on screen) and stretch with distance
@@ -224,6 +231,7 @@ export class Post {
   }
 
   setSize(w, h) {
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(w, h);
     this.grade.uniforms.uRes.value.set(w, h);
   }

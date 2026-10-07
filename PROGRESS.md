@@ -561,3 +561,55 @@ homestead hidden under its lip.
 snowride 4, snowvista 3, all "clearly". Its notes drove that later work: no sun dapple or debris on the pine
 floor, striped rays over a yellow wash, squiggle ledges and a clear-blue sky in the snow ride, "forest painted
 on as stains", a grey barn on a bald knoll and blob clouds in the vista.
+
+### Rounds 51-53: sun on the pine floor, snowfall in the air, timber drawn tree by tree
+- **Pines.** A longer lens from further back (35 degrees), so the horse no longer swells to twice the rider's width.
+  The sky seen up through the trees is bright haze, not a hard-edged cumulus. Fallen cones are ovoids, fewer and
+  smaller (the cone primitive read as triangular chips). The tread is a narrow hoof-worn line with needle litter
+  drifted over it. The framing pines hard by the lens were taken out again: at a few metres the needle sprays are
+  plainly cards.
+- **Snow ride.** Falling snow now dissolves everything beyond a few kilometres into the tone of the sky
+  (`uSnowfall`), which also removed a dark outline that hung above the left ridge: it was the crest of a far
+  backdrop range showing through. Snow-country rock is near black. A 42 degree lens from further back.
+- **Snow vista.** Distant spruce stands are drawn crown by crown in the ground shader (a dark cone lit on the sun's
+  side, shaded snow between), fading to their mean tone with distance. The storm deck is a layered overcast with
+  breaks. The barn is dark weathered timber.
+- **Rider.** A smaller, curled hat brim; a tail of thinner hair cards; less snow speckle on the coat.
+
+**Critic scores.** Round 51: pines 4, snowride 4, snowvista 3. Round 52: pines 4, snowride 3.5, snowvista 4.5.
+Round 53: pines 4, snowride 3, snowvista 4. All "clearly". The scores have not moved from the handoff's (4, 5, 3):
+within the critic's run-to-run spread of one point, the pines are level, the vista is up one and the snow ride
+is down.
+
+**What the critic keeps naming, in order of how often** (these are the next levers):
+1. **Horse and rider** (every pair, every round): a smooth rump with no musculature, a strip tail, boxy bags, an
+   untextured coat, legs lost in a dark mass. This is an asset problem, not a shader one. It needs a sculpted horse
+   mesh with real anatomy and hair cards, and a clothed rider with folds; the procedural body has gone as far as it
+   will go.
+2. **Pines lighting**: still read as one sepia wash. The volumetric pass is physically right but the stand lets
+   too little direct sun through; it wants higher contrast (denser canopy overhead, harder gaps) and a neutral,
+   not gold, highlight.
+3. **Snow-country terrain**: terraced contour banding (the strata pass over-reads from far away), blotchy snow
+   masks, no sharp ridgelines. The heightmap is 2 m a cell; sharp arêtes need either displacement detail in the
+   vertex stage or real mesh cliffs.
+4. **Sky**: the storm deck is still flat wisps on blue from the lookout. It needs a second, higher-resolution
+   cloud layer with self-shadowed bellies.
+5. **Valley floor**: no river, tracks or clearings reading from the lookout.
+6. **Ground dressing**: tiling snow normal, cloned shrubs, polka-dot scatter.
+
+### Performance on the target machine (first measured this session)
+The playable game had never been run on the GPU it was built for. On the M4 at the laptop's native 3024x1964 it
+drew **4 frames a second**; at half that resolution, 8. Found and fixed:
+- Each character was 20-40 separate meshes because every strap and buckle made its own material (2,500 draw calls
+  a frame in town). Materials and textures are now shared and the parts merge: 900 calls.
+- The ground's shader ran several times over for every pixel; a depth pre-pass now lets it run once.
+- Three grass clumps in four were behind the camera yet ran the whole grass vertex shader; they are culled first.
+- The shadow map and the water's mirror pass are redrawn every third and every second frame in play (stills take
+  both every frame), and the mirror pass is skipped when no water is in reach.
+- A frame governor lowers the render scale when the frame takes longer than 40 ms and raises it when there is
+  headroom (`?nogov` turns it off, `?ss=` pins the scale).
+
+Now: **about 15 fps at 1512x982, 28 fps at half scale; the governor settles at about 25 fps at a render scale of
+0.56** on this machine. Native retina is still about 6 fps. The game is playable but soft; it is not yet the
+"4K" the brief asks for at a playable rate. The remaining cost is shadows, terrain and grass in about equal parts.
+Stills (`?capture`) are unaffected and keep every setting at its highest.

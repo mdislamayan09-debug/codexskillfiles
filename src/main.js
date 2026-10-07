@@ -70,7 +70,7 @@ async function init() {
   const sky = new Sky(scene, renderer, QUALITY);
   setLoad(0.57, 'Loading photographic surfaces…'); await tick();
   const surf = await loadSurfaces(renderer);
-  const terrain = new Terrain(world, scene, surf, QUALITY);
+  const terrain = new Terrain(world, scene, surf, CAPTURE ? QUALITY : Math.min(QUALITY, 1.6));   // (stills keep the densest ground mesh)
   const backdrop = new Backdrop(world, scene, QUALITY);   // the country beyond the map edge, out to the horizon
   setLoad(0.6, 'Raising Copper Hollow…'); await tick();
   const town = new Town(world, scene, surf);
@@ -79,7 +79,9 @@ async function init() {
   for (const g of veg.grass) g.layers.set(1);
   setLoad(0.82, 'Filling the rivers…'); await tick();
   const water = new Water(scene, renderer, { reflections: QUALITY >= 0.7, resScale: QUALITY > 1 ? 0.75 : QUALITY >= 1 ? 0.5 : 0.35, normals: surf.water });
-  if (QUALITY > 1 && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
+  // (stills take an 8192 shadow map; in play 4096 over the same 300 m is 7 cm a texel and a quarter of the fill)
+  if (QUALITY > 1 && CAPTURE && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
+  else if (!CAPTURE) { sky.sun.shadow.mapSize.set(3072, 3072); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
   const snowfall = new Snowfall(scene, QUALITY >= 2 ? 150000 : QUALITY > 1 ? 70000 : 30000);
@@ -114,7 +116,9 @@ async function init() {
   const npcs = new NPCs({ world, town, veg, scene, fx: particles, tracers, audio });
   const player = new Player({ world, town, veg, scene, camera, input });
   const hud = new HUD(world);
-  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: QUALITY >= 2 ? 64 : QUALITY > 1 ? 40 : 24 });
+  // in play the shadow map and the water's mirror are each redrawn on alternate frames; stills take both every frame
+  sky.shadowEvery = CAPTURE ? 1 : 3; water.every = CAPTURE ? 1 : 2;
+  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: QUALITY >= 2 ? 64 : QUALITY > 1 ? 40 : 24, samples: params.has('msaa') ? +params.get('msaa') : 4, smaa: params.get('msaa') === '0' });
   // pooled lamp lights for night
   const lamps = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffa850, 0, 18, 1.8); scene.add(l); return l; });
 
@@ -968,9 +972,29 @@ async function init() {
   const clock = new THREE.Clock();
   let titleT = 0;
   const lampPos = town.lights;
+  // Frame governor. The world is drawn at the display's full pixel density when the machine can hold a playable
+  // rate at it and at a lower render scale when it cannot (the image is the same, a little softer), stepping back up
+  // when there is headroom. ?ss= pins the scale and capture mode never changes it.
+  const gov = { t: performance.now(), n: 0, scale: renderer.getPixelRatio(), max: renderer.getPixelRatio(), min: 0.5, on: !CAPTURE && !SS && !params.has('nogov') };
+  G.gov = gov;
+  function govern() {
+    if (!gov.on || !G.started) { gov.t = performance.now(); gov.n = 0; return; }
+    if (++gov.n < 24) return;
+    const now = performance.now(), ms = (now - gov.t) / gov.n;
+    gov.t = now; gov.n = 0; gov.ms = ms;
+    let ns = gov.scale;
+    if (ms > 40) ns = Math.max(gov.min, gov.scale * (ms > 80 ? 0.72 : ms > 55 ? 0.82 : 0.9));
+    else if (ms < 27 && gov.scale < gov.max) ns = Math.min(gov.max, gov.scale * 1.08);
+    if (Math.abs(ns - gov.scale) > 0.015) {
+      gov.scale = ns;
+      renderer.setPixelRatio(ns); renderer.setSize(innerWidth, innerHeight); post.setSize(innerWidth, innerHeight);
+      gov.t = performance.now();
+    }
+  }
   function frame() {
     requestAnimationFrame(frame);
     if (G.hold) { clock.getDelta(); return; }
+    govern();
     const rdt = Math.min(clock.getDelta(), 0.1);
     G.deadEyeK = THREE.MathUtils.lerp(G.deadEyeK, G.deadEye ? 1 : 0, Math.min(1, rdt * 6));
     G.timeScale = THREE.MathUtils.lerp(1, 0.3, G.deadEyeK);
@@ -1154,6 +1178,12 @@ async function init() {
       if (!player.mounted) add(player.pos, 0.35 + player.speed * 0.08);
       for (const a of npcs.actors) { if (rip.length >= 6) break; if (!a.dead) add(a.pos, 0.3 + a.speed * 0.08); }
       water.setRipples(rip);
+    }
+    // is there water for the mirror pass to show? (looked for now and then: the sea, the lake, the river in reach)
+    if (G.frame % 30 === 0) {
+      let wet = camera.position.y < 260 && world.heightAt(camera.position.x, camera.position.z) < 1.5;
+      for (const d of [80, 200, 400, 800, 1400]) { if (wet || camera.position.y > 260) break; for (let k = 0; k < 12; k++) { const a = k * 0.5236 + d; if (world.heightAt(camera.position.x + Math.cos(a) * d, camera.position.z + Math.sin(a) * d) < 0.3) { wet = true; break; } } }
+      water.needed = wet;
     }
     water.update(camera);
     if (G.started) hud.update(rdt, G);

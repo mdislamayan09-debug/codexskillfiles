@@ -1,6 +1,6 @@
 // GPU-displaced, instanced chunk-LOD terrain with a procedural splat shader.
 import * as THREE from 'three';
-import { U, GLSL_COMMON, patchMaterial } from './shared.js';
+import { U, GLSL_COMMON, GLSL_FAR_DEPTH, patchMaterial } from './shared.js';
 import { WORLD_SIZE, HALF } from './world.js';
 
 const CHUNK = 128;
@@ -289,8 +289,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float dirtAmt = smoothstep(0.55, 0.95, patchy + 0.25*town) * (0.35 + 0.65*town) * (1.0 - jun * 0.7) * (1.0 - des);
   dirtAmt = max(dirtAmt, smoothstep(0.55, 0.9, town) * (0.82 + 0.18 * micro));
   c = mix(c, dirt, dirtAmt); tn = mix(tn, dN, dirtAmt);
-  float rr = smoothstep(0.35, 0.75, road + (micro-0.5)*0.25);
+  // (through the pines the tread is a narrow hoof-worn line with needle litter drifted over it in patches, not a
+  // graded road)
+  float rr = smoothstep(0.35, 0.75, road - 0.2 * pineK + (micro-0.5)*0.25);
   c = mix(c, roadC, rr); tn = mix(tn, dN, rr);
+  c = mix(c, forestFloor * 0.92, rr * pineK * 0.75 * smoothstep(0.4, 0.62, fbm2(xz / 2.7 + 5.0) + 0.2 * (micro - 0.5)));
   float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des);
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
@@ -559,8 +562,23 @@ export class Terrain {
         .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n${VERT_HEAD}`)
         .replace('#include <begin_vertex>', VERT_BODY);
     };
+    // Depth pre-pass. The ground's shader is by far the heaviest in the frame and its chunks are drawn in no
+    // particular order, so in mountain country every pixel was shaded several times over before the nearest
+    // surface won. The ground is first laid into the depth buffer alone (a few lines of vertex shader, no colour);
+    // the full shader then runs once per pixel, on the surface that is actually seen. The pre-pass sits a hair
+    // further back so the two programs' rounding can never reject the real surface.
+    const preMat = new THREE.ShaderMaterial({
+      uniforms: { ...U, uChunk: { value: CHUNK } },
+      vertexShader: `${GLSL_COMMON}\n${GLSL_FAR_DEPTH}\n${VERT_HEAD}
+        void main(){ ${VERT_BODY} gl_Position = projectionMatrix * (modelViewMatrix * vec4(transformed, 1.0)); farDepth(gl_Position); }`,
+      fragmentShader: 'void main(){ gl_FragColor = vec4(0.0); }',
+      colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1.5, polygonOffsetUnits: 4,
+    });
     LODS.forEach((seg, li) => {
       const g = makeLodGeometry(seg, 2 * Math.pow(2, li));
+      const pre = new THREE.Mesh(g, preMat);
+      pre.frustumCulled = false; pre.renderOrder = -10; pre.castShadow = false; pre.receiveShadow = false;
+      scene.add(pre);
       const m = new THREE.Mesh(g, mat);
       m.frustumCulled = false;
       m.receiveShadow = true;

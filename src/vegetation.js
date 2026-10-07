@@ -907,8 +907,15 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec2 xz = aOff.xy + floor((cam - aOff.xy) / TILE + 0.5) * TILE;
       float dist = length(xz - cam);
       float fade = smoothstep(RADIUS, RADIUS*0.72, dist) * smoothstep(INNER*0.8, INNER, dist);
-      vec4 sp = splatAt(xz);
       float h0 = heightAt(xz);
+      // Clumps outside the lens's view are thrown out here, before any of the work below. The field is a square
+      // all round the camera and three clumps in four are behind it or off to the side; each used to run this whole
+      // shader for every one of its vertices, which cost more than any other part of the frame.
+      {
+        vec4 cp = projectionMatrix * (viewMatrix * vec4(xz.x, h0 + 0.3, xz.y, 1.0));
+        if (cp.w < -2.5 || abs(cp.x) > cp.w * 1.15 + 3.5 || cp.y > cp.w * 1.2 + 3.5 || cp.y < -cp.w * 1.2 - 3.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      }
+      vec4 sp = splatAt(xz);
       vec3 nrm = normalAt(xz);
       float slope = 1.0 - nrm.y;
       float edgeN = (vnoise(xz * 0.9) - 0.5) * 0.35 + (vnoise(xz * 3.1) - 0.5) * 0.12;
@@ -1329,11 +1336,14 @@ export class Vegetation {
     this.grass = [];
     if (quality > 0) {
       const q = quality;
-      this.grass.push(makeGrass(scene, 0.3 / Math.sqrt(q), 28, 0.6, 0));
-      this.grass.push(makeGrass(scene, 0.7 / Math.sqrt(q), 85, 1.2, 24));
+      // (clump counts grow with the square of this: past 1.5 the lawn costs a third of the frame for little gain)
+      const gq = Math.min(q, 1.5);
+      this.grass.push(makeGrass(scene, 0.3 / Math.sqrt(gq), 28, 0.6, 0));
+      this.grass.push(makeGrass(scene, 0.7 / Math.sqrt(gq), 85, 1.2, 24));
       // forest-floor clutter
       const cone = (() => {
-        const c = new THREE.ConeGeometry(0.045, 0.13, 7, 3); c.rotateZ(Math.PI / 2); c.translate(0, 0.035, 0);
+        // (an ovoid, as a fallen cone is: the pointed cone primitive lay about the floor as dark triangular chips)
+        const c = new THREE.SphereGeometry(0.036, 7, 5); c.scale(1.75, 0.95, 1); c.translate(0, 0.03, 0);
         const p = c.attributes.position, col = new Float32Array(p.count * 3);
         // (vertex colours are linear: these are dark, weathered cone browns, not the pale chips they read as before)
         for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.16 * v; col[i * 3 + 1] = 0.1 * v; col[i * 3 + 2] = 0.055 * v; }
@@ -1347,7 +1357,7 @@ export class Vegetation {
       })();
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
-        makeClutter(scene, cone, { spacing: 0.62 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
+        makeClutter(scene, cone, { spacing: 0.8 / Math.sqrt(q), radius: 26, smin: 0.7, smax: 1.15, color: 0xffffff, seed: 3 }),
         makeClutter(scene, twig, { spacing: 1.9 / Math.sqrt(q), radius: 34, smin: 0.4, smax: 1.3, color: 0x5a4632, flat: true, seed: 5 }),
         makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
       ];

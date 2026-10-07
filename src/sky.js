@@ -122,7 +122,7 @@ export class Sky {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
-      defines: { CLOUD_STEPS: quality >= 2 ? 112 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },
+      defines: { CLOUD_STEPS: quality >= 2 ? 80 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },   // (dithered: past ~80 steps the gain is not visible)
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
@@ -276,22 +276,32 @@ export class Sky {
     const sunCol = new THREE.Color().setRGB(1.0, 0.52 + 0.42 * warm, 0.26 + 0.62 * warm);
     const above = THREE.MathUtils.smoothstep(sunH, -0.04, 0.06);
     // moon takes over at night
+    // The shadow map is the costliest pass of the frame (every tree, rock and building near the lens drawn again).
+    // In play it is redrawn on alternate frames; the light then stays where that map was drawn from, so map and
+    // matrix always agree.
+    this.tick = (this.tick || 0) + 1;
+    const every = this.shadowEvery || 1;
+    this.sun.shadow.autoUpdate = every < 2;
+    const redraw = every < 2 || this.tick % every === 0 || !this.sun.shadow.map;
     if (above > 0.01) {
       this.sun.color.copy(sunCol);
       this.sun.intensity = 3.8 * above;
-      this.sun.position.copy(focus).addScaledVector(s, 600);
+      if (redraw) this.sun.position.copy(focus).addScaledVector(s, 600);
     } else {
       this.sun.color.setRGB(0.55, 0.65, 0.95);
       this.sun.intensity = 0.65 * night;
       const m = s.clone().negate(); m.y = Math.max(m.y, 0.25);
-      this.sun.position.copy(focus).addScaledVector(m.normalize(), 600);
+      if (redraw) this.sun.position.copy(focus).addScaledVector(m.normalize(), 600);
     }
-    // snap shadow camera to texels to avoid shimmering
-    const texel = (2 * 150) / this.sun.shadow.mapSize.x;
-    const f = focus.clone();
-    f.x = Math.round(f.x / texel) * texel; f.z = Math.round(f.z / texel) * texel;
-    this.sun.target.position.copy(f);
-    this.sun.position.sub(focus).add(f);
+    if (redraw) {
+      // snap shadow camera to texels to avoid shimmering
+      const texel = (2 * 150) / this.sun.shadow.mapSize.x;
+      const f = focus.clone();
+      f.x = Math.round(f.x / texel) * texel; f.z = Math.round(f.z / texel) * texel;
+      this.sun.target.position.copy(f);
+      this.sun.position.sub(focus).add(f);
+      if (every > 1) this.sun.shadow.needsUpdate = true;
+    }
     const W = this.weather;
     this.sun.intensity *= 1 - (0.62 + 0.16 * W.blizzard) * W.storm;   // a blizzard is lit mostly by the sky: soft, faint shadows
     // a storm deck in clear air is broken: cloud shadows cover most of the land, and the sun in the breaks is strong
@@ -299,6 +309,7 @@ export class Sky {
     this.sun.intensity *= 1 + 0.55 * U.uCloudShadow.value;
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uBlizzard.value = W.blizzard;
+    U.uSnowfall.value = W.blizzard;
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 

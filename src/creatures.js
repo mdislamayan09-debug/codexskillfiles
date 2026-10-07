@@ -107,7 +107,20 @@ const DUST_FRAG = /* glsl */ `
     float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * (0.55 + 0.45 * vnoise(vWPos.xz * 40.0 + vWPos.y * 13.0));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.85), dust * 0.45);
   }`;
-const std = (o) => patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }), { fragColor: DUST_FRAG });
+// One texture per recipe and one material per set of parameters, shared by every character. A horse's tack was
+// some forty meshes (each strap, ring and buckle its own material) and a town of riders two and a half thousand
+// draw calls a frame, which is what held the game to a few frames a second on the GPU it was built for; with
+// shared materials a character's loose parts merge into a handful of meshes.
+const TEX = new Map(), MATS = new Map();
+const memoTex = (key, make) => { if (!TEX.has(key)) TEX.set(key, make()); return TEX.get(key); };
+const std = (o) => {
+  const c = o.color === undefined ? null : (o.color.isColor ? o.color : new THREE.Color(o.color));
+  const key = [o.map ? o.map.uuid : '', c ? `${c.r.toFixed(3)},${c.g.toFixed(3)},${c.b.toFixed(3)}` : '', o.roughness, o.metalness, o.side, o.alphaTest, o.envMapIntensity].join('|');
+  if (!MATS.has(key)) MATS.set(key, patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }), { fragColor: DUST_FRAG }));
+  return MATS.get(key);
+};
+const hairTex_ = (...a) => memoTex('hair' + a.join(','), () => hairTexture(...a));
+const furTex_ = (...a) => memoTex('fur' + a.join(','), () => furTexture(...a));
 function mesh(geo, mat, cast = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; return m; }
 
 // Build a bone hierarchy from a spec: [{name, parent, pos:[x,y,z] (rest, model space)}]
@@ -599,8 +612,8 @@ export class Human {
       col.translate(0, ny, nk[2] - 0.035);
       col.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
       const colM = o.winter
-        ? std({ map: furTexture(0xa08a68), roughness: 0.97, side: THREE.DoubleSide })
-        : std({ map: leatherTexture(r), color: new THREE.Color(o.coat).multiplyScalar(1.9), roughness: 0.62, side: THREE.DoubleSide });
+        ? std({ map: furTex_(0xa08a68), roughness: 0.97, side: THREE.DoubleSide })
+        : std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(o.coat).multiplyScalar(1.9), roughness: 0.62, side: THREE.DoubleSide });
       if (o.winter) { colM.map.repeat.set(6, 1); }
       bones.spine.add(mesh(col, colM));
     }
@@ -643,14 +656,14 @@ export class Human {
         sg.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         sg.setIndex(idx); sg.computeVertexNormals();
         sg.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
-        const strapM = std({ map: leatherTexture(r), color: new THREE.Color(1.7, 1.35, 1.05), roughness: 0.6, side: THREE.DoubleSide });   // lighter than the coat so the diagonal reads
+        const strapM = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(1.7, 1.35, 1.05), roughness: 0.6, side: THREE.DoubleSide });   // lighter than the coat so the diagonal reads
         bones.spine.add(mesh(sg, strapM));
         // the satchel: a soft flapped bag on the left hip
         const e = pts[pts.length - 1];
         const bag = sweep([{ p: V(0.235, e.y - 0.02, e.z + 0.13), rx: 0.03, ry: 0.06 }, { p: V(0.25, e.y - 0.05, e.z + 0.09), rx: 0.05, ry: 0.11 },
           { p: V(0.255, e.y - 0.06, e.z + 0.02), rx: 0.055, ry: 0.12 }, { p: V(0.25, e.y - 0.05, e.z - 0.045), rx: 0.05, ry: 0.11 }, { p: V(0.235, e.y - 0.02, e.z - 0.08), rx: 0.03, ry: 0.06 }], 12);
         bag.translate(-bones.hips.userData.rest.x, -bones.hips.userData.rest.y, -bones.hips.userData.rest.z);
-        bones.hips.add(mesh(bag, std({ map: leatherTexture(r), color: new THREE.Color(1.9, 1.6, 1.3), roughness: 0.7 })));
+        bones.hips.add(mesh(bag, std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(1.9, 1.6, 1.3), roughness: 0.7 })));
       }
     }
     // holster + revolver grip on the hip
@@ -676,8 +689,8 @@ export class Human {
         geo.translate(-bone.userData.rest.x, -bone.userData.rest.y, -bone.userData.rest.z);
         return geo;
       };
-      const hatFur = std({ map: hairTexture(o.furHatColor || 0x6a5238, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
-      const colFur = std({ map: hairTexture(MH ? 0xa08a68 : (o.fur || 0xa48c6c), 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
+      const hatFur = std({ map: hairTex_(o.furHatColor || 0x6a5238, 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
+      const colFur = std({ map: hairTex_(MH ? 0xa08a68 : (o.fur || 0xa48c6c), 200), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9 });
       const hy = MH ? HA.hatY : 1.79, hz = MH ? HA.hatZ : -0.014;
       if (MH) {
         const shell = new THREE.SphereGeometry(0.135, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.62);
@@ -691,11 +704,11 @@ export class Human {
           }
           shell.computeVertexNormals();
         }
-        const sm = mesh(shell, std({ map: furTexture(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
+        const sm = mesh(shell, std({ map: furTex_(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         for (const sd of [-1, 1]) {   // ear flaps
           const flap = new THREE.SphereGeometry(0.07, 12, 10); flap.scale(0.55, 1.25, 1.15);
-          const fm = mesh(flap, std({ map: furTexture(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
+          const fm = mesh(flap, std({ map: furTex_(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
           fm.position.copy(at(bones.head, sd * 0.11, hy - 0.04, hz - 0.01)); bones.head.add(fm);
         }
       }
@@ -708,7 +721,7 @@ export class Human {
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
     // (the sculpted skirt alone reads as a solid tube from behind)
     if (o.coat && (outfit === 'arthur' || outfit === 'winter')) {
-      const tailM = std({ map: leatherTexture(r), color: new THREE.Color(o.coat).multiplyScalar(2.1), roughness: 0.62, side: THREE.DoubleSide });
+      const tailM = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(o.coat).multiplyScalar(2.1), roughness: 0.62, side: THREE.DoubleSide });
       for (const sd of [-1, 1]) {
         const W = 0.2, L = outfit === 'winter' ? 0.62 : 0.56, segX = 6, segY = 10;
         const g = new THREE.PlaneGeometry(W, L, segX, segY);
@@ -1035,7 +1048,7 @@ export class Quadruped {
       }
       const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.12, 1.1);
       cards.push(forelock);
-      const maneHair = std({ map: hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, color: 0xffffff });
+      const maneHair = std({ map: hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, color: 0xffffff });
       const mm = new THREE.Mesh(mergeGeometriesSafe(cards), maneHair);
       mm.position.set(-bones.neck.userData.rest.x, -bones.neck.userData.rest.y, -bones.neck.userData.rest.z);
       mm.castShadow = true; bones.neck.add(mm);
@@ -1044,7 +1057,7 @@ export class Quadruped {
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
       // (few strands to a lock, so each card is hair with air in it: at 120 strands every card was solid and the tail a slab)
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 46, true);
+      const hairTex = hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 46, true);
       const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.6 });
       const tcards = [];
       // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a
@@ -1098,8 +1111,8 @@ export class Quadruped {
     const body = bones.body;
     // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
     // (worn, oiled and dusty: at 0.55 roughness with a strong lift the bags and seat read as orange plastic)
-    const leather = std({ map: leatherTexture(r), color: new THREE.Color(1.55, 1.28, 1.02), roughness: 0.78 });
-    const blanket = std({ map: blanketTexture(r), roughness: 0.95 });
+    const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(1.55, 1.28, 1.02), roughness: 0.78 });
+    const blanket = std({ map: memoTex('blanket', () => blanketTexture(r)), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
     for (let i = 0; i < bp.count; i++) { const x = bp.getX(i); bp.setY(i, bp.getY(i) - x * x * 1.9); }
@@ -1128,9 +1141,9 @@ export class Quadruped {
     }
     roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.82, -0.52);
     // (a dark, grimed roll of hide and blanket: the pale canvas read as a lit log across the saddle)
-    body.add(mesh(roll, std({ map: canvasTexture(r), color: new THREE.Color(0.5, 0.4, 0.32), roughness: 0.95 })));
+    body.add(mesh(roll, std({ map: memoTex('canvas', () => canvasTexture(r)), color: new THREE.Color(0.5, 0.4, 0.32), roughness: 0.95 })));
     // the ends show the roll's layers: canvas wrapped round a wool blanket, in a spiral
-    const spiral = (() => {
+    const spiral = memoTex('spiral', () => {
       const c = document.createElement('canvas'); c.width = c.height = 128;
       const g = c.getContext('2d');
       g.fillStyle = '#5a2a1c'; g.fillRect(0, 0, 128, 128);
@@ -1142,7 +1155,7 @@ export class Quadruped {
       }
       g.strokeStyle = 'rgba(20,10,6,0.6)'; g.lineWidth = 2; g.beginPath(); g.arc(64, 64, 61, 0, 7); g.stroke();
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-    })();
+    });
     for (const sx of [-0.35, 0.35]) {
       const end = new THREE.CircleGeometry(0.104, 18); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.82, -0.52);
       body.add(mesh(end, std({ map: spiral, color: new THREE.Color(0.6, 0.55, 0.5), roughness: 1 })));

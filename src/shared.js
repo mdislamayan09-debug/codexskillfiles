@@ -17,6 +17,7 @@ export const U = {
   uFogFalloff: { value: 0.022 },
   uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
   uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
+  uSnowfall: { value: 0 },  // falling snow in the air: everything a few kilometres off dissolves into it
   uWind: { value: new THREE.Vector2(1, 0.3) },
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
@@ -111,12 +112,12 @@ float terrainSunShadow(vec3 wp){
   vec3 L = normalize(uSunDir);
   if (L.y < 0.0) return 1.0;
   float vis = 1.0; float t = 2.5;
-  for (int i = 0; i < 22; i++){
+  for (int i = 0; i < 16; i++){
     vec3 p = wp + L * t;
     float d = p.y - heightAt(p.xz);
     vis = min(vis, clamp(d / (t * 0.05 + 0.4) + 0.35, 0.0, 1.0));
-    if (vis <= 0.0 || p.y > 700.0) break;
-    t *= 1.33;
+    if (vis <= 0.0 || p.y > 1100.0) break;
+    t *= 1.48;
   }
   return vis;
 }
@@ -131,6 +132,7 @@ uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform float uFogBase;
 uniform float uMist;
+uniform float uSnowfall;
 uniform float uNight;
 // self-contained value noise (this block is also included by shaders that do not pull in GLSL_COMMON)
 float mistH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -158,6 +160,9 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   vec3 ext = exp(-dist * vec3(0.00019, 0.00013, 0.00008) * (1.0 - uNight*0.5) * (1.0 + 0.9 * uMist));
   col = col * ext + fogCol * (1.0 - ext) * 0.72;
   col = mix(col, fogCol, fogF);
+  // falling snow: the far walls and peaks fade out into the snowfall, to the tone of the sky behind them (a range
+  // standing behind a nearer crest showed through it as a dark outline hung in the sky)
+  col = mix(col, fogCol * 1.12, uSnowfall * 0.96 * (1.0 - exp(-max(dist - 300.0, 0.0) / 2300.0)));   // (the near walls keep their darks)
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     float above = wpos.y - uFogBase;
