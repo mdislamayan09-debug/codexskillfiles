@@ -242,7 +242,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 // ===================================================================================== HUMANS
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
-  winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x9a7a56, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
+  winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x5e4a38, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
   arthur: { coat: 0x503522, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x5c4b3a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
@@ -708,7 +708,7 @@ export class Human {
           }
           shell.computeVertexNormals();
         }
-        const sm = mesh(shell, std({ map: furTex_(o.furHatColor || 0x9a7a56), roughness: 0.95 }));
+        const sm = mesh(shell, std({ map: furTex_(o.furHatColor || 0x5e4a38), roughness: 0.95 }));
         sm.position.copy(at(bones.head, 0, hy + 0.01, hz)); bones.head.add(sm);
         {   // and the cap's back, turned down over the nape to the collar (bare, the back of the head showed between
             // cap and collar as a dark hole)

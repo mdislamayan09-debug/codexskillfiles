@@ -656,9 +656,11 @@ async function init() {
         // the bench's wall: broken rock standing along its face, and spruce along its rim
         let sd2 = 77;
         const r2 = () => ((sd2 = (sd2 * 16807) % 2147483647) / 2147483647);
-        for (let a = 54; a <= 226; a += 9 + r2() * 7) {
-          const side = 50 + (a - 62) * 0.105 - 22 - r2() * 4, [x, z] = P(a, side), sc = 4.5 + r2() * 5;
-          veg.crags.add(x, world.heightAt(x, z) - sc * 0.35, z, r2() * 6.28, sc, Math.floor(r2() * 3));
+        // (in three tiers from foot to rim, standing proud of the face and close enough to hide the ground behind them:
+        // buried in the slope, each showed one flat side like a panel let into a smooth dome)
+        for (const [out, s0, s1, lift] of [[33.5, 7, 5, 0.3], [30, 6, 5, 0.42], [26.5, 5, 4, 0.5]]) for (let a = 50; a <= 230; a += 5.5 + r2() * 4.5) {
+          const side = 50 + (a - 62) * 0.105 - out - r2() * 2.5, [x, z] = P(a, side), sc = s0 + r2() * s1;
+          veg.crags.add(x, world.heightAt(x, z) - sc * (0.93 - lift), z, r2() * 6.28, sc, Math.floor(r2() * 3));
         }
         // willow and dead brush crowding the creek's banks in clumps, and stones along its edge: from the saddle it is
         // the dark broken line of the banks that draws the creek across the snow
@@ -807,6 +809,10 @@ async function init() {
         }
         // and full-crowned pines standing back among them, their lower boughs reaching across the top of the frame:
         // dark layered branches against the bright air, as the reference is roofed (bare poles alone ran up into fog)
+        {
+          const sdr = U.uSunDir.value, sl2 = Math.hypot(sdr.x, sdr.z) || 1;
+          G.clearTreesAlong(px - sdr.x / sl2 * 6, pz - sdr.z / sl2 * 6, px + sdr.x / sl2 * 70, pz + sdr.z / sl2 * 70, 3.2);
+        }
         if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1], [34, -12, 1.5, 3], [44, 11, 1.45, 1], [27, -19, 1.4, 1], [50, 21, 1.5, 3]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
@@ -1246,7 +1252,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.95 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.5 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);

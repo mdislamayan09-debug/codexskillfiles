@@ -280,7 +280,7 @@ export class Post {
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
         v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
-        v.uDensity.value = state.volDensity ?? 0.0028; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
+        v.uDensity.value = state.volDensity ?? 0.0021; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

@@ -169,14 +169,16 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     // (separate banks lying in the hollows with clear air between them: one even layer over the whole floor
     // milked out the valley and hid its timber and river; banks hide a part and show the rest dark beside them)
     float bankN = smoothstep(0.5, 0.7, mistN(wpos.xz / 560.0 + 1.7) * 0.65 + mistN(wpos.xz / 190.0 - 4.1) * 0.35);
-    float bank = smoothstep(110.0, 15.0, above) * bankN;
+    float bank = smoothstep(150.0, 30.0, above) * bankN;
     float m = uMist * bank * (1.0 - exp(-dist / 650.0)) * 1.25;
-    col = mix(col, mix(uFogColor * 1.36, fogCol, 0.2), clamp(m * 0.8, 0.0, 0.9));   // (pale banks: at the air's own tone they did not read as fog at all)
+    // (fog lying in a valley is the brightest thing in it, lit from above: in the air's own blue-grey it could not
+    // be told from shaded snow)
+    col = mix(col, mix(vec3(0.8, 0.85, 0.93) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.92));   // (pale banks: at the air's own tone they did not read as fog at all)
     // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
     float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
     // (torn into separate rags with clear air between: a continuous band read as one white sheet over the slopes)
     float rag = smoothstep(0.52, 0.85, mistN(wpos.xz / 650.0 + vec2(wpos.y / 400.0, 0.0)) * 0.65 + mistN(wpos.xz / 190.0 - 3.7) * 0.35);
-    col = mix(col, mix(uFogColor * 1.15, fogCol, 0.35), clamp(uMist * band * rag * 0.45 * (1.0 - exp(-dist / 1800.0)), 0.0, 0.6));
+    col = mix(col, mix(vec3(0.74, 0.8, 0.89) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(uMist * band * rag * 0.8 * (1.0 - exp(-dist / 1400.0)), 0.0, 0.8));   // (pale and plain to see, banked against the slopes)
     // and the far ranges step back in pale blue-grey layers
     col = mix(col, uFogColor * vec3(0.95, 1.02, 1.15), uMist * 0.16 * (1.0 - exp(-dist / 4200.0)));
   }
