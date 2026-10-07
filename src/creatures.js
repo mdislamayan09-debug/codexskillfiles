@@ -170,7 +170,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (caught in clumps on the hat, shoulders, bedroll and rump, as in the reference's storm; a faint even
           // dusting read as no snow at all)
           // (fine flecks melting into the coat, thicker along the top line: broad white blotches read as a pinto's patches)
-          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.5, 0.95, wn.y) * smoothstep(0.42, 0.72, 0.55 * vnoise(vRest.xz * 170.0 + vRest.y * 60.0) + 0.3 * vnoise(vRest.xz * 60.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 14.0));
+          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.5, 0.95, wn.y) * smoothstep(0.56, 0.8, 0.55 * vnoise(vRest.xz * 170.0 + vRest.y * 60.0) + 0.3 * vnoise(vRest.xz * 60.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 14.0));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.6' : '0.5'});
         }
         // wet / darkened below the waterline
@@ -532,12 +532,12 @@ export class Human {
     bones.hips.add(mesh(mergeGeometriesSafe(loops), brass, false));
     // hat brim (thin, crisp — not sculpted)
     if (o.hat) {
-      const brim = new THREE.RingGeometry(0.085, 0.235, 32, 3);
+      const brim = new THREE.RingGeometry(0.085, 0.212, 32, 4);
       brim.rotateX(-Math.PI / 2);
       const bp = brim.attributes.position;
       // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
       // sides roll up, front and back dip slightly: from behind and above the brim reads as a wide ellipse
-      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.13) * 0.45 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.1 * Math.max(0, rr - 0.11); };
+      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.12) * 0.75 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.16 * Math.max(0, rr - 0.11); };
       for (let i = 0; i < bp.count; i++) bp.setY(i, brimY(bp.getX(i), bp.getZ(i)));
       brim.computeVertexNormals();
       const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
@@ -559,7 +559,7 @@ export class Human {
       // the brim has body: an underside a few millimetres below and a rolled, bound edge
       const under = brim.clone(); under.translate(0, -0.007, 0);
       const um = mesh(under, std({ color: new THREE.Color(o.hat).multiplyScalar(0.7), roughness: 0.95, side: THREE.DoubleSide })); um.position.copy(bm.position); bones.head.add(um);
-      const edge = new THREE.TorusGeometry(0.235, 0.0085, 5, 48); edge.rotateX(Math.PI / 2);
+      const edge = new THREE.TorusGeometry(0.212, 0.0085, 5, 48); edge.rotateX(Math.PI / 2);
       const ep = edge.attributes.position;
       for (let i = 0; i < ep.count; i++) ep.setY(i, ep.getY(i) + brimY(ep.getX(i), ep.getZ(i)));
       const em = mesh(edge, hatM); em.position.copy(bm.position); bones.head.add(em);
@@ -829,7 +829,7 @@ const SPECIES = {
   sheep: { scale: 0.55, coat: 'sheep', cell: 0.024 },
 };
 const COATS = {
-  bay: { coat: 0x4a2814, points: 0x15100c, mane: 0x110b07, belly: 0x3e2212, pinto: 0, dapple: 1 },
+  bay: { coat: 0x5c3018, points: 0x15100c, mane: 0x110b07, belly: 0x4a2814, pinto: 0, dapple: 1 },
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
@@ -1043,7 +1043,8 @@ export class Quadruped {
       // tail: a dock plus fanned, curved hair cards with alpha strands
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
-      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 120, true);
+      // (few strands to a lock, so each card is hair with air in it: at 120 strands every card was solid and the tail a slab)
+      const hairTex = hairTexture(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 46, true);
       const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.6 });
       const tcards = [];
       // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a

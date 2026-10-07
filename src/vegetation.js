@@ -59,7 +59,9 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // a spruce bough carries a load of snow along its upper side: on the standing cards the half above the
       // stem is white too, so each bough reads as a white shelf over dark needles
       // (in clumps along the bough, not a full coat: evenly coated firs read as frosted Christmas trees)
-      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.54, 0.66, vMapUv.y + 0.1 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)) * smoothstep(0.3, 0.6, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)));
+      // (broken and uneven, and on fewer boughs: a clean band on every card striped each spruce white and green like a
+      // candy cane)
+      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.58, 0.74, vMapUv.y + 0.22 * (vnoise(vWPos.xz * 3.1 + vWPos.y * 2.3) - 0.5)) * smoothstep(0.45, 0.7, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)) * 0.8);
       #endif
       #if defined(FROST_ALL) && defined(USE_MAP)
       // and snow lodged in the upper crown of the brush, in clumps (snowless brush read as grey pom-poms on the snow)

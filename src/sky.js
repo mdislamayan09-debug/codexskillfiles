@@ -52,7 +52,8 @@ float cloudDen(vec3 p, float cov){
   vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
   // a storm closes the gaps into a continuous, lumpy deck
   // a storm deck: heavy, but torn with breaks of brighter sky between the cells
-  float c = clamp(cov * (0.3 + 0.9 * weather) + 0.24 * uStorm * smoothstep(0.2, 0.6, weather), 0.0, 1.0);
+  // (a storm is a layered overcast with a few lit breaks, not fair-weather cumulus on a blue sky)
+  float c = clamp(cov * (0.3 + 0.9 * weather) + uStorm * (0.26 + 0.2 * smoothstep(0.2, 0.6, weather)), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   // (in a storm the slab flattens into a low deck, a thin lumpy layer seen from beneath, not towering cumulus)
   // (a deck with body: a thin sheet let the sun straight through and its underside came out pale and even)
@@ -128,7 +129,7 @@ export class Sky {
       fragmentShader: SKY_GLSL + /* glsl */ `
         // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
         // (the breaks between the storm cells are pale, washed sky, not a saturated blue)
-        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.7, 0.88, 1.1) * (0.95 + 0.2 * uBlizzard) + vec3(0.13, 0.18, 0.26), min(uStorm * 1.05, 1.0)); }
+        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.76, 0.89, 1.06) * (0.95 + 0.2 * uBlizzard) + vec3(0.15, 0.185, 0.24), min(uStorm * 1.05, 1.0)); }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);

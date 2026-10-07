@@ -155,7 +155,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
   vec3 roadC = dirt * 1.08;
   // a dry, dusty tread through the pines, brown dirt rather than a pale road
-  roadC = mix(roadC, roadC * vec3(1.08, 0.98, 0.86), pineK);
+  roadC = mix(roadC, roadC * vec3(0.8, 0.7, 0.58), pineK);   // (dark, damp woodland dirt: a pale tread read as a sand path)
   if (road > 0.05) {
     vec4 gv = texA(L_GRAVEL, xz, 1.8, 4.3);
     roadC = mix(roadC, gv.rgb * vec3(0.95, 0.88, 0.78), 0.35 * D);
@@ -214,7 +214,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   }
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
-  rock = mix(rock, rock * vec3(0.7, 0.67, 0.66), snowC);
+  rock = mix(rock, rock * vec3(0.5, 0.47, 0.46), snowC);   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
@@ -497,7 +497,22 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
           // (from afar the snow caught on every crown and lying between them averages to a cold mid grey)
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.3 + 0.04 + 0.1 * smoothstep(3.0, 10.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
+          // (each crown its own dark cone, lit on the sun's side with snow on that shoulder, shaded snow lying between
+          // them: a flat grey tint under sparse billboards read as stains painted on the mountainside. The crowns
+          // dissolve into their mean tone once a pixel is wider than a tree.)
+          {
+            vec2 cg = vWPos.xz / 6.0, ci = floor(cg);
+            vec2 cf = fract(cg) - 0.5 - (hash22(ci) - 0.5) * 0.55;
+            float sz = 0.5 + 0.5 * hash12(ci + 3.7);
+            float crown = smoothstep(0.5 * sz + 0.1, 0.12 * sz, length(cf)) * step(0.1, hash12(ci + 9.1));
+            float lit = 0.55 + 0.45 * dot(normalize(cf + 1e-4), normalize(uSunDir.xz + 1e-4));
+            float res = smoothstep(4.5, 1.2, cfp);
+            vec3 crownC = srgb(vec3(26,36,32)) * (0.6 + 0.8 * lit);
+            crownC = mix(crownC, srgb(vec3(170,180,192)), 0.22 * smoothstep(0.1, 0.5, lit));
+            vec3 gapC = srgb(vec3(128,140,156));
+            vec3 snowForest = mix(mix(srgb(vec3(34,44,46)), gapC, 0.26), mix(gapC, crownC, crown), res);
+            canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
+          }
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
           // grazing angles), strongest where the canopy is closed and crowns span a few pixels
           if (canopyK > 0.01) {

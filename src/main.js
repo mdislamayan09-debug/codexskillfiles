@@ -248,12 +248,14 @@ async function init() {
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     // both rides as the references frame them: camera close behind and to the left (+x of the frame is screen left),
     // the horse bearing right so its neck and ears show past the rider's shoulder, the rider filling the lower centre
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.15, player: [x, z, yaw], camRel: [0.95, 2.6, -4.4], lookRel: [-0.5, 2.1, 22], turn: -0.4, trailDress: true }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); // (a longer lens from further back, as the reference's: close in on a wide lens the horse's quarters swelled to
+    // half again the rider's width and he read as a toy on its back)
+    return { time: 16.15, fov: 35, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
-      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.65, 2.45, -5.3], lookRel: [-2.4, 1.7, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, player: [x, z, yaw], camRel: [0.7, 2.4, -6.6], lookRel: [-2.4, 1.6, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -732,7 +734,7 @@ async function init() {
       {
         const pines = veg.groups.pine, cy = yaw - (s.turn || 0), cf = [Math.sin(cy), Math.cos(cy)], cr = [Math.cos(cy), -Math.sin(cy)];
         const rel = s.camRel, camX = px + cr[0] * rel[0] + cf[0] * rel[2], camZ = pz + cr[1] * rel[0] + cf[1] * rel[2];
-        if (pines.length) for (const [fw, sd2, sc, v] of [[13, 9.5, 1.3, 0], [15, -10.5, 1.45, 2], [30, 12, 1.15, 1]]) {
+        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1]]) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
         }
@@ -1039,7 +1041,7 @@ async function init() {
       // (the reference's woods are full of warm backlit haze: trunks 150 m off fade to pale gold-grey)
       // (the sunlit part of that haze is now marched against the sun's shadow map in the post stack, so shaded air stays
       // clear: only a little even haze is left here)
-      G.mistK = 1 + (fo * 0.45 + morning * 1.5) * low;
+      G.mistK = 1 + (fo * 0.2 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);

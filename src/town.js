@@ -160,6 +160,7 @@ export class Town {
       red: std({ map: plankTexture(3, [140, 58, 44]) }),
       redV: std({ map: plankTexture(13, [134, 54, 40], true) }),
       bareV: std({ map: plankTexture(14, null, true) }),
+      logBrown: std({ map: plankTexture(15, [88, 66, 50], true) }),   // dark weathered timber
       teal: std({ map: plankTexture(4, [84, 104, 96]) }),
       cream: std({ map: plankTexture(5, [186, 174, 146]) }),
       blue: std({ map: plankTexture(6, [92, 104, 120]) }),
@@ -689,7 +690,7 @@ export class Town {
     const m = new THREE.Matrix4().makeRotationY(rotY);
     const at = (lx, lz) => new THREE.Vector3(lx, 0, lz).applyMatrix4(m).add(new THREE.Vector3(x, 0, z));
     const bp = at(-17, -7);
-    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 7, 10, 3.9, 'ochre');   // a low log-brown barn, not a grey box bigger than the house
+    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 7, 10, 3.9, 'logBrown');   // a low log-brown barn, not a grey box bigger than the house
     // the corral: split poles on posts, round a trampled pen beside the barn
     const cc = at(-15, 12), cm = new THREE.Matrix4().makeRotationY(rotY + 0.1).setPosition(cc.x, 0, cc.z);
     const W = 16, D = 11, pts = [];
