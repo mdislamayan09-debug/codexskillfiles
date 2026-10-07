@@ -263,7 +263,7 @@ async function init() {
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
-    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 13.3, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 14.9, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -805,7 +805,9 @@ async function init() {
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.25, z, fw * 2.3 + sd2, sc, talls[Math.abs(Math.round(fw + sd2)) % talls.length]);
         }
-        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1]]) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
+        // and full-crowned pines standing back among them, their lower boughs reaching across the top of the frame:
+        // dark layered branches against the bright air, as the reference is roofed (bare poles alone ran up into fog)
+        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1], [34, -12, 1.5, 3], [44, 11, 1.45, 1], [27, -19, 1.4, 1], [50, 21, 1.5, 3]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
         }
@@ -875,17 +877,18 @@ async function init() {
               if (D > 0.3) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
             }
           }
-          if (firs.length) for (let f = 150; f < 3700; f += 8.5) {
+          // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
+          if (firs.length) for (let f = 150; f < 3700; f += 6) {
             const half = 260 + f * 0.5;
-            for (let r = -half; r < half; r += 8.5) {
-              const jx = (rf() - 0.5) * 17, jz = (rf() - 0.5) * 17;   // (thrown well off the grid: half a cell's jitter left rows showing on thin slopes)
+            for (let r = -half; r < half; r += 6) {
+              const jx = (rf() - 0.5) * 12, jz = (rf() - 0.5) * 12;   // (thrown well off the grid: half a cell's jitter left rows showing on thin slopes)
               const x = c.x + d0.x * (f + jx) + rt0.x * (r + jz), z = c.z + d0.z * (f + jx) + rt0.z * (r + jz), pick = rf(), sc = rf() * rf();
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const h = world.heightAt(x, z);
               if (world.climateAt(x, z).snow < 0.5 || pick > stand(x, z, h) * 0.9) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.74 || sp.wet > 0.25 || sp.road > 0.2) continue;
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.5 + sc * 0.9, firs[Math.floor(pick * 977) % firs.length]);
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.6 + sc * 0.9, firs[Math.floor(pick * 977) % firs.length]);
               added++;
             }
           }
@@ -1243,7 +1246,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.62 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.95 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);

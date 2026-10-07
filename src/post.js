@@ -87,7 +87,7 @@ const VolumetricShader = {
       // full of the same lit dust (a hard-edged cumulus showing through the canopy read as a glowing blob)
       if (z >= 0.99999) {
         vec3 hz = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.02, 1.0, 0.95), 0.85) * (0.1 + 0.2 * pow(max(dot(rd0, uSunDir), 0.0), 4.0));
-        base.rgb = mix(base.rgb, hz, 0.72 * min(uStrength, 1.0));
+        base.rgb = mix(base.rgb, hz * vec3(0.97, 1.0, 1.06), 0.6 * min(uStrength, 1.0));
       }
       vec3 rd = normalize((uCamWorld * vec4(normalize(v.xyz), 0.0)).xyz);
       const int N = VOL_STEPS;
@@ -280,7 +280,7 @@ export class Post {
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
         v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
-        v.uDensity.value = state.volDensity ?? 0.003; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
+        v.uDensity.value = state.volDensity ?? 0.0028; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

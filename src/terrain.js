@@ -374,7 +374,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float ph = dot(xz, wdir) * 1.7 + fbm2(xz * 0.2) * 7.0;
     float rip = sin(ph) * smoothstep(3.0, 0.6, fp);
     float drift = fbm2(xz / 11.0);
-    vec2 dg = wdir * rip * 0.2 * mix(0.3, 1.0, drift) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.4
+    // (smooth, wind-laid snow: the finer terms dimpled the whole field like orange peel)
+    vec2 dg = wdir * rip * 0.1 * mix(0.3, 1.0, drift) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.16
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
@@ -432,7 +433,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float seep = smoothstep(0.7, 0.76, vnoise(xz / 46.0 + 11.3) * 0.8 + vnoise(xz / 15.0 - 4.7) * 0.2);
     float pillar = 0.55 + 0.45 * smoothstep(0.25, 0.7, vnoise(vec2(along * 0.9, wp.y * 0.03)));
     float icefall = smoothstep(0.3, 0.7, snowC) * smoothstep(0.55, 0.72, slope) * seep * pillar;
-    c = mix(c, mix(srgb(vec3(120,156,178)), srgb(vec3(196,216,228)), vnoise(vec2(along * 2.3, wp.y * 0.12))), icefall * 0.8);
+    c = mix(c, mix(srgb(vec3(120,156,178)), srgb(vec3(196,216,228)), vnoise(vec2(along * 2.3, wp.y * 0.12))), icefall * 0.45);
     rough = mix(rough, 0.2, icefall);
   }
   // the frozen creek in Frostwater Valley
@@ -536,7 +537,7 @@ export class Terrain {
             crownC = mix(crownC, srgb(vec3(170,180,192)), 0.22 * smoothstep(0.1, 0.5, lit));
             // (inside a stand the snow between the crowns lies in their shade: dark, so the stand reads as one mass)
             vec3 gapC = mix(srgb(vec3(128,140,156)), srgb(vec3(58,72,90)), smoothstep(0.5, 0.8, fo));
-            vec3 snowForest = mix(mix(srgb(vec3(34,44,46)), gapC, 0.26), mix(gapC, crownC, crown), res);
+            vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.14), mix(gapC, crownC, crown), res);   // (from afar a closed stand is dark blue-green, not grey)
             canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
           }
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at

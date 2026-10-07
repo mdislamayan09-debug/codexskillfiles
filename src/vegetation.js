@@ -1119,7 +1119,7 @@ function rockMaterial(surf = {}, bare = false) {
         {
           vec3 wn0 = normalize(inverseTransformDirection(normal, viewMatrix));
           float camD = length(vWPos - cameraPosition);
-          vec3 wn1 = rockTriN(vWPos, wn0, 2.6);
+          vec3 wn1 = rockTriN(vWPos, wn0, 4.6);
           // the finer grain only where it resolves (close ledges)
           vec3 wn2 = rockTriN(vWPos + 3.1, wn1, 0.8);
           vec3 wnP = normalize(mix(wn1, wn2, 0.55 * smoothstep(30.0, 6.0, camD)));
@@ -1137,9 +1137,10 @@ function rockMaterial(surf = {}, bare = false) {
       base = mix(base, srgbR(vec3(130,112,90)), smoothstep(0.6, 0.8, vnoise(vec2(vWPos.y*1.5, vWPos.x*0.2))) * 0.6);
       {
         vec3 w = pow(abs(wn), vec3(4.0)); w /= (w.x + w.y + w.z);
-        vec3 ra = texture(tRockA, vWPos.zy / 2.6).rgb * w.x + texture(tRockA, vWPos.xz / 2.6).rgb * w.y + texture(tRockA, vWPos.xy / 2.6).rgb * w.z;
+        // (a wider lay of the scan: at 2.6 m it tiled in plain panels across any crag bigger than a boulder)
+        vec3 ra = texture(tRockA, vWPos.zy / 4.6).rgb * w.x + texture(tRockA, vWPos.xz / 4.6).rgb * w.y + texture(tRockA, vWPos.xy / 4.6).rgb * w.z;
         // and the scan again at ledge scale, so a big outcrop is not one tile repeated
-        vec3 rb = texture(tRockA, vWPos.zy / 9.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 9.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 9.0 + 0.37).rgb * w.z;
+        vec3 rb = texture(tRockA, vWPos.zy / 23.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 23.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 23.0 + 0.37).rgb * w.z;
         base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
       }
       base *= 0.85 + 0.2*n2;
@@ -1160,8 +1161,8 @@ function rockMaterial(surf = {}, bare = false) {
       float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
-      rsnow *= max(drift * 0.9, 0.7 * fleck);
-      base *= vec3(1.5, 1.36, 1.14);   // sun-bleached, lichen-warmed ledge granite
+      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.8 * smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.86, 0.97, wn.y));   // (and lying on every flat top)
+      base *= vec3(1.34, 1.27, 1.16);   // weathered grey ledge granite, a little warm
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif

@@ -722,7 +722,7 @@ export class Human {
           fm.position.copy(at(bones.head, sd * 0.11, hy - 0.04, hz - 0.01)); bones.head.add(fm);
         }
       }
-      bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.135 : HA.headR, hy - 0.01, hy + (MH ? 0.06 : 0.14), 56, 0.06, bones.head), hatFur, false));
+      bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.135 : HA.headR, hy - 0.01, hy + (MH ? 0.06 : 0.14), MH ? 22 : 56, 0.06, bones.head), hatFur, false));   // (a few tufts at the rim: a full ring of strand cards wove the cap into a basket)
       bones.head.add(mesh(furCards(0, 0, hz, MH ? 0.09 : 0.07, hy + (MH ? 0.07 : 0.14), hy + (MH ? 0.1 : 0.16), 20, 0.06, bones.head), hatFur, false));
       // on the real body the rolled collar carries the pelt; only a short soft fringe on its rim
       if (MH) bones.spine.add(mesh(furCards(0, 0, MH.rest.neck[2] - 0.035, 0.125, MH.rest.neck[1] + 0.06, MH.rest.neck[1] + 0.1, 80, 0.032, bones.spine), colFur, false));
@@ -858,7 +858,7 @@ const COATS = {
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
-  redbay: { coat: 0x7c3e20, points: 0x1a120c, mane: 0x110b07, belly: 0x6c3619, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
+  redbay: { coat: 0x653a24, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
   chestnut: { coat: 0x8a4422, points: 0x6a3418, mane: 0x6a3016, belly: 0x9a5530, pinto: 0 },
   deer: { coat: 0x8a6440, points: 0x5a4430, mane: 0x6a5038, belly: 0xd8ccb8, pinto: 0 },
   sheep: { coat: 0xd2c8b4, points: 0x2a2420, mane: 0xc8bea8, belly: 0xc0b6a0, pinto: 0 },
@@ -1177,7 +1177,7 @@ export class Quadruped {
     }
     roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.82, -0.52);
     // (a dark, grimed roll of hide and blanket: the pale canvas read as a lit log across the saddle)
-    body.add(mesh(roll, std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.62, 0.56, 0.5), roughness: 0.97 })));   // a rolled wool blanket (the creased canvas read as a log)
+    body.add(mesh(roll, std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.4, 0.38, 0.36), roughness: 0.97 })));   // a rolled wool blanket, faded and grimed (the creased canvas read as a log)
     // the ends show the roll's layers: canvas wrapped round a wool blanket, in a spiral
     const spiral = memoTex('spiral', () => {
       const c = document.createElement('canvas'); c.width = c.height = 128;
