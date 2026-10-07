@@ -84,7 +84,7 @@ const VolumetricShader = {
       float jit = ign(gl_FragCoord.xy + fract(uTime * 0.37) * 97.0);
       float mu = dot(rd, uSunDir);
       // dusty air: a strong forward lobe (the glare round the sun) on a broad one (beams seen from the side)
-      float phase = mix(hg(0.78, mu), hg(0.25, mu), 0.45);
+      float phase = mix(hg(0.7, mu), hg(0.25, mu), 0.6);
       float lit = 0.0, amb = 0.0, tPrev = 0.0, T = 1.0;
       for (int i = 0; i < N; i++) {
         float f = (float(i) + jit) / float(N);
@@ -143,8 +143,10 @@ const GradeShader = {
       // 0.75; an S-curve here had blown the gaps to 0.6 and the top 5% to 0.9 (and a lifted toe went milky)
       {
         // (cool teal-green in the shade against warm gold in the light: an even olive cast read as grey-green mud)
-        vec3 c2 = sat(col, 1.15) * mix(vec3(0.88, 1.0, 0.97), vec3(1.08, 1.0, 0.84), smoothstep(0.15, 0.75, l));
-        c2 -= 0.2 * max(c2 - 0.35, 0.0);
+        // (true blacks under the boughs and a cool shade: an even yellow-green wash read as one flat tone)
+        vec3 c2 = sat(col, 1.26) * mix(vec3(0.84, 0.94, 1.0), vec3(1.09, 0.98, 0.86), smoothstep(0.1, 0.65, l));
+        c2 = max(c2 - 0.03, 0.0) * 1.04;
+        c2 -= 0.34 * max(c2 - 0.33, 0.0);
         col = mix(col, c2, uForest);
       }
       // storm: cold, blue-grey and low-saturation
@@ -166,7 +168,7 @@ const GradeShader = {
       }
       // vignette
       float vig = smoothstep(0.85, 0.25, length(cc * vec2(1.0, 0.85)));
-      col *= mix(1.0, vig, 0.5 * uVignette + uDeadEye * 0.4);
+      col *= mix(1.0, vig, 0.32 * uVignette + uDeadEye * 0.4);
       // damage
       col = mix(col, vec3(0.45, 0.02, 0.0), uDamage * smoothstep(0.25, 0.75, length(cc)) * 0.8);
       // film grain
@@ -260,8 +262,8 @@ export class Post {
         v.uInvProj.value.copy(this.camera.projectionMatrixInverse); v.uCamWorld.value.copy(this.camera.matrixWorld);
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
-        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.2);
-        v.uDensity.value = state.volDensity ?? 0.0065; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
+        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
+        v.uDensity.value = state.volDensity ?? 0.004; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }

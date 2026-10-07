@@ -86,7 +86,7 @@ vec4 marchClouds(vec3 d, vec3 s, vec3 sunC, vec3 ambTop, vec3 ambBot, float cov)
     if (den > 0.003) {
       float ld = 0.0;
       for (int j = 1; j <= 4; j++) { float o = 70.0 * float(j*j); ld += cloudDen(p + s * o, cov) * 70.0 * float(2*j - 1); }
-      float sig = 0.0045 * (1.0 + 2.6 * uStorm);   // storm decks are thick and opaque
+      float sig = 0.0045 * (1.0 + 6.0 * uStorm);   // storm decks are thick and opaque: dark bellies, light only at their torn edges
       // two-lobe transmittance fakes multiple scattering in thick cloud
       float Tl = max(exp(-ld * sig), 0.14 * exp(-ld * sig * 0.3));
       float powder = 1.0 - exp(-den * 1800.0 * sig);
@@ -128,7 +128,7 @@ export class Sky {
       fragmentShader: SKY_GLSL + /* glsl */ `
         // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
         // (the breaks between the storm cells are pale, washed sky, not a saturated blue)
-        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.78, 0.9, 1.06) * (0.95 + 0.2 * uBlizzard) + vec3(0.17, 0.2, 0.25), min(uStorm * 1.05, 1.0)); }
+        vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.7, 0.88, 1.1) * (0.95 + 0.2 * uBlizzard) + vec3(0.13, 0.18, 0.26), min(uStorm * 1.05, 1.0)); }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
@@ -187,7 +187,14 @@ export class Sky {
           // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
           // (right up to the zenith: seen from inside falling snow the deck is a pale, softly mottled ceiling, not the
           // dark slate underside of a dry storm; its cells still show through)
-          col = mix(col, uHaze * (1.25 - 0.3 * smoothstep(0.1, 0.9, d.y)), uBlizzard * mix(0.78, 0.36, smoothstep(0.04, 0.5, d.y)));
+          // seen from inside falling snow the deck is a pale ceiling, mottled lighter and darker where the cloud is
+          // thinner and thicker, brightening to an even glow at the horizon (a clear dark gradient read as open sky)
+          {
+            vec2 cuv = d.xz / (max(d.y, 0.0) + 0.16) + uCloudOffset * 3.0;
+            float lump = smoothstep(0.28, 0.72, fbm(cuv * 1.15) * 0.65 + fbm(cuv * 3.4 + 7.3) * 0.35);
+            vec3 ceilC = uHaze * mix(0.7 + 0.5 * lump, 1.2, 1.0 - smoothstep(0.0, 0.22, d.y));
+            col = mix(col, ceilC, uBlizzard * 0.92);
+          }
           gl_FragColor = vec4(col, 1.0);
         }`,
       side: THREE.BackSide,
@@ -304,7 +311,7 @@ export class Sky {
     U.uFogSunColor.value.setRGB(1.0, 0.62 + 0.3 * warm, 0.36 + 0.5 * warm).multiplyScalar(day * 0.75 + 0.02);
     U.uFogDensity.value = 0.0009 + 0.0006 * dusk + 0.0004 * night;
     // weather: blue-grey snow haze, warm green humidity, crisp dry desert air
-    U.uFogColor.value.lerp(new THREE.Color(0.44, 0.53, 0.67).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.75, W.blizzard * 0.85));
+    U.uFogColor.value.lerp(new THREE.Color(0.38, 0.5, 0.7).multiplyScalar(0.35 + 0.65 * day), Math.max(W.storm * 0.8, W.blizzard * 0.85));
     U.uFogColor.value.lerp(new THREE.Color(0.58, 0.64, 0.55).multiplyScalar(0.3 + 0.7 * day), W.humid * 0.4);
     U.uFogSunColor.value.multiplyScalar(1 - 0.75 * W.storm);
     // (falling snow greys out the far side of a valley within a kilometre or two: the reference's ridges fade layer

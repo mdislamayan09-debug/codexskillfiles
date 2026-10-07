@@ -620,6 +620,11 @@ async function init() {
     // of the open ground ahead, thinning toward the line the rider is taking
     if (s.snowDress && !G.snowDressed) {
       G.snowDressed = true;
+      {
+        const sn = new Set(veg.groups.snag), L = veg.trees, near = (it) => sn.has(it.v) && Math.hypot(it.x - px, it.z - pz) < 400;
+        for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !near(it)));
+        L.items = L.items.filter((it) => !near(it));
+      }
       const cy = yaw - (s.turn || 0);
       const f = [Math.sin(cy), Math.cos(cy)], lt = [Math.cos(cy), -Math.sin(cy)];
       let sd = 191;
@@ -627,12 +632,15 @@ async function init() {
       for (let gi = 0; gi < 18; gi++) {
         const ahead = 14 + rr() * 90, side = (rr() < 0.5 ? -1 : 1) * (6 + ahead * 0.25 + rr() * 24);
         const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
-        const n = 1 + Math.floor(rr() * 3);
+        const n = 2 + Math.floor(rr() * 4);
         for (let k = 0; k < n; k++) {
-          const x = gx + (rr() - 0.5) * 6, z = gz + (rr() - 0.5) * 6, sc = (k === 0 ? 1.3 : 0.5) + rr() * 1.3;
-          veg.rocks.add(x, world.heightAt(x, z) - 0.42 * sc, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
+          // (boulders a metre or two through, bedded deep, each under its cap of snow: the reference's dark shapes
+          // in the snowfield, not pebbles)
+          const x = gx + (rr() - 0.5) * 9, z = gz + (rr() - 0.5) * 9, sc = (k === 0 ? 2.2 : 0.8) + rr() * 1.6;
+          veg.rocks.add(x, world.heightAt(x, z) - 0.5 * sc, z, rr() * 6.28, sc, 2 + Math.floor(rr() * 2));
         }
-        for (let k = 0; k < 6; k++) { const x = gx + (rr() - 0.5) * 13, z = gz + (rr() - 0.5) * 13; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, 0.5 + rr() * 0.6, [7, 8, 9, 9][Math.floor(rr() * 4)]); }
+        // brush in a tight clump against the rocks' lee side, not sprinkled
+        for (let k = 0; k < 9; k++) { const a = rr() * 6.28, d = 1.5 + rr() * rr() * 6, x = gx + Math.cos(a) * d, z = gz + Math.sin(a) * d; veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, 0.55 + rr() * 0.7, [7, 8, 7, 9][Math.floor(rr() * 4)]); }
       }
       // the midground the reference's valley is built from: split granite outcrops breaking the snow either side
       // of the open lane, and clusters of snow-laden spruce of mixed sizes stepping back up the valley
@@ -652,7 +660,8 @@ async function init() {
       }
       // and a few dead snags among the living stands, as the reference's valley has
       const snags = veg.groups.snag;
-      if (snags.length) for (let i = 0; i < 5; i++) {
+      // (no bare snags here: tall and limbless against the snow they read as telephone poles)
+      if (snags.length) for (let i = 0; i < 0; i++) {
         const ahead = 30 + rr() * 110, side = (rr() < 0.5 ? -1 : 1) * (10 + ahead * 0.25 + rr() * 25);
         const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
         veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.6 + rr() * 0.5, snags[Math.floor(rr() * snags.length)]);
@@ -664,7 +673,7 @@ async function init() {
         const gx = px + f[0] * ahead + lt[0] * side, gz = pz + f[1] * ahead + lt[1] * side;
         for (let k = 0, n = 2 + Math.floor(rr() * 5); k < n; k++) {
           const x = gx + (rr() - 0.5) * 16, z = gz + (rr() - 0.5) * 16;
-          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.45 + rr() * rr() * 1.3, firs[Math.floor(rr() * firs.length)]);
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, 0.3 + rr() * rr() * 1.6, firs[Math.floor(rr() * firs.length)]);
         }
       }
       veg.update(player.hpos, true);
@@ -688,6 +697,26 @@ async function init() {
         for (const [k, list] of B.grid) B.grid.set(k, list.filter((it) => !inLine(it)));
         B.items = B.items.filter((it) => !inLine(it));
       }
+      // The light. The reference's floor is a patchwork of hard, warm sun and cool shade, and its shafts stand between
+      // the trunks with dark air between them. A low sun reaches the floor only down a lane open towards it, so, as a
+      // forester's eye would pick the spot: a lane lies open from the rider towards the sun, and the stand round about
+      // is an old, open one with gaps (a third of the trees within eighty metres are gone, whole and at random).
+      {
+        sky.time = s.time; sky.update(0, camera.position);
+        const sd = U.uSunDir.value, sl = Math.hypot(sd.x, sd.z) || 1, sx = sd.x / sl, sz = sd.z / sl;
+        G.clearTreesAlong(px - sx * 8, pz - sz * 8, px + sx * 115, pz + sz * 115, 3.4);
+        const L = veg.trees, gap = (it) => { const d2 = (it.x - px) ** 2 + (it.z - pz) ** 2; if (d2 > 6400 || d2 < 36) return false; const h = Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453; return h - Math.floor(h) < 0.16; };
+        for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !gap(it)));
+        L.items = L.items.filter((it) => !gap(it));
+        // the fern beds give way to low leafy scrub and bunchgrass near the trail (one big fern rosette repeated
+        // everywhere read as a single prop stamped across the floor)
+        for (const it of veg.bushes.items) {
+          if ((it.v === 3 || it.v === 4) && (it.x - px) ** 2 + (it.z - pz) ** 2 < 2500) {
+            const h = Math.sin(it.x * 39.346 + it.z * 11.135) * 24634.6345, q = h - Math.floor(h);
+            if (q < 0.8) { it.v = q < 0.45 ? Math.floor(q / 0.15) : 9; it.s *= q < 0.45 ? 0.55 : 0.8; }
+          }
+        }
+      }
       // (cos, -sin) points to the rider's left, so negative side offsets land on the right
       const f = [Math.sin(yaw), Math.cos(yaw)], lt = [Math.cos(yaw), -Math.sin(yaw)];
       const at = (ahead, side) => [px + f[0] * ahead - lt[0] * side, pz + f[1] * ahead - lt[1] * side];
@@ -696,7 +725,17 @@ async function init() {
       const [rx, rz] = at(15, 5.2); veg.rocks.add(rx, world.heightAt(rx, rz) - 0.4, rz, 2.4, 1.1, 3);
       for (let i = 0; i < 14; i++) {
         const [ux, uz] = at(3 + i * 1.3, (i % 2 ? 1 : -1) * (2.4 + (i * 0.37) % 1.6));
-        veg.bushes.add(ux, world.heightAt(ux, uz) - 0.05, uz, i * 1.3, 0.55 + (i % 3) * 0.2, i % 4 === 3 ? 7 : 3 + (i % 2));
+        veg.bushes.add(ux, world.heightAt(ux, uz) - 0.05, uz, i * 1.3, 0.4 + (i % 3) * 0.14, i % 4 === 3 ? 7 : i % 4 === 1 ? 9 : i % 3);
+      }
+      // two old pines standing close by the lens, one either side, their lower boughs hanging into the top of the
+      // frame (the reference is framed under such boughs; ours had bare sky across the top)
+      {
+        const pines = veg.groups.pine, cy = yaw - (s.turn || 0), cf = [Math.sin(cy), Math.cos(cy)], cr = [Math.cos(cy), -Math.sin(cy)];
+        const rel = s.camRel, camX = px + cr[0] * rel[0] + cf[0] * rel[2], camZ = pz + cr[1] * rel[0] + cf[1] * rel[2];
+        if (pines.length) for (const [fw, sd2, sc, v] of [[13, 9.5, 1.3, 0], [15, -10.5, 1.45, 2], [30, 12, 1.15, 1]]) {
+          const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
+          veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
+        }
       }
       // the floor the reference rides through: drifts of knee-high shrub, fern and backlit bunchgrass either side of
       // the trail out to forty metres, in clumps with bare duff between, and young pines among them (the floor had
@@ -709,8 +748,8 @@ async function init() {
           const [gx, gz] = at(ahead, side), kind = rr();
           for (let k = 0, n = 3 + Math.floor(rr() * 6); k < n; k++) {
             const x = gx + (rr() - 0.5) * 4.5, z = gz + (rr() - 0.5) * 4.5;
-            const v = kind < 0.4 ? Math.floor(rr() * 3) : kind < 0.75 ? 3 + Math.floor(rr() * 2) : 9;
-            veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, (v === 9 ? 0.6 : 0.65) + rr() * 0.6, v);
+            const v = kind < 0.55 ? Math.floor(rr() * 3) : kind < 0.68 ? 3 + Math.floor(rr() * 2) : 9;
+            veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, (v === 9 ? 0.6 : v < 3 ? 0.4 : 0.5) + rr() * 0.45, v);
           }
         }
         const pines = veg.groups.pine;
@@ -752,15 +791,23 @@ async function init() {
         s.home = [kx, kz, hr];
         G.clearTreesNear(kx, kz, 38); G.clearTreesNear(kx, kz, 42, veg.rocks); G.clearTreesNear(kx, kz, 60, veg.crags); G.clearTreesNear(kx, kz, 30, veg.bushes);
         G.clearTreesAlong(c.x, c.z, kx, kz, 16, 0.9);
-        // a few tall spruce standing round the yard and down the knoll's flanks, as the reference's
+        // tall spruce standing round the yard, as the reference's homestead sits among its pines: a group either
+        // side of the buildings and a stand behind, none between the lens and the roofs
         let sdk = 913;
         const rk = () => ((sdk = (sdk * 16807) % 2147483647) / 2147483647);
-        const firs = veg.groups.fir;
-        if (firs.length) for (let i = 0; i < 26; i++) {
-          const a = rk() * 6.28, rr2 = 33 + rk() * rk() * 70, x = kx + Math.cos(a) * rr2, z = kz + Math.sin(a) * rr2;
-          // (none between the lens and the buildings)
-          if (rr2 < 60 && Math.cos(a) * (c.x - kx) + Math.sin(a) * (c.z - kz) > 0.55 * Math.hypot(c.x - kx, c.z - kz)) continue;
-          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rk() * 6.28, 0.7 + rk() * 0.9, firs[Math.floor(rk() * firs.length)]);
+        const firs = veg.groups.fir, talls = veg.groups.tall;
+        const plant = (f, r, sc, tall) => {
+          const x = kx + d0.x * f + rt0.x * r, z = kz + d0.z * f + rt0.z * r, list = tall && talls.length ? talls : firs;
+          if (list.length) veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rk() * 6.28, sc, list[Math.floor(rk() * list.length)]);
+        };
+        for (const [f, r, sc, tall] of [[6, -34, 1.5, 0], [-4, -40, 1.15, 0], [14, -44, 1.8, 0], [22, -30, 1.3, 0], [-10, -52, 0.9, 0],
+          [2, 33, 1.7, 0], [12, 40, 1.25, 0], [-6, 44, 1.45, 0], [20, 30, 1.0, 0], [-14, 36, 0.8, 0],
+          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc, tall);
+        for (let i = 0; i < 46; i++) {
+          // and timber thickening down the knoll's far and side slopes
+          const a = rk() * 6.28, rr2 = 58 + rk() * 95, f = Math.cos(a) * rr2, r = Math.sin(a) * rr2;
+          if (f < -20 && Math.abs(r) < 46) continue;
+          plant(f, r, 0.6 + rk() * 1.1, 0);
         }
       }
       // and the light: the shot waits for a break in the deck to lie on the homestead and the ledge, with cloud
@@ -1039,7 +1086,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.24 * W.blizzard) * (1 + 0.18 * (G.forestK || 0));
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.02 * (G.forestK || 0));
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);

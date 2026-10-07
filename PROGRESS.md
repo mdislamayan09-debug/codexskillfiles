@@ -507,3 +507,57 @@ as a lookout over a valley.
   - A satin rather than glossy horse coat.
 - **Captures.** They now render at 1.5× supersampling. Headless Chromium has a device pixel ratio of 1, while the
   target Mac renders at 2×, so the critic had been judging aliased foliage that a player never sees.
+
+## New machine: the owner's MacBook (rounds 50 on)
+
+The project was carried over in a single handoff file and rebuilt on the target machine itself, an Apple M4.
+
+- **Captures now run on the real GPU.** `scripts/launch.mjs` starts Chromium in new-headless mode on ANGLE/Metal
+  (`GL=swiftshader` brings back the old software path). The world is ready in about 15 s and a frame takes 2-3 s,
+  against 5-15 minutes a frame before, so a change can be judged within a minute of making it.
+- **New tools.** `scripts/snap.sh` builds, captures and lays each shot beside its reference with the tone numbers
+  (`scripts/sbs.py`); `scripts/p.sh` is a one-shot probe; `scripts/mapdump.mjs` draws a shaded-relief map of any
+  window of the world (cliffs, creeks, roads, timber) for scouting; `scripts/sheet.py` makes contact sheets of
+  probe views.
+
+### Round 50: light you can see in the air, mountains with geology, a built vista
+The round 48-49 work was captured first (it had never been scored): pines dark and green with the sun out of
+frame, the snow ride facing a smooth slab with a creek line scribbled up it, the vista a grey shelf with the
+homestead hidden under its lip.
+
+- **Volumetric sunlight** (`post.js`, `VolumetricShader`). The view ray is marched through the air and the sun's
+  own shadow map is tested at every step, so haze glows only where the sun reaches it. Beams stand between the
+  trunks, follow the real canopy gaps and leave shaded air dark. The old screen-space pass (which could only smear
+  the sky's silhouette away from the sun) is nearly off under trees. The even forest haze was cut back to match.
+- **Pines.** The shot looks down the trail into the sun (16.15 h, the sun just above the frame) with a lane open
+  towards it, so the low sun reaches the floor in hard warm patches. A sixth of the trees within eighty metres are
+  gone (an old, open stand). Two old pines stand close by the lens with their boughs in the top of the frame.
+  The fern rosettes near the trail give way to low scrub and bunchgrass. The grade keeps true blacks, a cool
+  shade and a warm light. Bark is darker; the largest pines are slimmer.
+- **Mountain geology** (`world.js`, `terraceCliffs`). Every face steeper than about 35 degrees in the snow country
+  is re-cut along its bedding: beds of uneven thickness, hard ones standing as cliff bands above benches, soft
+  ones lying back, the whole dipping and wandering across the range, with gullies of scree left between
+  buttresses. The slope rule in the terrain shader then lays snow on the benches and bares the risers. The
+  canyon walls went from one airbrushed slab to banded cliffs.
+- **Snow ride.** A scouted location: the canyon floor below the north-west massif, looking north-east up the
+  valley with banded cliffs on the left and a spire in the gap. The blizzard sky is a pale mottled ceiling. Fog
+  is thinner so near cliffs stay dark; exposure is a third of a stop lower. Creek lines no longer run up cliffs;
+  seep lines hang with frozen falls instead. Boulders are bigger and capped, brush sits in clumps, the bare snags
+  are gone.
+- **Snow vista, built as a set.** A spur is raised from under the lookout to a knoll about 200 m off and 60 m
+  below the lens (`world.raiseSpur`, ground only ever raised, everything growing there lifted with it). The
+  homestead (a low log-brown barn, the cabin, sheds, corral) stands on its levelled crown among tall spruce.
+  The lookout's own rock is placed against the frame: jointed granite blocks up the left side, slabs along the
+  bottom, a boulder at the right. The shot waits for a break in the cloud deck to lie on the yard
+  (`cloudLight`, the cloud-shadow field on the CPU). Lower knolls keep their snow.
+- **Storm sky.** Clouds are lit as hard as fair-weather ones but are far thicker, so bodies are dark and torn
+  edges bright. The deck is dithered (no more contour lines). Cloud shade lets 40 % of the sun through, which
+  ended the grey camouflage blotches on snow slopes. Storm air and sky are bluer. Fog banks lie in separate
+  patches with clear air between.
+- **Rider and horse.** A smaller, dark bedroll; fine snow flecks instead of pinto blotches; a darker bay coat with
+  less sheen; the coat collar no longer stands out as a plate; a darker satchel strap.
+
+**Round 50 critic** (captured before the pines floor, sky and homestead-in-the-pines work above): pines 4,
+snowride 4, snowvista 3, all "clearly". Its notes drove that later work: no sun dapple or debris on the pine
+floor, striped rays over a yellow wash, squiggle ledges and a clear-blue sky in the snow ride, "forest painted
+on as stains", a grey barn on a bald knoll and blob clouds in the vista.

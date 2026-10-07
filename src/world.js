@@ -704,7 +704,9 @@ export class World {
     // the strata: beds of uneven thickness (thin shelves, thick cliff-forming bands), each with its own habit: a hard
     // bed stands up sheer above a narrow ledge, a soft one lies back as a ramp of snow
     const rs = mulberry32(this.seed * 7 + 5), beds = [];
-    for (let b = -200; b < 1500;) { const t = 7 + 34 * rs() * rs() + (rs() < 0.22 ? 22 : 0), hard = rs(); beds.push([b, t, 0.5 - 0.34 * hard, 0.5 + 0.34 * hard * (0.4 + 0.6 * rs())]); b += t; }
+    // (mostly thick: thin beds laid hairline snow shelves across a wall, which from a distance read as white
+    // squiggles drawn on it; cliff-forming bands tens of metres high stand between broad benches)
+    for (let b = -200; b < 1500;) { const t = 16 + 46 * rs() * rs() + (rs() < 0.3 ? 34 : 0), hard = 0.35 + 0.65 * rs(); beds.push([b, t, 0.5 - 0.3 * hard, 0.5 + 0.3 * hard * (0.5 + 0.5 * rs())]); b += t; }
     const cut = (u) => {
       let lo = 0, hi = beds.length - 1;
       while (lo < hi) { const m = (lo + hi + 1) >> 1; if (beds[m][0] <= u) lo = m; else hi = m - 1; }
@@ -725,7 +727,7 @@ export class World {
         // buttresses
         amt *= 0.3 + 0.7 * smoothstep(-0.35, 0.3, n.noise(x / 150 + 9.1, z / 150 - 4.2) + 0.4 * n.noise(x / 47 - 2.2, z / 47 + 6.6));
         // the bedding dips across the range and wanders, so ledges run on for a way, pinch out and step
-        const dip = 0.05 * x + 0.03 * z + 22 * n.noise(x / 330 + 3.3, z / 330 - 1.7) + 7 * n.noise(x / 90 - 6.1, z / 90 + 2.9) + 2.5 * n.noise(x / 31 + 1.1, z / 31 - 8.4);
+        const dip = 0.05 * x + 0.03 * z + 26 * n.noise(x / 360 + 3.3, z / 360 - 1.7) + 6 * n.noise(x / 110 - 6.1, z / 110 + 2.9);
         H[k] = lerp(h, cut(h + dip) - dip, amt);
       }
     }

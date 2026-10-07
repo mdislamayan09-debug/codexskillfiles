@@ -1145,7 +1145,7 @@ export class Vegetation {
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = conBarkTextures(11, [98, 70, 54], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
     const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted

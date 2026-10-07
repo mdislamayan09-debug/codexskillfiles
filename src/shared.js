@@ -160,9 +160,12 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     float above = wpos.y - uFogBase;
-    float bank = smoothstep(70.0, 5.0, above) * (0.35 + 0.65 * smoothstep(0.35, 0.7, mistN(wpos.xz / 420.0)));
-    float m = uMist * bank * (1.0 - exp(-dist / 1100.0));
-    col = mix(col, mix(uFogColor * 1.15, fogCol, 0.4), clamp(m, 0.0, 0.85));
+    // (separate banks lying in the hollows with clear air between them: one even layer over the whole floor
+    // milked out the valley and hid its timber and river; banks hide a part and show the rest dark beside them)
+    float bankN = smoothstep(0.5, 0.7, mistN(wpos.xz / 560.0 + 1.7) * 0.65 + mistN(wpos.xz / 190.0 - 4.1) * 0.35);
+    float bank = smoothstep(110.0, 15.0, above) * bankN;
+    float m = uMist * bank * (1.0 - exp(-dist / 650.0)) * 1.25;
+    col = mix(col, mix(uFogColor * 1.22, fogCol, 0.3), clamp(m, 0.0, 0.9));
     // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
     float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
     // (torn into separate rags with clear air between: a continuous band read as one white sheet over the slopes)

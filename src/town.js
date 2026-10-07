@@ -689,7 +689,7 @@ export class Town {
     const m = new THREE.Matrix4().makeRotationY(rotY);
     const at = (lx, lz) => new THREE.Vector3(lx, 0, lz).applyMatrix4(m).add(new THREE.Vector3(x, 0, z));
     const bp = at(-17, -7);
-    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 9, 13, 4.8, 'bare');
+    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 7, 10, 3.9, 'ochre');   // a low log-brown barn, not a grey box bigger than the house
     // the corral: split poles on posts, round a trampled pen beside the barn
     const cc = at(-15, 12), cm = new THREE.Matrix4().makeRotationY(rotY + 0.1).setPosition(cc.x, 0, cc.z);
     const W = 16, D = 11, pts = [];
