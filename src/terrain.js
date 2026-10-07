@@ -239,19 +239,19 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // couloirs that read as a comb)
   float ribs = smoothstep(0.15, 1.4, -lapS + 1.4 * (fbm2(xz / 22.0) - 0.5) + 0.5 * (vnoise(xz / 7.0) - 0.5)) * smoothstep(0.08, 0.26, slope) * smoothstep(0.4, 0.75, snowC);
   // (a narrow band, broken by noise: a steep face breaks from snow to rock along a crisp, ragged line)
-  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.17, snowC), 0.3, hiSnow), mix(mix(0.5, 0.27, snowC), 0.5, hiSnow), slope + 0.12 * (fbm2(xz / 9.0) - 0.5) + 0.08 * (vnoise(xz / 2.0) - 0.5)));
+  float snowAmt = smoothstep(0.3, 0.7, snowC + 0.12 * (fbm2(xz / 18.0) - 0.5)) * (1.0 - smoothstep(mix(mix(0.3, 0.23, snowC), 0.32, hiSnow), mix(mix(0.5, 0.34, snowC), 0.5, hiSnow), slope + 0.1 * (fbm2(xz / 9.0) - 0.5) + 0.06 * (vnoise(xz / 2.0) - 0.5)));
   // wind-scoured knolls: frosted rock and dry grass breaking through on exposed slopes
   // (tighter: broad soft scours and outcrops read as camouflage blotches across a whole mountainside)
   float scour = smoothstep(0.65, 0.74, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
   float outcrop = smoothstep(0.6, 0.68, fbm2(xz / 38.0 - 5.1) + 0.6 * slope) * smoothstep(0.12, 0.26, slope) * smoothstep(200.0, 320.0, wp.y);
   scour = max(scour, outcrop);
-  snowAmt *= 1.0 - 0.5 * scour * smoothstep(0.3, 0.6, snowC);
-  snowAmt *= 1.0 - 0.75 * outcrop * smoothstep(0.3, 0.6, snowC);
-  snowAmt *= 1.0 - 0.85 * ribs;
+  snowAmt *= 1.0 - 0.3 * scour * smoothstep(0.3, 0.6, snowC);
+  snowAmt *= 1.0 - 0.5 * outcrop * smoothstep(0.3, 0.6, snowC);
+  snowAmt *= 1.0 - 0.45 * ribs;
   // wind-scoured crests and summit knolls: the wind strips a convex top to rock and frozen turf with snow only in
   // its hollows (a summit under an unbroken white blanket reads as a model, not a mountain)
-  float crest = smoothstep(0.7, 2.0, -lapS + 0.9 * (fbm2(xz / 9.0 + 4.4) - 0.5) + 0.3 * (vnoise(xz / 2.6) - 0.5)) * smoothstep(0.4, 0.75, snowC) * smoothstep(300.0, 420.0, wp.y);
+  float crest = smoothstep(0.7, 2.0, -lapS + 0.9 * (fbm2(xz / 9.0 + 4.4) - 0.5) + 0.3 * (vnoise(xz / 2.6) - 0.5)) * smoothstep(0.4, 0.75, snowC) * smoothstep(525.0, 590.0, wp.y);   // (the high tops only: lower knolls and spurs keep their snow)
   snowAmt *= 1.0 - 0.75 * crest;
   rockAmt = max(rockAmt, crest * 0.8);
   // erosion relief on the mountainsides: ribs and runnels down the fall line every twenty metres or so, snow packed
@@ -264,12 +264,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float rB = 1.0 - abs(2.0 * vnoise(q * vec2(2.3, 1.6) + 4.1) - 1.0);
     float eK = smoothstep(0.12, 0.3, slope) * smoothstep(0.3, 0.7, snowC) * smoothstep(14.0, 5.0, fp);
     float ribE = smoothstep(0.58, 0.82, mix(rA, rB, 0.35)) * eK;
-    snowAmt *= 1.0 - 0.8 * ribE;
-    rockAmt = max(rockAmt, ribE * 0.85);
+    snowAmt *= 1.0 - 0.4 * ribE;
+    rockAmt = max(rockAmt, ribE * 0.5);
   }
   // a used track through the snow stays trampled and dirty: a dark line leading to the homestead
   snowAmt *= 1.0 - 0.55 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
-  rockAmt = max(rockAmt, ribs * 0.9);
+  rockAmt = max(rockAmt, ribs * 0.55);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
   // desert sand and coastal beaches
   vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
@@ -402,19 +402,23 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
       c = mix(c, c * vec3(0.86, 0.92, 1.05), pr);
     }
   }
-  // frozen falls: blue-white ice streaks hanging down cold cliff faces
-  if (snowC > 0.3 && slope > 0.4) {
-    float fallN = vnoise(vec2((xz.x + xz.y) * 0.09, wp.y * 0.004)) * 0.7 + vnoise(vec2((xz.x - xz.y) * 0.31, wp.y * 0.02)) * 0.3;
-    // (rarer and fainter, broken along their length: a field of them read as repeating white dashes on the slope)
-    float icefall = smoothstep(0.3, 0.7, snowC) * smoothstep(0.5, 0.78, slope) * smoothstep(0.68, 0.78, fallN) * smoothstep(0.3, 0.55, vnoise(vec2((xz.x - xz.y) * 0.05, wp.y * 0.03)));
-    c = mix(c, srgb(vec3(196,214,226)) * (0.8 + 0.3 * vnoise(vec2((xz.x + xz.y) * 1.3, wp.y * 0.3))), icefall * 0.6);
-    rough = mix(rough, 0.25, icefall);
+  // frozen falls: where seep lines cross a cliff band the risers hang with curtains of blue-white ice, stepping
+  // down from ledge to ledge (broad curtains a few tens of metres wide at long intervals, not dashes all over a face)
+  if (snowC > 0.3 && slope > 0.3) {
+    float along = dot(xz, vec2(0.71, 0.71));
+    float seep = smoothstep(0.7, 0.76, vnoise(xz / 46.0 + 11.3) * 0.8 + vnoise(xz / 15.0 - 4.7) * 0.2);
+    float pillar = 0.55 + 0.45 * smoothstep(0.25, 0.7, vnoise(vec2(along * 0.9, wp.y * 0.03)));
+    float icefall = smoothstep(0.3, 0.7, snowC) * smoothstep(0.55, 0.72, slope) * seep * pillar;
+    c = mix(c, mix(srgb(vec3(120,156,178)), srgb(vec3(196,216,228)), vnoise(vec2(along * 2.3, wp.y * 0.12))), icefall * 0.8);
+    rough = mix(rough, 0.2, icefall);
   }
   // the frozen creek in Frostwater Valley
   float cold = smoothstep(0.5, 0.8, snowC);
   // dark meltwater only in short open leads; most of the channel is iced and drifted over
   // the creek's corridor: willow scrub and gravel bars breaking through the snow along both banks, so from a
   // lookout the river reads as a dark braided band winding down the valley, not a faint line
+  // (only where the water can lie: a creek line carried down a cliff face is no creek)
+  cold *= 1.0 - smoothstep(0.1, 0.24, slope);
   float corridor = smoothstep(0.12, 0.4, wet) * (1.0 - smoothstep(0.45, 0.6, wet)) * cold;
   float willow = corridor * smoothstep(0.35, 0.65, fbm2(xz / 14.0 + 8.8) + 0.25 * (vnoise(xz / 3.0) - 0.5));
   c = mix(c, mix(srgb(vec3(46,40,36)), srgb(vec3(84,78,72)), vnoise(xz / 2.3)) * (0.8 + 0.3 * micro), willow * 0.75);
@@ -493,7 +497,7 @@ export class Terrain {
           canopy = mix(canopy, mix(srgb(vec3(124,58,22)), srgb(vec3(158,112,32)), cn) * mix(1.0, 0.55, step(0.7, cn)), ccl.b * 0.85); // autumn
           // snow-laden spruce still read as dark masses from afar, flecked with white
           // (from afar the snow caught on every crown and lying between them averages to a cold mid grey)
-          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.4 + 0.1 + 0.2 * smoothstep(3.0, 10.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
+          canopy = mix(canopy, mix(srgb(vec3(24,32,30)), srgb(vec3(150,160,170)), smoothstep(0.5, 0.9, fbm2(vWPos.xz / 4.0 + 1.7)) * smoothstep(5.0, 1.5, cfp) * 0.3 + 0.04 + 0.1 * smoothstep(3.0, 10.0, cfp)), smoothstep(0.4, 0.8, ccl.r));
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
           // grazing angles), strongest where the canopy is closed and crowns span a few pixels
           if (canopyK > 0.01) {
@@ -505,7 +509,7 @@ export class Terrain {
           }
           // snow-country spruce stand apart with snow lying between them: from afar the slope stays mostly white,
           // flecked dark (a closed dark canopy with white glades read as puddles of snow on black rock)
-          canopyK *= 1.0 - 0.3 * smoothstep(0.4, 0.8, ccl0.r);
+          canopyK *= 1.0 - 0.12 * smoothstep(0.4, 0.8, ccl0.r);
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }

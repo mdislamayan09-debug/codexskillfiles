@@ -49,6 +49,65 @@ const ShaftShader = {
     }`,
 };
 
+// True volumetric sunlight: the view ray is marched through the air and the sun's shadow map is tested at every
+// step, so haze glows only where the sun actually reaches it. Beams stand between the trunks, their edges follow
+// the real canopy gaps, and shaded air stays clear and dark (the screen-space pass below can only smear the sky's
+// silhouette away from the sun's position on screen).
+const VolumetricShader = {
+  uniforms: {
+    tDiffuse: { value: null }, tDepth: { value: null }, tShadow: { value: null },
+    uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uShadowMatrix: { value: new THREE.Matrix4() },
+    uSunDir: U.uSunDir, uSunColor: { value: new THREE.Color() }, uCamPos: { value: new THREE.Vector3() },
+    uDensity: { value: 0.004 }, uFalloff: { value: 0.03 }, uBase: { value: 0 }, uMaxDist: { value: 260 }, uStrength: { value: 0 }, uTime: { value: 0 },
+    uAmbient: { value: new THREE.Color() },
+  },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: /* glsl */ `
+    precision highp sampler2DShadow;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2DShadow tShadow;
+    uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform mat4 uShadowMatrix;
+    uniform vec3 uSunDir; uniform vec3 uSunColor; uniform vec3 uCamPos; uniform vec3 uAmbient;
+    uniform float uDensity; uniform float uFalloff; uniform float uBase; uniform float uMaxDist; uniform float uStrength; uniform float uTime;
+    varying vec2 vUv;
+    float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+    float hg(float g, float mu){ float g2 = g*g; return (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0*g*mu, 1.5)); }
+    void main(){
+      vec4 base = texture2D(tDiffuse, vUv);
+      if (uStrength <= 0.001) { gl_FragColor = base; return; }
+      float z = texture2D(tDepth, vUv).r;
+      vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
+      v.xyz /= v.w;
+      float dist = z >= 0.99999 ? uMaxDist : min(length(v.xyz), uMaxDist);
+      vec3 rd = normalize((uCamWorld * vec4(normalize(v.xyz), 0.0)).xyz);
+      const int N = VOL_STEPS;
+      // steps bunch up near the lens (where a beam's edge is sharpest on screen) and stretch with distance
+      float jit = ign(gl_FragCoord.xy + fract(uTime * 0.37) * 97.0);
+      float mu = dot(rd, uSunDir);
+      // dusty air: a strong forward lobe (the glare round the sun) on a broad one (beams seen from the side)
+      float phase = mix(hg(0.78, mu), hg(0.25, mu), 0.45);
+      float lit = 0.0, amb = 0.0, tPrev = 0.0, T = 1.0;
+      for (int i = 0; i < N; i++) {
+        float f = (float(i) + jit) / float(N);
+        float t = dist * f * (0.35 + 0.65 * f);
+        float dt = t - tPrev; tPrev = t;
+        vec3 p = uCamPos + rd * t;
+        vec4 sc = uShadowMatrix * vec4(p, 1.0);
+        float s = 1.0;
+        if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) s = texture(tShadow, vec3(sc.xy, sc.z - 0.0006));
+        float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff);
+        float a = den * dt;
+        lit += T * s * a;
+        amb += T * a;
+        T *= exp(-a * 0.6);
+      }
+      // (dust scatters the sun paler than its disc: a pale gold, not the low sun's orange)
+      vec3 sunC = mix(uSunColor, vec3(dot(uSunColor, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 0.98, 0.86), 0.55);
+      vec3 L = sunC * phase * lit * 12.566 + uAmbient * amb;
+      // the haze stands in front of what is behind it: a little of the scene is lost to it as well
+      gl_FragColor = vec4(base.rgb * mix(1.0, T, 0.5) + L * uStrength, base.a);
+    }`,
+};
+
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, uTime: { value: 0 }, uDeadEye: { value: 0 }, uDamage: { value: 0 }, uNight: { value: 0 }, uStorm: { value: 0 }, uForest: { value: 0 },
@@ -121,7 +180,7 @@ const GradeShader = {
 };
 
 export class Post {
-  constructor(renderer, scene, camera, { ao = true, bloom = true, smaa = false, samples = 4 } = {}) {
+  constructor(renderer, scene, camera, { ao = true, bloom = true, smaa = false, samples = 4, volSteps = 48 } = {}) {
     this.renderer = renderer;
     this.camera = camera;
     const size = renderer.getSize(new THREE.Vector2());
@@ -132,6 +191,10 @@ export class Post {
     this.composer = new EffectComposer(renderer, rt);
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
+    this.vol = new ShaderPass(new THREE.ShaderMaterial({ ...VolumetricShader, uniforms: VolumetricShader.uniforms, defines: { VOL_STEPS: volSteps } }));
+    this.vol.material.depthTest = false;
+    this.vol.material.depthWrite = false;
+    this.composer.addPass(this.vol);
     this.shafts = new ShaderPass(ShaftShader);
     this.shafts.material.depthTest = false;
     this.shafts.material.depthWrite = false;
@@ -186,6 +249,22 @@ export class Post {
     // the RenderPass draws into whatever readBuffer is at frame start
     const depth = this.composer.readBuffer.depthTexture;
     sh.tDepth.value = depth;
+    // volumetric sunlight: the sun's own shadow map, marched along every view ray
+    {
+      const v = this.vol.uniforms, sun = state.sun, map = sun && sun.shadow.map && sun.shadow.map.depthTexture;
+      const k = map ? (state.vol || 0) : 0;
+      this.vol.enabled = k > 0.001;
+      if (this.vol.enabled) {
+        v.tDepth.value = depth; v.tShadow.value = map;
+        v.uShadowMatrix.value.copy(sun.shadow.matrix);
+        v.uInvProj.value.copy(this.camera.projectionMatrixInverse); v.uCamWorld.value.copy(this.camera.matrixWorld);
+        v.uCamPos.value.copy(this.camera.position);
+        v.uSunColor.value.copy(U.uSunColor.value);
+        v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.2);
+        v.uDensity.value = state.volDensity ?? 0.0065; v.uFalloff.value = state.volFalloff ?? 0.03; v.uBase.value = U.uFogBase.value;
+        v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
+      }
+    }
     if (this.gtao) {
       this.gtao.gtaoMaterial.uniforms.tDepth.value = depth;
       this.gtao.pdMaterial.uniforms.tDepth.value = depth;

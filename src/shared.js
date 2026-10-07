@@ -22,9 +22,23 @@ export const U = {
   uPlayerPos: { value: new THREE.Vector3() },
   uNight: { value: 0 },
   uCloudShadow: { value: 0 },  // how much of the sun the broken storm deck blocks (0 = none)
+  uCloudShadowOff: { value: new THREE.Vector2() },   // where the deck's breaks lie (a shot can wait for the light)
   uTrail: { value: Array.from({ length: 48 }, () => new THREE.Vector2()) },   // horse trail through snow (terrain)
   uTrailN: { value: 0 },
 };
+
+// the cloud-shadow field of GLSL_SUNSHADOW, on the CPU: how much of the sun reaches a point (0..1 before the
+// uCloudShadow blend), for a given offset of the deck
+export function cloudLight(x, y, z, off = U.uCloudShadowOff.value) {
+  const fr = (v) => v - Math.floor(v), H = (px, py) => fr(Math.sin(px * 127.1 + py * 311.7) * 43758.5453);
+  const N = (px, py) => { const ix = Math.floor(px), iy = Math.floor(py); let fx = px - ix, fy = py - iy; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    return (H(ix, iy) * (1 - fx) + H(ix + 1, iy) * fx) * (1 - fy) + (H(ix, iy + 1) * (1 - fx) + H(ix + 1, iy + 1) * fx) * fy; };
+  const L = U.uSunDir.value, k = Math.max(1800 - y, 200) / Math.max(L.y, 0.15);
+  const qx = (x + L.x * k) / 2600 + U.uTime.value * 0.0012 + off.x, qy = (z + L.z * k) / 2600 + U.uTime.value * 0.0005 + off.y;
+  const c = N(qx, qy) * 0.6 + N(qx * 2.3 + 7.1, qy * 2.3 + 7.1) * 0.3 + N(qx * 5.1 - 3.3, qy * 5.1 - 3.3) * 0.1;
+  const t = Math.min(1, Math.max(0, (c - 0.46) / 0.24));
+  return t * t * (3 - 2 * t);
+}
 
 export const GLSL_COMMON = /* glsl */ `
 uniform sampler2D uHeight;
@@ -79,14 +93,17 @@ void farDepth(inout vec4 pos){
 export const GLSL_SUNSHADOW = /* glsl */ `
 float gSunVis = 1.0;
 uniform float uCloudShadow;
+uniform vec2 uCloudShadowOff;
 // shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the
 // breaks drop drifting pools of sunlight on slopes and peaks (the light the eye goes to)
 float cloudShade(vec3 wp){
   if (uCloudShadow <= 0.001) return 1.0;
   vec3 L = normalize(uSunDir);
-  vec2 q = (wp.xz + L.xz / max(L.y, 0.15) * max(1800.0 - wp.y, 200.0)) / 2600.0 + vec2(uTime * 0.0012, uTime * 0.0005);
+  vec2 q = (wp.xz + L.xz / max(L.y, 0.15) * max(1800.0 - wp.y, 200.0)) / 2600.0 + vec2(uTime * 0.0012, uTime * 0.0005) + uCloudShadowOff;
   float c = mistN(q) * 0.6 + mistN(q * 2.3 + 7.1) * 0.3 + mistN(q * 5.1 - 3.3) * 0.1;
-  return mix(1.0, smoothstep(0.52, 0.64, c), uCloudShadow);
+  // (a broken deck still lets a good part of the sun's light down through its thin places: full-black shade laid
+  // dark grey blotches with soft edges over every snow slope, like camouflage)
+  return mix(1.0, 0.42 + 0.58 * smoothstep(0.46, 0.7, c), uCloudShadow);
 }
 
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).

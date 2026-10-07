@@ -1,6 +1,6 @@
-import { chromium } from 'playwright';
+import { launch } from './launch.mjs';
 const url = process.argv[2];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 480, height: 270 } });
 const errs = [];
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });

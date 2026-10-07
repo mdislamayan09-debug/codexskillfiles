@@ -3,7 +3,7 @@ import './style.css';
 import * as THREE from 'three';
 import { setCreatureDetail, loadHumanModel } from './creatures.js';
 import { World, TOWN, CAMP, RANCH, CHURCH, CABIN, PINE_TRAIL, RES, HALF, setWorldResolution, loadRealTerrain } from './world.js';
-import { U, patchMaterial } from './shared.js';
+import { U, patchMaterial, cloudLight } from './shared.js';
 import { Terrain } from './terrain.js';
 import { Backdrop } from './backdrop.js';
 import { loadSurfaces } from './assets.js';
@@ -114,7 +114,7 @@ async function init() {
   const npcs = new NPCs({ world, town, veg, scene, fx: particles, tracers, audio });
   const player = new Player({ world, town, veg, scene, camera, input });
   const hud = new HUD(world);
-  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true });
+  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: QUALITY >= 2 ? 64 : QUALITY > 1 ? 40 : 24 });
   // pooled lamp lights for night
   const lamps = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffa850, 0, 18, 1.8); scene.add(l); return l; });
 
@@ -248,9 +248,12 @@ async function init() {
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     // both rides as the references frame them: camera close behind and to the left (+x of the frame is screen left),
     // the horse bearing right so its neck and ears show past the rider's shoulder, the rider filling the lower centre
-    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.6, player: [x, z, yaw], camRel: [0.5, 2.55, -4.3], lookRel: [-0.6, 2.15, 22], turn: -0.55, trailDress: true }; },
+    pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); return { time: 16.15, player: [x, z, yaw], camRel: [0.95, 2.6, -4.4], lookRel: [-0.5, 2.1, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
-    snowride: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.65, 2.45, -5.3], lookRel: [-2.4, 1.7, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+    snowride: () => {
+      // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
+      // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
+      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.65, 2.45, -5.3], lookRel: [-2.4, 1.7, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -345,7 +348,7 @@ async function init() {
       const fx = Math.sin(c0.az), fz = Math.cos(c0.az), rx = -fz, rz = fx;
       for (const side of [0, -4, 4, -8, 8, -12]) for (const back of [0, -6, -12]) {
         const cx = c0.cx + rx * side + fx * back, cz = c0.cz + rz * side + fz * back;
-        const c = { ...c0, cx, cz, ch: world.heightAt(cx, cz) + 2.2 };
+        const c = { ...c0, cx, cz, ch: world.heightAt(cx, cz) + 4.2 };   // (standing on the ledge's highest block: lower, the summit's own flat filled the bottom of the frame)
         frame(c);
         let open = true;
         for (const sx of [-0.25, 0, 0.25]) { n2.set(sx, -0.42); rc.setFromCamera(n2, cam); if (march(rc.ray.origin, rc.ray.direction, 200) < 160) { open = false; break; } }
@@ -457,6 +460,15 @@ async function init() {
       }
     }
     return best;
+  };
+  // the nearest dry, level spot to a scouted position (a ride starts on open snow, not in a creek or on a boulder slope)
+  G.clearNear = (x0, z0, yaw) => {
+    for (let r = 0; r < 120; r += 6) for (let a = 0; a < 6.28; a += 0.52) {
+      const x = x0 + Math.cos(a) * r, z = z0 + Math.sin(a) * r;
+      if (world.normalAt(x, z).y > 0.97 && world.splatAt(x, z).wet < 0.1 && world.climateAt(x, z).snow > 0.7) return [x, z, yaw];
+      if (r === 0) break;
+    }
+    return null;
   };
   // a point a fraction t along a road, facing along it (reverse = facing back toward its start)
   G.onRoad = (ri, t, reverse = false) => {
@@ -668,6 +680,9 @@ async function init() {
         L.items = L.items.filter((it) => !near(it));
         const cy = yaw - (s.turn || 0), rel = s.camRel;
         const camX = px + Math.cos(cy) * rel[0] + Math.sin(cy) * rel[2], camZ = pz - Math.sin(cy) * rel[0] + Math.cos(cy) * rel[2];
+        // and the trail runs on from the lens as an open corridor into the light: no crown standing across the
+        // vanishing point (a full fir on the outside of the bend had walled the sun and the distance off)
+        G.clearTreesAlong(camX, camZ, camX + Math.sin(cy) * 90, camZ + Math.cos(cy) * 90, 2.2);
         const B = veg.bushes, dx = px - camX, dz = pz - camZ, L2 = dx * dx + dz * dz;
         const inLine = (it) => { const t = Math.max(0, Math.min(1.3, ((it.x - camX) * dx + (it.z - camZ) * dz) / L2)); return Math.hypot(camX + dx * t - it.x, camZ + dz * t - it.z) < 1.6 + it.s; };
         for (const [k, list] of B.grid) B.grid.set(k, list.filter((it) => !inLine(it)));
@@ -713,18 +728,57 @@ async function init() {
       // clear the lookout itself, as a location artist would
       G.clearTreesNear(c.x, c.z, 40);
       G.clearTreesNear(c.x, c.z, 60, veg.crags);       // no crag looming in front of the lens
-      // the homestead on its bench below the lookout, with its yard and a sightline cleared down to it
-      if (s.home && !G.homePlaced) {
-        G.homePlaced = true;
-        const [hx, hz, hr] = s.home;
-        world.stampPad(hx, hz, 28, 34);
-        town.addHomestead(hx, hz, hr);
-        G.clearTreesNear(hx, hz, 36); G.clearTreesNear(hx, hz, 40, veg.rocks); G.clearTreesNear(hx, hz, 50, veg.crags);
-        G.clearTreesAlong(c.x, c.z, hx, hz, 14, 0.92);
-      }
-      // the frame as the lens will see it, to set the ledge's rocks against
+      // the frame as the lens will see it
       camera.position.copy(c); camera.fov = s.fov || camera.fov; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
       camera.lookAt(l); camera.updateMatrixWorld();
+      const d0 = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt0 = new THREE.Vector3(-d0.z, 0, d0.x);
+      // The homestead's knoll, as the reference has it: a spur running out from under the lookout and ending in a
+      // broad top a couple of hundred metres off and some sixty metres below the lens, in the lower middle of the
+      // frame a little right of centre, the valley dropping away behind it. Built as a set: the ground is raised
+      // (only ever raised), what grows there is lifted with it, and the yard is levelled on its crown.
+      if (!G.homePlaced) {
+        G.homePlaced = true;
+        const KD = 205, kx = c.x + d0.x * KD + rt0.x * 34, kz = c.z + d0.z * KD + rt0.z * 34;
+        const kTop = c.y - KD * Math.tan(0.12 + Math.atan(0.44 * Math.tan(THREE.MathUtils.degToRad((s.fov || 40) / 2))));
+        const ax = c.x + d0.x * 34 + rt0.x * 10, az = c.z + d0.z * 34 + rt0.z * 10, aTop = Math.min(world.heightAt(ax, az) + 2, c.y - 24);
+        const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
+        const R = 260, inBox = (it) => it.x > Math.min(ax, kx) - R && it.x < Math.max(ax, kx) + R && it.z > Math.min(az, kz) - R && it.z < Math.max(az, kz) + R;
+        const before = layers.map((L) => L.items.filter(inBox).map((it) => [it, world.heightAt(it.x, it.z)]));
+        if (kTop > world.heightAt(kx, kz)) world.raiseSpur(ax, az, aTop, kx, kz, kTop);
+        for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
+        world.stampPad(kx, kz, 27, 24);
+        const hr = Math.atan2(c.x - kx, c.z - kz) + 0.6;
+        town.addHomestead(kx, kz, hr);
+        s.home = [kx, kz, hr];
+        G.clearTreesNear(kx, kz, 38); G.clearTreesNear(kx, kz, 42, veg.rocks); G.clearTreesNear(kx, kz, 60, veg.crags); G.clearTreesNear(kx, kz, 30, veg.bushes);
+        G.clearTreesAlong(c.x, c.z, kx, kz, 16, 0.9);
+        // a few tall spruce standing round the yard and down the knoll's flanks, as the reference's
+        let sdk = 913;
+        const rk = () => ((sdk = (sdk * 16807) % 2147483647) / 2147483647);
+        const firs = veg.groups.fir;
+        if (firs.length) for (let i = 0; i < 26; i++) {
+          const a = rk() * 6.28, rr2 = 33 + rk() * rk() * 70, x = kx + Math.cos(a) * rr2, z = kz + Math.sin(a) * rr2;
+          // (none between the lens and the buildings)
+          if (rr2 < 60 && Math.cos(a) * (c.x - kx) + Math.sin(a) * (c.z - kz) > 0.55 * Math.hypot(c.x - kx, c.z - kz)) continue;
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rk() * 6.28, 0.7 + rk() * 0.9, firs[Math.floor(rk() * firs.length)]);
+        }
+      }
+      // and the light: the shot waits for a break in the deck to lie on the homestead and the ledge, with cloud
+      // shade on the slopes beyond (the offset of the deck's shadow field is searched for that)
+      if (s.home) {
+        sky.time = s.time; sky.update(0, c);
+        let bo = null, bs = -1e9, sdl = 4711;
+        const rl = () => ((sdl = (sdl * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 400; i++) {
+          const off = new THREE.Vector2(rl() * 40, rl() * 40);
+          const home = cloudLight(s.home[0], c.y - 58, s.home[1], off), near = cloudLight(c.x + d0.x * 8, c.y, c.z + d0.z * 8, off);
+          let far = 0;
+          for (const [f, r] of [[900, -500], [1300, 300], [700, 600], [1800, -200], [2400, 500], [1500, -900]]) far += cloudLight(c.x + d0.x * f + rt0.x * r, c.y - 250, c.z + d0.z * f + rt0.z * r, off) / 6;
+          const sc = home * 2 + near * 1.4 - Math.abs(far - 0.45) * 1.5;
+          if (sc > bs) { bs = sc; bo = off; }
+        }
+        U.uCloudShadowOff.value.copy(bo);
+      }
       const rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
       // the ground under a point of the frame, within maxD metres of the lens
       const groundAt = (nx, ny, maxD) => {
@@ -735,25 +789,36 @@ async function init() {
       };
       let sd = 77;
       const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
-      // the lookout's own rock, as the reference's: broken granite slabs bedded in the near ground right across the
-      // bottom of the frame (sized with distance so each reads as a slab, not a pebble or a wall), and a split
-      // shoulder rising out of the lower-left corner; the lower middle stays low so the view drops past it
-      for (let i = 0; i < 34; i++) {
-        const nx = -1.06 + rr() * 2.12, ny = -1.0 + rr() * (Math.abs(nx) < 0.4 ? 0.2 : 0.42);
+      // The lookout's own rock, set against the frame as the reference's: a split granite outcrop standing up the
+      // left side from the bottom corner to above the middle, broken slabs along the bottom edge, and a boulder
+      // shouldering in at the lower right; the lower middle is left open for the drop to the homestead. Each block is
+      // given the point of the frame its crown should reach and how far off it stands, and is grown from the ground
+      // under that point up to it.
+      const block = (nx, ny, dist, rot, v = 5, wide = 1) => {
+        n2.set(nx, ny); rc.setFromCamera(n2, camera);
+        const r = rc.ray.direction, x = c.x + r.x * dist, z = c.z + r.z * dist, top = c.y + r.y * dist, g = world.heightAt(x, z);
+        const sc = Math.min(7.5, Math.max(1.3, (top - g) / 0.62)) * wide;
+        veg.rocks.add(x, Math.max(g - 0.14 * sc, top - 0.76 * sc), z, rot, sc, v);
+      };
+      // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one
+      // on the right, so the blocks stand on rock rather than hang over the drop
+      {
+        const P = (f, r, dy) => [c.x + d0.x * f + rt0.x * r, c.z + d0.z * f + rt0.z * r, c.y + dy];
+        const [l0x, l0z, l0y] = P(1, -5.5, -3.2), [l1x, l1z, l1y] = P(12, -4.8, -4.6);
+        world.raiseSpur(l0x, l0z, l0y, l1x, l1z, l1y, { side: 1.5, round: 0.02, top: 3.5, reach: 30, rough: 0.12, sag: 0 });
+        const [r0x, r0z, r0y] = P(4, 5.5, -5.2), [r1x, r1z, r1y] = P(11, 6.5, -6.4);
+        world.raiseSpur(r0x, r0z, r0y, r1x, r1z, r1y, { side: 1.5, round: 0.02, top: 3, reach: 30, rough: 0.12, sag: 0 });
+      }
+      for (const b of [[-0.96, 0.12, 8.5, 0.4, 6, 1], [-0.72, -0.1, 9.5, 1.9, 7, 1], [-0.5, -0.34, 10, 3.1, 8, 1], [-0.9, -0.4, 6.5, 4.4, 7, 1], [-0.34, -0.6, 8.5, 2.2, 6, 1], [-0.64, -0.7, 6.8, 5.3, 8, 1],
+        [-0.12, -0.84, 7.5, 0.9, 4, 1.2], [0.16, -0.9, 7.8, 3.7, 5, 1.2], [0.42, -0.84, 8.2, 1.4, 4, 1.1],
+        [0.8, -0.52, 9.5, 2.6, 7, 1], [0.98, -0.68, 7.2, 5.9, 6, 1], [0.62, -0.8, 8.6, 4.1, 8, 1]]) block(...b);
+      // and loose slabs bedded in whatever of the ledge's own ground still shows between them
+      for (let i = 0; i < 22; i++) {
+        const nx = -1.06 + rr() * 2.12, ny = -1.0 + rr() * (Math.abs(nx - 0.1) < 0.3 ? 0.14 : 0.36);
         const hit = groundAt(nx, ny, 24);
         if (!hit) continue;
         const [x, g, z, t] = hit, sc = (0.45 + rr() * 0.55) * (0.3 + t * 0.085);
         veg.rocks.add(x, g - sc * 0.42, z, rr() * 6.28, sc, 4 + Math.floor(rr() * 2));
-      }
-      for (const [nx, ny, crown, rot] of [[-1.02, -0.8, -0.02, 0.4], [-0.84, -0.92, -0.32, 1.9], [-0.66, -0.98, -0.6, 3.1]]) {
-        const hit = groundAt(nx, ny, 26);
-        if (!hit) continue;
-        const [x, g, z, t] = hit;
-        // the crown on the ray through (nx, crown) at the same range
-        n2.set(nx, crown); rc.setFromCamera(n2, camera);
-        const rd = rc.ray.direction, k = t / Math.hypot(rd.x, rd.z), top = c.y + rd.y * k;
-        const sc = Math.min(6.5, Math.max(1.4, (top - g) / 0.62));
-        veg.rocks.add(x, g - 0.14 * sc, z, rot, sc, 5);
       }
       // the homestead's place in the frame, kept clear of the ledge's dressing (bushes had hidden it)
       let hNdc = null;
@@ -925,7 +990,9 @@ async function init() {
       // (the forest haze once read as milk at 1.7x the reference's exposure; with the canopy now closed by full
       // crowns the woods went the other way, 0.6x in their upper two-thirds, and want the sunlit haze back)
       // (the reference's woods are full of warm backlit haze: trunks 150 m off fade to pale gold-grey)
-      G.mistK = 1 + (fo * 1.25 + morning * 1.5) * low;
+      // (the sunlit part of that haze is now marched against the sun's shadow map in the post stack, so shaded air stays
+      // clear: only a little even haze is left here)
+      G.mistK = 1 + (fo * 0.45 + morning * 1.5) * low;
       G.forestK = fo * low;
       // regional weather from the climate under the camera (snapped on the first frames of a capture shot)
       const cc = world.climateAt(camera.position.x, camera.position.z);
@@ -971,8 +1038,9 @@ async function init() {
       // air reads brighter than the eye wants it, so stop down a little there)
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 + 0.06 * W.storm * (1 - W.blizzard)) * (1 + 0.18 * (G.forestK || 0));
-      renderer.toneMappingExposure += (target - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
+      // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.06 * W.storm * (1 - W.blizzard)) * (1 - 0.24 * W.blizzard) * (1 + 0.18 * (G.forestK || 0));
+      renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     town.update(dt, U.uNight.value, sky.weather.storm);
     veg.update(camera.position);
@@ -1044,7 +1112,7 @@ async function init() {
     // (in clear air under a storm the cold grade is lighter: warm rock and dry grass keep some colour against the snow)
     // (a clear-air storm keeps more colour: warm rock and dry grass against the cool snow, as the reference's vista)
     const coldGrade = Math.max(sky.weather.blizzard, 0.42 * sky.weather.storm * THREE.MathUtils.smoothstep(world.climateAt(camera.position.x, camera.position.z).snow, 0.4, 0.8));
-    post.render(rdt, { storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 + (G.forestK || 0) * 1.7 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
+    post.render(rdt, { sun: sky.sun, vol: G.volK ?? ((G.forestK || 0) * (1 - U.uNight.value) * (1 - sky.weather.storm)), volDensity: G.volDensity, volDist: G.volDist, volAmbient: G.volAmbient, storm: coldGrade, forest: (G.forestK || 0) * (1 - U.uNight.value), shaftK: 1 - (G.forestK || 0) * 0.85 - sky.weather.storm * 0.8, deadEye: G.deadEyeK, damage: G.damage, letterbox: player.cinematic * 0.11, fade: player.dead ? Math.min(1, (4 - G.dieT) / 2) : 0 });
     if (G.snap) {
       // photo mode: save the frame at full render resolution, without the HUD (it is DOM, not canvas)
       G.snap = false;

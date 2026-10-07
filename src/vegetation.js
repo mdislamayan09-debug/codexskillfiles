@@ -966,7 +966,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
         vec3 pg = mix(srgbV(vec3(130,140,70)), srgbV(vec3(160,160,92)), aOff.w);
         vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
-        vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 1.2 * (0.75 + 0.5 * midV);
+        vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.95 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
       }
       vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
@@ -1036,6 +1036,13 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
     v.x *= sx; v.z *= sz;
     if (v.y < -0.2) v.y = -0.2 - (v.y + 0.2) * 0.2;
     p.setXYZ(i, v.x, v.y * 0.75, v.z);
+  }
+  // deep-cut blocks come out much smaller than the unit boulder: bring the crown back to the same height, so
+  // placement by scale means the same thing for every variant
+  if (cutDepth > 0.2) {
+    let top = 0, wide = 0;
+    for (let i = 0; i < p.count; i++) { top = Math.max(top, p.getY(i)); wide = Math.max(wide, Math.hypot(p.getX(i), p.getZ(i))); }
+    g.scale(0.56 / wide, 0.62 / top, 0.56 / wide);   // a block about as tall as it is broad
   }
   g.computeVertexNormals();
   return g;
@@ -1113,6 +1120,7 @@ function rockMaterial(surf = {}, bare = false) {
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
       rsnow *= max(drift * 0.6, 0.6 * fleck);
+      base *= vec3(1.34, 1.24, 1.08);   // sun-bleached, lichen-warmed ledge granite
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
@@ -1137,7 +1145,7 @@ export class Vegetation {
     const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = conBarkTextures(11, [118, 80, 60], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const cbP = conBarkTextures(11, [98, 70, 54], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
     const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
@@ -1298,6 +1306,9 @@ export class Vegetation {
     // (the ledge blocks are cut by twice the joint planes, deeper: split granite with flat faces and hard edges, not
     // rounded lumps)
     const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 5, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
+    // 6-8: outcrop blocks for a lookout's own ledge, stood several metres tall beside the lens: cut right through by
+    // many joint planes into stacked, square-shouldered blocks (the boulders above, scaled up, are smooth domes)
+    for (const sd of [31, 47, 58]) rockBuilds.push({ parts: [{ geometry: rockGeometry(sd, true, 6, 30, 0.34), material: rMatBare }] });
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
@@ -1424,7 +1435,7 @@ export class Vegetation {
         // the pine belt's middle storey: young full-skirted firs among the tall clear boles, and the mature pines
         // of mixed ages (one size of tall pine in an even stand read as planted poles)
         if (pz < -700 && cl.snow <= 0.45 && cl.jungle <= 0.45 && !swamp && !beach) {
-          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.68 + rc() * 0.62;
+          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.68 + rc() * 0.46;
         }
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving

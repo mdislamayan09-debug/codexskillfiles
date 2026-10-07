@@ -1,6 +1,6 @@
 // Capture in-game screenshots for the gauntlet critic.
 // usage: node scripts/shoot.mjs [url] [shot,shot,...] [frames] [WxH]   (CANVAS=1 reads the canvas instead of a page screenshot)
-import { chromium } from 'playwright';
+import { launch } from './launch.mjs';
 import fs from 'node:fs';
 
 const url = process.argv[2] || 'http://localhost:4173/?capture';
@@ -10,11 +10,7 @@ const [W, H] = (process.argv[5] || '1280x720').split('x').map(Number);
 const outDir = process.env.OUT || 'shots';
 fs.mkdirSync(outDir, { recursive: true });
 
-const exe = fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined;
-const browser = await chromium.launch({
-  executablePath: exe,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
-});
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));

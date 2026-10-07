@@ -660,6 +660,7 @@ export class World {
     }
     this.cabinH = this.cabinH ?? this.cabinHeight();
     this.smoothMountains();
+    this.terraceCliffs();
     this.genMs = performance.now() - t0;
     if (typeof document === 'undefined' && typeof window === 'undefined') return; // node: no GPU textures
     this.heightTex = new THREE.DataTexture(this.heights, RES, RES, THREE.RedFormat, THREE.FloatType);
@@ -692,6 +693,44 @@ export class World {
     }
   }
 
+  // Mountain geology. A heightfield of smoothed elevation data has no cliffs: its steep faces are even ramps that
+  // shade as one airbrushed slab. Real faces are cut along their bedding into rock bands standing between ledges,
+  // and the ledges hold the snow. Here every steep face in the snow country is re-cut that way: within each stratum
+  // the ground lies back as a bench and then stands up as a riser, the strata dipping and wandering along the face.
+  // The terrain shader's slope rule then lays snow on the benches and bares the risers by itself.
+  terraceCliffs() {
+    const H = this.heights, C = this.climate, src = new Float32Array(H);
+    const n = this.n, R = 3, inv = 1 / (2 * R * CELL);
+    // the strata: beds of uneven thickness (thin shelves, thick cliff-forming bands), each with its own habit: a hard
+    // bed stands up sheer above a narrow ledge, a soft one lies back as a ramp of snow
+    const rs = mulberry32(this.seed * 7 + 5), beds = [];
+    for (let b = -200; b < 1500;) { const t = 7 + 34 * rs() * rs() + (rs() < 0.22 ? 22 : 0), hard = rs(); beds.push([b, t, 0.5 - 0.34 * hard, 0.5 + 0.34 * hard * (0.4 + 0.6 * rs())]); b += t; }
+    const cut = (u) => {
+      let lo = 0, hi = beds.length - 1;
+      while (lo < hi) { const m = (lo + hi + 1) >> 1; if (beds[m][0] <= u) lo = m; else hi = m - 1; }
+      const [b, t, a, c] = beds[lo];
+      return b + smoothstep(a, c, (u - b) / t) * t;
+    };
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const g = Math.hypot(src[k + R] - src[k - R], src[k + R * RES] - src[k - R * RES]) * inv;   // rise over run
+        let amt = smoothstep(0.62, 1.1, g) * smoothstep(0.35, 0.65, snow);   // faces steeper than ~35 degrees
+        if (amt <= 0) continue;
+        const x = i * CELL - HALF, h = src[k];
+        // not every part of a face shows its bedding: gullies and aprons of scree and drift run down between the
+        // buttresses
+        amt *= 0.3 + 0.7 * smoothstep(-0.35, 0.3, n.noise(x / 150 + 9.1, z / 150 - 4.2) + 0.4 * n.noise(x / 47 - 2.2, z / 47 + 6.6));
+        // the bedding dips across the range and wanders, so ledges run on for a way, pinch out and step
+        const dip = 0.05 * x + 0.03 * z + 22 * n.noise(x / 330 + 3.3, z / 330 - 1.7) + 7 * n.noise(x / 90 - 6.1, z / 90 + 2.9) + 2.5 * n.noise(x / 31 + 1.1, z / 31 - 8.4);
+        H[k] = lerp(h, cut(h + dip) - dip, amt);
+      }
+    }
+  }
+
   // Bilinear height sample — matches the GPU sampler exactly.
   // level a yard into the slope (a homestead set down after load): within r the ground takes the height at the
   // centre, easing back to the natural slope over `fall` metres; the GPU copy is re-uploaded
@@ -715,6 +754,36 @@ export class World {
     }
     this.splatTex.needsUpdate = true;
     return h0;
+  }
+
+  // Set-building: raise a spur, a rounded crest running out from (ax, az) at height ah and down to a knoll standing
+  // at (bx, bz), height bh. Ground is only ever raised. Returns the box of ground that may have changed.
+  raiseSpur(ax, az, ah, bx, bz, bh, { side = 0.52, round = 0.0032, top = 30, reach = 230, rough = 1, sag = 8 } = {}) {
+    const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+    const x0 = Math.min(ax, bx) - reach, x1 = Math.max(ax, bx) + reach, z0 = Math.min(az, bz) - reach, z1 = Math.max(az, bz) + reach;
+    const i0 = Math.max(0, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z1 + HALF) / CELL));
+    const n = this.n;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = i * CELL - HALF, z = j * CELL - HALF;
+      const t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+      const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+      // the crest sags into a saddle behind the knoll, which stands as its own broad top
+      // (the crest runs down to a saddle lying below the knoll's top and climbs the last stretch onto it, so the top
+      // stands clear of its own approach when seen from up the crest)
+      const crest = lerp(ah, bh - sag, Math.min(1, t / 0.7)) + sag * smoothstep(0.7, 1, t);
+      const flat = lerp(5, top, smoothstep(0.72, 1, t));
+      const target = crest - side * Math.max(0, d - flat) - round * d * d + rough * (3.2 * n.noise(x / 34 + 4.2, z / 34 - 7.7) + 1.3 * n.noise(x / 13 - 1.1, z / 13 + 3.9) + 0.4 * n.noise(x / 5 + 2.3, z / 5 - 6.1));
+      const k = j * RES + i;
+      if (target > this.heights[k]) {
+        const lift = target - this.heights[k];
+        this.heights[k] = target;
+        this.splat[k * 4] = 0; this.splat[k * 4 + 1] = 0;                       // no road or creek carried up onto it
+        this.splat[k * 4 + 2] = Math.round(this.splat[k * 4 + 2] * (1 - smoothstep(0, 5, lift)));   // open snow where the ground is newly made
+      }
+    }
+    this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
+    return [x0, z0, x1, z1];
   }
 
   heightAt(x, z) {
