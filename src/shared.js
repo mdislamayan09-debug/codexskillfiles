@@ -2,7 +2,20 @@
 import * as THREE from 'three';
 import { WORLD_SIZE, RES } from './world.js';
 
+// The lattice every shader's value noise reads: 256 x 256 uniform random numbers in a half-float texture, wrapped
+// and bilinearly filtered. One fetch at a smoothed coordinate gives the same smooth value noise as four hashes and
+// three mixes did; the ground's shader calls it well over a hundred times a pixel.
+function noiseLattice() {
+  const N = 256, d = new Uint16Array(N * N);
+  let s = 0x9e3779b9;
+  for (let i = 0; i < d.length; i++) { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; d[i] = THREE.DataUtils.toHalfFloat(((t ^ (t >>> 14)) >>> 0) / 4294967296); }
+  const t = new THREE.DataTexture(d, N, N, THREE.RedFormat, THREE.HalfFloatType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return t;
+}
+
 export const U = {
+  uNoise: { value: noiseLattice() },
   uTime: { value: 0 },
   uHeight: { value: null },
   uSplat: { value: null },
@@ -55,8 +68,9 @@ uniform vec3 uPlayerPos;
 
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); p3 += dot(p3, p3.yzx+33.33); return fract((p3.xx+p3.yz)*p3.zy); }
+uniform sampler2D uNoise;
 float vnoise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); vec2 u = f*f*(3.0-2.0*f);
-  return mix(mix(hash12(i), hash12(i+vec2(1,0)), u.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), u.x), u.y); }
+  return textureLod(uNoise, (mod(i, 256.0) + u + 0.5) / 256.0, 0.0).r; }
 float fbm2(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<4;i++){ s+=a*vnoise(p); p=p*2.03+vec2(1.7,9.2); a*=0.5;} return s; }
 float fbm5(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.03+vec2(1.7,9.2); a*=0.5;} return s; }
 

@@ -70,7 +70,7 @@ async function init() {
   const sky = new Sky(scene, renderer, QUALITY);
   setLoad(0.57, 'Loading photographic surfaces…'); await tick();
   const surf = await loadSurfaces(renderer);
-  const terrain = new Terrain(world, scene, surf, CAPTURE ? QUALITY : Math.min(QUALITY, 1.6));   // (stills keep the densest ground mesh)
+  const terrain = new Terrain(world, scene, surf, CAPTURE ? QUALITY : 1);   // (stills keep the densest ground mesh; in play 2 m cells to 240 m, 4 m to 640 m)
   const backdrop = new Backdrop(world, scene, QUALITY);   // the country beyond the map edge, out to the horizon
   setLoad(0.6, 'Raising Copper Hollow…'); await tick();
   const town = new Town(world, scene, surf);
@@ -81,7 +81,7 @@ async function init() {
   const water = new Water(scene, renderer, { reflections: QUALITY >= 0.7, resScale: QUALITY > 1 ? 0.75 : QUALITY >= 1 ? 0.5 : 0.35, normals: surf.water });
   // (stills take an 8192 shadow map; in play 4096 over the same 300 m is 7 cm a texel and a quarter of the fill)
   if (QUALITY > 1 && CAPTURE && renderer.capabilities.maxTextureSize >= 8192) { sky.sun.shadow.mapSize.set(8192, 8192); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
-  else if (!CAPTURE) { sky.sun.shadow.mapSize.set(3072, 3072); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
+  else if (!CAPTURE) { sky.sun.shadow.mapSize.set(2048, 2048); sky.sun.shadow.map?.dispose(); sky.sun.shadow.map = null; }
   const particles = new Particles(scene, 4000);
   const tracers = new Tracers(scene);
   const snowfall = new Snowfall(scene, QUALITY >= 2 ? 150000 : QUALITY > 1 ? 70000 : 30000);
