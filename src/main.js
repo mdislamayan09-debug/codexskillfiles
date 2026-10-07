@@ -254,7 +254,9 @@ async function init() {
     // the horse bearing right so its neck and ears show past the rider's shoulder, the rider filling the lower centre
     pines: () => { const [x, z, yaw] = G.denseOnRoad(PINE_TRAIL, true); // (a longer lens from further back, as the reference's: close in on a wide lens the horse's quarters swelled to
     // half again the rider's width and he read as a toy on its back)
-    return { time: 16.15, fov: 35, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
+    // (a high afternoon sun, as the reference's: it comes down steeply through the gaps between the crowns in separate
+    // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
+    return { time: 15.0, fov: 35, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -768,7 +770,7 @@ async function init() {
       {
         sky.time = s.time; sky.update(0, camera.position);
         const sd = U.uSunDir.value, sl = Math.hypot(sd.x, sd.z) || 1, sx = sd.x / sl, sz = sd.z / sl;
-        G.clearTreesAlong(px - sx * 8, pz - sz * 8, px + sx * 115, pz + sz * 115, 3.4);
+        // (no lane cut toward the sun: under a high sun the crowns over the trail are what dapple the floor)
         const L = veg.trees, gap = (it) => { const d2 = (it.x - px) ** 2 + (it.z - pz) ** 2; if (d2 > 6400 || d2 < 36) return false; const h = Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453; return h - Math.floor(h) < 0.16; };
         for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !gap(it)));
         L.items = L.items.filter((it) => !gap(it));
@@ -811,7 +813,6 @@ async function init() {
         // dark layered branches against the bright air, as the reference is roofed (bare poles alone ran up into fog)
         {
           const sdr = U.uSunDir.value, sl2 = Math.hypot(sdr.x, sdr.z) || 1;
-          G.clearTreesAlong(px - sdr.x / sl2 * 6, pz - sdr.z / sl2 * 6, px + sdr.x / sl2 * 70, pz + sdr.z / sl2 * 70, 3.2);
         }
         if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1], [34, -12, 1.5, 3], [44, 11, 1.45, 1], [27, -19, 1.4, 1], [50, 21, 1.5, 3]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
@@ -1254,9 +1255,10 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.5 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 1.0 * (G.forestK || 0));   // (the eye opens up under a closed canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
+    U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);
     town.update(dt, U.uNight.value, sky.weather.storm);
     veg.update(camera.position);
     terrain.update(camera);

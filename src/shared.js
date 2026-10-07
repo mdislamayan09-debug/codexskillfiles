@@ -17,7 +17,8 @@ export const U = {
   uFogFalloff: { value: 0.022 },
   uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
   uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
-  uSnowfall: { value: 0 },  // falling snow in the air: everything a few kilometres off dissolves into it
+  uSnowfall: { value: 0 },
+  uCanopy: { value: 0 },    // under a forest roof: the sun reaches the air and the floor only through its small gaps  // falling snow in the air: everything a few kilometres off dissolves into it
   uWind: { value: new THREE.Vector2(1, 0.3) },
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
@@ -95,6 +96,20 @@ export const GLSL_SUNSHADOW = /* glsl */ `
 float gSunVis = 1.0;
 uniform float uCloudShadow;
 uniform vec2 uCloudShadowOff;
+uniform float uCanopy;
+// The canopy's small gaps. A forest roof lets the sun through in thousands of openings far smaller than a shadow
+// map of the whole stand can hold; they are what break the light into separate shafts in the air and into pools on
+// the floor. The pattern is laid across the sun's own direction, so it is the same all the way down a ray: a beam
+// in the haze ends in its own patch of light on the ground.
+float canopyGaps(vec3 wp){
+  if (uCanopy <= 0.001) return 1.0;
+  vec3 L = normalize(uSunDir);
+  vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
+  vec2 q = vec2(dot(wp, R), dot(wp, Up));
+  float n = mistN(q / 3.1) * 0.55 + mistN(q / 1.1 + 7.3) * 0.3 + mistN(q / 9.0 - 2.9) * 0.15;
+  return mix(1.0, 0.06 + 0.94 * smoothstep(0.46, 0.56, n), uCanopy);
+}
+
 // shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the
 // breaks drop drifting pools of sunlight on slopes and peaks (the light the eye goes to)
 float cloudShade(vec3 wp){
@@ -217,7 +232,7 @@ export function patchMaterial(mat, { vertexHead = '', vertexBody = null, fragHea
     if (fragColor) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', fragColor);
     // every lit surface takes the cloud shadows; terrain-aware materials also take the ridges' long shadows
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n gSunVis = ' + (sunShadow ? 'terrainSunShadow(vWPos) * ' : '') + 'cloudShade(vWPos);')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n gSunVis = ' + (sunShadow ? 'terrainSunShadow(vWPos) * ' : '') + 'cloudShade(vWPos) * canopyGaps(vWPos);')
       .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace(
         'getDirectionalLightInfo( directionalLight, directLight );', 'getDirectionalLightInfo( directionalLight, directLight ); directLight.color *= gSunVis;'));
     if (noFlip) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal); nonPerturbedNormal = normal;');

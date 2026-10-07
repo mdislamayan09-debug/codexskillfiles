@@ -59,7 +59,7 @@ const VolumetricShader = {
     uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uShadowMatrix: { value: new THREE.Matrix4() },
     uSunDir: U.uSunDir, uSunColor: { value: new THREE.Color() }, uCamPos: { value: new THREE.Vector3() },
     uDensity: { value: 0.004 }, uFalloff: { value: 0.03 }, uBase: { value: 0 }, uMaxDist: { value: 260 }, uStrength: { value: 0 }, uTime: { value: 0 },
-    uAmbient: { value: new THREE.Color() },
+    uAmbient: { value: new THREE.Color() }, uCanopy: U.uCanopy,
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader: /* glsl */ `
@@ -71,6 +71,23 @@ const VolumetricShader = {
     varying vec2 vUv;
     float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
     float hg(float g, float mu){ float g2 = g*g; return (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0*g*mu, 1.5)); }
+    uniform float uCanopy;
+    float mistH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float mistN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+      return mix(mix(mistH(i), mistH(i+vec2(1,0)), f.x), mix(mistH(i+vec2(0,1)), mistH(i+vec2(1,1)), f.x), f.y); }
+    // The canopy's small gaps. A forest roof lets the sun through in thousands of openings far smaller than a shadow
+    // map of the whole stand can hold; they are what break the light into separate shafts in the air and into pools on
+    // the floor. The pattern is laid across the sun's own direction, so it is the same all the way down a ray: a beam
+    // in the haze ends in its own patch of light on the ground.
+    float canopyGaps(vec3 wp){
+      if (uCanopy <= 0.001) return 1.0;
+      vec3 L = normalize(uSunDir);
+      vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
+      vec2 q = vec2(dot(wp, R), dot(wp, Up));
+      float n = mistN(q / 3.1) * 0.55 + mistN(q / 1.1 + 7.3) * 0.3 + mistN(q / 9.0 - 2.9) * 0.15;
+      return mix(1.0, 0.06 + 0.94 * smoothstep(0.46, 0.56, n), uCanopy);
+    }
+    
     float h31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
     float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
       return mix(mix(mix(h31(i), h31(i+vec3(1,0,0)), f.x), mix(h31(i+vec3(0,1,0)), h31(i+vec3(1,1,0)), f.x), f.y),
@@ -95,7 +112,7 @@ const VolumetricShader = {
       float jit = ign(gl_FragCoord.xy + fract(uTime * 0.37) * 97.0);
       float mu = dot(rd, uSunDir);
       // dusty air: a strong forward lobe (the glare round the sun) on a broad one (beams seen from the side)
-      float phase = mix(hg(0.7, mu), hg(0.25, mu), 0.6);
+      float phase = mix(hg(0.7, mu), hg(0.1, mu), 0.7);   // (mostly a broad lobe: beams show from the side and from below, not only round the sun)
       float lit = 0.0, amb = 0.0, tPrev = 0.0, T = 1.0;
       for (int i = 0; i < N; i++) {
         float f = (float(i) + jit) / float(N);
@@ -108,6 +125,7 @@ const VolumetricShader = {
         // the beams' edges; and the dust hangs unevenly, in drifts, so a beam is not one even streak)
         vec2 so = (vec2(ign(gl_FragCoord.xy + float(i) * 7.3), ign(gl_FragCoord.yx + float(i) * 3.1)) - 0.5) * 0.0022;
         if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) s = texture(tShadow, vec3(sc.xy + so, sc.z - 0.0006));
+        s *= canopyGaps(p);
         float den = uDensity * exp(-max(p.y - uBase, 0.0) * uFalloff) * (0.45 + 1.1 * n3(p * 0.11 + vec3(uTime * 0.02, 0.0, uTime * 0.013)));
         float a = den * dt;
         lit += T * s * a;
@@ -280,7 +298,7 @@ export class Post {
         v.uCamPos.value.copy(this.camera.position);
         v.uSunColor.value.copy(U.uSunColor.value);
         v.uAmbient.value.copy(U.uFogColor.value).multiplyScalar(state.volAmbient ?? 0.07);
-        v.uDensity.value = state.volDensity ?? 0.0021; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
+        v.uDensity.value = state.volDensity ?? 0.0105; v.uFalloff.value = state.volFalloff ?? 0.016;   // (the haze stands up into the crowns: thinning out by head height it left the upper frame dark) v.uBase.value = U.uFogBase.value;
         v.uMaxDist.value = state.volDist ?? 260; v.uStrength.value = k; v.uTime.value = g.uTime.value;
       }
     }
