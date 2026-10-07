@@ -709,3 +709,28 @@ volume). That is where the remaining distance is.
 between 3 and 5 on every shot, every one "clearly". The critic's notes are about asset fidelity now: bark,
 needle cards, rock surface, cloth, the horse's coat and anatomy, cloud volume. The frames have changed a great
 deal and the score has not, which says the remaining distance is in the assets, not the staging.
+
+### Rounds 64-65, and where the loop stands
+- **Round 64 made the pines worse (3).** A new plated bark read as "cracked mud at the wrong scale", denser cones
+  as "identical dark dots stamped on an orange sheet", and the corrected haze base as a fog wall. Withdrawn in
+  round 65: the furrowed bark is back, cones are fewer and closer to the duff's tone, the duff is a darker
+  grey-brown, the dust thinner, the sun pools a metre or two across. Kept from round 64: boles that wander and
+  taper in five sections, a few thick dead limbs, needle fringes that glow against the sun.
+- **Play performance.** Value noise comes from a 256 x 256 half-float lattice texture (one fetch for four hashes),
+  play shadows are 2048, the ground mesh in play is the standard LOD. 14.5 fps at 1512x982, 28 fps at half scale,
+  about 25 fps where the governor settles (0.56). Native retina is about 5 fps.
+
+**Critic scores.** Round 64: 3 / 4 / 3. Round 65: 4 / 5 / 3.
+
+**All sixteen scored rounds of this session** (pines / snowride / snowvista):
+50: 4/4/3 · 51: 4/4/3 · 52: 4/3.5/4.5 · 53: 4/3/4 · 54: 4/4/3 · 56: 4/4/3 · 57: 4/5/4 · 58: 4/4/3 · 59: 4/4/3 ·
+60: 4/5/4 · 61: 4/4/3 · 62: 4/5/3 · 64: 3/4/3 · 65: 4/5/3. The handoff's last score was 4/5/3. Every verdict was
+"clearly".
+
+**Conclusion.** Staging, light, terrain, sets and dressing all changed a great deal and the blind score did not
+move outside the critic's own run-to-run spread. What the critic names now is asset fidelity, the same items
+every round: the horse and rider (anatomy, coat, cloth, tack), bark and needle foliage, rock surface, the snow
+surface, cloud volume, and a valley floor with a river and forest in it. Procedural stand-ins for those have
+reached their ceiling at about 4 out of 10 against RDR2. The next step that can move the score is real assets:
+scanned PBR materials (bark, forest floor, granite, snow) and a sculpted, textured horse and rider. That needs
+the owner's go-ahead to download them.
