@@ -657,3 +657,28 @@ band; vista terracing bands, thresholded-looking cloud, no aerial layering.
 Scores have stayed in the 3-4.5 band for seven rounds while the frames have changed a great deal; the critic's
 notes have moved from composition and lighting to asset fidelity (bark, needles, rock, cloth, coat, cloud
 volume). That is where the remaining distance is.
+
+### Rounds 58-61: rock that is jointed, sun on the pine floor, snow under the spruce
+- **Rock.** Outcrops and crags are built from bedding planes and two sets of upright joints (stacked blocks and
+  stepped ledges, snow lying in patches on the flat tops) instead of an icosphere cut by planes at random angles,
+  which made crystal shards. The scan is laid wider, in two unturned lays mixed by patches, with a narrow
+  triplanar blend (two projections of its grain had crossed into a weave on oblique faces) and a fine grain close
+  up. The lookout's rock takes the whole sky's light. A "snow packed in the joints" experiment drew white
+  scribbles over the rock and was removed.
+- **Snow ride.** The left wall is three tiers of jointed blocks standing proud of the slope from foot to rim.
+  The storm grade leaves the darks near neutral and puts the blue in the snow; falling snow is grey-blue. Tall
+  ragged pines stand among the spruce. Smoother snow. A dark fur cap; a muted bay and blanket.
+- **Pines.** The stand of tall pines had closed the lane opened toward the sun; re-opened, the foreground floor
+  lies in warm sun with the trunks' shadows across it. A few full-crowned pines hang boughs across the top of the
+  frame. Twig, cone and stone litter is twice as dense and the drawn litter reaches the middle distance and runs
+  over the tread. The fallen log is a knotted, out-of-round trunk.
+- **Snow vista.** The ground inside a spruce stand is shaded snow, not a grey tint (tinted, a forested
+  mountainside read as grey rock with white patches); the trees are what is dark. Stands are close-grown on the
+  valley floor and thin with height to the treeline. Timber round the homestead. The sun is back to the side
+  (behind the lens it lit the foreground but flattened every slope).
+- **Horse and rider.** Light from above models every body (backs and rumps lit, bellies and inner legs in their own
+  shade). Grooves between the buttock muscles and at the flank. Worn leather with rubbed and dry patches. A
+  lighter, thinner tail.
+
+**Critic scores.** Round 57: 4 / 5 / 4. Round 58: 4 / 4 / 3. Round 59: 4 / 4 / 3. Round 60: 4 / 5 / 4.
+(pines / snowride / snowvista; all "clearly".) The best total is 13 against 12 at the handoff.

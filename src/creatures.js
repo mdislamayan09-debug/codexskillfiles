@@ -186,6 +186,12 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.5, 0.95, wn.y) * smoothstep(0.5, 0.74, 0.55 * vnoise(vRest.xz * 170.0 + vRest.y * 60.0) + 0.3 * vnoise(vRest.xz * 60.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 14.0));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.6' : '0.5'});
         }
+        // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
+        // inside of the legs lie in the body's own shade (lit evenly all round, a body read as a flat cut-out)
+        {
+          vec3 wnf = inverseTransformDirection(normalize(vNormal), viewMatrix);
+          diffuseColor.rgb *= mix(${kind === 'human' ? '0.78' : '0.55'}, ${kind === 'human' ? '1.08' : '1.16'}, smoothstep(-0.7, 0.75, wnf.y));
+        }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
       }`,
@@ -198,6 +204,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           {
             const float RT[15] = float[15](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
             roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 14)];
+            ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.38, 0.92, smoothstep(0.3, 0.7, fbm2(vRest.xy * 11.0 + vRest.z * 8.0)));'}
           }`)
         .replace('#include <normal_fragment_maps>', `
           #include <normal_fragment_maps>
@@ -209,7 +216,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             ${quad
               // broad muscle swells, the coat's hair lying in streaks along the body (catching the light in bands),
               // and the groove down the croup
-              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0007 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0004 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02;'
+              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0007 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0004 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02 - 0.014 * smoothstep(0.04, 0.0, abs(abs(vRest.x) - 0.12 - 0.05 * (1.3 - vRest.y))) * smoothstep(-0.68, -0.8, vRest.z) * smoothstep(0.88, 1.02, vRest.y) * smoothstep(1.46, 1.34, vRest.y) - 0.012 * smoothstep(0.07, 0.0, abs(vRest.z + 0.36 - 0.25 * (vRest.y - 1.15))) * smoothstep(0.95, 1.1, vRest.y) * smoothstep(1.45, 1.3, vRest.y) * smoothstep(0.15, 0.25, abs(vRest.x));'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -1079,14 +1086,14 @@ export class Quadruped {
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
       // (few strands to a lock, so each card is hair with air in it: at 120 strands every card was solid and the tail a slab)
-      const hairTex = hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x5a4030), 0.5).getHex(), 46, true);
+      const hairTex = hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x6e5440), 0.75).getHex(), 40, true);
       const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.6 });
       const tcards = [];
       // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a
       // round, layered bundle, full at the top and separating into wisps toward the hocks (not one flat card)
       // (fuller: 34 narrow locks within 7 cm of the dock read from behind as one dark strip)
       // (a switch, not a broom: narrow at the dock, fullest a third of the way down, drawing in to loose ends)
-      for (let i = 0; i < 48; i++) {
+      for (let i = 0; i < 30; i++) {
         const th = r() * Math.PI * 2, rho = 0.012 + r() * 0.06;
         const len = 0.95 + r() * 0.5 - rho * 3;
         const c = new THREE.PlaneGeometry(0.08 + r() * 0.06, len, 2, 10);

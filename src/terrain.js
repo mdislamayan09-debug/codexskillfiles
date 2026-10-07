@@ -536,8 +536,10 @@ export class Terrain {
             vec3 crownC = srgb(vec3(26,36,32)) * (0.6 + 0.8 * lit);
             crownC = mix(crownC, srgb(vec3(170,180,192)), 0.22 * smoothstep(0.1, 0.5, lit));
             // (inside a stand the snow between the crowns lies in their shade: dark, so the stand reads as one mass)
-            vec3 gapC = mix(srgb(vec3(128,140,156)), srgb(vec3(58,72,90)), smoothstep(0.5, 0.8, fo));
-            vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.14), mix(gapC, crownC, crown), res);   // (from afar a closed stand is dark blue-green, not grey)
+            // (the ground in a snow-country stand is snow, a little shaded: the trees themselves are what is dark.
+            // Tinted grey under them, a forested mountainside read as grey rock with white patches and specks on it.)
+            vec3 gapC = mix(srgb(vec3(170,182,200)), srgb(vec3(104,122,150)), smoothstep(0.5, 0.85, fo));   // (deep in a stand the snow lies in the trees' shade)
+            vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.6), mix(gapC, crownC, crown * 0.5), res);
             canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
           }
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at

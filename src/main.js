@@ -884,14 +884,16 @@ async function init() {
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
-          if (firs.length) for (let f = 150; f < 3700; f += 6) {
+          if (firs.length) for (let f = 150; f < 3700; f += 4.6) {
             const half = 260 + f * 0.5;
-            for (let r = -half; r < half; r += 6) {
+            for (let r = -half; r < half; r += 4.6) {
               const jx = (rf() - 0.5) * 12, jz = (rf() - 0.5) * 12;   // (thrown well off the grid: half a cell's jitter left rows showing on thin slopes)
               const x = c.x + d0.x * (f + jx) + rt0.x * (r + jz), z = c.z + d0.z * (f + jx) + rt0.z * (r + jz), pick = rf(), sc = rf() * rf();
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const h = world.heightAt(x, z);
-              if (world.climateAt(x, z).snow < 0.5 || pick > stand(x, z, h) * 0.9) continue;
+              // (closed canopy on the valley's floor and lower slopes, thinning with height to the treeline)
+              const st = stand(x, z, h);
+              if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.35 + 0.6 * (1 - THREE.MathUtils.smoothstep(h, 300, 470)))) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.74 || sp.wet > 0.25 || sp.road > 0.2) continue;
               veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.6 + sc * 0.9, firs[Math.floor(pick * 977) % firs.length]);
@@ -949,11 +951,11 @@ async function init() {
           if (rk() < 0.35) { const sc = 0.8 + rk() * 2.2; veg.rocks.add(x, gh - 0.4 * sc, z, rk() * 6.28, sc, 2 + Math.floor(rk() * 2)); }
           else for (let q = 0; q < 3; q++) { const bx = x + (rk() - 0.5) * 4, bz = z + (rk() - 0.5) * 4; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.06, bz, rk() * 6.28, 0.6 + rk() * 0.9, [7, 8, 9][Math.floor(rk() * 3)]); }
         }
-        for (let i = 0; i < 46; i++) {
-          // and timber thickening down the knoll's far and side slopes
-          const a = rk() * 6.28, rr2 = 58 + rk() * 95, f = Math.cos(a) * rr2, r = Math.sin(a) * rr2;
-          if (f < -20 && Math.abs(r) < 46) continue;
-          plant(f, r, 0.4 + rk() * 0.7, 0);
+        for (let i = 0; i < 190; i++) {
+          // and timber thick down the knoll's far and side slopes: the cabin nestles in dark spruce, as the reference's
+          const a = rk() * 6.28, rr2 = 36 + rk() * 120, f = Math.cos(a) * rr2, r = Math.sin(a) * rr2;
+          if (f < 6 && Math.abs(r) < 40 + Math.max(0, -f) * 0.25) continue;   // (the lens's sight of the yard kept clear)
+          plant(f, r, 0.5 + rk() * 0.75, 0);
         }
       }
       // and the light: the shot waits for a break in the deck to lie on the homestead and the ledge, with cloud
