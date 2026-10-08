@@ -32,7 +32,8 @@ export const U = {
   uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
   uBankBase: { value: 0 },  // the valley floor ahead of the lens, which the fog bank lies on
   uSnowfall: { value: 0 },
-  uCanopy: { value: 0 },    // under a forest roof: the sun reaches the air and the floor only through its small gaps  // falling snow in the air: everything a few kilometres off dissolves into it
+  uCanopy: { value: 0 },
+  uCanopySpot: { value: new THREE.Vector4(0, 0, 0, 0) },   // xyz a point the key shaft falls on, w its radius (0 = none)    // under a forest roof: the sun reaches the air and the floor only through its small gaps  // falling snow in the air: everything a few kilometres off dissolves into it
   uWind: { value: new THREE.Vector2(1, 0.3) },
   uWindStrength: { value: 1 },
   uPlayerPos: { value: new THREE.Vector3() },
@@ -112,6 +113,7 @@ float gSunVis = 1.0;
 uniform float uCloudShadow;
 uniform vec2 uCloudShadowOff;
 uniform float uCanopy;
+uniform vec4 uCanopySpot;
 // The canopy's small gaps. A forest roof lets the sun through in thousands of openings far smaller than a shadow
 // map of the whole stand can hold; they are what break the light into separate shafts in the air and into pools on
 // the floor. The pattern is laid across the sun's own direction, so it is the same all the way down a ray: a beam
@@ -122,7 +124,11 @@ float canopyGaps(vec3 wp){
   vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
   vec2 q = vec2(dot(wp, R), dot(wp, Up));
   float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-  return mix(1.0, 0.03 + 0.97 * smoothstep(0.555, 0.62, n), uCanopy);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
+  float gap = 0.03 + 0.97 * smoothstep(0.555, 0.62, n);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
+  // a shot's key light: one gap in the roof whose shaft falls on a chosen point (the rider), as a cinematographer
+  // would wait for or cut
+  if (uCanopySpot.w > 0.0) { vec2 q0 = vec2(dot(uCanopySpot.xyz, R), dot(uCanopySpot.xyz, Up)); gap = max(gap, smoothstep(uCanopySpot.w, uCanopySpot.w * 0.5, length(q - q0))); }
+  return mix(1.0, gap, uCanopy);
 }
 
 // shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the
@@ -134,7 +140,7 @@ float cloudShade(vec3 wp){
   float c = mistN(q) * 0.6 + mistN(q * 2.3 + 7.1) * 0.3 + mistN(q * 5.1 - 3.3) * 0.1;
   // (a broken deck still lets a good part of the sun's light down through its thin places: full-black shade laid
   // dark grey blotches with soft edges over every snow slope, like camouflage)
-  return mix(1.0, 0.42 + 0.58 * smoothstep(0.46, 0.7, c), uCloudShadow);
+  return mix(1.0, 0.6 + 0.4 * smoothstep(0.42, 0.74, c), uCloudShadow);
 }
 
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
@@ -224,6 +230,9 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
     col = mix(col, mix(vec3(0.74, 0.8, 0.89) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(uMist * band * rag * 0.8 * (1.0 - exp(-dist / 1400.0)), 0.0, 0.8));   // (pale and plain to see, banked against the slopes)
     // and the far ranges step back in pale blue-grey layers
     col = mix(col, uFogColor * vec3(0.95, 1.02, 1.15), uMist * 0.16 * (1.0 - exp(-dist / 4200.0)));
+    // and past three kilometres or so every range is a flat blue-grey shape, each paler than the one before it (a
+    // sunlit snow massif six kilometres off stood as the brightest, whitest thing in the frame)
+    col = mix(col, uFogColor * vec3(1.0, 1.06, 1.18), min(uMist * 1.1, 1.0) * 0.78 * smoothstep(2600.0, 8500.0, dist));
   }
   return col;
 }

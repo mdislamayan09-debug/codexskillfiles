@@ -59,7 +59,7 @@ const VolumetricShader = {
     uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uShadowMatrix: { value: new THREE.Matrix4() },
     uSunDir: U.uSunDir, uSunColor: { value: new THREE.Color() }, uCamPos: { value: new THREE.Vector3() },
     uDensity: { value: 0.004 }, uFalloff: { value: 0.03 }, uBase: { value: 0 }, uMaxDist: { value: 260 }, uStrength: { value: 0 }, uTime: { value: 0 },
-    uAmbient: { value: new THREE.Color() }, uCanopy: U.uCanopy,
+    uAmbient: { value: new THREE.Color() }, uCanopy: U.uCanopy, uCanopySpot: U.uCanopySpot,
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader: /* glsl */ `
@@ -72,6 +72,7 @@ const VolumetricShader = {
     float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
     float hg(float g, float mu){ float g2 = g*g; return (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0*g*mu, 1.5)); }
     uniform float uCanopy;
+uniform vec4 uCanopySpot;
     float mistH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float mistN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
       return mix(mix(mistH(i), mistH(i+vec2(1,0)), f.x), mix(mistH(i+vec2(0,1)), mistH(i+vec2(1,1)), f.x), f.y); }
@@ -85,7 +86,11 @@ const VolumetricShader = {
       vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
       vec2 q = vec2(dot(wp, R), dot(wp, Up));
       float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-      return mix(1.0, 0.03 + 0.97 * smoothstep(0.555, 0.62, n), uCanopy);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
+      float gap = 0.03 + 0.97 * smoothstep(0.555, 0.62, n);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
+  // a shot's key light: one gap in the roof whose shaft falls on a chosen point (the rider), as a cinematographer
+  // would wait for or cut
+  if (uCanopySpot.w > 0.0) { vec2 q0 = vec2(dot(uCanopySpot.xyz, R), dot(uCanopySpot.xyz, Up)); gap = max(gap, smoothstep(uCanopySpot.w, uCanopySpot.w * 0.5, length(q - q0))); }
+  return mix(1.0, gap, uCanopy);
     }
     
     float h31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }

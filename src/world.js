@@ -660,6 +660,7 @@ export class World {
     }
     this.cabinH = this.cabinH ?? this.cabinHeight();
     this.smoothMountains();
+    this.cragSlopes();
     this.erodeSlopes();
     this.terraceCliffs();
     this.genMs = performance.now() - t0;
@@ -691,6 +692,34 @@ export class World {
         tmp[k] = lerp(h, sum / 9, m * 0.8);
       }
       H.set(tmp);
+    }
+  }
+
+  // Crags. The elevation data is thirty-metre survey ground blown up to two-metre cells: every mountainside is a
+  // smooth ramp with a smooth skyline. On steep and on high ground a ridged relief is laid over it, sharp-crested
+  // buttresses a couple of hundred metres apart with smaller ones on their flanks, tens of metres high. That is
+  // what gives a face steps too steep for snow (dark rock) beside ledges that hold it, and a skyline with teeth.
+  cragSlopes() {
+    const H = this.heights, C = this.climate, src = new Float32Array(H);
+    const n = this.n, R = 10, inv = 1 / (2 * R * CELL);
+    const ridged = (x, z) => {
+      let s = 0, a = 1, f = 1, w = 1, norm = 0;
+      for (let o = 0; o < 4; o++) { let r = 1 - Math.abs(n.noise(x * f + o * 7.3, z * f - o * 3.1)); r *= r; s += r * a * w; norm += a; w = Math.min(1, r * 1.6); a *= 0.5; f *= 2.1; }
+      return s / norm;
+    };
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const g = Math.hypot(src[k + R] - src[k - R], src[k + R * RES] - src[k - R * RES]) * inv, h = src[k];
+        // faces steeper than about 25 degrees, and the high tops whatever their slope
+        const a = Math.max(smoothstep(0.46, 0.9, g), 0.7 * smoothstep(540, 720, h) * smoothstep(0.15, 0.4, g)) * smoothstep(0.35, 0.65, snow);
+        if (a <= 0) continue;
+        const x = i * CELL - HALF;
+        H[k] = h + a * (30 * (ridged(x / 190, z / 190) - 0.42) + 8 * (ridged(x / 60 + 9.1, z / 60 - 4.4) - 0.42));
+      }
     }
   }
 

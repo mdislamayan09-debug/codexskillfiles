@@ -184,8 +184,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (caught in clumps on the hat, shoulders, bedroll and rump, as in the reference's storm; a faint even
           // dusting read as no snow at all)
           // (fine flecks melting into the coat, thicker along the top line: broad white blotches read as a pinto's patches)
-          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.5, 0.95, wn.y) * smoothstep(0.5, 0.74, 0.55 * vnoise(vRest.xz * 170.0 + vRest.y * 60.0) + 0.3 * vnoise(vRest.xz * 60.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 14.0));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.6' : '0.5'});
+          // (a soft veil lying on what faces up, thicker in places: as separate flecks it read as noise sprayed on the coat)
+          float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.62, 0.98, wn.y) * (0.3 + 0.7 * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 19.0 + vRest.y * 7.0) + 0.4 * vnoise(vRest.xz * 55.0 - vRest.y * 20.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.42'});
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
         // inside of the legs lie in the body's own shade (lit evenly all round, a body read as a flat cut-out)
@@ -1152,7 +1153,7 @@ export class Quadruped {
       // many narrow, layered cards in a lifted-brown version of the mane colour, so strands and sheen read
       // instead of a solid black wedge
       // (few strands to a lock, so each card is hair with air in it: at 120 strands every card was solid and the tail a slab)
-      const hairTex = hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x6e5440), 0.75).getHex(), 40, true);
+      const hairTex = hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x7a5e46), 0.9).getHex(), 40, true);
       const hairM = std({ map: hairTex, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.6 });
       const tcards = [];
       // a hanging switch with real volume: locks set all round the dock facing every way, so from behind it is a
@@ -1250,7 +1251,7 @@ export class Quadruped {
     }
     roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.82, -0.52);
     // (a dark, grimed roll of hide and blanket: the pale canvas read as a lit log across the saddle)
-    body.add(mesh(roll, std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.4, 0.38, 0.36), roughness: 0.97 })));   // a rolled wool blanket, faded and grimed (the creased canvas read as a log)
+    body.add(mesh(roll, std({ map: memoTex('canvas', () => canvasTexture(r)), color: new THREE.Color(0.44, 0.41, 0.35), roughness: 0.97 })));   // a drab canvas roll (the bright patterned blanket read as a toy) (the creased canvas read as a log)
     // the ends show the roll's layers: canvas wrapped round a wool blanket, in a spiral
     const spiral = memoTex('spiral', () => {
       const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -1273,8 +1274,8 @@ export class Quadruped {
     for (const s of [-1, 1]) {
       // a soft, bulging leather bag (a five-point sweep, rounded at both ends) with a flap and two buckled straps
       // a squarish stitched leather bag (superelliptic section), soft at the corners, with buckles on its straps
-      const bag = sweep([{ p: V(s * 0.41, 1.52, -0.69), rx: 0.04, ry: 0.1, sq: 0.6 }, { p: V(s * 0.43, 1.5, -0.65), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.085, ry: 0.175, sq: 0.42 },
-        { p: V(s * 0.43, 1.5, -0.29), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.41, 1.52, -0.25), rx: 0.04, ry: 0.1, sq: 0.6 }], 28);
+      const bag = sweep([{ p: V(s * 0.41, 1.52, -0.69), rx: 0.04, ry: 0.1, sq: 0.6 }, { p: V(s * 0.43, 1.5, -0.65), rx: 0.075, ry: 0.15, sq: 0.7 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.085, ry: 0.165, sq: 0.66 },
+        { p: V(s * 0.43, 1.5, -0.29), rx: 0.075, ry: 0.15, sq: 0.7 }, { p: V(s * 0.41, 1.52, -0.25), rx: 0.04, ry: 0.1, sq: 0.8 }], 28);
       body.add(mesh(bag, leather));
       for (const zz of [-0.56, -0.38]) {
         const bk = new THREE.BoxGeometry(0.012, 0.032, 0.03); bk.translate(s * 0.535, 1.5, zz);

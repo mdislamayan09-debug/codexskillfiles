@@ -770,3 +770,22 @@ the owner's go-ahead to download them.
 
 **Critic scores.** Round 66: 4 / 5 / 3. Round 67: 3 / 4 / 5. Round 68: 4 / 4 / 4. The vista reached 5 for the
 first time (round 67, the new lookout).
+
+### Round 70
+- **Crags** (`world.cragSlopes`): a ridged relief, buttresses about 190 m apart with smaller ones on their
+  flanks and tens of metres high, on every snow-country face steeper than about 25 degrees and on the high tops.
+  Faces now have steps too steep for snow (dark rock) beside ledges that hold it. The map's own mountains in the
+  vista read as rock and timber for the first time.
+- **Snow ride.** Three spurs raised in the middle distance, left at 330 m, right at 560 m, left at 830 m, with
+  steep rocky flanks and timber on their crests: the valley closes in plane behind plane instead of running
+  empty to walls a kilometre off. The whole horse is in frame (legs in the snow, tail). Conifers carry more snow
+  while it falls. Snow on coats is a soft veil, not speckle. A drab canvas bedroll; rounder bags.
+- **Vista.** The backdrop north of the map: its valley has walls within a kilometre of the floor, crags on the
+  ground between, timber on the floor and lower slopes with crown speckle, and the region's relief takes over
+  within a kilometre of the edge (it had lain beyond the map as smooth extruded dunes). Past three kilometres
+  ranges flatten toward pale blue-grey. The storm deck is two-thirds closed.
+- **Pines.** A key shaft (`U.uCanopySpot`, a shot's `keyShaft`): one gap in the roof whose light falls on the
+  rider. Fallen needles drawn in two fine layers close to the lens.
+- Still open in the vista: a smooth snow massif six kilometres off (backdrop, too coarse a mesh for crags).
+
+**Round 69 critic:** 4 / 3 / 4.

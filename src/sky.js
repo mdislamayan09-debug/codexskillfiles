@@ -146,7 +146,7 @@ export class Sky {
           {
             vec2 huv = d.xz / (max(d.y, 0.0) + 0.2);
             float hc = fbm(huv * 0.9 + 11.0);
-            vec3 hi = vec3(0.7, 0.75, 0.83) * (0.7 + 0.7 * hc) * (0.3 + 0.7 * day);
+            vec3 hi = vec3(0.66, 0.72, 0.82) * (0.5 + 0.65 * hc) * (0.3 + 0.7 * day);
             col = mix(col, hi, uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.1, d.y) * 0.9);
           }
           // sun disc
@@ -329,7 +329,8 @@ export class Sky {
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uBlizzard.value = W.blizzard;
     U.uSnowfall.value = W.blizzard;
-    this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
+    // (a storm in clear air is a broken deck, a third of the sky open; in falling snow it closes over)
+    this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm * (0.62 + 0.38 * W.blizzard) + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 
     this.hemi.intensity = 0.16 + 0.1 * day;

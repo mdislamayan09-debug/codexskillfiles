@@ -78,7 +78,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= 0.45;   // dark green under a dusting: heavier, every spruce stood as a white cone
+      sk *= mix(0.45, 0.85, uSnowfall);   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL

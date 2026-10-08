@@ -301,16 +301,18 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // the thousand, where the modelled twigs and cones could only ever be a sprinkle on a smooth floor)
   if (pineK > 0.01 && fp < 0.2) {
     float nearK = pineK * smoothstep(0.2, 0.05, fp);
-    for (int L = 0; L < 3; L++) {
-      float cs = L == 0 ? 0.47 : L == 1 ? 0.21 : 0.11;
+    for (int L = 0; L < 5; L++) {
+      if (L > 2 && fp > 0.02) break;   // (fallen needles, drawn only where a pixel is finer than one)
+      float cs = L == 0 ? 0.47 : L == 1 ? 0.21 : L == 2 ? 0.11 : L == 3 ? 0.055 : 0.031;
       vec2 gc = floor(xz / cs + float(L) * 3.7), gf = fract(xz / cs + float(L) * 3.7) - 0.5;
       vec2 hh = hash22(gc + float(L) * 17.3);
       float ang = hh.x * 6.2832;
       vec2 dir = vec2(cos(ang), sin(ang));
       vec2 q = gf - (hh.yx - 0.5) * 0.3;
       float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x)) + 0.05 * sin(along * 9.0 + hh.y * 6.0);
-      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : 0.35, hash12(gc + 5.1));
-      vec3 sc2 = L == 0 ? srgb(vec3(126,110,90)) : L == 1 ? srgb(vec3(104,74,46)) : srgb(vec3(60,46,34));
+      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : L > 2 ? 0.25 : 0.35, hash12(gc + 5.1));
+      if (L > 2) stick *= smoothstep(0.02, 0.008, fp);
+      vec3 sc2 = L == 0 ? srgb(vec3(126,110,90)) : L == 1 ? srgb(vec3(104,74,46)) : L == 2 ? srgb(vec3(60,46,34)) : L == 3 ? srgb(vec3(136,96,52)) : srgb(vec3(84,60,36));
       c = mix(c, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8) * (1.0 - 0.35 * rr));
     }
   }
