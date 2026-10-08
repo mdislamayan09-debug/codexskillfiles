@@ -258,7 +258,9 @@ async function init() {
     // half again the rider's width and he read as a toy on its back)
     // (a high afternoon sun, as the reference's: it comes down steeply through the gaps between the crowns in separate
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
-    return { time: 15.0, fov: 35, volDensity: 0.0055, volFalloff: 0.016, expK: 1.42, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
+    // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
+    // without them the same sun lit all the air in the lane as one wash)
+    return { time: 16.35, fov: 35, volDensity: 0.0046, volFalloff: 0.016, expK: 1.3, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -1276,7 +1278,21 @@ async function init() {
       const fb = Math.max(0, gmin - 10);
       U.uFogBase.value += (fb - U.uFogBase.value) * (G.frame < 3 ? 1 : Math.min(1, rdt * 0.5));
       // (fog banks stack down the valley in falling snow too: the reference's ridges separate by value through it)
-      U.uMist.value = sky.weather.storm * (1 - 0.55 * sky.weather.blizzard) * THREE.MathUtils.smoothstep(cc.snow, 0.4, 0.8);
+      U.uMist.value = sky.weather.storm * (1 - 0.55 * sky.weather.blizzard) * (G.weatherOverride ? 1 : THREE.MathUtils.smoothstep(cc.snow, 0.4, 0.8));
+      // the valley fog lies on the floor ahead of the lens (the lowest snow-country ground in a fan out to 2.4 km):
+      // taken all round, a lookout above a valley's mouth took the lowlands behind it for the floor
+      if (U.uMist.value > 0.01 && (G.frame < 3 || G.frame % 20 === 0)) {
+        const fw = new THREE.Vector3(); camera.getWorldDirection(fw);
+        const fa = Math.atan2(fw.x, fw.z);
+        let lo = 1e9;
+        for (const da of [-0.6, -0.3, 0, 0.3, 0.6]) for (const dd of [150, 400, 800, 1300, 1900, 2400]) {
+          const x = camera.position.x + Math.sin(fa + da) * dd, z = camera.position.z + Math.cos(fa + da) * dd;
+          if (Math.abs(x) > HALF - 20 || Math.abs(z) > HALF - 20 || world.climateAt(x, z).snow < 0.5) continue;
+          lo = Math.min(lo, world.heightAt(x, z));
+        }
+        if (lo > 1e8) lo = world.heightAt(camera.position.x, camera.position.z);
+        U.uBankBase.value += (lo - U.uBankBase.value) * (G.frame < 3 ? 1 : 0.2);
+      }
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
@@ -1294,7 +1310,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.3 * W.blizzard) * (1 + 0.2 * (G.forestK || 0));   // (the eye opens up a little under a canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.19 * W.blizzard) * (1 + 0.2 * (G.forestK || 0));   // (the eye opens up a little under a canopy)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);

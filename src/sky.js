@@ -53,7 +53,9 @@ float cloudDen(vec3 p, float cov){
   // a storm closes the gaps into a continuous, lumpy deck
   // a storm deck: heavy, but torn with breaks of brighter sky between the cells
   // (a storm is a layered overcast with a few lit breaks, not fair-weather cumulus on a blue sky)
-  float c = clamp(cov * (0.3 + 0.9 * weather) + uStorm * (0.26 + 0.2 * smoothstep(0.2, 0.6, weather)), 0.0, 1.0);
+  // (in clear air the deck is broken into great masses with breaks between them, a third of the sky open; in falling
+  // snow it closes right over)
+  float c = clamp(cov * (0.3 + 0.9 * weather) + uStorm * mix(0.02, 0.26 + 0.2 * smoothstep(0.2, 0.6, weather), uBlizzard), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   // (in a storm the slab flattens into a low deck, a thin lumpy layer seen from beneath, not towering cumulus)
   // (a deck with body: a thin sheet let the sun straight through and its underside came out pale and even)
@@ -139,6 +141,14 @@ export class Sky {
           // storm: a low, flat, blue-grey overcast
           col = stormSky(col);
           float day = smoothstep(-0.12, 0.25, s.y);
+          // above the broken storm deck lies a high, sunlit overcast: seen through the breaks it is the brightest thing in
+          // the sky, and the deck's dark masses stand against it with lit edges
+          {
+            vec2 huv = d.xz / (max(d.y, 0.0) + 0.2);
+            float hc = fbm(huv * 0.9 + 11.0);
+            vec3 hi = vec3(0.7, 0.75, 0.83) * (0.7 + 0.7 * hc) * (0.3 + 0.7 * day);
+            col = mix(col, hi, uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.1, d.y) * 0.9);
+          }
           // sun disc
           float mu = dot(d, s);
           col += smoothstep(0.99965, 0.9999, mu) * vec3(30.0, 24.0, 16.0) * smoothstep(-0.05, 0.02, s.y);
@@ -184,7 +194,7 @@ export class Sky {
             {
               vec2 cuv2 = d.xz / (d.y + 0.14) * 0.9 + uCloudOffset * 2.0;
               float cell = fbm(cuv2 * 1.3) * 0.6 + fbm(cuv2 * 3.1 + 5.2) * 0.4;
-              cl.rgb *= mix(1.0, mix(0.5, 1.45, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
+              cl.rgb *= mix(1.0, mix(0.45, 1.05, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
             }
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;

@@ -85,7 +85,7 @@ const VolumetricShader = {
       vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
       vec2 q = vec2(dot(wp, R), dot(wp, Up));
       float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-      return mix(1.0, 0.06 + 0.94 * smoothstep(0.46, 0.56, n), uCanopy);
+      return mix(1.0, 0.04 + 0.96 * smoothstep(0.52, 0.6, n), uCanopy);   // (about a third of the floor in sun)
     }
     
     float h31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -179,7 +179,7 @@ const GradeShader = {
       {
         // (cool teal-green in the shade against warm gold in the light: an even olive cast read as grey-green mud)
         // (true blacks under the boughs and a cool shade: an even yellow-green wash read as one flat tone)
-        vec3 c2 = sat(col, 1.22) * mix(vec3(0.84, 0.95, 1.03), vec3(1.05, 0.99, 0.9), smoothstep(0.1, 0.65, l));
+        vec3 c2 = sat(col, 1.34) * mix(vec3(0.84, 0.95, 1.03), vec3(1.05, 0.99, 0.9), smoothstep(0.1, 0.65, l));
         c2 = max(c2 - 0.03, 0.0) * 1.04;
         c2 -= 0.34 * max(c2 - 0.33, 0.0);
         col = mix(col, c2, uForest);

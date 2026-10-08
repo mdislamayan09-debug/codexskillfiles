@@ -30,6 +30,7 @@ export const U = {
   uFogFalloff: { value: 0.022 },
   uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
   uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
+  uBankBase: { value: 0 },  // the valley floor ahead of the lens, which the fog bank lies on
   uSnowfall: { value: 0 },
   uCanopy: { value: 0 },    // under a forest roof: the sun reaches the air and the floor only through its small gaps  // falling snow in the air: everything a few kilometres off dissolves into it
   uWind: { value: new THREE.Vector2(1, 0.3) },
@@ -121,7 +122,7 @@ float canopyGaps(vec3 wp){
   vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
   vec2 q = vec2(dot(wp, R), dot(wp, Up));
   float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-  return mix(1.0, 0.06 + 0.94 * smoothstep(0.46, 0.56, n), uCanopy);
+  return mix(1.0, 0.04 + 0.96 * smoothstep(0.52, 0.6, n), uCanopy);   // (about a third of the floor in sun)
 }
 
 // shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the
@@ -161,6 +162,7 @@ uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform float uFogBase;
 uniform float uMist;
+uniform float uBankBase;
 uniform float uSnowfall;
 uniform float uNight;
 // self-contained value noise (this block is also included by shaders that do not pull in GLSL_COMMON)
@@ -195,14 +197,26 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     float above = wpos.y - uFogBase;
-    // (separate banks lying in the hollows with clear air between them: one even layer over the whole floor
-    // milked out the valley and hid its timber and river; banks hide a part and show the rest dark beside them)
-    float bankN = smoothstep(0.5, 0.7, mistN(wpos.xz / 560.0 + 1.7) * 0.65 + mistN(wpos.xz / 190.0 - 4.1) * 0.35);
-    float bank = smoothstep(150.0, 30.0, above) * bankN;
-    float m = uMist * bank * (1.0 - exp(-dist / 650.0)) * 1.25;
-    // (fog lying in a valley is the brightest thing in it, lit from above: in the air's own blue-grey it could not
-    // be told from shaded snow)
-    col = mix(col, mix(vec3(0.8, 0.85, 0.93) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.92));   // (pale banks: at the air's own tone they did not read as fog at all)
+    // Valley fog as a layer of air, not paint: a bank lies between the valley floor and a ceiling a hundred metres
+    // up, and what it hides depends on how far the sight line runs inside it. Looked down into from a height it
+    // pools along the floor, thickening with distance, and whatever stands above the ceiling stands clear of it
+    // with a soft edge where slopes rise out of it. (Painted onto surfaces by their height it never read as fog.)
+    {
+      float h1 = uBankBase + 78.0;
+      float yc = cameraPosition.y, tIn = 0.0, tOut = dist;
+      bool hit = true;
+      if (yc > h1) { if (rd.y >= -1e-4) hit = false; else tIn = (yc - h1) / -rd.y; }
+      else if (rd.y > 1e-4) tOut = min(dist, (h1 - yc) / rd.y);
+      float Lb = hit ? max(0.0, tOut - tIn) : 0.0;
+      if (Lb > 0.0) {
+        // in banks, with clear air between them (sampled where the sight line is well inside the layer)
+        vec3 pm = cameraPosition + rd * (tIn + min(Lb, 900.0) * 0.5);
+        float bankN = smoothstep(0.42, 0.7, mistN(pm.xz / 620.0 + 1.7) * 0.65 + mistN(pm.xz / 210.0 - 4.1) * 0.35);
+        // (thin enough that the floor's timber and river show through it, thick only in its banks)
+        float m = 1.0 - exp(-Lb * uMist * (0.1 + 0.9 * bankN) / 1500.0);
+        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.8));
+      }
+    }
     // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
     float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
     // (torn into separate rags with clear air between: a continuous band read as one white sheet over the slopes)

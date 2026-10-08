@@ -214,7 +214,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   }
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
-  rock = mix(rock, rock * vec3(0.5, 0.47, 0.46), snowC);   // (near-black wet rock against the snow, as the reference's faces)
+  rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;

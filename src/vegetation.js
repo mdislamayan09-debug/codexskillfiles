@@ -103,14 +103,29 @@ function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = fa
     ...extra,
   });
 }
-function windDepthMaterial(map, flutter = 0) {
+// porous: inside a stand (uCanopy), the share of a crown's volume, in blocks a couple of metres through and fixed in
+// the world, that lets the sun straight through. There the roof's shade is drawn by the gap pattern every lit
+// surface and the lit air share (canopyGaps), which a shadow map of solid cards cannot hold: as solid cards every
+// crown threw one unbroken shadow and a stand's floor lay in even shade, with none of the sun pools a real one has.
+// Trunks keep their real shadows, which fall as bars across the pools. A lone tree in the open casts its full shadow.
+function windDepthMaterial(map, flutter = 0, porous = 0) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5, side: THREE.DoubleSide });
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n#define LEAF_FLUTTER ${flutter.toFixed(2)}\n${WIND_VERT}`)
-      .replace('#include <begin_vertex>', WIND_BODY);
+      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n#define LEAF_FLUTTER ${flutter.toFixed(2)}\n${WIND_VERT}\nvarying vec3 vSW;`)
+      .replace('#include <begin_vertex>', WIND_BODY + `
+        { vec4 sw = vec4(position, 1.0);
+          #ifdef USE_INSTANCING
+            sw = instanceMatrix * sw;
+          #endif
+          vSW = (modelMatrix * sw).xyz; }`);
+    if (porous > 0) shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSW;\nuniform float uCanopy;')
+      .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>
+        { vec3 q = floor(vSW / vec3(2.3, 1.7, 2.3)); if (fract(sin(dot(q, vec3(12.9898, 78.233, 37.719))) * 43758.5453) < ${porous.toFixed(2)} * uCanopy) discard; }`);
   };
+  m.customProgramCacheKey = () => 'wd' + flutter + '_' + porous;
   return m;
 }
 
@@ -1300,7 +1315,7 @@ export class Vegetation {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
         { geometry: b.wood, material: ponderosaBark },
-        { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) },
+        { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1, 1.08) },
       ] });
     }
     const cypMat = leafMat(cypTex, 0xc8d0b0);
@@ -1318,7 +1333,7 @@ export class Vegetation {
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
     for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
-      addB('tall', 'pine', b, [{ geometry: b.wood, material: ponderosaBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) }]);
+      addB('tall', 'pine', b, [{ geometry: b.wood, material: ponderosaBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1, 1.08) }]);
     }
     // dead snags, silver-grey and barkless
     const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: new THREE.Color(1.55, 1.5, 1.45), roughness: 0.95 }), 0);   // weathered silver-grey
