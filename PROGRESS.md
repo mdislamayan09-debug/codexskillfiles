@@ -789,3 +789,21 @@ first time (round 67, the new lookout).
 - Still open in the vista: a smooth snow massif six kilometres off (backdrop, too coarse a mesh for crags).
 
 **Round 69 critic:** 4 / 3 / 4.
+
+### Rounds 71-73
+- Rider and tack reworked against a zoomed crop of the reference: collar up, leather patina, fitted coat with
+  readable folds, thin tan strap, small grey roll, flat bags, dark bay with a coat sheen, rim light on hat and
+  tack, three-quarter camera. Snow ride framed as the reference (whole horse, hat four-tenths down).
+- Pines: deep shade under the roof (ambient cut by forest cover) with brighter sun pools; dark sticks, spiky
+  cones, flat grey stones, seedlings, a weathered log.
+- Vista (round 73, captured, not yet scored): the base scatter's lone trees removed and the timber replanted in
+  masses following the drainages, on ground up to about 50 degrees, sizes from saplings to giants; dark ground
+  deep inside stands; frosted blue-grey far trees.
+
+**Critic scores.** Round 70: 4 / 4 / 5. Round 71: 4 / 4 / 5. Round 72: 4 / 5 / 5 (total 14, the best yet;
+12 at the handoff). All "clearly".
+
+**Next (planned, not started):** pines track made visible again (lighter dirt, less litter over it, no grass
+crown), larger stones and fallen branches along the verges, curved dead limbs, clustered softer shafts, more
+colour separation in the forest grade; darker, less orange tack; a less saturated red bay with less sheen in
+snow; re-check the nine other shots (not re-run since round 68).

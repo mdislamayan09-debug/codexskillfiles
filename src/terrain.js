@@ -541,7 +541,7 @@ export class Terrain {
             // (inside a stand the snow between the crowns lies in their shade: dark, so the stand reads as one mass)
             // (the ground in a snow-country stand is snow, a little shaded: the trees themselves are what is dark.
             // Tinted grey under them, a forested mountainside read as grey rock with white patches and specks on it.)
-            vec3 gapC = mix(srgb(vec3(170,182,200)), srgb(vec3(104,122,150)), smoothstep(0.5, 0.85, fo));   // (deep in a stand the snow lies in the trees' shade)
+            vec3 gapC = mix(srgb(vec3(170,182,200)), srgb(vec3(62,78,100)), smoothstep(0.55, 0.88, fo));   // (deep in a stand the snow lies in the trees' shade: from afar the stand is one dark mass)
             vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.6), mix(gapC, crownC, crown * 0.5), res);
             canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
           }
@@ -559,7 +559,7 @@ export class Terrain {
           canopyK *= 1.0 - 0.12 * smoothstep(0.4, 0.8, ccl0.r);
           // (and only where timber can stand: on faces too steep for trees the stand's tint lay alone on the snow as a
           // blue-grey smear)
-          canopyK *= mix(1.0, smoothstep(0.66, 0.78, normalAt(vWPos.xz).y), smoothstep(0.4, 0.8, ccl0.r));
+          canopyK *= mix(1.0, smoothstep(0.55, 0.68, normalAt(vWPos.xz).y), smoothstep(0.4, 0.8, ccl0.r));
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }

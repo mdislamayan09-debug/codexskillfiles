@@ -931,11 +931,23 @@ async function init() {
           const rf = () => ((sdf = (sdf * 16807) % 2147483647) / 2147483647);
           // how thick the timber stands at a point: full below the treeline, thinning out through it, in broad
           // masses with meadows between
+          // (in masses with crisp edges and open snow between, thick in the drainages and running up every gully, as
+          // timber grows on a mountainside: thinned evenly it stood on the slopes as a sprinkle of dots)
+          const SS = THREE.MathUtils.smoothstep;
           const stand = (x, z, h) => {
-            const alt = 1 - THREE.MathUtils.smoothstep(h + 40 * n.noise(x / 170, z / 170), 440, 585);
+            const alt = 1 - SS(h + 40 * n.noise(x / 170, z / 170), 440, 585);
             if (alt <= 0) return 0;
-            return alt * THREE.MathUtils.smoothstep(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.3, 0.12);
+            const mass = SS(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.14, 0.02);
+            const lap = (world.heightAt(x + 18, z) + world.heightAt(x - 18, z) + world.heightAt(x, z + 18) + world.heightAt(x, z - 18)) / 4 - h;   // > 0 in a drainage
+            return alt * Math.max(mass * (0.4 + 0.6 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0));
           };
+          // the base scatter's lone trees over the same ground are taken out: the stands are planted whole below
+          {
+            const L = veg.trees, wx = (it) => (it.x - c.x) * d0.x + (it.z - c.z) * d0.z, wr = (it) => (it.x - c.x) * rt0.x + (it.z - c.z) * rt0.z;
+            const inWedge = (it) => { const f = wx(it); return f > 150 && f < 3700 && Math.abs(wr(it)) < 260 + f * 0.5; };
+            for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !inWedge(it)));
+            L.items = L.items.filter((it) => !inWedge(it));
+          }
           // the ground under the stands first, as one continuous field (stamped round each tree it came out in blocks)
           for (let f = 150; f < 3700; f += 4) {
             const half = 260 + f * 0.5;
@@ -943,7 +955,7 @@ async function init() {
               const x = c.x + d0.x * f + rt0.x * r, z = c.z + d0.z * f + rt0.z * r;
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const D = stand(x, z, world.heightAt(x, z));
-              if (D > 0.3 && world.normalAt(x, z).y > 0.74) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
+              if (D > 0.3 && world.normalAt(x, z).y > 0.6) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
@@ -956,10 +968,10 @@ async function init() {
               const h = world.heightAt(x, z);
               // (closed canopy on the valley's floor and lower slopes, thinning with height to the treeline)
               const st = stand(x, z, h);
-              if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.35 + 0.6 * (1 - THREE.MathUtils.smoothstep(h, 300, 470)))) continue;
+              if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.5 + 0.48 * (1 - THREE.MathUtils.smoothstep(h, 320, 500)))) continue;
               const sp = world.splatAt(x, z);
-              if (world.normalAt(x, z).y < 0.74 || sp.wet > 0.25 || sp.road > 0.2) continue;
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.6 + sc * 0.9, firs[Math.floor(pick * 977) % firs.length]);
+              if (world.normalAt(x, z).y < 0.6 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.38 + sc * 1.25, firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants)
               added++;
             }
           }

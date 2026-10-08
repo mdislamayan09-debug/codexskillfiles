@@ -78,7 +78,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= mix(0.45, 0.85, uSnowfall);   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
+      sk *= mix(0.6, 0.85, uSnowfall);   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
@@ -1754,6 +1754,8 @@ export class Vegetation {
           // far forest into salt-and-pepper speckle
           float dCam = length(cameraPosition - vW);
           alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.32 * smoothstep(520.0, 220.0, dCam));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
+          // (and from afar a snow-country spruce is frosted blue-grey, not a black cone on the white)
+          alb = mix(alb, vec3(0.2, 0.25, 0.32), 0.5 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam));
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
