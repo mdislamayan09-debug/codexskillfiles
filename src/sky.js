@@ -333,7 +333,9 @@ export class Sky {
     this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm * (0.62 + 0.38 * W.blizzard) + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 
-    this.hemi.intensity = 0.16 + 0.1 * day;
+    // (ambientK: under a closed canopy most of the sky is shut out)
+    this.hemi.intensity = (0.16 + 0.1 * day) * (this.ambientK ?? 1);
+    if (this.envBase !== undefined) this.scene.environmentIntensity = this.envBase * (this.ambientK ?? 1);
     this.hemi.color.setRGB(0.32 + 0.43 * day, 0.4 + 0.4 * day, 0.62 + 0.23 * day);
     this.hemi.groundColor.setRGB(0.3 * day + 0.03, 0.26 * day + 0.03, 0.17 * day + 0.04);
 
@@ -365,7 +367,7 @@ export class Sky {
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
-      this.scene.environmentIntensity = 0.5 + 0.3 * day * Math.min(1, Math.max(0, sunH * 3));
+      this.envBase = 0.5 + 0.3 * day * Math.min(1, Math.max(0, sunH * 3));
     }
     this.mesh.position.copy(focus);
   }

@@ -540,7 +540,7 @@ function buildLog(seed) {
       let y = Math.sin(a) * rad * kn, z = Math.cos(a) * rad * kn;
       y = Math.max(y, -rad * 0.6);                                   // settled into the duff
       tp.setXYZ(k, t, y + r * 0.36 - 0.05 * Math.cos(t / L * Math.PI), z);
-      tu.setXY(k, tu.getX(k) * 4, tu.getY(k) * L * 1.1);
+      tu.setXY(k, tu.getX(k) * 2, tu.getY(k) * L * 0.5);
     }
     trunk.computeVertexNormals();
   }
@@ -1034,7 +1034,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
       {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
-        vec3 pg = mix(srgbV(vec3(96,112,58)), srgbV(vec3(128,136,76)), aOff.w);   // (olive, not lime)
+        vec3 pg = mix(srgbV(vec3(118,138,66)), srgbV(vec3(156,168,88)), aOff.w);   // (pale yellow-green where the sun finds it; its own shade keeps it olive)
         vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
         vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.95 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
@@ -1439,7 +1439,7 @@ export class Vegetation {
     // fallen logs on forest floors
     // an old fallen trunk: grey weathered bark, moss and lichen along its upper side (the trees' own bark, laid on
     // its side, read as a striped tube)
-    const logMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.4, 1.4), color: new THREE.Color(0.95, 0.9, 0.86), roughness: 0.96 }), 0, {
+    const logMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), color: new THREE.Color(0.5, 0.47, 0.45), roughness: 0.96 }), 0, {
       fragColor: `#include <color_fragment>
         {
           vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
@@ -1488,10 +1488,13 @@ export class Vegetation {
       // forest-floor clutter
       const cone = (() => {
         // (an ovoid, as a fallen cone is: the pointed cone primitive lay about the floor as dark triangular chips)
-        const c = new THREE.SphereGeometry(0.036, 7, 5); c.scale(1.75, 0.95, 1); c.translate(0, 0.03, 0);
+        const c = new THREE.SphereGeometry(0.036, 12, 9); c.scale(1.75, 0.95, 1);
+        // open scales standing out all over it: a spiky silhouette, as a fallen cone has (the smooth ovoid was a pebble)
+        { const cp = c.attributes.position; for (let i = 0; i < cp.count; i++) { const k = 1 + 0.42 * (((i * 2654435761) >>> 0) % 1000 / 1000 > 0.5 ? 1 : 0) * (0.5 + 0.5 * Math.sin(i * 1.7)); cp.setXYZ(i, cp.getX(i) * k, cp.getY(i) * k, cp.getZ(i) * k); } c.computeVertexNormals(); }
+        c.translate(0, 0.03, 0);
         const p = c.attributes.position, col = new Float32Array(p.count * 3);
         // (vertex colours are linear: these are dark, weathered cone browns, not the pale chips they read as before)
-        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.2 * v; col[i * 3 + 1] = 0.135 * v; col[i * 3 + 2] = 0.085 * v; }
+        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.105 * v; col[i * 3 + 1] = 0.066 * v; col[i * 3 + 2] = 0.04 * v; }
         c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
       })();
       // a fallen twig: a bent stick with two side shoots (a plain cylinder read as a dropped dowel), and a longer
@@ -1501,16 +1504,16 @@ export class Vegetation {
       const bough = stick([[-1.4, 0, -0.3, 0.1, 0.045, 0.036, 0.04], [-0.3, 0.1, 0.8, -0.05, 0.036, 0.024, 0.035], [0.8, -0.05, 1.5, 0.12, 0.024, 0.01, 0.03], [-0.7, 0.05, -0.2, 0.55, 0.02, 0.008, 0.05], [0.1, 0.06, 0.7, -0.5, 0.018, 0.007, 0.06], [0.5, -0.02, 0.95, 0.4, 0.014, 0.005, 0.07], [-1.0, 0.02, -0.75, -0.4, 0.016, 0.006, 0.05]]);
       const stone = (() => {
         const st = new THREE.IcosahedronGeometry(0.5, 1), p = st.attributes.position;
-        for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.6, p.getZ(i) * k); }
+        for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.4, p.getZ(i) * k); }   // flat, bedded stones
         st.computeVertexNormals(); st.translate(0, 0.12, 0); return st;
       })();
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
         makeClutter(scene, cone, { spacing: 0.8 / Math.sqrt(q), radius: 24, smin: 0.6, smax: 1.3, color: 0xffffff, seed: 3 }),
         // (weathered grey-brown and plentiful: the reference's floor is strewn with them)
-        makeClutter(scene, twig, { spacing: 0.62 / Math.sqrt(q), radius: 28, smin: 0.3, smax: 1.3, color: 0x8a7964, flat: true, seed: 5 }),
-        makeClutter(scene, bough, { spacing: 4.6 / Math.sqrt(q), radius: 44, smin: 0.6, smax: 1.3, color: 0x74624e, flat: true, seed: 11 }),
-        makeClutter(scene, stone, { spacing: 1.7 / Math.sqrt(q), radius: 36, smin: 0.08, smax: 0.42, color: 0x5a554c, roughness: 0.9, mode: 'stone', seed: 9 }),
+        makeClutter(scene, twig, { spacing: 0.62 / Math.sqrt(q), radius: 28, smin: 0.3, smax: 1.3, color: 0x4d3b2b, flat: true, seed: 5 }),   // (dark, barked: pale and straight they were spilled matchsticks)
+        makeClutter(scene, bough, { spacing: 4.6 / Math.sqrt(q), radius: 44, smin: 0.6, smax: 1.3, color: 0x3a2b20, flat: true, seed: 11 }),
+        makeClutter(scene, stone, { spacing: 1.7 / Math.sqrt(q), radius: 36, smin: 0.1, smax: 0.5, color: 0x8c8a84, roughness: 0.78, mode: 'stone', seed: 9 }),
       ];
     }
   }

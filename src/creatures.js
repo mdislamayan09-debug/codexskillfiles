@@ -116,7 +116,14 @@ const memoTex = (key, make) => { if (!TEX.has(key)) TEX.set(key, make()); return
 const std = (o) => {
   const c = o.color === undefined ? null : (o.color.isColor ? o.color : new THREE.Color(o.color));
   const key = [o.map ? o.map.uuid : '', c ? `${c.r.toFixed(3)},${c.g.toFixed(3)},${c.b.toFixed(3)}` : '', o.roughness, o.metalness, o.side, o.alphaTest, o.envMapIntensity].join('|');
-  if (!MATS.has(key)) MATS.set(key, patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }), { fragColor: DUST_FRAG }));
+  if (!MATS.has(key)) MATS.set(key, patchMaterial(new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...o }), { fragColor: DUST_FRAG, onShader: (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    {
+      // against the light a hat, a strap or a saddle is drawn by its lit edge (felt and leather scatter at grazing angles)
+      vec3 Vv = normalize(vViewPosition);
+      float fres = pow(1.0 - clamp(abs(dot(normalize(vNormal), Vv)), 0.0, 1.0), 3.0);
+      vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
+      totalEmissiveRadiance += (diffuseColor.rgb + 0.03) * uSunColor * fres * smoothstep(-0.2, 0.8, dot(-Vv, wsun)) * 0.4;
+    }`); } }));
   return MATS.get(key);
 };
 const hairTex_ = (...a) => memoTex('hair' + a.join(','), () => hairTexture(...a));
@@ -168,8 +175,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               // old leather's patina, at the scale of a fingertip: rubbed-pale scuffs gathered where it wears, dark stains
               // between (broad light and dark shapes read as muscle; this fine it reads as hide)
               float p1 = fbm2(vRest.xy * 31.0 + vRest.z * 23.0), p2 = vnoise(vRest.xy * 150.0 - vRest.z * 115.0), p3 = fbm2(vRest.xy * 9.0 + vRest.z * 7.0);
-              float scuff = smoothstep(0.46, 0.74, p1 * 0.72 + p2 * 0.28) * (0.3 + 0.7 * smoothstep(0.35, 0.65, p3));
-              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(2.9, 2.35, 1.8) + vec3(0.03, 0.02, 0.01), scuff * 0.62);
+              float scuff = smoothstep(0.42, 0.8, p1 * 0.8 + p2 * 0.2) * (0.3 + 0.7 * smoothstep(0.35, 0.65, p3));
+              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(2.3, 1.95, 1.6) + vec3(0.02, 0.014, 0.008), scuff * 0.36);
               diffuseColor.rgb *= 1.0 - 0.4 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
             }
             // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
@@ -214,7 +221,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           {
             const float RT[15] = float[15](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
             roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 14)];
-            ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.46, 0.9, smoothstep(0.3, 0.72, fbm2(vRest.xy * 58.0 + vRest.z * 43.0) * 0.6 + fbm2(vRest.xy * 12.0 + vRest.z * 9.0) * 0.4));'}
+            ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.6, 0.9, smoothstep(0.3, 0.72, fbm2(vRest.xy * 31.0 + vRest.z * 23.0) * 0.5 + fbm2(vRest.xy * 9.0 + vRest.z * 7.0) * 0.5));'}
           }`)
         .replace('#include <normal_fragment_maps>', `
           #include <normal_fragment_maps>
@@ -248,6 +255,14 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '3.5'});
           vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           float back = smoothstep(-0.2, 0.8, dot(-Vv, wsun));
+          ${quad ? `{
+            // a groomed coat's sheen: a broad, soft highlight from the open sky above, broken into streaks along the lie
+            // of the hair. It is what shows a horse's muscle from any distance; without it the body is one flat tone.
+            vec3 Ls = normalize((viewMatrix * vec4(normalize(vec3(uSunDir.x * 0.6, 1.0, uSunDir.z * 0.6)), 0.0)).xyz);
+            float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
+            float streak = 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0));
+            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak;
+          }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
           totalEmissiveRadiance += (diffuseColor.rgb + 0.035) * uSunColor * fres * back * ${quad ? '0.14' : '0.6'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.3' : '0.15'};
@@ -260,7 +275,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x5e4a38, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x44301f, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x4b453c, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x44301f, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x6b6253, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -534,7 +549,9 @@ function tailorCoat(pos, lab, R, G, index, n, winter) {
     const [yi, a, r] = polar(i), af = ((a / (2 * Math.PI) * NA) % NA + NA) % NA, a0 = Math.floor(af) % NA, a1 = (a0 + 1) % NA, t = af - Math.floor(af);
     const y = pos[i * 3 + 1], w = 1 - Math.min(1, Math.max(0, (y - (y1 - 0.2)) / 0.1));   // the yoke keeps the shoulders' own shape
     // long folds falling from the shoulder blades, a little fuller toward the hem
-    const fold = 0.0045 * Math.sin(a * 9 + 1.3 * Math.sin(y * 14)) * (0.4 + (y1 - y) * 1.6) * (winter ? 1.3 : 1);
+    // (long folds falling from the shoulder blades, deepening toward the hem, and creases bunched across the small of
+    // the back where a rider sits: deep enough to catch the light as folds)
+    const fold = (0.0105 * Math.sin(a * 7 + 1.3 * Math.sin(y * 14)) * (0.25 + (y1 - y) * 2.0) + 0.0055 * Math.sin(y * 46 + 2.0 * Math.sin(a * 3)) * Math.exp(-((y - (y0 + 0.2)) ** 2) / 0.012)) * (winter ? 1.2 : 1);
     const rt = Math.max(r, dr[yi][a0] * (1 - t) + dr[yi][a1] * t) + fold * w;
     const k = 1 + (rt / Math.max(r, 1e-4) - 1) * w;
     pos[i * 3] *= k; pos[i * 3 + 2] = cz[yi] + (pos[i * 3 + 2] - cz[yi]) * k;
@@ -1188,7 +1205,7 @@ export class Quadruped {
           // carried a little off the quarters at the dock, then hanging plumb
           cp.setZ(k, cp.getZ(k) - Math.sin(Math.min(y, 0.4) * 2.6) * 0.12 + y * 0.02);
           const sw = Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, y) / 1.3)));
-          cp.setX(k, cp.getX(k) + Math.sin(th) * 0.05 * sw);
+          cp.setX(k, cp.getX(k) * (1.0 - 0.45 * Math.min(1, y / 1.3)) + Math.sin(th) * 0.05 * sw + 0.1 * Math.sin(y * 2.1) * Math.min(1, y * 1.5));   // (a hanging tail is never plumb and square)
           cp.setZ(k, cp.getZ(k) + Math.cos(th) * 0.03 * sw);
         }
         tcards.push(c);

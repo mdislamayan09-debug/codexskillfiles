@@ -260,7 +260,7 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
-    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.2, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
+    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.42, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -869,9 +869,16 @@ async function init() {
           const [gx, gz] = at(ahead, side), kind = rr();
           for (let k = 0, n = 3 + Math.floor(rr() * 6); k < n; k++) {
             const x = gx + (rr() - 0.5) * 4.5, z = gz + (rr() - 0.5) * 4.5;
-            const v = kind < 0.55 ? Math.floor(rr() * 3) : kind < 0.68 ? 3 + Math.floor(rr() * 2) : 9;
+            const v = kind < 0.72 ? Math.floor(rr() * 3) : kind < 0.9 ? 3 + Math.floor(rr() * 2) : 9;
             veg.bushes.add(x, world.heightAt(x, z) - 0.05, z, rr() * 6.28, (v === 9 ? 0.6 : v < 3 ? 0.4 : 0.5) + rr() * 0.45, v);
           }
+        }
+        // seedlings and low leafy plants scattered over the duff, a hand or two high (the reference's floor is green
+        // with them in the shade between the grass)
+        for (let i = 0; i < 130; i++) {
+          const ahead = -3 + rr() * 30, side = (rr() < 0.5 ? -1 : 1) * (1.6 + rr() * rr() * 14);
+          const [x, z] = at(ahead, side);
+          veg.bushes.add(x, world.heightAt(x, z) - 0.02, z, rr() * 6.28, 0.07 + rr() * 0.09, Math.floor(rr() * 3));
         }
         const pines = veg.groups.pine;
         if (pines.length) for (let i = 0; i < 5; i++) {
@@ -1324,6 +1331,7 @@ async function init() {
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
     shadowFocus.y = world.heightAt(shadowFocus.x, shadowFocus.z);
+    sky.ambientK = 1 - 0.45 * (G.forestK || 0) * (1 - U.uNight.value);
     sky.update(!G.freezeTime && G.started ? dt : 0, shadowFocus);
     sky.mesh.position.copy(camera.position);
     U.uFogDensity.value *= G.mistK || 1;

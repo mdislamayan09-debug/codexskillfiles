@@ -124,7 +124,7 @@ float canopyGaps(vec3 wp){
   vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
   vec2 q = vec2(dot(wp, R), dot(wp, Up));
   float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-  float gap = 0.03 + 0.97 * smoothstep(0.555, 0.62, n);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
+  float gap = 0.02 + 0.98 * smoothstep(0.535, 0.6, n);   // (about a quarter of the floor in sun: narrow shafts, dark air between)
   // a shot's key light: one gap in the roof whose shaft falls on a chosen point (the rider), as a cinematographer
   // would wait for or cut
   if (uCanopySpot.w > 0.0) { vec2 q0 = vec2(dot(uCanopySpot.xyz, R), dot(uCanopySpot.xyz, Up)); gap = max(gap, smoothstep(uCanopySpot.w, uCanopySpot.w * 0.5, length(q - q0))); }
