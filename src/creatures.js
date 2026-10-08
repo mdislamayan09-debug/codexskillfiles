@@ -161,19 +161,20 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           int lb = int(vLab + 0.5);
           if (lb == 3 || lb == 2 || lb == 6) {
             // worn leather and felt: broad mottling, rubbed-light high points, seams and stitching lines
-            float m = fbm2(vRest.xy * 7.0 + vRest.z * 5.0);
-            diffuseColor.rgb *= 0.74 + 0.5 * m;
+            // (a fine, low-contrast grain: broad light and dark blotches on a close-fitting coat read as muscle)
+            float m = fbm2(vRest.xy * 26.0 + vRest.z * 19.0);
+            diffuseColor.rgb *= 0.9 + 0.2 * m;
             // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
             float wear = smoothstep(1.3, 1.5, vRest.y) * (0.6 + 0.4 * fbm2(vRest.xz * 4.0));
             float folds = (sin(vRest.x * 55.0 + fbm2(vRest.xy * 3.0) * 4.0) * 0.5 + 0.5) * smoothstep(1.35, 1.0, vRest.y);
-            diffuseColor.rgb *= (1.0 + 0.35 * wear * float(lb == 3)) * (1.0 - 0.3 * folds * float(lb == 3));
+            diffuseColor.rgb *= (1.0 + 0.14 * wear * float(lb == 3)) * (1.0 - 0.1 * folds * float(lb == 3));
             float seam = smoothstep(0.006, 0.0, abs(vRest.x)) * step(vRest.z, -0.04) * step(vRest.y, 1.45);  // centre back
             seam = max(seam, smoothstep(0.007, 0.0, abs(vRest.y - 1.43)) * step(vRest.z, -0.02));           // yoke
             seam = max(seam, smoothstep(0.006, 0.0, abs(abs(vRest.x) - 0.185)) * step(vRest.y, 1.3));       // side seams
             diffuseColor.rgb *= 1.0 - 0.45 * seam * float(lb == 3);
             // creases bunch where the coat folds over the saddle
             float crease = (sin(vRest.y * 140.0 + vnoise(vRest.xz * 30.0) * 5.0) * 0.5 + 0.5) * smoothstep(1.12, 0.95, vRest.y) * smoothstep(0.7, 0.85, vRest.y);
-            diffuseColor.rgb *= 1.0 - 0.25 * crease * float(lb == 3);
+            diffuseColor.rgb *= 1.0 - 0.12 * crease * float(lb == 3);
           }
         }` : ''}
         ${extraFrag}
@@ -204,7 +205,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           {
             const float RT[15] = float[15](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
             roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 14)];
-            ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.38, 0.92, smoothstep(0.3, 0.7, fbm2(vRest.xy * 11.0 + vRest.z * 8.0)));'}
+            ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.8, 0.97, smoothstep(0.3, 0.7, fbm2(vRest.xy * 11.0 + vRest.z * 8.0)));'}
           }`)
         .replace('#include <normal_fragment_maps>', `
           #include <normal_fragment_maps>
@@ -218,7 +219,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               // and the groove down the croup
               ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0007 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0004 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02 - 0.014 * smoothstep(0.04, 0.0, abs(abs(vRest.x) - 0.12 - 0.05 * (1.3 - vRest.y))) * smoothstep(-0.68, -0.8, vRest.z) * smoothstep(0.88, 1.02, vRest.y) * smoothstep(1.46, 1.34, vRest.y) - 0.012 * smoothstep(0.07, 0.0, abs(vRest.z + 0.36 - 0.25 * (vRest.y - 1.15))) * smoothstep(0.95, 1.1, vRest.y) * smoothstep(1.45, 1.3, vRest.y) * smoothstep(0.15, 0.25, abs(vRest.x));'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
-                 if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * 0.003 * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
+                 if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * (lab == 3 ? 0.0007 : 0.003) * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
                  else if (lab == 13 || lab == 14) hgt = vnoise(vec2(vRest.x * 260.0 + vRest.z * 190.0, vRest.y * 70.0)) * 0.0024 + vnoise(vRest.xy * 900.0 + vRest.z * 700.0) * 0.0008; // fur
                  else if (lab == 5 || lab == 8 || lab == 10) hgt = vnoise(vRest.xy * 140.0 + vRest.z * 90.0) * 0.0008;`}
@@ -435,7 +436,7 @@ function mhTemplate(outfit, o) {
       else if (o.vest && r === G.torso && !throat) { L0 = L.vest; push = 0.012; }
       else { L0 = L.shirt; push = 0.007; }
       if (r === G.farm && y < MH.rest.wrL[1] + 0.05 && o.coat) push *= 1.3;     // cuffs
-    } else if (r === G.belt) { L0 = L.belt; push = 0.016; }
+    } else if (r === G.belt) { L0 = L.belt; push = 0.016; if (o.coat && (winter || z - MH.rest.spine[2] < 0.04)) { L0 = L.coat; push = winter ? 0.04 : 0.032; } }   // (the coat hangs over the belt at the back and sides)
     else if (r === G.pelvis) { L0 = o.dress ? L.pants : L.pants; push = 0.008; if (o.coat && z < 0.02) { L0 = L.coat; push = winter ? 0.032 : 0.022; } }
     else if (r === G.thigh) {
       L0 = L.pants; push = 0.011;
@@ -458,6 +459,7 @@ function mhTemplate(outfit, o) {
     }
     pos[i * 3] = x + N[i * 3] * push; pos[i * 3 + 1] = y + N[i * 3 + 1] * push; pos[i * 3 + 2] = z + N[i * 3 + 2] * push;
   }
+  if (o.coat) tailorCoat(pos, lab, R, G, MH.index, n, winter);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('aRest', new THREE.BufferAttribute(pos.slice(), 3));
@@ -468,6 +470,63 @@ function mhTemplate(outfit, o) {
   geo.setIndex(new THREE.BufferAttribute(MH.index, 1));
   geo.computeVertexNormals();
   return { geo, prims: [] };
+}
+
+// The coat as a garment. Pushed out along the skin's normals it is a second skin: shoulder blades, the groove of the
+// spine and the buttocks all show through it, and the rider reads as a painted nude. A coat hangs. Here the cloth
+// is first relaxed (so no muscle shows), then draped: working down from the shoulders, at every bearing round the
+// body it falls straight from whatever stood furthest out above it, and it spans hollows instead of following them.
+function tailorCoat(pos, lab, R, G, index, n, winter) {
+  const coat = new Uint8Array(n);
+  for (let i = 0; i < n; i++) coat[i] = lab[i] === L.coat ? 1 : 0;
+  const nb = Array.from({ length: n }, () => []);
+  for (let t = 0; t < index.length; t += 3) { const a = index[t], b = index[t + 1], c = index[t + 2]; nb[a].push(b, c); nb[b].push(a, c); nb[c].push(a, b); }
+  const tmp = new Float32Array(pos.length);
+  for (let it = 0; it < 7; it++) {
+    tmp.set(pos);
+    for (let i = 0; i < n; i++) {
+      if (!coat[i] || !nb[i].length) continue;
+      let sx = 0, sy = 0, sz = 0, c = 0;
+      for (const j of nb[i]) { if (!coat[j]) continue; sx += pos[j * 3]; sy += pos[j * 3 + 1]; sz += pos[j * 3 + 2]; c++; }
+      if (!c) continue;
+      const k = 0.6;
+      tmp[i * 3] += (sx / c - pos[i * 3]) * k; tmp[i * 3 + 1] += (sy / c - pos[i * 3 + 1]) * k * 0.3; tmp[i * 3 + 2] += (sz / c - pos[i * 3 + 2]) * k;
+    }
+    pos.set(tmp);
+  }
+  // the body of the coat: torso, the belt it covers, and the seat
+  const shell = [];
+  let y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < n; i++) if (coat[i] && (R[i] === G.torso || R[i] === G.belt || R[i] === G.pelvis)) { shell.push(i); y0 = Math.min(y0, pos[i * 3 + 1]); y1 = Math.max(y1, pos[i * 3 + 1]); }
+  if (shell.length < 50) return;
+  const DY = 0.016, NY = Math.ceil((y1 - y0) / DY) + 1, NA = 56;
+  const cz = new Float32Array(NY), cn = new Float32Array(NY);
+  for (const i of shell) { const yi = Math.round((pos[i * 3 + 1] - y0) / DY); cz[yi] += pos[i * 3 + 2]; cn[yi]++; }
+  for (let yi = 0; yi < NY; yi++) cz[yi] = cn[yi] ? cz[yi] / cn[yi] : NaN;
+  for (let yi = 0; yi < NY; yi++) if (Number.isNaN(cz[yi])) { let k = 1; while (k < NY && Number.isNaN(cz[Math.max(0, yi - k)]) && Number.isNaN(cz[Math.min(NY - 1, yi + k)])) k++; cz[yi] = !Number.isNaN(cz[Math.max(0, yi - k)]) ? cz[Math.max(0, yi - k)] : cz[Math.min(NY - 1, yi + k)]; }
+  for (let p2 = 0; p2 < 3; p2++) for (let yi = 1; yi < NY - 1; yi++) cz[yi] = (cz[yi - 1] + 2 * cz[yi] + cz[yi + 1]) / 4;
+  const polar = (i) => { const y = pos[i * 3 + 1], yf = (y - y0) / DY, yi = Math.min(NY - 1, Math.max(0, Math.round(yf))), dx = pos[i * 3], dz = pos[i * 3 + 2] - cz[yi]; return [yi, Math.atan2(dx, dz), Math.hypot(dx, dz)]; };
+  const br = Array.from({ length: NY }, () => new Float32Array(NA));
+  for (const i of shell) { const [yi, a, r] = polar(i), ai = ((Math.round(a / (2 * Math.PI) * NA) % NA) + NA) % NA; if (r > br[yi][ai]) br[yi][ai] = r; }
+  // holes in the table (bearings a row has no vertex on) take their neighbours' reach
+  for (let yi = 0; yi < NY; yi++) for (let p2 = 0; p2 < NA; p2++) { let any = false; for (let ai = 0; ai < NA; ai++) if (br[yi][ai] === 0) { const l = br[yi][(ai + NA - 1) % NA], r2 = br[yi][(ai + 1) % NA]; if (l || r2) { br[yi][ai] = Math.max(l, r2) * 0.995; any = true; } } if (!any) break; }
+  const dr = br.map((row) => Float32Array.from(row));
+  const top = Math.max(0, NY - 1 - Math.round(0.1 / DY));
+  for (let yi = top - 1; yi >= 0; yi--) for (let ai = 0; ai < NA; ai++) {
+    // the back and sides hang (bearing 0 is the chest; the open front of a riding coat follows the body)
+    const back = Math.abs(ai - NA / 2) < NA * 0.36 ? 1 : 0;
+    dr[yi][ai] = Math.max(br[yi][ai], back ? dr[yi + 1][ai] - 0.0004 : 0);   // (near plumb: a slight taper to the waist, not a barrel)
+  }
+  for (let p2 = 0; p2 < 3; p2++) for (let yi = 0; yi < NY; yi++) { const row = dr[yi], o2 = Float32Array.from(row); for (let ai = 0; ai < NA; ai++) row[ai] = Math.max(br[yi][ai], (o2[(ai + NA - 1) % NA] + 2 * o2[ai] + o2[(ai + 1) % NA]) / 4); }
+  for (const i of shell) {
+    const [yi, a, r] = polar(i), af = ((a / (2 * Math.PI) * NA) % NA + NA) % NA, a0 = Math.floor(af) % NA, a1 = (a0 + 1) % NA, t = af - Math.floor(af);
+    const y = pos[i * 3 + 1], w = 1 - Math.min(1, Math.max(0, (y - (y1 - 0.2)) / 0.1));   // the yoke keeps the shoulders' own shape
+    // long folds falling from the shoulder blades, a little fuller toward the hem
+    const fold = 0.0045 * Math.sin(a * 9 + 1.3 * Math.sin(y * 14)) * (0.4 + (y1 - y) * 1.6) * (winter ? 1.3 : 1);
+    const rt = Math.max(r, dr[yi][a0] * (1 - t) + dr[yi][a1] * t) + (fold + 0.004) * w;   // (with a little ease all round)
+    const k = 1 + (rt / Math.max(r, 1e-4) - 1) * w;
+    pos[i * 3] *= k; pos[i * 3 + 2] = cz[yi] + (pos[i * 3 + 2] - cz[yi]) * k;
+  }
 }
 
 const humanCache = new Map();
@@ -631,8 +690,9 @@ export class Human {
     // satchel strap across the back, right shoulder to left hip, and the satchel riding on the hip:
     // the diagonal line every rider in the references carries
     if (MH && (outfit === 'arthur' || outfit === 'winter')) {
-      const RG = MH.regions, P = MH.position, Rg = MH.region;
-      const push = o.coat ? (o.winter ? 0.04 : 0.028) * 1.15 : 0.012;
+      // (measured on the clothed figure as tailored, not on the bare body: the draped coat stands further out)
+      const RG = MH.regions, P = tpl.geo.attributes.position.array, Rg = MH.region;
+      const push = 0;
       const backAt = (x, y) => {
         let best = 1e9;
         for (let i = 0; i < MH.count; i++) {
@@ -640,7 +700,7 @@ export class Human {
           if (rg !== RG.torso && rg !== RG.pelvis && rg !== RG.belt) continue;
           if (Math.abs(P[i * 3] - x) < 0.022 && Math.abs(P[i * 3 + 1] - y) < 0.022) best = Math.min(best, P[i * 3 + 2]);
         }
-        return best < 1e8 ? best - push - 0.008 : null;
+        return best < 1e8 ? best - push - 0.01 : null;
       };
       const yS = MH.rest.neck[1] - 0.045, yH = MH.rest.hips[1] + 0.02;
       const pts = [];
@@ -1064,15 +1124,21 @@ export class Quadruped {
     if (kind === 'horse') {
       // mane: hair cards along the crest, falling to the off side
       const cards = [];
-      for (let i = 0; i < 22; i++) {
-        const t = i / 21;
-        const p = V(0, 1.68 + t * 0.36, 0.5 + t * 0.42);
-        const g2 = new THREE.PlaneGeometry(0.19, 0.5 - t * 0.16, 1, 4);
-        g2.translate(0, -0.1, 0);
-        const gp = g2.attributes.position;
-        for (let k = 0; k < gp.count; k++) gp.setZ(k, gp.getZ(k) + (gp.getY(k) + 0.1) * (gp.getY(k) + 0.1) * -0.6);
-        g2.rotateY(Math.PI / 2); g2.rotateZ(-0.35 - r() * 0.15); g2.rotateX(-0.75);
-        g2.translate(p.x + 0.04, p.y, p.z);
+      // (one unbroken fall of hair lying down the off side of the neck, in two layers, each lock overlapping the next:
+      // separate cards turned every way stood up along the crest as a row of black teeth)
+      for (const [layer, side, hang, n] of [[0, 1, 0.3, 26], [1, 1, 0.22, 22], [2, -1, 0.1, 18]]) for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1.6) / n;
+        const crest = (t) => V(0, 1.66 + Math.min(1, t) * 0.4, 0.46 + Math.min(1, t) * 0.47);
+        const a = crest(t0), b = crest(t1), L = hang * (1 - 0.35 * t0) * (0.8 + r() * 0.4);
+        const out = side * (0.035 + layer * 0.012), sw = (r() - 0.5) * 0.05;
+        const pa = [a.x, a.y + 0.012, a.z, b.x, b.y + 0.012, b.z,
+          a.x + out * 1.6, a.y - L * 0.45, a.z + sw - 0.02, b.x + out * 1.6, b.y - L * 0.45, b.z + sw - 0.02,
+          a.x + out * 2.1, a.y - L, a.z + sw * 2 - 0.05, b.x + out * 2.1, b.y - L, b.z + sw * 2 - 0.05];
+        const g2 = new THREE.BufferGeometry();
+        g2.setAttribute('position', new THREE.Float32BufferAttribute(pa, 3));
+        g2.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 0, 0.5, 1, 0.5, 0, 0, 1, 0], 2));
+        g2.setIndex([0, 2, 1, 1, 2, 3, 2, 4, 3, 3, 4, 5]);
+        g2.computeVertexNormals();
         cards.push(g2);
       }
       const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.12, 1.1);
@@ -1154,7 +1220,7 @@ export class Quadruped {
     const body = bones.body;
     // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
     // (worn, oiled and dusty: at 0.55 roughness with a strong lift the bags and seat read as orange plastic)
-    const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(1.15, 0.93, 0.74), roughness: 0.78 });   // dark, used saddle leather
+    const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(0.78, 0.6, 0.47), roughness: 0.82 });   // dark, used saddle leather
     const blanket = std({ map: memoTex('blanket', () => blanketTexture(r)), roughness: 0.95 });
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
@@ -1208,11 +1274,11 @@ export class Quadruped {
       // a soft, bulging leather bag (a five-point sweep, rounded at both ends) with a flap and two buckled straps
       // a squarish stitched leather bag (superelliptic section), soft at the corners, with buckles on its straps
       const bag = sweep([{ p: V(s * 0.41, 1.52, -0.69), rx: 0.04, ry: 0.1, sq: 0.6 }, { p: V(s * 0.43, 1.5, -0.65), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.45, 1.49, -0.47), rx: 0.085, ry: 0.175, sq: 0.42 },
-        { p: V(s * 0.43, 1.5, -0.29), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.41, 1.52, -0.25), rx: 0.04, ry: 0.1, sq: 0.6 }], 16);
+        { p: V(s * 0.43, 1.5, -0.29), rx: 0.075, ry: 0.16, sq: 0.45 }, { p: V(s * 0.41, 1.52, -0.25), rx: 0.04, ry: 0.1, sq: 0.6 }], 28);
       body.add(mesh(bag, leather));
       for (const zz of [-0.56, -0.38]) {
         const bk = new THREE.BoxGeometry(0.012, 0.032, 0.03); bk.translate(s * 0.535, 1.5, zz);
-        body.add(mesh(bk, std({ color: 0x9a8a6a, metalness: 0.7, roughness: 0.4 })));
+        body.add(mesh(bk, std({ color: 0x4a4034, metalness: 0.6, roughness: 0.55 })));   // (dull brass: bright, the buckles were white squares on the bag)
       }
       const flap = sweep([{ p: V(s * 0.5, 1.62, -0.66), rx: 0.012, ry: 0.06 }, { p: V(s * 0.535, 1.6, -0.47), rx: 0.014, ry: 0.075 }, { p: V(s * 0.5, 1.62, -0.28), rx: 0.012, ry: 0.06 }], 10);
       body.add(mesh(flap, leather));

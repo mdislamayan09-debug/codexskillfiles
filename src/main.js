@@ -248,6 +248,8 @@ async function init() {
     night: () => ({ time: 21.5, player: [-20, 2, Math.PI / 2], cam: [-46, null, -1, 2.4], look: [60, null, -3, 4] }),
     portrait: () => ({ time: 15.2, player: [-260, 40, 0.9], camRel: [2.4, 2.1, 3.0], lookRel: [0, 1.85, 0.2] }),
     hud: () => ({ time: 17.3, player: [300, -40, -Math.PI / 2 + 0.1], hud: true }),
+    // a plain patch of open prairie under an early-afternoon sun, for looking at the rider and horse (scripts/turntable.mjs)
+    studio: () => ({ time: 14.2, player: [1700, -420, 2.2], camRel: [2.6, 1.8, -3.4], lookRel: [0, 1.3, 0.1] }),
     // --- world v2 biomes (references: forest trail ride, snowy valley ride, snowy valley vista)
     // heading west-south-west down the logging trail, into the low afternoon sun as in the reference
     // both rides as the references frame them: camera close behind and to the left (+x of the frame is screen left),
@@ -261,7 +263,7 @@ async function init() {
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
-      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.4, -6.6], lookRel: [-2.4, 1.6, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.35, -5.2], lookRel: [-2.4, 2.3, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
