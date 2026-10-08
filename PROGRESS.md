@@ -734,3 +734,39 @@ surface, cloud volume, and a valley floor with a river and forest in it. Procedu
 reached their ceiling at about 4 out of 10 against RDR2. The next step that can move the score is real assets:
 scanned PBR materials (bark, forest floor, granite, snow) and a sculpted, textured horse and rider. That needs
 the owner's go-ahead to download them.
+
+## Loop restarted (2026-10-08): the owner asked for it to run on for days
+
+### Rounds 66-69
+- **Tools.** `scripts/turntable.mjs` takes six chase views of the rider and horse in one page load; the `studio`
+  shot stands them on open prairie under an early-afternoon sun.
+- **The rider's coat is a garment** (`tailorCoat` in `creatures.js`). Pushed out along the skin's normals it was a
+  second skin (shoulder blades, spine and buttocks showed through; with a glossy leather it read as a bare back).
+  The cloth is relaxed, then draped: working down from the shoulders, at every bearing round the body it falls
+  from whatever stood furthest out above it. It hangs over the belt, with long folds, and is matte with a fine
+  grain. The strap is fitted to the tailored coat.
+- **Horse.** The mane is one continuous fall of hair in layers down the off side of the neck (separate cards had
+  stood along the crest as a row of teeth). Dark saddle leather, rounder bags, dull buckles.
+- **Vista: a scouted lookout.** The search-found summit looked into a side notch. The shot now stands on a rock
+  knob built up from the west shoulder above the mouth of the main valley (`?vistasearch` brings the old search
+  back), looking north-east up its length: the floor with its frozen river on the right, timbered slopes either
+  side. Low morning side light.
+- **Lookout rock.** A 44-subdivision mesh; each joint face a plateau and each edge a short rounded riser
+  (`soft()`), so blocks have weathered arrises; spalled faces; speckled granite with rain streaks; crisp-edged
+  crust lichens; thin ragged snow on the flats; frosted grass and brush rooted on the blocks. Cool grey.
+- **Homestead.** A broad, level crown with gentle flanks; a broken ring of spruce close round the buildings.
+- **Valley fog is a layer of air** (`applyAtmosphere`): a bank between the valley floor ahead of the lens
+  (`U.uBankBase`) and a ceiling 78 m up, integrated along the sight line, in banks. Painted onto surfaces by
+  their height it had never read as fog in four attempts.
+- **Storm sky.** The deck is broken into great masses over a bright high overcast seen through the breaks.
+- **Erosion** (`world.erodeSlopes`): gullies cut down the fall line of snow-country slopes in two sizes, in
+  swarms; their walls bare to rock.
+- **Pines: god rays.** Inside a stand the conifer crowns no longer write to the shadow map (`windDepthMaterial`
+  with `porous`, gated by `U.uCanopy`); the canopy-gap pattern carries the roof's shade instead, so about a fifth
+  of the floor is in sun and the air is cut into narrow shafts, on a 150-step march for stills. Trunks keep real
+  shadows, which fall as bars across the sun streaks. A low sun ahead again (16.35 h). The floor is grown over
+  with olive grass off the tread; shrubs are olive, not card green; no full crowns hang near the lens (their
+  needle cards read as broadleaf blobs).
+
+**Critic scores.** Round 66: 4 / 5 / 3. Round 67: 3 / 4 / 5. Round 68: 4 / 4 / 4. The vista reached 5 for the
+first time (round 67, the new lookout).
