@@ -267,7 +267,7 @@ async function init() {
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
-    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 14.9, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
+    snowvista: () => { const v = G.findVista(); return { fov: 40, foreground: true, home: v.home, weather: { storm: 0.86, blizzard: 0.0 }, time: 8.6, player: [CABIN.x - 40, CABIN.z - 30, 0], cam: [v.cx, null, v.cz, v.ch - world.heightAt(v.cx, v.cz)], look: [v.tx, null, v.tz, v.th] }; },
     jungle: () => { const v = G.findCoastVista(); return { clearView: true, time: 15.8, player: [v.px, v.pz, v.yaw], cam: [v.cx, null, v.cz, 2.2], look: [v.tx, null, v.tz, v.th] }; },
     autumn: () => { const [x, z, yaw] = G.onRoad(0, 0.08, true); return { time: 16.2, player: [x, z, yaw], camRel: [0.7, 2.4, -6.2], lookRel: [0, 2.0, 14] }; },
     desert: () => { sky.time = 17.6; sky.update(0, camera.position); const [x, z, yaw] = G.findButte(); return { time: 17.6, player: [x, z, yaw], camRel: [0.9, 2.2, -5.8], lookRel: [0, 6.0, 30] }; },
@@ -279,6 +279,18 @@ async function init() {
   // over the snowy north by marching rays through a trial frame from every ledge.
   G.findVista = () => {
     if (G.vistaCache) return G.vistaCache;
+    // Scouted, as a location manager would (rounds 66-67): the west shoulder above the mouth of the main valley,
+    // looking north-east up its length. The valley floor lies across the right of the frame with its river
+    // winding away, timbered slopes either side and the range across it. The summit lookout the search below
+    // finds looks into a side notch with no floor in view. The lens stands on a rock knob built up from the
+    // shoulder (see the lookout's dressing), high enough to see over the timber below it.
+    if (!params.has('vistasearch')) {
+      const S = { cx: -1060, cz: -1990, lift: 85, tx: -600, tz: -3500 }, PITCH0 = -0.12, D0 = 1200;
+      const az0 = Math.atan2(S.tx - S.cx, S.tz - S.cz), ch0 = world.heightAt(S.cx, S.cz) + S.lift;
+      const lx0 = S.cx + Math.sin(az0) * D0, lz0 = S.cz + Math.cos(az0) * D0;
+      G.vistaCache = { cx: S.cx, cz: S.cz, ch: ch0, tx: lx0, tz: lz0, th: ch0 + Math.tan(PITCH0) * D0 - world.heightAt(lx0, lz0), home: null, knob: true };
+      return G.vistaCache;
+    }
     const cam = new THREE.PerspectiveCamera(40, 16 / 9, 0.5, 1e5), rc = new THREE.Raycaster(), n2 = new THREE.Vector2();
     const E = HALF - 12, PITCH = -0.12;
     const march = (o, r, max = 9000) => {
@@ -850,6 +862,22 @@ async function init() {
     if (s.foreground && G.camOverride && G.camOverride.pos && !G.fgPlaced) {
       G.fgPlaced = true;
       const c = G.camOverride.pos, l = G.camOverride.look;
+      // the lookout's own knob: the shoulder built up into a rock summit under the lens (what grows there lifted with it)
+      if (G.vistaCache && G.vistaCache.knob && !G.knobBuilt) {
+        G.knobBuilt = true;
+        const kd = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize();
+        const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
+        const nearK = (it) => (it.x - c.x) ** 2 + (it.z - c.z) ** 2 < 330 * 330;
+        const before = layers.map((L) => L.items.filter(nearK).map((it) => [it, world.heightAt(it.x, it.z)]));
+        world.raiseSpur(c.x - kd.x * 70, c.z - kd.z * 70, c.y - 2.2, c.x, c.z, c.y - 4.2, { side: 0.66, round: 0.0012, top: 9, flat0: 12, reach: 280, rough: 0.7, sag: 0 });
+        for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
+        // (the lens stands a man's height and a half above whatever the knob's top came out at)
+        { const dy = world.heightAt(c.x, c.z) + 4.2 - c.y; c.y += dy; l.y += dy; }
+        // (and no timber on the knob's own upper slopes: a summit of rock and snow; nor the brush, boulders and logs
+        // that stood on the shoulder before, which would now sit against the lens)
+        G.clearTreesNear(c.x, c.z, 64);
+        G.clearTreesNear(c.x, c.z, 40, veg.bushes); G.clearTreesNear(c.x, c.z, 40, veg.rocks); G.clearTreesNear(c.x, c.z, 60, veg.logs);
+      }
       // clear the lookout itself, as a location artist would
       G.clearTreesNear(c.x, c.z, 40);
       G.clearTreesNear(c.x, c.z, 60, veg.crags);       // no crag looming in front of the lens
@@ -885,7 +913,7 @@ async function init() {
               const x = c.x + d0.x * f + rt0.x * r, z = c.z + d0.z * f + rt0.z * r;
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const D = stand(x, z, world.heightAt(x, z));
-              if (D > 0.3) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
+              if (D > 0.3 && world.normalAt(x, z).y > 0.74) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
@@ -923,7 +951,8 @@ async function init() {
         const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
         const R = 260, inBox = (it) => it.x > Math.min(ax, kx) - R && it.x < Math.max(ax, kx) + R && it.z > Math.min(az, kz) - R && it.z < Math.max(az, kz) + R;
         const before = layers.map((L) => L.items.filter(inBox).map((it) => [it, world.heightAt(it.x, it.z)]));
-        if (kTop > world.heightAt(kx, kz)) world.raiseSpur(ax, az, aTop, kx, kz, kTop);
+        // (a broad, level crown: on a narrow dome every tree round the yard stood on the flanks, below it and out of sight)
+        if (kTop > world.heightAt(kx, kz)) world.raiseSpur(ax, az, aTop, kx, kz, kTop, { top: 50, side: 0.36, round: 0.0011 });   // (gentle flanks that hold their snow: steeper, the knoll stood on dark rock walls like a pedestal)
         for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
         world.stampPad(kx, kz, 27, 24);
         const hr = Math.atan2(c.x - kx, c.z - kz) + 0.6;
@@ -950,6 +979,12 @@ async function init() {
         for (const [f, r, sc, tall] of [[6, -34, 1.5, 0], [-4, -40, 1.15, 0], [14, -44, 1.8, 0], [22, -30, 1.3, 0], [-10, -52, 0.9, 0],
           [2, 33, 1.7, 0], [12, 40, 1.25, 0], [-6, 44, 1.45, 0], [20, 30, 1.0, 0], [-14, 36, 0.8, 0],
           [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 0.6, tall);
+        // and a broken ring of spruce on the crown itself, close round the buildings on three sides (open toward the lens)
+        for (let i = 0; i < 34; i++) {
+          const a = rk() * 6.28, rr4 = 25 + rk() * 22, f = Math.cos(a) * rr4, r = Math.sin(a) * rr4;
+          if (f < -4 && Math.abs(r) < 24) continue;
+          plant(f, r, 0.55 + rk() * rk() * 0.75, 0);
+        }
         // the knoll's own slopes broken with rock and brush, so it is ground and not an iced dome
         for (let i = 0; i < 70; i++) {
           const a = rk() * 6.28, rr3 = 30 + rk() * 55, x = kx + Math.cos(a) * rr3, z = kz + Math.sin(a) * rr3, gh = world.heightAt(x, z);

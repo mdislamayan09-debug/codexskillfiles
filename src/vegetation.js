@@ -1092,10 +1092,16 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       // and stepped ledges (planes cut at random angles made crystal shards, not an outcrop)
       v.applyMatrix3(jointM);
       const wob = 0.06 * n.noise(v.x * 1.3 + 7.1, v.z * 1.3 - 2.2);
-      v.x = lerp1(v.x, (Math.round((v.x + wob) / jstep[0] + jo[0]) - jo[0]) * jstep[0], 0.86);
-      v.y = lerp1(v.y, (Math.round((v.y + wob * 0.6) / jstep[1] + jo[1]) - jo[1]) * jstep[1], 0.9);
-      v.z = lerp1(v.z, (Math.round((v.z - wob) / jstep[2] + jo[2]) - jo[2]) * jstep[2], 0.86);
+      // (each face a plateau, each edge a short rounded riser: on a fine mesh the blocks come out with weathered,
+      // rounded arrises; snapped hard to the lattice on a coarse one they were faceted shards)
+      const soft = (x, st, o, k) => { const q = x / st + o, f = q - Math.floor(q) - 0.5; return (Math.floor(q) + 0.5 + 0.5 * Math.tanh(k * f) / Math.tanh(k * 0.5) - o) * st; };
+      const kx = detail > 12 ? 9 + 5 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
+      v.x = lerp1(v.x, soft(v.x + wob, jstep[0], jo[0], kx), 0.9);
+      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1], jo[1], kx + 3), 0.93);
+      v.z = lerp1(v.z, soft(v.z - wob, jstep[2], jo[2], kx), 0.9);
       v.applyMatrix3(jointMi);
+      // weathering: faces spalled and pitted a little
+      if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
     } else for (const c of cuts) { const t = v.dot(c.n) - c.o; if (t > 0) v.addScaledVector(c.n, -t * 0.97); }
     // facet/strata flattening
     v.y = Math.round(v.y * 6) / 6 * 0.12 + v.y * 0.88;
@@ -1109,7 +1115,9 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
     let top = 0, wide = 0;
     for (let i = 0; i < p.count; i++) { top = Math.max(top, p.getY(i)); wide = Math.max(wide, Math.hypot(p.getX(i), p.getZ(i))); }
     g.scale(0.56 / wide, 0.62 / top, 0.56 / wide);   // a block about as tall as it is broad
-    // hard edges where the joint planes meet (smoothed across them, a split block shaded as a rounded lump)
+    // hard edges where the joint planes meet (smoothed across them, a split block shaded as a rounded lump); the fine
+    // mesh carries its own rounded edges and takes smooth normals
+    if (detail > 12) { g.computeVertexNormals(); return g; }
     return toCreasedNormals(g, 0.7);
   }
   g.computeVertexNormals();
@@ -1174,19 +1182,45 @@ function rockMaterial(surf = {}, bare = false) {
         }
         // and the scan again at ledge scale, so a big outcrop is not one tile repeated
         vec3 rb = texture(tRockA, vWPos.zy / 23.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 23.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 23.0 + 0.37).rgb * w.z;
-        base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
+        float scanL = clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
+        #ifdef BARE_LEDGE
+        // (only a little of the scan: a half-metre photograph stretched over a three-metre block a pace from the lens
+        // read as smeared marble)
+        base *= mix(1.0, scanL, 0.3);
+        #else
+        base *= scanL;
+        #endif
       }
       base *= 0.85 + 0.2*n2;
+      #ifdef BARE_LEDGE
+      {
+        // granite from a pace away: an even grey-tan body speckled with crystals (dark mica, pale feldspar), rain-stained
+        // in streaks down its faces
+        float sp1 = vnoise(vWPos.xz * 95.0 + vWPos.y * 71.0), sp2 = vnoise(vWPos.xy * 230.0 - vWPos.z * 170.0), sp3 = vnoise(vWPos.zy * 41.0 + vWPos.x * 33.0);
+        float nearG = smoothstep(34.0, 9.0, length(vWPos - cameraPosition));
+        base *= mix(1.0, 0.8 + 0.4 * (sp1 * 0.45 + sp2 * 0.3 + sp3 * 0.25), nearG);
+        base = mix(base, srgbR(vec3(50,48,46)), smoothstep(0.72, 0.82, sp1) * 0.5 * nearG);
+        base = mix(base, srgbR(vec3(188,180,168)), smoothstep(0.74, 0.86, sp2) * 0.4 * nearG);
+        float streak = smoothstep(0.45, 0.75, vnoise(vec2(dot(vWPos.xz, vec2(0.7, 0.7)) * 3.2, vWPos.y * 0.45)));
+        base *= 1.0 - 0.28 * streak * smoothstep(0.75, 0.3, wn.y);
+      }
+      #endif
       // close to, the stone has grain: crystal-sized speckle and pitting the half-metre scan cannot carry
       {
         float nearR = smoothstep(26.0, 5.0, length(vWPos - cameraPosition));
         float grain = vnoise(vWPos.xz * 61.0 + vWPos.y * 47.0) * 0.6 + vnoise(vWPos.xy * 143.0 - vWPos.z * 97.0) * 0.4;
+        #ifndef BARE_LEDGE
         base *= mix(1.0, 0.72 + 0.56 * grain, nearR);
+        #endif
       }
       // dark joint seams
       // (faint: dark winding seams at full strength read as the veins of wet marble, not jointed granite)
       float jointK = rockCrack(vWPos) * smoothstep(40.0, 8.0, length(vWPos - cameraPosition));
+      #ifdef BARE_LEDGE
+      base *= 1.0 - 0.08 * jointK;
+      #else
       base *= 1.0 - 0.22 * jointK;
+      #endif
       vec4 rcl = climateAt(vWPos.xz);
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
@@ -1201,16 +1235,23 @@ function rockMaterial(surf = {}, bare = false) {
       float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
-      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.62 * smoothstep(0.35, 0.75, rcl.r) * smoothstep(0.88, 0.98, wn.y) * smoothstep(0.3, 0.6, n1 + 0.3 * n2));   // (and lying on the flat tops, in patches)
+      // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
+      // facets read as paper laid on the rock)
+      float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
+      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.8 * smoothstep(0.35, 0.75, rcl.r) * topS);
       base *= vec3(1.34, 1.27, 1.16);   // weathered grey ledge granite, a little warm
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
-      float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(146,142,130)), lichen * 0.28);               // pale grey crust lichen (stronger and greener it read as algae)
-      // and the warm ochre crust lichen of the reference's granite, in scattered rosettes
-      float ochre = smoothstep(0.7, 0.82, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,128,82)), ochre * 0.45);
+      // crust lichens, in crisp-edged crinkled patches a hand or two across: pale grey-green, ochre, and the black one
+      // that grows in the damp streaks
+      float crink = 0.22 * (vnoise(vWPos.xz * 23.0 + vWPos.y * 17.0) - 0.5) + 0.1 * (vnoise(vWPos.xy * 61.0 + vWPos.z * 43.0) - 0.5);
+      float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.5);
+      float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(168,136,78)), ochre * 0.6);
+      float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
+      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.5);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,
@@ -1400,10 +1441,10 @@ export class Vegetation {
     // 4 and 5: the fractured blocks again in wind-scoured bare granite, for lookout ledges
     // (the ledge blocks are cut by twice the joint planes, deeper: split granite with flat faces and hard edges, not
     // rounded lumps)
-    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 5, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
+    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 12, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
     // 6-8: outcrop blocks for a lookout's own ledge, stood several metres tall beside the lens: cut right through by
     // many joint planes into stacked, square-shouldered blocks (the boulders above, scaled up, are smooth domes)
-    for (const sd of [31, 47, 58]) rockBuilds.push({ parts: [{ geometry: rockGeometry(sd, true, 6, 30, 0.34), material: rMatBare }] });
+    for (const sd of [31, 47, 58]) rockBuilds.push({ parts: [{ geometry: rockGeometry(sd, true, quality >= 2 ? 44 : 22, 30, 0.34), material: rMatBare }] });
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield

@@ -555,6 +555,9 @@ export class Terrain {
           // snow-country spruce stand apart with snow lying between them: from afar the slope stays mostly white,
           // flecked dark (a closed dark canopy with white glades read as puddles of snow on black rock)
           canopyK *= 1.0 - 0.12 * smoothstep(0.4, 0.8, ccl0.r);
+          // (and only where timber can stand: on faces too steep for trees the stand's tint lay alone on the snow as a
+          // blue-grey smear)
+          canopyK *= mix(1.0, smoothstep(0.66, 0.78, normalAt(vWPos.xz).y), smoothstep(0.4, 0.8, ccl0.r));
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }
