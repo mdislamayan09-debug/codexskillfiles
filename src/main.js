@@ -118,7 +118,7 @@ async function init() {
   const hud = new HUD(world);
   // in play the shadow map and the water's mirror are each redrawn on alternate frames; stills take both every frame
   sky.shadowEvery = CAPTURE ? 1 : 3; water.every = CAPTURE ? 1 : 2;
-  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: CAPTURE ? (QUALITY >= 2 ? 64 : 40) : (QUALITY >= 2 ? 22 : 16), volDust: CAPTURE,   /* (stills march the air finely; in play a third of the steps, dithered, costs a few ms not twenty) */ samples: params.has('msaa') ? +params.get('msaa') : 4, smaa: params.get('msaa') === '0' });
+  const post = new Post(renderer, scene, camera, { ao: QUALITY >= 0.7, bloom: true, volSteps: CAPTURE ? (QUALITY >= 2 ? 150 : 64) : (QUALITY >= 2 ? 22 : 16), volDust: CAPTURE,   /* (stills march the air finely; in play a third of the steps, dithered, costs a few ms not twenty) */ samples: params.has('msaa') ? +params.get('msaa') : 4, smaa: params.get('msaa') === '0' });
   // pooled lamp lights for night
   const lamps = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffa850, 0, 18, 1.8); scene.add(l); return l; });
 
@@ -260,12 +260,12 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
-    return { time: 16.35, fov: 35, volDensity: 0.0046, volFalloff: 0.016, expK: 1.3, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
+    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.2, player: [x, z, yaw], camRel: [1.0, 2.5, -5.6], lookRel: [-0.45, 1.95, 22], turn: -0.4, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
-      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.35, -5.2], lookRel: [-2.4, 2.3, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, fov: 42, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.35, -5.2], lookRel: [-2.4, 1.95, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -832,7 +832,7 @@ async function init() {
         {
           const sdr = U.uSunDir.value, sl2 = Math.hypot(sdr.x, sdr.z) || 1;
         }
-        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1], [34, -12, 1.5, 3], [44, 11, 1.45, 1], [27, -19, 1.4, 1], [50, 21, 1.5, 3]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
+        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
         }
@@ -1036,6 +1036,12 @@ async function init() {
         const r = rc.ray.direction, x = c.x + r.x * dist, z = c.z + r.z * dist, top = c.y + r.y * dist, g = world.heightAt(x, z);
         const sc = Math.min(7.5, Math.max(1.3, (top - g) / 0.62)) * wide;
         veg.rocks.add(x, Math.max(g - 0.14 * sc, top - 0.76 * sc), z, rot, sc, v);
+        // frosted grass and dead brush rooted in the block's top and shoulders (bare, the outcrop was a quarry face)
+        const by = Math.max(g - 0.14 * sc, top - 0.76 * sc) + 0.62 * sc;
+        for (let q = 0; q < 5; q++) {
+          const a = rr() * 6.28, rad = rr() * 0.3 * sc, drop = (rad / (0.3 * sc)) ** 2 * 0.22 * sc;
+          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.35 + rr() * 0.5, [9, 9, 7, 8, 10][Math.floor(rr() * 5)]);
+        }
       };
       // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one
       // on the right, so the blocks stand on rock rather than hang over the drop

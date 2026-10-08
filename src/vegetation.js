@@ -48,6 +48,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // every shrub and broadleaf crown its own shade: yellow-green new growth, dark old leaf, a few going brown
       float pv = hash12(floor(${pos}.xz * 1.7) + 2.3);
       diffuseColor.rgb *= mix(vec3(0.7, 0.76, 0.7), vec3(1.08, 1.02, 0.74), pv) * mix(vec3(1.0), vec3(1.1, 0.86, 0.62), step(0.86, fract(pv * 7.31)));
+      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.0, 1.02, 0.86), diffuseColor.rgb, 0.68);   // (olive: full-strength, the card green was aquarium plastic)
     }
     #endif
     #endif
@@ -996,7 +997,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.2 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));   // (much more and the floor went bare)
       // and in the pine woods it grows in drifts where the light gets in, open duff between them (a clump every few
       // metres everywhere read as tufts dotted over the floor at regular spacing)
-      dens *= mix(1.0, smoothstep(0.38, 0.6, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
+      dens *= mix(1.0, smoothstep(0.16, 0.42, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -1033,7 +1034,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
       {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
-        vec3 pg = mix(srgbV(vec3(130,140,70)), srgbV(vec3(160,160,92)), aOff.w);
+        vec3 pg = mix(srgbV(vec3(96,112,58)), srgbV(vec3(128,136,76)), aOff.w);   // (olive, not lime)
         vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
         vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.95 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
@@ -1254,7 +1255,7 @@ function rockMaterial(surf = {}, bare = false) {
       // facets read as paper laid on the rock)
       float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
       rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.8 * smoothstep(0.35, 0.75, rcl.r) * topS);
-      base *= vec3(1.34, 1.27, 1.16);   // weathered grey ledge granite, a little warm
+      base *= vec3(1.22, 1.2, 1.17);   // weathered grey ledge granite
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
@@ -1264,7 +1265,7 @@ function rockMaterial(surf = {}, bare = false) {
       float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.5);
       float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(168,136,78)), ochre * 0.6);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.34);
       float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
       base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.5);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -1387,7 +1388,7 @@ export class Vegetation {
       for (let k = 0; k < 7; k++) cards.push(cardGeo(1.3 + rnd() * 0.6, new THREE.Vector3((rnd() - 0.5) * 1.2, 0.45 + rnd() * 0.5, (rnd() - 0.5) * 1.2), c, rnd, 1, 0.9));
       const g = leafAO(setSway(mergeGeometries(cards), (x, y) => y * 0.25));
       // (thin leaves that glow when the sun is behind them)
-      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0xb4bca0, true, 0.42, 0.14), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
+      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0x8f977c, true, 0.42, 0.14), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
     }
     // ferns (3, 4), big-leaf jungle plants (5, 6), dry scrub (7, 8)
     const fernT = fernTexture(), fernMat = leafMat(fernT, 0xb8bc9e);   // (muted: a saturated card green reads as pasted on)

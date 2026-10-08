@@ -122,7 +122,7 @@ float canopyGaps(vec3 wp){
   vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
   vec2 q = vec2(dot(wp, R), dot(wp, Up));
   float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18;   // (pools a metre or two across)
-  return mix(1.0, 0.04 + 0.96 * smoothstep(0.52, 0.6, n), uCanopy);   // (about a third of the floor in sun)
+  return mix(1.0, 0.03 + 0.97 * smoothstep(0.555, 0.62, n), uCanopy);   // (about a fifth of the floor in sun: narrow shafts, dark air between)
 }
 
 // shadows of the cloud deck on the land: under a broken storm deck most of the ground lies in cloud shade and the

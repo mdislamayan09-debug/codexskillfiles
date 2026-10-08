@@ -660,6 +660,7 @@ export class World {
     }
     this.cabinH = this.cabinH ?? this.cabinHeight();
     this.smoothMountains();
+    this.erodeSlopes();
     this.terraceCliffs();
     this.genMs = performance.now() - t0;
     if (typeof document === 'undefined' && typeof window === 'undefined') return; // node: no GPU textures
@@ -690,6 +691,35 @@ export class World {
         tmp[k] = lerp(h, sum / 9, m * 0.8);
       }
       H.set(tmp);
+    }
+  }
+
+  // Erosion. Smoothed elevation data carries a mountain's broad form and none of what water and avalanche do to
+  // it: every slope is one even ramp, shaded as one airbrushed surface with a ruler-straight skyline. Here the
+  // snow-country slopes are cut by gullies running down the fall line: narrow V-cuts along the zero lines of a
+  // noise stretched downhill, so they wander, branch and die out, in two sizes. Their walls are steep, so the
+  // ground's own slope rule bares them to rock: dark veins down a white face, and a skyline with notches in it.
+  erodeSlopes() {
+    const H = this.heights, C = this.climate, src = new Float32Array(H);
+    const n = this.n2, n3 = this.n3, R = 4, inv = 1 / (2 * R * CELL);
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const gx = (src[k + R] - src[k - R]) * inv, gz = (src[k + R * RES] - src[k - R * RES]) * inv, g = Math.hypot(gx, gz);
+        const amt = smoothstep(0.22, 0.6, g) * smoothstep(0.35, 0.65, snow);
+        if (amt <= 0) continue;
+        const x = i * CELL - HALF, dx = gx / g, dz = gz / g;          // (dx, dz) points uphill
+        const u = x * -dz + z * dx, v = x * dx + z * dz;                // across the slope, and up it
+        // where the gullies are cut at all: in swarms, with clean faces between
+        const swarm = smoothstep(-0.25, 0.35, n3.noise(x / 420 + 2.2, z / 420 - 5.1));
+        const a1 = n.noise(u / 60 + 0.35 * n3.noise(v / 140, u / 140), v / 300 + 11.3);
+        const a2 = n.noise(u / 25 - 4.4, v / 130 + 3.9);
+        const cut = 8 * Math.pow(1 - Math.min(1, Math.abs(a1) * 2.4), 2) + 3.2 * Math.pow(1 - Math.min(1, Math.abs(a2) * 2.2), 2);
+        H[k] = src[k] - cut * amt * (0.25 + 0.75 * swarm);
+      }
     }
   }
 
