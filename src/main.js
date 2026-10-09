@@ -688,8 +688,12 @@ async function init() {
         // the rider on the brow of a low rise, the floor falling gently away ahead of him (from a hollow the ground
         // in front hid the whole middle distance)
         {
-          const [m0x, m0z] = P(-40, 0), [m1x, m1z] = P(6, 0), mh = world.heightAt(px, pz) + 6.5;
-          world.raiseSpur(m0x, m0z, mh - 0.5, m1x, m1z, mh, { side: 0.11, round: 0.0005, top: 16, flat0: 12, reach: 170, rough: 0.25, sag: 0 });
+          // (round 93: a long ramp, not a brow. From a flat-topped rise the floor ahead lay edge-on behind its lip and
+          // nothing on it could be seen, however high the rise; the reference's snowfield falls away from the horse's
+          // feet at one gentle grade all the way down to the creek, so the whole of it faces the lens)
+          const fl0 = world.heightAt(px, pz);
+          if (params.has('lowbrow')) { const [m0x, m0z] = P(-40, 0), [m1x, m1z] = P(6, 0); world.raiseSpur(m0x, m0z, fl0 + 6, m1x, m1z, fl0 + 6.5, { side: 0.11, round: 0.0005, top: 16, flat0: 12, reach: 170, rough: 0.25, sag: 0 }); }
+          else { const [m0x, m0z] = P(-50, 0), [m1x, m1z] = P(250, 0); world.raiseSpur(m0x, m0z, fl0 + 15, m1x, m1z, fl0 + 0.4, { side: 0.13, round: 0.0003, top: 26, flat0: 26, reach: 200, rough: 0.3, sag: 0 }); }
         }
         world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 1.5);   // (deep enough to see under an overcast)
         const [b0x, b0z] = P(62, 50), [b1x, b1z] = P(215, 66);
@@ -885,6 +889,30 @@ async function init() {
           const ahead = 7 + rb2() * 40, side = (i % 2 ? -1 : 1) * (3.5 + ahead * 0.22 + rb2() * (4 + ahead * 0.3));
           const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, sc = 0.7 + rb2() * rb2() * 1.6;
           veg.rocks.add(x, world.heightAt(x, z) - 0.2 * sc, z, rb2() * 6.28, sc * 1.25, 4 + Math.floor(rb2() * 2));   // (standing well out of the snow, dark-sided: sunk to their caps they were white on white)
+        }
+      }
+      // (round 93) and the middle ground: boulders under their caps of snow and clumps of dead brush scattered over the
+      // floor out to three hundred metres, thinning with distance (between the rider and the timber there was bare snow)
+      {
+        let sdm = 9173;
+        const rm2 = () => ((sdm = (sdm * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 46; i++) {
+          const ahead = 45 + rm2() * rm2() * 280, side = (rm2() - 0.5) * 2 * (14 + ahead * 0.42);
+          if (Math.abs(side) < 5 + ahead * 0.03) continue;
+          const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
+          if (world.splatAt(x, z).wet > 0.3) continue;
+          const big = rm2() < 0.3, sc = big ? 6 + rm2() * 3.5 : 1.2 + rm2() * 2.6;
+          veg.rocks.add(x, world.heightAt(x, z) - (big ? 0.42 : 0.22) * sc, z, rm2() * 6.28, sc, big ? 6 + Math.floor(rm2() * 3) : 4 + Math.floor(rm2() * 2));
+        }
+        for (let i = 0; i < 60; i++) {
+          const ahead = 12 + rm2() * rm2() * 170, side = (rm2() - 0.5) * 2 * (8 + ahead * 0.5);
+          if (Math.abs(side) < 3.5 + ahead * 0.03) continue;
+          const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
+          if (world.splatAt(x, z).wet > 0.3) continue;
+          for (let k = 0, n = 2 + Math.floor(rm2() * 4); k < n; k++) {
+            const bx = x + (rm2() - 0.5) * 3, bz = z + (rm2() - 0.5) * 3;
+            veg.bushes.add(bx, world.heightAt(bx, bz) - 0.07, bz, rm2() * 6.28, 0.5 + rm2() * 0.8, [7, 8, 7, 8, 9][Math.floor(rm2() * 5)]);
+          }
         }
       }
       // and single old pines standing out on the floor at every distance, dark boles and ragged crowns against the
@@ -1135,11 +1163,15 @@ async function init() {
           // timber grows on a mountainside: thinned evenly it stood on the slopes as a sprinkle of dots)
           const SS = THREE.MathUtils.smoothstep;
           const stand = (x, z, h) => {
-            const alt = 1 - SS(h + 40 * n.noise(x / 170, z / 170), 440, 585);
-            if (alt <= 0) return 0;
+            // (round 93: a treeline. Timbered to 440 m and more, both flanks were one even carpet of trees from floor to
+            // skyline; the reference's forest fills the floor and lower slopes and gives out in a ragged line, with open
+            // snow and rock above it and tongues of timber running up the gullies)
+            const alt = params.has('hightimber') ? 1 - SS(h + 40 * n.noise(x / 170, z / 170), 440, 585) : 1 - SS(h + 55 * n.noise(x / 170, z / 170) + 25 * n.noise(x / 60 + 4.0, z / 60 - 2.0), 300, 400);
+            if (alt <= 0 && (params.has('hightimber') || h > 540)) return 0;
             const mass = SS(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.3, -0.12);
             const lap = (world.heightAt(x + 18, z) + world.heightAt(x - 18, z) + world.heightAt(x, z + 18) + world.heightAt(x, z - 18)) / 4 - h;   // > 0 in a drainage
-            return alt * Math.max(mass * (0.6 + 0.4 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0));
+            const gully = params.has('hightimber') ? 0 : 0.8 * SS(lap, 0.9, 2.4) * (1 - SS(h, 430, 540));   // timber climbs the drainages past the treeline
+            return Math.max(alt * Math.max(mass * (0.6 + 0.4 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0)), gully);
           };
           // the base scatter's lone trees over the same ground are taken out: the stands are planted whole below
           {
@@ -1175,7 +1207,7 @@ async function init() {
               if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.5 + 0.48 * (1 - THREE.MathUtils.smoothstep(h, 320, 500)))) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.5 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.75 + sc * 1.9, firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants)
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, (0.75 + sc * 1.9) * (1 - 0.45 * SS(h, 290, 430)), firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants, stunted toward the treeline)
               added++;
             }
           }

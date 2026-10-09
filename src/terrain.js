@@ -397,7 +397,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         // (beds of uneven thickness: all one height, a face was a flight of stairs)
         float q0 = (wp.y + 0.19 * dot(xz, vec2(0.92, 0.38)) + 5.0 * fbm2(xz / 60.0) + 2.6 * fbm2(xz / 34.0)) / 4.4;   // (dipping with the cut beds)
         float q = q0 + 0.55 * vnoise(vec2(q0 * 0.6, 5.0)) + 0.25 * vnoise(vec2(q0 * 1.7, 9.0)), f = fract(q), bi = floor(q);
-        float kMid = smoothstep(1500.0, 500.0, camDc), kNear = smoothstep(520.0, 140.0, camDc);
+        // (round 93: bed by bed only within a quarter-mile. Further off the snow on every four-metre bed was a page of
+        // white dashes ruled across the wall, read every round as a heightmap's contour steps)
+        float kMid = smoothstep(460.0, 200.0, camDc), kNear = smoothstep(520.0, 140.0, camDc);
         rock *= mix(1.0, 0.8 + 0.42 * hash12(vec2(bi, 3.0)), steep * kMid);
         float joint = 1.0 - smoothstep(0.0, 0.045, abs(fract(along / 3.4 + 0.9 * fbm2(vec2(along / 11.0 + bi * 3.7, bi * 1.3)) + bi * 0.37) - 0.5));
         rock *= 1.0 - 0.62 * joint * steep * smoothstep(900.0, 250.0, camDc);
@@ -421,7 +423,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
           float along = dot(xz, vec2(0.8, -0.6));
           float run = smoothstep(0.4, 0.55, fbm2(vec2(along / 40.0 + bi * 5.0, bi * 1.9)));
           float riser = smoothstep(0.08, 0.2, f) * (1.0 - smoothstep(0.5 + 0.2 * hash12(vec2(bi, 7.0)), 0.78, f));
-          float k = band * zone * run * riser * smoothstep(3200.0, 900.0, camDc);
+          // (and the cliff bands: beds near to, but from afar whole ribs and buttresses of dark rock standing out of the
+          // snow, in masses a hundred metres across, not ruled lines)
+          float farK = smoothstep(300.0, 700.0, camDc);
+          float rib = smoothstep(0.5, 0.62, fbm2(xz / 70.0 + 9.2) + 0.35 * (slope - 0.22) + 0.25 * (fbm2(vec2(dot(xz, vec2(0.8, -0.6)) / 24.0, wp.y / 60.0)) - 0.5));
+          float k = band * mix(zone * run * riser, rib, farK) * smoothstep(3200.0, 900.0, camDc);
           snowAmt *= 1.0 - 0.9 * k;
           rockAmt = max(rockAmt, k);
           rock *= mix(1.0, 0.75 + 0.4 * hash12(vec2(bi, 3.0)), k);

@@ -1107,3 +1107,21 @@ with no distance filtering".
   take 0.2 more sky fill under a storm's overcast (they were black cut-outs); a coiled lariat on the near side.
 - **Bark**: furrows wander three times as far, plates are short, furrow contrast lower, tone grey-brown and
   darker (the saturated cinnamon lit up orange-red in the low sun). Pine exposure 1.23.
+
+**Critic scores.** Round 92: 4 / 3.5 / **6** (vista: "at thumbnail size this nearly passes"; "the right-hand
+mountain mass has believable snow and rock breakup"). Snow ride's first item is still "horizontal contour-line
+steps" on the right wall: at that distance it is the shader's snow-ledge dashes on every 4 m bed, not the cut
+terraces. Pines: "the forest alone would be about 5.5; the horse and rider are about 2.5 and drag it down".
+
+### Round 93
+- **Vista: a treeline.** Timbered to 440 m and more, both flanks were one even carpet of trees from floor to
+  skyline. Now the forest fills the floor and lower slopes and gives out in a ragged line at 300-400 m, with
+  open snow and rock above it, tongues of timber climbing the gullies, and trees stunted toward the line
+  (`?hightimber` to compare).
+- **Snow ride: the snowfield falls away from the horse's feet** as one long ramp down to the creek (15 m over
+  200 m), so the whole middle ground faces the lens (`?lowbrow` = the old flat-topped rise, whose lip hid the
+  floor however high it was). On it: 46 boulders under snow caps and 60 clumps of dead brush out to 300 m.
+- **Far rock.** Big outcrops are drawn out to 1.5 km (the rock layer stopped at 420 m: the spurs' rock bands
+  and the far end of the cliff were simply not drawn). Snow ledges are drawn bed by bed only within a
+  quarter-mile (further off they were white dashes ruled across the wall: the "contour steps"); from afar the
+  cliff bands are whole ribs and buttresses of dark rock a hundred metres across.

@@ -747,7 +747,9 @@ class ScatterLayer {
   update(pos, force = false) {
     if (!force && pos.distanceToSquared(this.last) < 64) return;
     this.last.copy(pos);
-    const R = this.radius, R2 = R * R;
+    // (big outcrops are drawn much further out than the boulders round them: a cliff built of them a quarter-mile off
+    // was simply not there)
+    const RN = this.radius, RN2 = RN * RN, farR = this.farRadius || 0, R = Math.max(RN, farR), farR2 = farR * farR;
     const counts = this.variants.map(() => 0);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
@@ -758,7 +760,8 @@ class ScatterLayer {
       if (!list) continue;
       for (const it of list) {
         const dx = it.x - pos.x, dz = it.z - pos.z;
-        if (dx * dx + dz * dz > R2) continue;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > RN2 && !(d2 < farR2 && it.v >= this.farFrom && it.s >= 6)) continue;
         const v = it.v;
         if (counts[v] >= this.capacity) continue;
         if (this.lean) {
@@ -1624,6 +1627,7 @@ export class Vegetation {
     // many joint planes into stacked, square-shouldered blocks (the boulders above, scaled up, are smooth domes)
     for (const sd of [31, 47, 58]) rockBuilds.push({ parts: [{ geometry: rockGeometry(sd, true, quality >= 2 ? 44 : 22, 30, 0.34), material: rMatBare }] });
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
+    this.rocks.farFrom = 6; this.rocks.farRadius = 1500;
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
     // (jointed blocks with hard edges and flat tops for the snow to lie on: the rounded boulder, scaled up to a crag,
