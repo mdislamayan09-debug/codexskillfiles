@@ -1237,7 +1237,7 @@ function rockMaterial(surf = {}, bare = false) {
       vec3 gTW = vec3(0.0, 1.0, 0.0);
       float tnz(vec3 p) { return vnoise(p.zy) * gTW.x + vnoise(p.xz + 13.7) * gTW.y + vnoise(p.xy + 29.3) * gTW.z; }
       float tfb(vec3 p) { return fbm2(p.zy) * gTW.x + fbm2(p.xz + 13.7) * gTW.y + fbm2(p.xy + 29.3) * gTW.z; }
-      float gCrack = 0.0, gCrackSnow = 0.0;
+      float gCrack = 0.0, gCrackSnow = 0.0, gStrataSnow = 0.0;
       float rockCrack(vec3 p) {
         // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
         float a = vnoise(vec2(dot(p, vec3(0.71, 0.3, 0.6)), dot(p, vec3(-0.25, 0.9, 0.33))) * 0.9);
@@ -1346,6 +1346,23 @@ function rockMaterial(surf = {}, bare = false) {
         gCrackSnow = smoothstep(0.04, 0.01, cN) * kN;   // (the fine joints only, hair-thin: a hand wide along the big ones they were white lightning drawn on the rock)
         gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 * wgt + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
       }
+      #ifdef BARE_LEDGE
+      // (round 101) strata. A cliff built of these blocks had cracks a pace apart and nothing at the scale of the cliff:
+      // "a scaled-up boulder". The rock is bedded in the world, three metres or so to a bed: each bed its own shade
+      // on the upright faces, shade under the lip of the bed above, and a line of snow lying on the ledge at its foot.
+      {
+        float camDb = length(vWPos - cameraPosition);
+        float bq = vWPos.y / 3.2 + 0.35 * tnz(vWPos * 0.11) + 0.12 * tnz(vWPos * 0.5 + 3.0);
+        float bf = fract(bq), bi = floor(bq);
+        float steepB = smoothstep(0.78, 0.4, wn.y);
+        float kB = smoothstep(1200.0, 80.0, camDb) * smoothstep(5.0, 16.0, camDb);
+        base *= mix(1.0, 0.8 + 0.4 * hash12(vec2(bi, 5.0)), steepB * kB);
+        base *= 1.0 - 0.5 * smoothstep(0.86, 1.0, bf) * steepB * kB;
+        // (in runs a few paces long, some beds thick with it and some bare: ruled the length of the cliff it was stripes)
+        float runS = smoothstep(0.44, 0.58, tnz(vec3(vWPos.x, bi * 3.0, vWPos.z) * 0.5 + 2.0) * 0.7 + 0.3 * hash12(vec2(bi, 11.0)));
+        gStrataSnow = smoothstep(0.0, 0.04, bf) * smoothstep(0.1 + 0.2 * hash12(vec2(bi, 2.0)), 0.07, bf) * steepB * kB * runS;
+      }
+      #endif
       vec4 rcl = climateAt(vWPos.xz);
       // under falling snow the stone is wet and dark, slate blue as the sky that lights it, with rime blown onto its faces
       {
@@ -1379,7 +1396,7 @@ function rockMaterial(surf = {}, bare = false) {
       // (round 90) and it packs into the joints: every crack that faces the sky at all holds a line of snow, which is
       // what ties the white to the rock's own structure (patches alone lay on it like cut paper)
       float crevS = gCrackSnow * smoothstep(0.45, 0.75, wn.y) * smoothstep(0.4, 0.6, tnz(vWPos * 1.9 + 4.0)) * 0.7;
-      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(max(topS * 0.93, crevS * 0.88), 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
+      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(max(max(topS * 0.93, crevS * 0.88), gStrataSnow * 0.86), 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
       // close to, the stone is sharp: fine bedding lines a hand apart, and grain at two scales
       {
         float nearK = smoothstep(30.0, 6.0, length(vWPos - cameraPosition));

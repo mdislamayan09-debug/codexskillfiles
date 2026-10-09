@@ -1245,3 +1245,18 @@ wedge-shaped block.
   that changed nothing). The cut is now a broken surface (two scales of noise, a slight lean), on all big
   outcrops, so the snow ride's cliff has broken tops too.
 - Rim light on cloth between the two settings the critic rejected (2.7 at 0.27).
+
+**Critic scores.** Round 100: 4 / 4 / 5. The wedge is no longer named. Vista's first item: mountain surfaces
+"salt-and-pepper noise at one scale everywhere, not following slope; silhouettes soft" (named in nearly every
+round); snow ride's: the cliff "a scaled-up boulder: crack texture whose feature size says 2 m rock, not 60 m
+cliff, no horizontal strata, no snow on ledges"; pines: the rider and horse.
+
+### Round 101
+- **Far snow and rock sort themselves by the lie of the whole face** (terrain shader, snow country, beyond 250 m):
+  the slope is read over forty metres, not cell by cell. Every crinkle of a mountainside used to shed its snow on
+  its steep side and keep it on its flat: "salt and pepper at one scale". Now gentle faces are clean snowfields
+  and steep faces dark rock; the small wind-scours fade out with distance. The lighting normal is unchanged.
+- **Outcrop rock is bedded** (rock shader, big blocks): three metres or so to a bed in world space, each bed its
+  own shade on upright faces, shade under the lip of the bed above, and snow lying on the ledge at its foot in
+  short runs of varied thickness. The snow ride's cliff reads as stratified rock with snow on its ledges
+  instead of "a scaled-up boulder".

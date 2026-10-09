@@ -103,6 +103,21 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float snowC = cl.r, jun = cl.g, aut = cl.b, des = cl.a;
   float pineK = smoothstep(-700.0, -1300.0, wp.z) * (1.0 - snowC);   // needle litter on the pine belt
   float slope = 1.0 - n.y;
+  // (round 101) From afar, in snow country, snow and rock sort themselves by the lie of the whole face, not of each
+  // facet: the slope is read over forty metres. Read cell by cell, every crinkle of a mountainside shed its snow on
+  // its steep side and kept it on its flat, and a flank a kilometre off was salt and pepper at one scale.
+  float farSnowK = 0.0;
+  {
+    float camDs = length(wp - cameraPosition);
+    if (snowC > 0.3 && camDs > 250.0) {
+      float eC = 22.0;
+      float hxC = heightAt(xz + vec2(eC, 0.0)) - heightAt(xz - vec2(eC, 0.0));
+      float hzC = heightAt(xz + vec2(0.0, eC)) - heightAt(xz - vec2(0.0, eC));
+      float slopeC = 1.0 - normalize(vec3(-hxC, 2.0 * eC, -hzC)).y;
+      farSnowK = smoothstep(250.0, 700.0, camDs) * smoothstep(0.3, 0.6, snowC);
+      slope = mix(slope, slopeC, farSnowK);
+    }
+  }
   float macro = fbm2(xz/380.0);
   float mid = fbm2(xz/45.0 + 7.0);
   // metres per pixel: noise finer than the pixel footprint fades to its mean instead of aliasing into speckle
@@ -251,6 +266,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float scour = smoothstep(0.65, 0.74, fbm2(xz / 16.0 + 2.7) + slope * 0.6) * smoothstep(0.08, 0.2, slope);
   // granite outcrops breaking through the snow on moderate mountain slopes, in clusters
   float outcrop = smoothstep(0.6, 0.68, fbm2(xz / 38.0 - 5.1) + 0.6 * slope) * smoothstep(0.12, 0.26, slope) * smoothstep(200.0, 320.0, wp.y);
+  scour *= 1.0 - 0.8 * farSnowK;   // (the small wind-scours fade out with distance: they were the pepper)
   scour = max(scour, outcrop);
   snowAmt *= 1.0 - 0.3 * scour * smoothstep(0.3, 0.6, snowC);
   snowAmt *= 1.0 - 0.5 * outcrop * smoothstep(0.3, 0.6, snowC);
