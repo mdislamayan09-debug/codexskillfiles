@@ -1045,9 +1045,10 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
       {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
-        vec3 pg = mix(srgbV(vec3(118,138,66)), srgbV(vec3(156,168,88)), aOff.w);   // (pale yellow-green where the sun finds it; its own shade keeps it olive)
+        // (round 79: greyer and darker: in a sunlit gap the yellow-green lit up as a strip of lime down the trail)
+        vec3 pg = mix(srgbV(vec3(100,114,64)), srgbV(vec3(126,134,80)), aOff.w);   // (pale yellow-green where the sun finds it; its own shade keeps it olive)
         vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
-        vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.95 * (0.75 + 0.5 * midV);
+        vec3 pc = mix(pg, ps, clamp(step(0.5, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.8 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
       }
       vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
@@ -1124,10 +1125,12 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       const soft = (x, st, o, k) => { const q = x / st + o, f = q - Math.floor(q) - 0.5; return (Math.floor(q) + 0.5 + 0.5 * Math.tanh(k * f) / Math.tanh(k * 0.5) - o) * st; };
       // (the big outcrop variants: joints closer together and the blocks well rounded, a weathered mass split by
       // cracks; at the boulders' spacing a rock six metres tall was three huge boxes)
-      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 5.5 + 3 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
-      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.74 : 0.9);
-      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.8 : 0.93);
-      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.74 : 0.9);
+      // (round 79: the big ones only half way to the lattice, on softer steps: a weathered mass with ledges in it, its
+      // joints drawn as cracks by the surface. Three-quarters snapped, an outcrop was a pile of boxes with pointed corners)
+      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 3.6 + 2 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
+      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.46 : 0.9);
+      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.62 : 0.93);
+      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.46 : 0.9);
       v.applyMatrix3(jointMi);
       // weathering: faces spalled and pitted a little
       if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
@@ -1170,6 +1173,24 @@ function rockMaterial(surf = {}, bare = false) {
         tz = vec3(tz.xy + n.xy, abs(tz.z) * n.z);
         return normalize(tx.zyx * w.x + ty.xzy * w.y + tz.xyz * w.z);
       }
+      // A network of cracks: the borders between scattered cells, laid on each of the three planes (cells broader than
+      // tall on upright faces, as bedded rock breaks). Returns the distance to the nearest border in cell units.
+      float crackCell(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        float d1 = 9.0, d2 = 9.0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+          vec2 g = vec2(float(x), float(y));
+          float d = length(g + hash22(i + g) - f);
+          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+        }
+        return d2 - d1;
+      }
+      float crackNet(vec3 p, vec3 n, float sc) {
+        vec3 w = pow(abs(n), vec3(8.0)); w /= (w.x + w.y + w.z);
+        vec3 q = p * sc + 0.16 * vec3(vnoise(p.yz * sc * 2.3), vnoise(p.zx * sc * 2.3 + 5.0), vnoise(p.xy * sc * 2.3 + 9.0));
+        return crackCell(q.zy * vec2(1.0, 1.7)) * w.x + crackCell(q.xz * 1.15) * w.y + crackCell(q.xy * vec2(1.0, 1.7) + 4.3) * w.z;
+      }
+      float gCrack = 0.0;
       float rockCrack(vec3 p) {
         // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
         float a = vnoise(vec2(dot(p, vec3(0.71, 0.3, 0.6)), dot(p, vec3(-0.25, 0.9, 0.33))) * 0.9);
@@ -1188,6 +1209,16 @@ function rockMaterial(surf = {}, bare = false) {
           vec3 wn2 = rockTriN(vWPos + 3.1, wn1, 0.8);
           vec3 wnP = normalize(mix(wn1, wn2, 0.55 * smoothstep(30.0, 6.0, camD)));
           normal = normalize((viewMatrix * vec4(wnP, 0.0)).xyz);
+          // the cracks are cut into the surface: their walls catch the light and hold shade
+          {
+            float hgt = -gCrack;
+            vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition);
+            float hx = dFdx(hgt), hy = dFdy(hgt);
+            vec3 r1 = cross(dpdy, normal), r2 = cross(normal, dpdx);
+            float det = dot(dpdx, r1);
+            vec3 grad = sign(det) * (hx * r1 + hy * r2);
+            normal = normalize(abs(det) * normal - grad);
+          }
         }`);
     },
     fragColor: /* glsl */ `
@@ -1215,7 +1246,7 @@ function rockMaterial(surf = {}, bare = false) {
         #ifdef BARE_LEDGE
         // (only a little of the scan: a half-metre photograph stretched over a three-metre block a pace from the lens
         // read as smeared marble)
-        base *= mix(1.0, scanL, 0.3);
+        base *= mix(1.0, scanL, 0.1);   // (round 79: less still: its blotches, stretched to a metre, were camouflage)
         #else
         base *= scanL;
         #endif
@@ -1250,6 +1281,19 @@ function rockMaterial(surf = {}, bare = false) {
       #else
       base *= 1.0 - 0.22 * jointK;
       #endif
+      // cracks: the rock's joints drawn on it as thin dark lines, a close network a pace across and a coarse one that
+      // still reads on a cliff a quarter-mile off
+      {
+        float camDc = length(vWPos - cameraPosition);
+        float kN = smoothstep(48.0, 12.0, camDc), kF = smoothstep(700.0, 120.0, camDc) * smoothstep(8.0, 40.0, camDc);
+        float cN = kN > 0.0 ? crackNet(vWPos, wn, 1.45) : 1.0, cF = kF > 0.0 ? crackNet(vWPos + 17.0, wn, 0.24) : 1.0;
+        float cN2 = kN > 0.5 ? crackNet(vWPos + 5.0, wn, 4.6) : 1.0;
+        float lineN = smoothstep(0.05, 0.012, cN) * kN, lineF = smoothstep(0.06, 0.015, cF) * kF, line2 = smoothstep(0.05, 0.01, cN2) * smoothstep(0.5, 1.0, kN);
+        base *= 1.0 - 0.6 * lineN - 0.5 * lineF - 0.3 * line2;
+        // (the stone a shade darker for a hand's width either side of a joint, where water stands)
+        base *= 1.0 - 0.14 * smoothstep(0.3, 0.0, cN) * kN - 0.12 * smoothstep(0.3, 0.0, cF) * kF;
+        gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
+      }
       vec4 rcl = climateAt(vWPos.xz);
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
@@ -1266,24 +1310,32 @@ function rockMaterial(surf = {}, bare = false) {
       #ifdef BARE_LEDGE
       // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
       // facets read as paper laid on the rock)
-      float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
+      // (its edge broken into grains and flecks: a clean edge was a white paper cut-out laid on the stone)
+      float topS = smoothstep(0.72, 0.95, wn.y) * smoothstep(0.3, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.2 * (vnoise(vWPos.xz * 47.0) - 0.5) + 0.16 * (vnoise(vWPos.xz * 130.0 + vWPos.y * 90.0) - 0.5));
       // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
       rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.5 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.35 + 0.65 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * vec2(7.0, 2.1) + vWPos.y * 3.0))));
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
-      base *= vec3(0.86, 0.9, 0.97) * (0.62 + 0.62 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));
+      base *= vec3(0.86, 0.9, 0.97) * (0.74 + 0.4 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
       // crust lichens, in crisp-edged crinkled patches a hand or two across: pale grey-green, ochre, and the black one
       // that grows in the damp streaks
       float crink = 0.22 * (vnoise(vWPos.xz * 23.0 + vWPos.y * 17.0) - 0.5) + 0.1 * (vnoise(vWPos.xy * 61.0 + vWPos.z * 43.0) - 0.5);
-      float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28);
-      float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22);
-      float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
-      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3);
+      #ifdef BARE_LEDGE
+      // (a pace from the lens lichen is a scatter of hand-sized crusts, not a map of continents: at the boulders' scale
+      // it lay on the ledge in crisp camouflage shapes)
+      float lsc = 3.4, lK = 0.45;
+      #else
+      float lsc = 1.0, lK = 1.0;
+      #endif
+      float lichen = smoothstep(0.56, 0.6, vnoise((vWPos.xz * 1.7 + vWPos.y * 2.3) * lsc) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28 * lK);
+      float ochre = smoothstep(0.66, 0.7, vnoise((vWPos.xz * 2.3 - vWPos.y * 1.9) * lsc + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22 * lK);
+      float blackL = smoothstep(0.64, 0.68, vnoise((vWPos.zy * 2.9 + vWPos.x * 2.1) * lsc - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
+      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3 * lK);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,

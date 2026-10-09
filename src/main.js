@@ -260,7 +260,10 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
-    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: 1.18, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
+    // (round 79: framed as the reference is: the lens above the rider's shoulder looking down the trail, the rider left of
+    // centre with the hat a third down and the frame cutting the horse at the croup, the trail running up to the right;
+    // ?pinesold is the level, right-of-centre framing of rounds 50-78)
+    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -268,8 +271,12 @@ async function init() {
       // (round 77: the main valley's floor, looking north up it: timbered flanks with rock on them either side and
       // a notch at its head, where the canyon had sheer pale walls a kilometre off that read as painted slabs;
       // ?canyonride brings the canyon back)
-      const [x, z, yaw] = (params.has('canyonride') ? G.clearNear(-3300, -2700, 1.78) : G.clearNear(-620, -2700, 2.83)) || G.findCanyonRide() || G.alongValley(0.5); // (framed as the reference: the whole horse, its feet near the bottom edge and the rider's hat four-tenths down)
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      const [x, z, yaw] = (params.has('canyonride') ? G.clearNear(-3300, -2700, 1.78) : G.clearNear(-620, -2700, params.has('rideold') ? 2.83 : 2.77)) || G.findCanyonRide() || G.alongValley(0.5); // (framed as the reference: the whole horse, its feet near the bottom edge and the rider's hat four-tenths down)
+      // (round 79: measured off the reference: the lens six metres back and near three up, the horse seen three-quarters
+      // from behind with its feet at the bottom edge and the rider's hat just under half way down; ?rideold is the close
+      // three-quarter framing of rounds 50-78)
+      if (params.has('rideold')) return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true };
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.5, 2.8, -6.0], lookRel: [-3.6, 0.8, 18], turn: -0.62, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -1187,6 +1194,24 @@ async function init() {
         const [x, g, z] = hit, k = rr();
         veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.25 + rr() * 0.5) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : 7 + Math.floor(rr() * 2));   // (no dead stalks: they stood about the ledge as stakes)
       }
+      // (round 79) and what the reference's ledge is thick with: russet brush in dense low domes (three or four plants
+      // grown into one another) and frosted grass in fine tufts (many small ones together, not one broad fan), in the
+      // pockets between the rocks all across the bottom of the frame
+      for (let i = 0; i < 34; i++) {
+        const bnx = -1.02 + rr() * 2.04, bny = -0.98 + rr() * 0.5;
+        if (hidesHome(bnx, bny)) continue;
+        const hit = groundAt(bnx, bny, 26);
+        if (!hit) continue;
+        const [x, g, z, t] = hit;
+        if (t < 2.4) continue;
+        if (i % 3 === 0) {
+          const s0 = 0.34 + rr() * 0.3;
+          for (let q = 0; q < 4; q++) { const bx = x + (rr() - 0.5) * 0.5 * s0 * 2, bz = z + (rr() - 0.5) * 0.5 * s0 * 2; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.08, bz, rr() * 6.28, s0 * (0.75 + rr() * 0.4), 7 + Math.floor(rr() * 2)); }
+        } else for (let q = 0; q < 7; q++) {
+          const bx = x + (rr() - 0.5) * 0.9, bz = z + (rr() - 0.5) * 0.9;
+          veg.bushes.add(bx, world.heightAt(bx, bz) - 0.03, bz, rr() * 6.28, 0.14 + rr() * 0.16, 9);
+        }
+      }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
       // way down the near ground, so it reads as a mountainside rather than a blank white wedge
       const d = new THREE.Vector3(l.x - c.x, 0, l.z - c.z).normalize(), rt = new THREE.Vector3(-d.z, 0, d.x);
@@ -1434,6 +1459,7 @@ async function init() {
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);
+    U.uCharFill.value = 0.05 + 0.22 * (G.forestK || 0) * (1 - U.uNight.value);
     if (G.keyShaft) U.uCanopySpot.value.set(player.hpos.x, player.hpos.y + 1.7, player.hpos.z, G.keyShaft); else U.uCanopySpot.value.w = 0;
     town.update(dt, U.uNight.value, sky.weather.storm);
     veg.update(camera.position);

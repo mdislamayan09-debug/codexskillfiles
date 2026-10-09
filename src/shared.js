@@ -40,6 +40,7 @@ export const U = {
   uPlayerPos: { value: new THREE.Vector3() },
   uNight: { value: 0 },
   uCloudShadow: { value: 0 },  // how much of the sun the broken storm deck blocks (0 = none)
+  uCharFill: { value: 0.06 },   // light bounced onto figures from the ground and the lit air round them
   uCloudShadowOff: { value: new THREE.Vector2() },   // where the deck's breaks lie (a shot can wait for the light)
   uTrail: { value: Array.from({ length: 48 }, () => new THREE.Vector2()) },   // horse trail through snow (terrain)
   uTrailN: { value: 0 },
@@ -164,6 +165,7 @@ export const GLSL_FOG_PARS = /* glsl */ `
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uFogColor;
+uniform float uCharFill;
 uniform vec3 uFogSunColor;
 uniform float uFogDensity;
 uniform float uFogFalloff;

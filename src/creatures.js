@@ -35,7 +35,8 @@ function blanketTexture(r) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d');
   // worn, sun-faded wool in earth reds and browns (a bright blue blanket read as a plastic placeholder)
-  const pal = [['#6a2a1c', '#c4b088', '#2a221c'], ['#7a3a22', '#b8a47c', '#3a2a20'], ['#4a3a2a', '#c0ae86', '#6a2a1c']][Math.floor(r() * 3)];
+  // (drab: a red blanket with a cream zigzag was the loudest thing in any frame the horse stood in)
+  const pal = [['#4a3c30', '#75674f', '#2a221c'], ['#50402f', '#786a52', '#30261e'], ['#453a30', '#70644e', '#3a2a20']][Math.floor(r() * 3)];
   g.fillStyle = pal[0]; g.fillRect(0, 0, 256, 256);
   for (let y = 0; y < 256; y += 32) { g.fillStyle = pal[2]; g.fillRect(0, y + 2, 256, 4); }
   g.fillStyle = pal[1];
@@ -122,7 +123,9 @@ const std = (o) => {
       vec3 Vv = normalize(vViewPosition);
       float fres = pow(1.0 - clamp(abs(dot(normalize(vNormal), Vv)), 0.0, 1.0), 3.0);
       vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
-      totalEmissiveRadiance += (diffuseColor.rgb + 0.03) * uSunColor * fres * smoothstep(-0.2, 0.8, dot(-Vv, wsun)) * 0.4;
+      // (a thin edge only: at three times this every hat and strap wore a glowing outline)
+      totalEmissiveRadiance += (diffuseColor.rgb + 0.008) * uSunColor * fres * smoothstep(-0.2, 0.8, dot(-Vv, wsun)) * 0.13;
+      totalEmissiveRadiance += diffuseColor.rgb * uFogColor * uCharFill;
     }`); } }));
   return MATS.get(key);
 };
@@ -176,8 +179,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               // between (broad light and dark shapes read as muscle; this fine it reads as hide)
               float p1 = fbm2(vRest.xy * 31.0 + vRest.z * 23.0), p2 = vnoise(vRest.xy * 150.0 - vRest.z * 115.0), p3 = fbm2(vRest.xy * 9.0 + vRest.z * 7.0);
               float scuff = smoothstep(0.42, 0.8, p1 * 0.8 + p2 * 0.2) * (0.3 + 0.7 * smoothstep(0.35, 0.65, p3));
-              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(2.3, 1.95, 1.6) + vec3(0.02, 0.014, 0.008), scuff * 0.36);
-              diffuseColor.rgb *= 1.0 - 0.4 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
+              // (rubbed a shade paler, not painted tan: at twice this the coat was a camouflage of orange blotches)
+              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.6, 1.48, 1.34) + vec3(0.012, 0.01, 0.007), scuff * 0.34);
+              diffuseColor.rgb *= 1.0 - 0.3 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
             }
             // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
             float wear = smoothstep(1.3, 1.5, vRest.y) * (0.6 + 0.4 * fbm2(vRest.xz * 4.0));
@@ -201,7 +205,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (fine flecks melting into the coat, thicker along the top line: broad white blotches read as a pinto's patches)
           // (a soft veil lying on what faces up, thicker in places: as separate flecks it read as noise sprayed on the coat)
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.62, 0.98, wn.y) * (0.3 + 0.7 * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 19.0 + vRest.y * 7.0) + 0.4 * vnoise(vRest.xz * 55.0 - vRest.y * 20.0)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.3'});
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.2'});
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
         // inside of the legs lie in the body's own shade (lit evenly all round, a body read as a flat cut-out)
@@ -233,7 +237,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             ${quad
               // broad muscle swells, the coat's hair lying in streaks along the body (catching the light in bands),
               // and the groove down the croup
-              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0007 + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0004 - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02 - 0.014 * smoothstep(0.04, 0.0, abs(abs(vRest.x) - 0.12 - 0.05 * (1.3 - vRest.y))) * smoothstep(-0.68, -0.8, vRest.z) * smoothstep(0.88, 1.02, vRest.y) * smoothstep(1.46, 1.34, vRest.y) - 0.012 * smoothstep(0.07, 0.0, abs(vRest.z + 0.36 - 0.25 * (vRest.y - 1.15))) * smoothstep(0.95, 1.1, vRest.y) * smoothstep(1.45, 1.3, vRest.y) * smoothstep(0.15, 0.25, abs(vRest.x));'
+              ? 'hgt = vnoise(vRest.zy * 3.2 + vRest.x * 1.5) * 0.02 + vnoise(vRest.zy * 7.0 + vRest.x * 3.0) * 0.012 + vnoise(vec2(vRest.z * 12.0, vRest.y * 150.0 + vRest.x * 130.0)) * 0.0007 * smoothstep(0.45, 0.15, length(fwidth(vRest)) * 150.0) + vnoise(vec2(vRest.z * 40.0, vRest.y * 420.0 + vRest.x * 380.0)) * 0.0004 * smoothstep(0.45, 0.15, length(fwidth(vRest)) * 420.0) - smoothstep(0.05, 0.0, abs(vRest.x)) * smoothstep(-0.6, -0.95, vRest.z) * smoothstep(1.0, 1.3, vRest.y) * 0.02 - 0.014 * smoothstep(0.04, 0.0, abs(abs(vRest.x) - 0.12 - 0.05 * (1.3 - vRest.y))) * smoothstep(-0.68, -0.8, vRest.z) * smoothstep(0.88, 1.02, vRest.y) * smoothstep(1.46, 1.34, vRest.y) - 0.012 * smoothstep(0.07, 0.0, abs(vRest.z + 0.36 - 0.25 * (vRest.y - 1.15))) * smoothstep(0.95, 1.1, vRest.y) * smoothstep(1.45, 1.3, vRest.y) * smoothstep(0.15, 0.25, abs(vRest.x));'
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * (lab == 3 ? 0.0007 : 0.003) * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035;
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
@@ -260,12 +264,16 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             // of the hair. It is what shows a horse's muscle from any distance; without it the body is one flat tone.
             vec3 Ls = normalize((viewMatrix * vec4(normalize(vec3(uSunDir.x * 0.6, 1.0, uSunDir.z * 0.6)), 0.0)).xyz);
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
-            float streak = 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0));
+            // (the streaks fade out as they near a pixel's width: beating against the pixel grid they wove the rump into twill)
+            float streak = mix(1.0, 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0)), smoothstep(0.5, 0.18, length(fwidth(vRest)) * 64.0));
             totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - 0.8 * uSnowfall);
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
-          totalEmissiveRadiance += (diffuseColor.rgb + 0.035) * uSunColor * fres * back * ${quad ? '0.14' : '0.6'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.3' : '0.15'};
+          // (thin: at 0.6 the rider's whole outline glowed like velvet under a lamp)
+          totalEmissiveRadiance += (diffuseColor.rgb + 0.01) * uSunColor * fres * back * ${quad ? '0.1' : '0.18'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.2' : '0.1'};
+          // light bounced up off the ground and in from the lit air: a figure in shade is dim, not black
+          totalEmissiveRadiance += diffuseColor.rgb * uFogColor * uCharFill;
         }`);
     },
   });
@@ -275,7 +283,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x5e4a38, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x44301f, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x6b6253, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x56402f, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x55483a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -319,9 +327,11 @@ function humanPrims(o) {
     add(EL([0, 1.49, 0.07], [0.09, 0.07, 0.04]), L.fur, 'spine', 0.03); // lapels
   }
   if (o.coat) {
-    add(EL([0, 1.33, -0.005], [0.205, 0.19, 0.135]), L.coat, 'spine', 0.03);
-    add(RC([-0.17, 1.47, -0.02], [0.17, 1.47, -0.02], 0.085, 0.085), L.coat, 'spine', 0.03);
-    add(RC([0, 1.15, -0.012], [0, 0.74, -0.03], 0.185, 0.215), L.coat, 'hips', 0.035);
+    // (cut square: broad across the shoulders, straight down the sides to the saddle. Round-shouldered and fuller at
+    // the waist than the chest, the rider sat on the horse like a sack)
+    add(EL([0, 1.33, -0.005], [0.2, 0.19, 0.132]), L.coat, 'spine', 0.03);
+    add(RC([-0.19, 1.478, -0.022], [0.19, 1.478, -0.022], 0.086, 0.086), L.coat, 'spine', 0.026);
+    add(RC([0, 1.15, -0.012], [0, 0.74, -0.03], 0.172, 0.205), L.coat, 'hips', 0.035);
     add(RC([0, 1.52, -0.05], [0, 1.6, -0.06], 0.085, 0.07), L.coat, 'spine', 0.03); // collar
   }
   if (o.dress) add(RC([0, 1.02, 0], [0, 0.1, 0], 0.17, 0.38), L.pants, 'hips', 0.06);
@@ -551,7 +561,7 @@ function tailorCoat(pos, lab, R, G, index, n, winter) {
     // long folds falling from the shoulder blades, a little fuller toward the hem
     // (long folds falling from the shoulder blades, deepening toward the hem, and creases bunched across the small of
     // the back where a rider sits: deep enough to catch the light as folds)
-    const fold = (0.0105 * Math.sin(a * 7 + 1.3 * Math.sin(y * 14)) * (0.25 + (y1 - y) * 2.0) + 0.0055 * Math.sin(y * 46 + 2.0 * Math.sin(a * 3)) * Math.exp(-((y - (y0 + 0.2)) ** 2) / 0.012)) * (winter ? 1.2 : 1);
+    const fold = (0.0058 * Math.sin(a * 9 + 1.3 * Math.sin(y * 14)) * (0.25 + (y1 - y) * 2.0) + 0.0055 * Math.sin(y * 46 + 2.0 * Math.sin(a * 3)) * Math.exp(-((y - (y0 + 0.2)) ** 2) / 0.012)) * (winter ? 1.2 : 1);
     const rt = Math.max(r, dr[yi][a0] * (1 - t) + dr[yi][a1] * t) + fold * w;
     const k = 1 + (rt / Math.max(r, 1e-4) - 1) * w;
     pos[i * 3] *= k; pos[i * 3 + 2] = cz[yi] + (pos[i * 3 + 2] - cz[yi]) * k;
@@ -763,14 +773,15 @@ export class Human {
         const bag = sweep([{ p: V(0.235, e.y - 0.02, e.z + 0.13), rx: 0.03, ry: 0.06 }, { p: V(0.25, e.y - 0.05, e.z + 0.09), rx: 0.05, ry: 0.11 },
           { p: V(0.255, e.y - 0.06, e.z + 0.02), rx: 0.055, ry: 0.12 }, { p: V(0.25, e.y - 0.05, e.z - 0.045), rx: 0.05, ry: 0.11 }, { p: V(0.235, e.y - 0.02, e.z - 0.08), rx: 0.03, ry: 0.06 }], 12);
         bag.translate(-bones.hips.userData.rest.x, -bones.hips.userData.rest.y, -bones.hips.userData.rest.z);
-        bones.hips.add(mesh(bag, std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(1.9, 1.6, 1.3), roughness: 0.7 })));
+        bones.hips.add(mesh(bag, std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(0.85, 0.7, 0.56), roughness: 0.78 })));   // (worn brown: lifted to tan it hung at the hip like an orange)
       }
     }
     // holster + revolver grip on the hip
     // on the right hip (-x), the satchel rides on the left
-    const holster = new THREE.BoxGeometry(0.06, 0.2, 0.08); holster.translate(-0.19, -0.14, 0.02);
+    // (a shaped pouch tapering to the muzzle: the plain block stood on the hip as a post)
+    const holster = sweep([{ p: V(-0.2, -0.03, 0.03), rx: 0.022, ry: 0.045 }, { p: V(-0.205, -0.12, 0.025), rx: 0.024, ry: 0.04 }, { p: V(-0.2, -0.24, 0.01), rx: 0.016, ry: 0.024 }], 10);
     bones.hips.add(mesh(holster, leather));
-    const grip = new THREE.BoxGeometry(0.03, 0.08, 0.04); grip.rotateZ(0.3); grip.translate(-0.2, -0.01, 0.03);
+    const grip = sweep([{ p: V(-0.2, -0.04, 0.035), rx: 0.012, ry: 0.02 }, { p: V(-0.215, 0.01, 0.05), rx: 0.013, ry: 0.018 }, { p: V(-0.225, 0.05, 0.075), rx: 0.012, ry: 0.016 }], 8);
     bones.hips.add(mesh(grip, std({ color: 0x5a3a24 })));
     // fur fringe: short hair cards around the trapper hat and the collar so the silhouette reads as pelt, not a shell
     if (o.furHat) {
@@ -826,7 +837,9 @@ export class Human {
     }
     // coat tails: two cloth panels from the waist that split over the cantle and hang down the horse's flanks
     // (the sculpted skirt alone reads as a solid tube from behind)
-    if (o.coat && (outfit === 'arthur' || outfit === 'winter')) {
+    // (round 79: left off. Flat panels hanging past the saddle, they showed from behind and above as two black slabs
+    // standing on the horse's back; the jackets in the references end at the hip)
+    if (o.coat && o.longTails && (outfit === 'arthur' || outfit === 'winter')) {
       const tailM = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(o.coat).multiplyScalar(2.1), roughness: 0.62, side: THREE.DoubleSide });
       for (const sd of [-1, 1]) {
         const W = 0.2, L = outfit === 'winter' ? 0.62 : 0.56, segX = 6, segY = 10;
@@ -962,7 +975,8 @@ const COATS = {
 
 function legBones(front, s, z, ys) {
   const n = (k) => `${front ? 'f' : 'h'}${s < 0 ? 'L' : 'R'}${k}`;
-  const zs = front ? [z, z, z + 0.01, z + 0.01] : [z, z - 0.04, z - 0.11, z - 0.09];
+  // (the hind leg stands angled: stifle forward under the flank, hock well back, cannon plumb below it)
+  const zs = front ? [z, z, z + 0.01, z + 0.01] : [z, z + 0.11, z - 0.18, z - 0.16];
   return [
     { name: n(0), parent: 'body', pos: [s * 0.2, ys[0], zs[0]] },
     { name: n(1), parent: n(0), pos: [s * 0.2, ys[1], zs[1]] },
@@ -1035,19 +1049,24 @@ function quadPrims(kind, QB) {
       // muscled forearm tapering hard into a flat, bony cannon
       add(RC([x * 0.95, 1.3, 0.52], [x, 0.92, 0.53], 0.15 * lw, 0.1 * lw), QL.coat, nb(0), 0.08);
       add(RC([x, 0.92, 0.53], [x, 0.53, 0.53], 0.1 * lw, 0.055 * lw), QL.coat, nb(1), 0.05);
-      add(EL([x, 0.51, 0.535], [0.066 * lw, 0.072 * lw, 0.07 * lw]), QL.points, nb(2), 0.03);     // knee
-      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.052 * lw, 0.046 * lw), QL.points, nb(2), 0.02);
+      add(EL([x, 0.51, 0.535], [0.06 * lw, 0.07 * lw, 0.056 * lw]), QL.points, nb(2), 0.03);     // knee (broad and flat, not a ball)
+      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.044 * lw, 0.04 * lw), QL.points, nb(2), 0.02);
     } else {
       // (each thigh its own column, daylight between them from the stifle down: fused, the quarters ran down to
       // the hocks as one pear)
-      add(EL([x * 1.02, 1.12, -0.62], [0.142 * lw * bw, 0.33, 0.25]), QL.coat, nb(0), 0.05);   // thigh and stifle
-      add(RC([x * 1.02, 0.97, -0.67], [x, 0.58, -0.74], 0.115 * lw, 0.058 * lw), QL.coat, nb(1), 0.045);   // gaskin
-      add(EL([x, 0.56, -0.745], [0.06 * lw, 0.088 * lw, 0.092 * lw]), QL.points, nb(2), 0.03);    // hock
-      add(EL([x, 0.6, -0.815], [0.035 * lw, 0.05 * lw, 0.035 * lw]), QL.points, nb(2), 0.02);       // point of hock
-      add(RC([x, 0.55, -0.74], [x, 0.18, -0.72], 0.052 * lw, 0.046 * lw), QL.points, nb(2), 0.02);
+      // (round 79: built on the leg's real angles. As a plumb column with a ball at the hock it was a table leg: now
+      // the stifle stands forward, the gaskin slopes back to a hock that is deep fore and aft and narrow from behind,
+      // and the hamstring runs down from the buttock to the point of the hock)
+      add(EL([x * 1.02, 1.13, -0.6], [0.142 * lw * bw, 0.33, 0.26]), QL.coat, nb(0), 0.05);   // thigh
+      add(EL([x * 1.02, 1.0, -0.47], [0.1 * lw * bw, 0.15, 0.12]), QL.coat, nb(0), 0.06);   // stifle
+      add(RC([x * 1.02, 0.98, -0.53], [x * 0.97, 0.61, -0.79], 0.112 * lw, 0.056 * lw), QL.coat, nb(1), 0.045);   // gaskin
+      add(RC([x, 1.04, -0.82], [x * 0.97, 0.67, -0.855], 0.062 * lw, 0.024 * lw), QL.coat, nb(1), 0.05);   // hamstring
+      add(EL([x * 0.96, 0.585, -0.8], [0.043 * lw, 0.085 * lw, 0.082 * lw]), QL.points, nb(2), 0.03);    // hock
+      add(EL([x * 0.96, 0.635, -0.868], [0.026 * lw, 0.05 * lw, 0.034 * lw]), QL.points, nb(2), 0.02);       // point of hock
+      add(RC([x * 0.96, 0.57, -0.795], [x * 0.97, 0.18, -0.78], 0.045 * lw, 0.04 * lw), QL.points, nb(2), 0.02);
     }
-    const zf = front ? 0.54 : -0.72;
-    add(EL([x, 0.17, zf - 0.005], [0.062 * lw, 0.062 * lw, 0.072 * lw]), QL.points, nb(3), 0.025);   // fetlock
+    const zf = front ? 0.54 : -0.78;
+    add(EL([x * (front ? 1 : 0.97), 0.17, zf - 0.005], [0.05 * lw, 0.058 * lw, 0.068 * lw]), QL.points, nb(3), 0.025);   // fetlock
     add(RC([x, 0.16, zf + 0.005], [x, 0.065, zf + 0.04], 0.042 * lw, 0.05 * lw), QL.points, nb(3), 0.02);
     add(RC([x, 0.065, zf + 0.035], [x, 0.018, zf + 0.06], 0.058 * lw, 0.066 * lw), QL.hoof, nb(3), 0.008, { rigid: true });
   };
@@ -1188,26 +1207,38 @@ export class Quadruped {
       // round, layered bundle, full at the top and separating into wisps toward the hocks (not one flat card)
       // (fuller: 34 narrow locks within 7 cm of the dock read from behind as one dark strip)
       // (a switch, not a broom: narrow at the dock, fullest a third of the way down, drawing in to loose ends)
-      for (let i = 0; i < 30; i++) {
-        // (a narrow switch: at twice this width it hung behind the horse like a board)
-        const th = r() * Math.PI * 2, rho = 0.008 + r() * 0.034;
-        const len = 0.95 + r() * 0.5 - rho * 3;
-        const c = new THREE.PlaneGeometry(0.05 + r() * 0.04, len, 2, 10);
+      // (round 79: a body of hair with locks lying on it. Thirty cards within a hand's width of the dock were a flat
+      // striped ribbon from any angle but square behind; now a solid core gives the switch its bulk (narrow at the dock,
+      // full a third of the way down, drawing in toward the hocks) and the cards lie on its surface and run on past its
+      // end as loose wisps. It hangs close against the quarters instead of trailing out behind.)
+      const LT = 0.8;   // (to the hocks, not the fetlocks)
+      const coreR = (y) => { const t = Math.min(1, Math.max(0, y / LT)); return 0.02 + 0.042 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1 + 0.03)), 0.85) * (1 - 0.3 * t); };
+      const bendX = (y) => 0.035 * Math.sin(y * 2.1) * Math.min(1, y * 1.5), bendZ = (y) => -Math.sin(Math.min(y, 0.4) * 2.6) * 0.05 + y * 0.015;
+      {
+        const prof = [];
+        for (let k = 0; k <= 22; k++) { const y = (k / 22) * LT; prof.push(new THREE.Vector2(k === 22 ? 0.0 : coreR(y) * 0.86, -y)); }
+        const core = new THREE.LatheGeometry(prof, 14);
+        const kp = core.attributes.position;
+        for (let k = 0; k < kp.count; k++) { const y = -kp.getY(k); kp.setXYZ(k, kp.getX(k) + bendX(y), kp.getY(k) - 0.03, kp.getZ(k) * 0.74 + bendZ(y) - 0.02); }
+        core.computeVertexNormals();
+        bones.tail.add(mesh(core, std({ color: new THREE.Color(C.mane).lerp(new THREE.Color(0x3a2a1e), 0.6), roughness: 0.8 })));
+      }
+      for (let i = 0; i < 72; i++) {
+        const th = r() * Math.PI * 2, kR = 0.8 + r() * 0.3;
+        const len = 0.55 + r() * 0.5, w = 0.035 + r() * 0.035, wph = r() * 6.28, wam = 0.006 + r() * 0.012;
+        const c = new THREE.PlaneGeometry(w, len, 2, 12);
         c.translate(0, -len / 2, 0);
-        const cp0 = c.attributes.position;
-        for (let k = 0; k < cp0.count; k++) { const t = Math.max(0, -cp0.getY(k) / len); cp0.setX(k, cp0.getX(k) * (0.6 + 0.9 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, t * 1.1))), 0.8))); }
-        c.rotateZ((r() - 0.5) * 0.1);
-        c.rotateY(th);
-        c.translate(Math.sin(th) * rho, -0.02 - r() * 0.04, Math.cos(th) * rho - 0.02);
-        const cp = c.attributes.position;
+        const cp = c.attributes.position, tw = (r() - 0.5) * 0.5;
         for (let k = 0; k < cp.count; k++) {
-          const y = -cp.getY(k);
-          // carried a little off the quarters at the dock, then hanging plumb
-          cp.setZ(k, cp.getZ(k) - Math.sin(Math.min(y, 0.4) * 2.6) * 0.12 + y * 0.02);
-          const sw = Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, y) / 1.3)));
-          cp.setX(k, cp.getX(k) * (1.0 - 0.45 * Math.min(1, y / 1.3)) + Math.sin(th) * 0.05 * sw + 0.1 * Math.sin(y * 2.1) * Math.min(1, y * 1.5));   // (a hanging tail is never plumb and square)
-          cp.setZ(k, cp.getZ(k) + Math.cos(th) * 0.03 * sw);
+          const u = cp.getX(k), y = Math.max(0, -cp.getY(k)), t = y / len;
+          // (each lock narrows to its end and wavers as it falls: straight parallel cards were a plank)
+          const taper = (0.6 + 0.9 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, t * 1.1))), 0.8)) * (1 - 0.65 * Math.min(1, Math.max(0, (t - 0.55) / 0.45)));
+          const wav = wam * Math.sin(y * 11 + wph) * Math.min(1, y * 3);
+          const rad = (y < LT ? coreR(y) : coreR(LT) * Math.max(0.25, 1 - (y - LT) / 0.45)) * kR + 0.004;
+          const a = th + tw * t;   // each lock winds a little round the switch as it falls
+          cp.setXYZ(k, Math.sin(a) * rad + Math.cos(a) * (u * taper + wav) + bendX(y), -y - 0.03, (Math.cos(a) * rad - Math.sin(a) * (u * taper + wav)) * 0.74 + bendZ(y) - 0.02);
         }
+        c.computeVertexNormals();
         tcards.push(c);
       }
       const tm = mesh(mergeGeometriesSafe(tcards), hairM); bones.tail.add(tm);
@@ -1251,7 +1282,7 @@ export class Quadruped {
     // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
     // (worn, oiled and dusty: at 0.55 roughness with a strong lift the bags and seat read as orange plastic)
     const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(0.5, 0.4, 0.33), roughness: 0.82 });   // dark, used saddle leather
-    const blanket = std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.42, 0.47, 0.56), roughness: 0.95 });   // (faded grey-blue: the red read as orange plastic under the rider)
+    const blanket = std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.7, 0.7, 0.7), roughness: 0.95 });   // (faded grey-blue: the red read as orange plastic under the rider)
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
     for (let i = 0; i < bp.count; i++) { const x = bp.getX(i); bp.setY(i, bp.getY(i) - x * x * 1.9); }
@@ -1264,8 +1295,9 @@ export class Quadruped {
     body.add(mesh(seat, leather));
     const horn = new THREE.CylinderGeometry(0.035, 0.025, 0.12, 8); horn.translate(0, 1.91, 0.27); body.add(mesh(horn, leather));
     // cantle: the raised, dished back of the seat (a solid curved board, not a hoop)
-    const cant = new THREE.CylinderGeometry(0.17, 0.17, 0.045, 16, 1, false, Math.PI / 2, Math.PI);
-    cant.rotateX(Math.PI / 2); cant.scale(1, 0.55, 1); cant.rotateX(-0.35); cant.translate(0, 1.78, -0.35); body.add(mesh(cant, leather));
+    // (a rounded roll of leather: the half-drum it was showed its flat cut faces from behind as a black box)
+    const cant = new THREE.SphereGeometry(1, 18, 10);
+    cant.scale(0.19, 0.075, 0.04); cant.rotateX(-0.35); cant.translate(0, 1.795, -0.36); body.add(mesh(cant, leather));
     // bedroll: a canvas-and-hide roll with the wool blanket showing in the ends
     // the roll bulges between its straps and is cinched in under them, a little sagging and lumpy
     const roll = new THREE.CylinderGeometry(0.086, 0.086, 0.56, 18, 24, true);
@@ -1273,14 +1305,18 @@ export class Quadruped {
       const rp = roll.attributes.position;
       for (let k = 0; k < rp.count; k++) {
         const yy = rp.getY(k), x0 = rp.getX(k), z0 = rp.getZ(k);
-        const cinch = 1 - 0.2 * Math.exp(-((Math.abs(yy) - 0.16) ** 2) / 0.0012) + 0.03 * Math.sin(yy * 23 + Math.atan2(z0, x0) * 3);
+        const ang = Math.atan2(z0, x0);
+        // (lumpy, and drawn in to nothing at the ends where the blanket is tucked: an even drum with flat lids was a log)
+        const cinch = (1 - 0.2 * Math.exp(-((Math.abs(yy) - 0.16) ** 2) / 0.0012) + 0.03 * Math.sin(yy * 23 + ang * 3) + 0.06 * Math.sin(yy * 9 + 1.1) * Math.cos(ang * 2 + yy * 5)) * (1 - 0.42 * Math.pow(Math.min(1, Math.abs(yy) / 0.28), 6));
         rp.setXYZ(k, x0 * cinch, yy, z0 * cinch);
       }
       roll.computeVertexNormals();
     }
-    roll.rotateZ(Math.PI / 2); roll.scale(1, 0.9, 1); roll.translate(0, 1.82, -0.52);
+    roll.rotateZ(Math.PI / 2); roll.scale(1, 0.78, 1.08);
+    { const rp = roll.attributes.position; for (let k = 0; k < rp.count; k++) rp.setY(k, rp.getY(k) - 0.45 * rp.getX(k) * rp.getX(k)); roll.computeVertexNormals(); }   // sagging off the ends
+    roll.translate(0, 1.815, -0.52);
     // (a dark, grimed roll of hide and blanket: the pale canvas read as a lit log across the saddle)
-    body.add(mesh(roll, std({ map: memoTex('canvas', () => canvasTexture(r)), color: new THREE.Color(0.5, 0.47, 0.43), roughness: 0.97 })));   // a drab grey-brown roll (the bright patterned blanket read as a toy) (the creased canvas read as a log)
+    body.add(mesh(roll, std({ map: memoTex('canvas', () => canvasTexture(r)), color: new THREE.Color(0.36, 0.29, 0.23), roughness: 0.97 })));   // a brown hide roll (grey-tan canvas went olive in forest light) (the bright patterned blanket read as a toy) (the creased canvas read as a log)
     // the ends show the roll's layers: canvas wrapped round a wool blanket, in a spiral
     const spiral = memoTex('spiral', () => {
       const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -1296,10 +1332,11 @@ export class Quadruped {
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
     });
     for (const sx of [-0.28, 0.28]) {
-      const end = new THREE.CircleGeometry(0.085, 18); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.82, -0.52);
-      body.add(mesh(end, std({ map: spiral, color: new THREE.Color(0.36, 0.36, 0.36), roughness: 1 })));
+      // (a tucked, domed end of dark wool: the flat disc with its painted spiral was a sawn log's end)
+      const end = new THREE.SphereGeometry(0.052, 12, 8); end.scale(0.4, 0.78, 1.08); end.translate(sx * 0.985, 1.815 - 0.45 * sx * sx, -0.52);
+      body.add(mesh(end, std({ map: spiral, color: new THREE.Color(0.2, 0.2, 0.2), roughness: 1 })));
     }
-    for (const sx of [-0.16, 0.16]) { const st = new THREE.TorusGeometry(0.089, 0.011, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.92, 1); st.translate(sx, 1.82, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
+    for (const sx of [-0.16, 0.16]) { const st = new THREE.TorusGeometry(0.089, 0.011, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.72, 1); st.translate(sx, 1.815 - 0.45 * sx * sx, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
     for (const s of [-1, 1]) {
       // a soft, bulging leather bag (a five-point sweep, rounded at both ends) with a flap and two buckled straps
       // a squarish stitched leather bag (superelliptic section), soft at the corners, with buckles on its straps
@@ -1317,10 +1354,12 @@ export class Quadruped {
         const st = new THREE.TorusGeometry(0.17, 0.008, 4, 18, Math.PI); st.rotateY(Math.PI / 2); st.rotateX(Math.PI / 2); st.scale(0.86, 1, 0.42); st.translate(s * 0.4, 1.45, zz - 0.06);
         body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 })));
       }
-      const strap = new THREE.BoxGeometry(0.02, 0.5, 0.05); strap.translate(s * 0.38, 1.43, 0.05); body.add(mesh(strap, leather));
+
       const stir = new THREE.TorusGeometry(0.06, 0.012, 4, 10); stir.translate(s * 0.42, 1.14, 0.05);
       body.add(mesh(stir, std({ color: 0x3a3632, metalness: 0.6 })));
-      const fender = new THREE.BoxGeometry(0.02, 0.4, 0.18); fender.translate(s * 0.36, 1.45, 0.02); body.add(mesh(fender, leather));
+      // (a thin leaf of leather lying on the horse's side under the rider's leg: the slab and strap stood off it as two planks)
+      const fender = sweep([{ p: V(s * 0.3, 1.66, 0.0), rx: 0.008, ry: 0.07 }, { p: V(s * 0.345, 1.45, 0.04), rx: 0.008, ry: 0.1 }, { p: V(s * 0.36, 1.24, 0.07), rx: 0.008, ry: 0.07 }], 8);
+      body.add(mesh(fender, leather));
     }
     // the cinch: a girth strap round the barrel under the belly, holding the saddle down
     {
@@ -1333,7 +1372,9 @@ export class Quadruped {
     const scab = new THREE.CylinderGeometry(0.035, 0.05, 0.8, 8);
     scab.rotateX(Math.PI / 2 - 0.55); scab.translate(0.37, 1.42, 0.38);
     body.add(mesh(scab, leather));
-    const stock = new THREE.BoxGeometry(0.045, 0.09, 0.26); stock.rotateX(-0.55); stock.translate(0.37, 1.66, 0.0);
+    // (a shaped butt, deep at the plate and drawn in to the wrist: the plain block stood behind the rider's leg as a post)
+    const stock = sweep([{ p: V(0, 0, -0.14), rx: 0.016, ry: 0.05 }, { p: V(0, 0.004, -0.05), rx: 0.018, ry: 0.044 }, { p: V(0, 0.012, 0.06), rx: 0.016, ry: 0.03 }, { p: V(0, 0.016, 0.13), rx: 0.014, ry: 0.022 }], 10);
+    stock.rotateX(-0.55); stock.translate(0.365, 1.64, 0.02);
     body.add(mesh(stock, std({ color: 0x3a2416, roughness: 0.68 })));   // dark oiled walnut, not a pale lit block
     const rope = new THREE.TorusGeometry(0.12, 0.018, 6, 16); rope.rotateY(Math.PI / 2); rope.translate(0.24, 1.73, 0.22);
     body.add(mesh(rope, std({ color: 0x9a845a })));
@@ -1375,8 +1416,8 @@ export class Quadruped {
         Lg.j4.rotation.x = lift * amp * 0.8 + 0.04;
       } else {
         Lg.top.rotation.x = -swing * amp * 0.6 + 0.04;
-        Lg.j2.rotation.x = -0.1 - lift * amp * 0.5;
-        Lg.j3.rotation.x = 0.12 + lift * amp * 0.9;
+        Lg.j2.rotation.x = -0.02 - lift * amp * 0.5;   // (the standing angles are in the leg's own shape now)
+        Lg.j3.rotation.x = 0.02 + lift * amp * 0.9;
         Lg.j4.rotation.x = -0.06 + lift * amp * 0.4;
       }
     });
@@ -1387,8 +1428,8 @@ export class Quadruped {
     const want = gait === 0 && this.grazing > 0 ? 1 : 0;
     this.grazeK = THREE.MathUtils.lerp(this.grazeK, want, Math.min(1, dt * 1.5));
     this.neck.rotation.x = (gait >= 3 ? Math.sin(P + 1) * 0.1 : Math.sin(P * 2) * 0.04 * amp) + this.grazeK * 1.35 - Math.min(gait, 2) * 0.03;
-    this.tail.rotation.x = 0.15 + Math.sin(performance.now() * 0.002 + this.phase) * 0.05 + gait * 0.12;
-    this.tail.rotation.z = Math.sin(performance.now() * 0.0013) * 0.15;
+    this.tail.rotation.x = 0.04 + Math.sin(performance.now() * 0.002 + this.phase) * 0.03 + gait * 0.07;   // (hanging against the quarters at a walk, streaming a little at speed)
+    this.tail.rotation.z = Math.sin(performance.now() * 0.0013) * 0.07;
     return this.phase;
   }
 }

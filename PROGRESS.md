@@ -848,3 +848,43 @@ backdrop shading, lenticular smudges for a sky. So:
   almost no sheen in snowfall; a paler trench under the horse.
 - **Captures use a fresh page per shot** (`FRESH=1`, the default in `snap.sh`): each shot dresses a pristine
   world, so one shot's raised ground and planted timber never show in another's frame.
+
+**Critic scores.** Round 77: 4 / 4 / 4.
+
+### Round 78
+- **Storm sky is the ray-marched cumulus.** The cloud slab now flattens only inside snowfall; the painted deck is
+  down to a wash. The vista's sky is heaped grey cloud with dark bellies.
+- **Vista: grown timber.** The valley's spruce were ten-metre saplings on a 4.6 m grid: a sprinkle of black
+  spikes under which the homestead's buildings stood like warehouses. Replanted at 15-35 m in broader stands;
+  the homestead is 300 m off with tall spruce round it; the knoll's flanks keep their snow (snow pad to a
+  half slope); the stand's floor tint is taken off the knoll and the sightline; roof snow lies in drifts;
+  the fog bank is a veil (cap 0.42). Ledge granite measured against the reference and cooled/darkened.
+- **Snow trough** is churned and only a little darker under snowfall; no sun glints in a blizzard.
+
+**Critic scores.** Round 78: 4 / 3 / 5 (vista back to its best; both riding shots: "mannequin rider, balloon
+horse, flat ribbon tail, boxes for tack").
+
+### Round 79: horse, rider, tack, framing, rock
+The riding shots' weakest thing has been the same for thirty rounds, so this round went at it directly.
+- **Framing measured off the references.** Pines: lens above the rider's shoulder looking down the trail,
+  rider left of centre, hat a third down, frame cutting the horse at the croup (`?pinesold` = rounds 50-78).
+  Snow ride: lens six metres back and near three up, whole horse in frame, hat just under half way down
+  (`?rideold`).
+- **Figures are lit.** `uCharFill`: light bounced from the ground and lit air onto figures (0.05 in the open,
+  0.27 under canopy); measured against the reference the rider's back was a third as bright as it should be.
+  Rim light cut to a third (rider and tack wore a glowing outline).
+- **Rider.** Leather coat a mid brown with quieter patina; square shoulders, straight sides; folds shallower.
+  The flat coat-tail panels are gone (two black slabs on the horse's back from above).
+- **Tack.** Blanket drab wool (was red with a cream zigzag); satchel worn brown (was orange); bedroll a lumpy,
+  sagging hide roll tucked in at the ends (was a drum with a painted spiral lid); cantle a rounded roll (was a
+  half-drum showing its cut faces); fender a leaf of leather on the horse's side; rifle butt and holster shaped.
+- **Horse.** Hind legs built on real angles: stifle forward, gaskin sloping back to a hock that is deep fore
+  and aft and narrow from behind, hamstring from buttock to point of hock (bones moved to match; standing
+  offsets removed from the walk). Knees and fetlocks flat, cannons slimmer. Tail is a solid core with 72 locks
+  lying on it, to the hocks, hanging against the quarters. Hair-lie relief and sheen streaks fade out before
+  they beat against the pixel grid (the rump was twill).
+- **Rock.** Crack networks (cell borders on three planes: a close one a pace across and a coarse one for cliffs)
+  drawn dark and cut into the normal. Big outcrop variants are only half snapped to their joint lattice: a
+  weathered mass, not a pile of boxes. On ledge rock the lichen is hand-sized and faint (it was camouflage), the
+  stretched scan is nearly out, snow edges break into grains.
+- **Pine-belt grass** greyer and darker (a strip of lime down the trail in the sun).
