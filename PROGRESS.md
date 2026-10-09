@@ -1260,3 +1260,18 @@ cliff, no horizontal strata, no snow on ledges"; pines: the rider and horse.
   own shade on upright faces, shade under the lip of the bed above, and snow lying on the ledge at its foot in
   short runs of varied thickness. The snow ride's cliff reads as stratified rock with snow on its ledges
   instead of "a scaled-up boulder".
+
+**Critic scores.** Round 101: 4 / 4 / 5. The right massif, "where rock breaks through snow according to slope, is
+convincing" (it had been "salt-and-pepper" for twenty rounds). The cliff's ledge snow "looks painted on: thin
+dashes that do not sit on ledges; the base meets the ground in a hard line with no drift". Vista: trees
+"near-black specks with no snow on their crowns" against "large white firs round the cabin that do not match".
+
+### Round 102
+- **Snow is banked against the foot of every rock in snow country**: a ragged apron climbing it a pace or so
+  (cliffs and boulders met the snowfield on a ruled line; the slabs in the snow ride's field are half buried now).
+- **Strata are stepped in the light**: each bed stands out a hand at its foot in the bump, so the ledge snow lies
+  on steps instead of being ruled on a smooth face.
+- **Trees match near and far**: near conifers carry less of a white coat in clear weather (0.42), far billboards
+  keep their snow flecks out to 1.6 km: dark trees with snow on their boughs at every distance.
+- **A ridden horse carries its head** (neck raised 0.2 rad on the rein when a shot poses it): the head hung
+  small and low ahead of the saddle. Ears shorter and blunter.

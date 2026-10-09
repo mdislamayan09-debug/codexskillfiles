@@ -1134,7 +1134,7 @@ function quadPrims(kind, QB) {
   add(EL(muzzle, [0.07 * hs, 0.08 * hs, 0.08 * hs]), sheep ? QL.points : QL.muzzle, 'head', 0.04);
   for (const s of [-1, 1]) {
     const ear = sheep ? RC([s * 0.08, H[1] + 0.02, H[2] - 0.04], [s * 0.2, H[1] - 0.02, H[2] - 0.06], 0.03, 0.02)
-      : RC([s * 0.06, H[1] + 0.1 * hs, H[2] - 0.04], [s * (deer ? 0.13 : 0.085), H[1] + (deer ? 0.26 : 0.2) * hs, H[2] - 0.06], deer ? 0.04 : 0.036, deer ? 0.012 : 0.02);   // (a horse's ear is a short leaf: long and needle-tipped they were a cat's)
+      : RC([s * 0.06, H[1] + 0.1 * hs, H[2] - 0.04], [s * (deer ? 0.13 : 0.09), H[1] + (deer ? 0.26 : 0.17) * hs, H[2] - 0.065], deer ? 0.04 : 0.042, deer ? 0.012 : 0.028);   // (a horse's ear is a short leaf: long and needle-tipped they were a cat's)
     add(ear, sheep ? QL.points : QL.coat, 'head', 0.02);
     const nos = EL([s * 0.035, muzzle[1] - 0.01, muzzle[2] + 0.06 * hs], [0.018, 0.02, 0.02]); nos.sub = true; P.push(nos);
     const eyeSock = EL([s * 0.1 * hs, H[1] + 0.02, H[2] + 0.05], [0.02, 0.022, 0.025]); eyeSock.sub = true; P.push(eyeSock);
@@ -1563,7 +1563,8 @@ export class Quadruped {
     this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, -turn * 0.12, Math.min(1, dt * 4));
     const want = gait === 0 && this.grazing > 0 ? 1 : 0;
     this.grazeK = THREE.MathUtils.lerp(this.grazeK, want, Math.min(1, dt * 1.5));
-    this.neck.rotation.x = (gait >= 3 ? Math.sin(P + 1) * 0.1 : Math.sin(P * 2) * 0.04 * amp) + this.grazeK * 1.35 - Math.min(gait, 2) * 0.03;
+    // (a ridden horse carries its head: neck raised a hand on the rein. Level, the head hung small and low ahead of the saddle)
+    this.neck.rotation.x = (gait >= 3 ? Math.sin(P + 1) * 0.1 : Math.sin(P * 2) * 0.04 * amp) + this.grazeK * 1.35 - Math.min(gait, 2) * 0.03 - (this.pose != null ? 0.2 : 0);
     this.tail.rotation.x = 0.04 + Math.sin(performance.now() * 0.002 + this.phase) * 0.03 + gait * 0.07;   // (hanging against the quarters at a walk, streaming a little at speed)
     this.tail.rotation.z = Math.sin(performance.now() * 0.0013) * 0.07;
     return this.phase;

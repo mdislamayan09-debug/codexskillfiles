@@ -78,7 +78,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= mix(0.6, 0.5, uSnowfall);   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
+      sk *= mix(0.42, 0.5, uSnowfall);   // (round 102: dark trees with snow on their boughs: at 0.6 the firs round the homestead were white cones in front of a black forest)   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
       // was mix(0.6, 0.85, uSnowfall)   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
@@ -1361,6 +1361,8 @@ function rockMaterial(surf = {}, bare = false) {
         // (in runs a few paces long, some beds thick with it and some bare: ruled the length of the cliff it was stripes)
         float runS = smoothstep(0.44, 0.58, tnz(vec3(vWPos.x, bi * 3.0, vWPos.z) * 0.5 + 2.0) * 0.7 + 0.3 * hash12(vec2(bi, 11.0)));
         gStrataSnow = smoothstep(0.0, 0.04, bf) * smoothstep(0.1 + 0.2 * hash12(vec2(bi, 2.0)), 0.07, bf) * steepB * kB * runS;
+        // (and each bed stands out a hand at its foot, in the light: the snow lines lie on steps, not on a smooth face)
+        gCrack -= (smoothstep(0.34, 0.0, bf) * 0.22 - smoothstep(0.82, 1.0, bf) * 0.16) * steepB * kB;
       }
       #endif
       vec4 rcl = climateAt(vWPos.xz);
@@ -1429,6 +1431,12 @@ function rockMaterial(surf = {}, bare = false) {
       base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22 * lK);
       float blackL = smoothstep(0.64, 0.68, tnz(vWPos * 2.9 * lsc - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
       base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3 * lK);
+      // snow banked against the foot of the rock, a ragged apron climbing it a pace or so (it met the snowfield on a ruled line)
+      {
+        float aboveR = vWPos.y - heightAt(vWPos.xz);
+        float bank = smoothstep(0.35, 0.75, rcl.r) * smoothstep(1.5, 0.25, aboveR + 1.3 * (vnoise(vWPos.xz * 0.55 + 3.0) - 0.5) + 0.5 * (vnoise(vWPos.xz * 2.3) - 0.5));
+        rsnow = max(rsnow, bank * 0.95);
+      }
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,
@@ -1958,7 +1966,7 @@ export class Vegetation {
           // snow on the upper boughs, fading out with distance: a few-pixel tree with a white cap is what turns a
           // far forest into salt-and-pepper speckle
           float dCam = length(cameraPosition - vW);
-          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * mix(0.2, 0.34, smoothstep(900.0, 250.0, dCam)));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
+          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * mix(0.3, 0.38, smoothstep(1600.0, 250.0, dCam)));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
           // (and from afar a snow-country spruce is frosted blue-grey, not a black cone on the white)
           // (round 98: dark under their snow, as timber is in a storm: frosted pale they were the colour of the slope behind)
           alb = mix(alb, vec3(0.24, 0.31, 0.37), 0.55 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam) * (1.0 - 0.75 * uSnowfall));
