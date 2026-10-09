@@ -46,7 +46,7 @@ export class Player {
       this.horse.body.add(this.rider.root);
       // (a big man on his horse, as the references' rider is: at life size beside our deep-bodied horse he sat like a boy)
       this.rider.root.scale.setScalar(1.15);
-      this.rider.root.position.set(0, 0.8, -0.1);
+      this.rider.root.position.set(0, 0.775, -0.05);   // (down into the seat)
       this.rider.root.rotation.set(0, 0, 0);
     } else {
       this.scene.add(this.rider.root);

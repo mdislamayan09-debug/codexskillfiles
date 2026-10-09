@@ -438,6 +438,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
       }
     }
   }
+  // the ground under the rider's horse lies in its shade (it stood on the trail without touching it)
+  c *= 1.0 - 0.34 * smoothstep(1.7, 0.2, length(xz - uPlayerPos.xz)) * (1.0 - uSnowfall);
   c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6 * (1.0 - jun) * (1.0 - des) * (1.0 - aut) * (1.0 - smoothstep(0.4, 0.7, snowC)));
   c = mix(c, rock, rockAmt); tn = mix(tn, rN, rockAmt);
   rough = mix(rough, 0.82, rockAmt);

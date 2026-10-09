@@ -1125,3 +1125,23 @@ terraces. Pines: "the forest alone would be about 5.5; the horse and rider are a
   and the far end of the cliff were simply not drawn). Snow ledges are drawn bed by bed only within a
   quarter-mile (further off they were white dashes ruled across the wall: the "contour steps"); from afar the
   cliff bands are whole ribs and buttresses of dark rock a hundred metres across.
+
+**Critic scores.** Round 93: 4 / 4 / 5. Both riding shots: the hero asset first again ("rebuild the horse and
+rider: proportions, coat and leather materials, rim light, contact shadow"). A close crop of our pine rider
+shows why: a charcoal sack of a coat lit flat by the uniform fill, a boot like a bare foot with the stirrup
+hanging a foot away from it, a blanket striped like planks, the rifle butt standing up beside his thigh, the
+mane a blue-black block.
+
+### Round 94: the rig, from a close crop
+- **Stirrups ride on the rider's feet** (a wooden hoop and tread round the ball of each boot, shown only in the
+  saddle); the horse's own rings, which dangled a foot from the boot, are gone. Boots have a sole and a stacked
+  heel and a looser shaft (the scanned foot in a skin of leather was a bare foot).
+- **No loose slats.** The two that stood beside the rider's thigh and on the blanket were the holster (fixed to
+  the hips, so upright behind a seated thigh: now hung on the thigh bone) and the rifle butt (now on the +x
+  side; the shots' lenses stand on -x). The fender is a plain leaf laid to the barrel's curve.
+- **Lariat** coiled over the near-side bag, as the reference's. **Blanket** plain dark felted wool (the striped
+  weave lay under the saddle like planks). **Mane** hangs clear of the neck (its locks lay inside it and showed
+  as stray ticks), warm dark, low alpha cut-off.
+- **Light on figures**: the fill comes from above (0.3 underneath to 1.2 on top: laid on evenly it flattened every
+  form into one tone); rim light back up to a third of the old glow (0.34 rider, 0.2 horse); the ground under
+  the rider's horse lies in its shade. Leather jacket 0x4c3524. Rider sits 2.5 cm lower and 5 cm forward.
