@@ -1145,3 +1145,19 @@ mane a blue-black block.
 - **Light on figures**: the fill comes from above (0.3 underneath to 1.2 on top: laid on evenly it flattened every
   form into one tone); rim light back up to a third of the old glow (0.34 rider, 0.2 horse); the ground under
   the rider's horse lies in its shade. Leather jacket 0x4c3524. Rider sits 2.5 cm lower and 5 cm forward.
+
+**Critic scores.** Round 94: 4 / 4 / 5. Rider and horse first on both riding shots again ("uniform brown fuzz
+with no folds", "the head under the hat is a featureless dark blob", "a black blotch for a mane", "lasso a
+perfect torus", horse "picking up none of the blue ambient light").
+
+### Round 95
+- **The mane is fitted to the neck by measurement**: the neck's half-width under every point of every lock is read
+  off the sculpted mesh (a table of the furthest vertex in each 2 cm cell of the side view), and the lock laid a
+  finger clear of it, five rows deep. Two estimates from the sculpt's primitives both left the cards cutting in
+  and out of the neck ("a black blotch for a mane", "stray ticks").
+- **The rider's arms hang by his ribs with his hands a hand's breadth over the horn** (he rode as if holding a
+  steering wheel at chest height).
+- **Under a snowstorm's overcast**: the sun is fainter still (0.62 + 0.3 x blizzard: the horse's hard blue shadow
+  implied sun) with 45% more sky light; figures, tack and coat lose a third of their saturation and take the
+  light's grey-blue (the bay stood in the storm orange-red, "picking up none of the blue ambient").
+- Coat stains fainter.

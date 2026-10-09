@@ -107,6 +107,8 @@ const DUST_FRAG = /* glsl */ `
     vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
     float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * (0.55 + 0.45 * vnoise(vWPos.xz * 40.0 + vWPos.y * 13.0));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.85), dust * 0.45);
+    // under a snowstorm's overcast everything takes the grey-blue of the light: colours go quiet
+    { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.32 * ovc) * mix(vec3(1.0), vec3(0.88, 0.94, 1.04), ovc); }
   }`;
 // One texture per recipe and one material per set of parameters, shared by every character. A horse's tack was
 // some forty meshes (each strap, ring and buckle its own material) and a town of riders two and a half thousand
@@ -188,7 +190,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               float scuff = smoothstep(0.42, 0.8, p1 * 0.8 + p2 * 0.2) * (0.3 + 0.7 * smoothstep(0.35, 0.65, p3));
               // (rubbed a shade paler, not painted tan: at twice this the coat was a camouflage of orange blotches)
               diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.5, 1.4, 1.3) + vec3(0.01, 0.008, 0.006), scuff * 0.2);   // (fainter: mottled tan, it read as bare skin)
-              diffuseColor.rgb *= 1.0 - 0.3 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
+              diffuseColor.rgb *= 1.0 - 0.14 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
             }
             // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
             float wear = smoothstep(1.3, 1.5, vRest.y) * (0.6 + 0.4 * fbm2(vRest.xz * 4.0));
@@ -247,6 +249,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         }
         // wet / darkened below the waterline
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
+        // under a snowstorm's overcast everything takes the grey-blue of the light: colours go quiet (the bay stood in the
+        // storm orange-red, as if lit by another sky)
+        { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.32 * ovc) * mix(vec3(1.0), vec3(0.88, 0.94, 1.04), ovc); }
       }`,
     onShader: (s) => {
       Object.entries(uniforms).forEach(([k, u]) => (s.uniforms[k] = u));
@@ -1011,7 +1016,9 @@ export class Human {
       // sat on the horse like a man on a kitchen chair)
       for (const l of Lg) { l.hp.rotation.x = -0.98; l.hp.rotation.z = l.s * 0.47; l.kn.rotation.x = 1.08; l.an.rotation.x = -0.1; }
       // elbows out a little and hands low over the horn: the arms read beside the body from behind
-      for (const a of A) { a.sh.rotation.x = -0.42; a.sh.rotation.z = a.s * 0.2; a.el.rotation.x = -1.15; a.wr.rotation.x = 0.2; }
+      // (round 95: upper arms hanging by the ribs, forearms level, hands a hand's breadth over the horn. Reaching
+      // forward at chest height he rode as if holding a steering wheel)
+      for (const a of A) { a.sh.rotation.x = -0.1; a.sh.rotation.z = a.s * 0.13; a.el.rotation.x = -0.9; a.wr.rotation.x = 0.1; }
     } else {
       this.hips.position.y = H0 - Math.abs(Math.sin(t * 2)) * 0.02 * Math.min(speed, 3) + breathe * 0.2;
       const stride = Math.min(1, speed / 2) * 0.55 + Math.max(0, speed - 2) * 0.08;
@@ -1265,20 +1272,37 @@ export class Quadruped {
       const cards = [];
       // (one unbroken fall of hair lying down the off side of the neck, in two layers, each lock overlapping the next:
       // separate cards turned every way stood up along the crest as a row of black teeth)
-      // (and a fall on the near side too: from that side the neck was bald)
-      for (const [layer, side, hang, n] of [[0, 1, 0.3, 28], [1, 1, 0.22, 24], [2, -1, 0.2, 26]]) for (let i = 0; i < n; i++) {
+      // (round 95: each lock is laid over the neck's own curve, five rows deep, a finger clear of the coat all the way
+      // down. Hung on a straight slant the cards cut in and out of the neck: inside it they were stray ticks along the
+      // crest, outside it ragged black patches on the horse's side)
+      // (and measured, not estimated: the neck's half-width at each point is read off the sculpted mesh itself, from
+      // a table of the furthest vertex in each two-centimetre cell of the side view)
+      const halfW = new Map(), rp = tpl.geo.attributes.aRest || tpl.geo.attributes.position;
+      for (let k = 0; k < rp.count; k++) {
+        const y = rp.getY(k), z = rp.getZ(k);
+        if (y < 1.25 || z < 0.25) continue;
+        const key = Math.round(y / 0.02) * 1000 + Math.round(z / 0.02), ax = Math.abs(rp.getX(k));
+        if (ax > (halfW.get(key) || 0)) halfW.set(key, ax);
+      }
+      const neckW = (y, z) => { let m = 0; const yi = Math.round(y / 0.02), zi = Math.round(z / 0.02); for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 2; b2++) m = Math.max(m, halfW.get((yi + a2) * 1000 + zi + b2) || 0); return m; };
+      for (const [layer, side, hang, n] of [[0, 1, 0.4, 30], [1, 1, 0.3, 26], [2, -1, 0.22, 24]]) for (let i = 0; i < n; i++) {
         const t0 = i / n, t1 = (i + 1.6) / n;
         const crest = (t) => V(0, 1.66 + Math.min(1, t) * 0.49, 0.46 + Math.min(1, t) * 0.55);
-        const a = crest(t0), b = crest(t1), L = hang * (1 - 0.35 * t0) * (0.8 + r() * 0.4);
-        // (hanging clear of the neck: at a third of this reach the locks lay inside it and showed as stray ticks)
-        const out = side * (0.2 - 0.09 * t0 + 0.018 + (layer % 2) * 0.012) / 2.1, sw = (r() - 0.5) * 0.05;
-        const pa = [a.x, a.y + 0.012, a.z, b.x, b.y + 0.012, b.z,
-          a.x + out * 1.6, a.y - L * 0.45, a.z + sw - 0.02, b.x + out * 1.6, b.y - L * 0.45, b.z + sw - 0.02,
-          a.x + out * 2.1, a.y - L, a.z + sw * 2 - 0.05, b.x + out * 2.1, b.y - L, b.z + sw * 2 - 0.05];
+        const a = crest(t0), b = crest(t1), L = hang * (1 - 0.35 * t0) * (0.8 + r() * 0.4), sw = (r() - 0.5) * 0.05;
+        const pa = [], uvA = [], ix = [], ROWS = 5;
+        for (let k = 0; k < ROWS; k++) {
+          const f = k / (ROWS - 1), d = L * f;
+          // (the neck's half-width under this point of the lock, from its sculpt: a capsule whose radius runs from
+          // 0.23 at the shoulder to 0.125 at the poll, its axis 0.27 to 0.12 below the crest line)
+          const w = Math.max(0.03, neckW(a.y - d, a.z - 0.03 * f), neckW(b.y - d, b.z - 0.03 * f)) + 0.014 + layer * 0.007;
+          pa.push(a.x + side * w, a.y + 0.012 - d, a.z + sw * f - 0.03 * f, b.x + side * w, b.y + 0.012 - d, b.z + sw * f - 0.03 * f);
+          uvA.push(0, 1 - f, 1, 1 - f);
+          if (k) { const q = (k - 1) * 2; ix.push(q, q + 2, q + 1, q + 1, q + 2, q + 3); }
+        }
         const g2 = new THREE.BufferGeometry();
         g2.setAttribute('position', new THREE.Float32BufferAttribute(pa, 3));
-        g2.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 0, 0.5, 1, 0.5, 0, 0, 1, 0], 2));
-        g2.setIndex([0, 2, 1, 1, 2, 3, 2, 4, 3, 3, 4, 5]);
+        g2.setAttribute('uv', new THREE.Float32BufferAttribute(uvA, 2));
+        g2.setIndex(ix);
         g2.computeVertexNormals();
         cards.push(g2);
       }

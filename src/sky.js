@@ -378,7 +378,8 @@ export class Sky {
       if (every > 1) this.sun.shadow.needsUpdate = true;
     }
     const W = this.weather;
-    this.sun.intensity *= 1 - (0.62 + 0.16 * W.blizzard) * W.storm;   // a blizzard is lit mostly by the sky: soft, faint shadows
+    this.sun.intensity *= 1 - (0.62 + 0.3 * W.blizzard) * W.storm;   // (round 95: fainter still: a hard blue shadow under the horse implied sun under an overcast)
+    // was 0.62 + 0.16 * W.blizzard   // a blizzard is lit mostly by the sky: soft, faint shadows
     // a storm deck in clear air is broken: cloud shadows cover most of the land, and the sun in the breaks is strong
     U.uCloudShadow.value = 0.9 * W.storm * (1 - W.blizzard);
     this.sun.intensity *= 1 + 1.0 * U.uCloudShadow.value;
@@ -390,7 +391,7 @@ export class Sky {
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 
     // (ambientK: under a closed canopy most of the sky is shut out)
-    this.hemi.intensity = (0.16 + 0.1 * day) * (this.ambientK ?? 1);
+    this.hemi.intensity = (0.16 + 0.1 * day) * (this.ambientK ?? 1) * (1 + 0.45 * W.blizzard * W.storm);
     if (this.envBase !== undefined) this.scene.environmentIntensity = this.envBase * (this.ambientK ?? 1);
     this.hemi.color.setRGB(0.32 + 0.43 * day, 0.4 + 0.4 * day, 0.62 + 0.23 * day);
     this.hemi.groundColor.setRGB(0.3 * day + 0.03, 0.26 * day + 0.03, 0.17 * day + 0.04);
