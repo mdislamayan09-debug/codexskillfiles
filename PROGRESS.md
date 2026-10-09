@@ -1228,3 +1228,20 @@ ride's is the left cliff ("lumpy blob", with "a white smear and a dark band" at 
   between four the bench's own slope showed as flat dark panels with a white stripe across them.
 - **Light**: the rim on cloth is broad and soft at 0.2 (narrow at 0.34 it was "a toon outline"); trunks inside a
   stand at 0.72 (0.5 took them to black); broadleaf scrub under the canopy lifted x1.5 (black cut-outs).
+
+**Critic scores.** Round 99: 4 / 4 / 5. Nine other scenes re-checked after this session's changes (gallop, ranch,
+town, forest, swamp, autumn, desert, jungle, vista): no regressions. The critic now reverses itself between
+rounds on single items (the rim light is "a toon outline" at 0.34 and "no rim light" at 0.2; the outcrop is
+"steel-blue monochrome" when cool and "a yellow-green hue that does not belong" when warm), which marks the
+noise floor of this method: totals have stayed 12-14 for twenty-two rounds (77-99) while the frames changed a
+great deal. What it never reverses on: the horse and rider as assets, bare ground in the pines, the vista's
+wedge-shaped block.
+
+### Round 100
+- **The vista's wedge is gone.** Named by the critic in every round since 79 ("smooth triangular prism",
+  "knife-straight edge"), it was the corner of the big left block where round 83's tilted cut met its side:
+  the cut was a plane, so every big outcrop had one flat sloping face. Found by listing every near rock with
+  where its crown falls in frame (a raycast had picked a smaller block standing in front of it, and replacing
+  that changed nothing). The cut is now a broken surface (two scales of noise, a slight lean), on all big
+  outcrops, so the snow ride's cliff has broken tops too.
+- Rim light on cloth between the two settings the critic rejected (2.7 at 0.27).

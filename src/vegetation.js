@@ -1151,7 +1151,9 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.74 : 0.93);
       v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.62 : 0.9);
       // (a broken, tilted top, not a table: cut dead level the blocks were stumps iced with snow, twice as broad in the frame)
-      if (big) { const cap = 0.56 + 0.16 * v.x + 0.09 * v.z + 0.08 * n.noise(v.x * 1.3 + 3.0, v.z * 1.3 - 1.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.14; }
+      // (round 100: a broken top, not a tilted plane. The cut was a ramp, so every big block had one flat sloping face
+      // meeting its sides in knife-straight edges, and from the lookout the corner of the nearest stood up as a wedge)
+      if (big) { const cap = 0.58 + 0.05 * v.x + 0.03 * v.z + 0.13 * n.noise(v.x * 2.1 + 3.0, v.z * 2.1 - 1.0) + 0.05 * n.noise(v.x * 5.3 - 2.0, v.z * 5.3 + 4.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.3; }
       v.applyMatrix3(jointMi);
       // weathering: faces spalled and pitted a little
       if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }

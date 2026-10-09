@@ -1364,9 +1364,12 @@ async function init() {
         const [r0x, r0z, r0y] = P(4, 5.5, -5.2), [r1x, r1z, r1y] = P(11, 6.5, -6.4);
         world.raiseSpur(r0x, r0z, r0y, r1x, r1z, r1y, { side: 1.5, round: 0.02, top: 3, reach: 30, rough: 0.12, sag: 0 });
       }
+      // (round 100: the wedge the critic named in every round since 79 was the tilted-cut corner of the big left block,
+      // not the small block that stood below it: found by listing every near rock with where its crown falls in frame.
+      // The cut is fixed in rockGeometry; the small block is a low broad one now, `?wedge` brings the old one back)
       // (the outcrop climbs the left edge to two-thirds of the frame's height and steps down toward the middle: lower,
       // the lens looked straight down on the timbered slope below it, every tree a dot on white)
-      for (const b of [[-1.0, 0.56, 7.2, 5.1, 7, 1], [-0.84, 0.36, 8.3, 2.7, 8, 1], [-0.62, 0.12, 9.4, 0.9, 6, 1], [-0.96, 0.12, 8.5, 0.4, 6, 1], [-0.72, -0.1, 9.5, 1.9, 7, 1], [-0.5, -0.34, 10, 3.1, 8, 1], [-0.9, -0.4, 6.5, 4.4, 7, 1], [-0.34, -0.6, 8.5, 2.2, 6, 1], [-0.64, -0.7, 6.8, 5.3, 8, 1],
+      for (const b of [[-1.0, 0.56, 7.2, 5.1, 7, 1], [-0.84, 0.36, 8.3, 2.7, 8, 1], [-0.62, 0.12, 9.4, 2.5, 6, 1], [-0.96, 0.12, 8.5, 0.4, 6, 1], [-0.72, -0.1, 9.5, 1.9, 7, 1], [-0.5, -0.34, 10, 3.1, 8, 1], [-0.9, -0.4, 6.5, 4.4, 7, 1], ...(params.has('wedge') ? [[-0.34, -0.6, 8.5, 2.2, 6, 1]] : [[-0.4, -0.78, 8.0, 0.7, 7, 1.5]]), [-0.64, -0.7, 6.8, 5.3, 8, 1],
         [-0.12, -0.84, 7.5, 0.9, 4, 1.2], [0.16, -0.9, 7.8, 3.7, 5, 1.2], [0.42, -0.84, 8.2, 1.4, 4, 1.1],
         [0.8, -0.52, 9.5, 2.6, 7, 1], [0.98, -0.68, 7.2, 5.9, 6, 1], [0.62, -0.8, 8.6, 4.1, 8, 1]]) block(...b);
       // and loose slabs bedded in whatever of the ledge's own ground still shows between them
