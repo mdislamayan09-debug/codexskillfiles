@@ -1197,3 +1197,20 @@ sandstone: over-corrected). Snow ride: "no atmospheric depth", and the rider I d
   blue"); lens a metre closer. River ice is dark from a distance, and the vista's river wider.
 - **Horse**: ears short leaves (they were "cat-like spikes"), coat rougher (0.92) with half the sheen.
   **Lariat** a thin rope in a long hanging loop ("a perfect torus", "a tyre").
+
+**Critic scores.** Round 97: 4 / 4 / 5. Found from its "trunks evenly lit red-orange" (after I had greyed the bark
+in round 92): that edit reached only the first of the two bark materials, and the pine shot's ponderosas use the
+second. Vista sky: "dark noisy smear with stamped white puffs, horizontal banding" (the march's dither grain and
+step bands on the now-close deck). Snow ride: far walls "washed-out pale-blue blobs" (the haze I added), trees
+"all tinted the same pale blue-white, no dark needle mass under the snow".
+
+### Round 98
+- **Pine trunks are dark shapes against the lit air.** Both bark materials are grey-brown now (the round-92 edit
+  had reached only the spruce bark; the ponderosas in the pine shot stayed cinnamon), and inside a stand bark
+  is halved and needles take 0.62 (`uCanopy`): lit by the forest's raised exposure, boles stood orange-brown in
+  their own shade and the canopy was one mid green. Bark keeps the shared climate shading again (my override
+  had dropped it).
+- **Stills march the cloud at 176 steps** (80 in play): on the close deck the dither showed as grain and the
+  steps as bands. A storm's lit heads are pale grey (sun x0.45), not white.
+- **Conifers in a snowstorm are dark under their snow** (near trees' load 0.5, far billboards lose the frosted
+  tint and a third of their albedo). Snowfall haze eased (300 m start, 2600 m scale).

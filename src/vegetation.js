@@ -78,7 +78,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= mix(0.6, 0.68, uSnowfall);   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
+      sk *= mix(0.6, 0.5, uSnowfall);   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
       // was mix(0.6, 0.85, uSnowfall)   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
@@ -94,6 +94,10 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
     #ifdef FROST_ALL
     // desert scrub is sun-bleached grey-tan, not dark twigs
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.43, 0.33) * (0.7 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), cl.a * 0.75);
+    #endif
+    #ifdef CONIFER_SNOW
+    // inside a stand the needles are dark masses against the lit air (one mid green, the canopy was soft green card)
+    diffuseColor.rgb *= mix(1.0, 0.62, uCanopy);
     #endif
   }`;
 function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false, russet = 0.7 } = {}) {
@@ -1416,13 +1420,17 @@ export class Vegetation {
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
     const cb = conBarkTextures(6, [92, 76, 64], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0, { fragColor: `#include <color_fragment>
+    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0, { fragColor: CLIMATE_FRAG('vTreePos') + `
       {
         // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
         // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
         float above = vWPos.y - heightAt(vWPos.xz);
         // (grey-brown, not cinnamon: in a low sun the saturated bark lit up orange-red on every bole)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.94), 0.5) * 0.62;
+        // (round 98: inside a stand a bole is a dark shape against the lit air, as the reference's are: lit by the forest's
+        // raised exposure they stood orange-brown in their own shade. And both barks now: the grey-brown above had been
+        // given to the spruce bark only, and the pine shot's ponderosas stayed cinnamon for six rounds)
+        diffuseColor.rgb *= mix(1.0, 0.5, uCanopy);
         diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
         float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
@@ -1437,11 +1445,17 @@ export class Vegetation {
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
     const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0, { fragColor: `#include <color_fragment>
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0, { fragColor: CLIMATE_FRAG('vTreePos') + `
       {
         // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
         // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
         float above = vWPos.y - heightAt(vWPos.xz);
+        // (grey-brown, not cinnamon: in a low sun the saturated bark lit up orange-red on every bole)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.94), 0.5) * 0.62;
+        // (round 98: inside a stand a bole is a dark shape against the lit air, as the reference's are: lit by the forest's
+        // raised exposure they stood orange-brown in their own shade. And both barks now: the grey-brown above had been
+        // given to the spruce bark only, and the pine shot's ponderosas stayed cinnamon for six rounds)
+        diffuseColor.rgb *= mix(1.0, 0.5, uCanopy);
         diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
         float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
@@ -1924,7 +1938,9 @@ export class Vegetation {
           float dCam = length(cameraPosition - vW);
           alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * mix(0.2, 0.34, smoothstep(900.0, 250.0, dCam)));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
           // (and from afar a snow-country spruce is frosted blue-grey, not a black cone on the white)
-          alb = mix(alb, vec3(0.24, 0.31, 0.37), 0.55 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam));
+          // (round 98: dark under their snow, as timber is in a storm: frosted pale they were the colour of the slope behind)
+          alb = mix(alb, vec3(0.24, 0.31, 0.37), 0.55 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam) * (1.0 - 0.75 * uSnowfall));
+          alb *= 1.0 - 0.35 * uSnowfall * smoothstep(0.35, 0.8, icl.r);
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);

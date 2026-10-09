@@ -206,7 +206,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   // thinner, so rock a kilometre off still shows dark through it)
   // (round 97: and it takes the valley by degrees: a quarter gone at a kilometre, two-thirds at two. Thin, there was
   // nothing between the middle ground and the far ridges)
-  col = mix(col, fogCol * vec3(0.9, 1.0, 1.07), min(1.0, uSnowfall * 1.5) * 0.96 * (1.0 - exp(-max(dist - 150.0, 0.0) / 1900.0)));   // (the near walls keep their darks)
+  col = mix(col, fogCol * vec3(0.9, 1.0, 1.07), min(1.0, uSnowfall * 1.5) * 0.96 * (1.0 - exp(-max(dist - 300.0, 0.0) / 2600.0)));   // (eased: at 1900 the valley's walls went to pale blobs)   // (the near walls keep their darks)
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     // Valley fog as a layer of air, not paint: a bank lies between the valley floor and a ceiling a hundred metres

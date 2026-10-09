@@ -141,7 +141,8 @@ export class Sky {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
-      defines: { CLOUD_STEPS: quality >= 2 ? 80 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },   // (dithered: past ~80 steps the gain is not visible)
+      // (stills march twice as fine: on a deck standing close at eye level the dither showed as grain and the steps as bands)
+      defines: { CLOUD_STEPS: (typeof location !== 'undefined' && /[?&]capture\b/.test(location.search)) ? 176 : quality >= 2 ? 80 : quality > 1 ? 48 : quality >= 1 ? 32 : 18 },   // (dithered: past ~80 steps the gain is not visible)
       vertexShader: /* glsl */ `
         varying vec3 vDir;
         void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_Position.z = gl_Position.w * 0.99999; }`,
@@ -282,7 +283,7 @@ export class Sky {
             ambTop *= 1.0 - 0.2 * uStorm;
             // (a storm's cloud is lit as hard as any other: its body is dark because it is thick, and its thin torn edges
             // and the walls of its breaks blaze: the silver linings a dimmed, even grey deck never had)
-            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.25 * uStorm), ambTop, ambBot, uCloudCover);
+            vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.55 * uStorm), ambTop, ambBot, uCloudCover);   // (a storm's lit heads are pale grey, not white: at full sun they were stamped-on puffs)
             // aerial perspective: far clouds melt into the horizon haze
             float far = 1.0 - exp(-(max(CB - uDeck.z, 0.0) / max(d.y, 0.02)) / 17000.0);
             vec3 hz = stormSky(skyColor(d, s));
