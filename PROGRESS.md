@@ -888,3 +888,10 @@ The riding shots' weakest thing has been the same for thirty rounds, so this rou
   weathered mass, not a pile of boxes. On ledge rock the lichen is hand-sized and faint (it was camouflage), the
   stretched scan is nearly out, snow edges break into grains.
 - **Pine-belt grass** greyer and darker (a strip of lime down the trail in the sun).
+
+**Critic scores.** Round 79: 4 / 3 / 5. No movement in the totals. What it saw: the coat's tan patina "reads as
+bare skin", hat brim cartoonishly curled, horse legs now *too* thin ("stick legs"), pair too small in the snow
+frame; the vista outcrop went from boxes to "melted wax with a spiky silhouette" (the half-snapped lattice
+overshot) with snow "smeared into creases instead of sitting on up-facing surfaces"; snow ride's valley walls
+are still a smooth dark mass and a washed pale sheet. Next: outcrop back toward planes and joints with snow on
+its tops; snow-ride walls; horse legs' girth; coat darker and less mottled.
