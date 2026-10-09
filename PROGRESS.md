@@ -508,6 +508,22 @@ as a lookout over a valley.
 - **Captures.** They now render at 1.5× supersampling. Headless Chromium has a device pixel ratio of 1, while the
   target Mac renders at 2×, so the critic had been judging aliased foliage that a player never sees.
 
+**Round 47 critic:** pines 4, snowride 5, snowvista 3. The vista was milky from haze, fixed in the round 48–49
+commits.
+
+### Round 49: first supersampled capture
+- **Frames.** Rendered at `ss=1.5` and saved in `latest_frames/w49_*.jpg`. They have not been critiqued yet.
+- **Vista.** A dark, flat storm deck with breaks of light, crisper mountains, textured forests, and the homestead
+  with smoke in the lower centre.
+- **Pines.** Lusher, with ferns and drifts of shrub along the trail, but darker.
+- **Committed after the capture started:**
+  - cliff strata with snow on the ledges
+  - a trampled yard round the homestead
+- **Handoff.** `scripts/build_handoff.py` packs the project and this log into `../DUST_AND_REDEMPTION_HANDOFF.md`
+  for a fresh session.
+
+*(The round-49 notes above are the first account's, from the GitHub branch; what follows was written in a separate repository rebuilt from the handoff file.)*
+
 ## New machine: the owner's MacBook (rounds 50 on)
 
 The project was carried over in a single handoff file and rebuilt on the target machine itself, an Apple M4.
