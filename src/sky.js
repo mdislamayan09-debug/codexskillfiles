@@ -255,7 +255,9 @@ export class Sky {
             vec2 cuv = d.xz / (max(d.y, 0.0) + 0.16) + uCloudOffset * 3.0;
             float lump = smoothstep(0.28, 0.72, fbm(cuv * 1.15) * 0.65 + fbm(cuv * 3.4 + 7.3) * 0.35);
             // (heavy and dark overhead, as the reference's ceiling presses down on the peaks, with paler rifts)
-            vec3 ceilC = uHaze * mix(0.46 + 0.55 * lump * lump, 1.15, 1.0 - smoothstep(0.0, 0.2, d.y));
+            // (round 85: measured against the reference's storm sky ours was a fifth too light, greyer, and flat: p5 153
+            // against 91. Darker and bluer, with deep masses and pale rifts, down to a horizon the far fog matches.)
+            vec3 ceilC = uHaze * vec3(0.8, 0.89, 0.96) * mix(0.3 + 0.95 * lump * lump, 1.12, 1.0 - smoothstep(0.0, 0.14, d.y));
             col = mix(col, ceilC, uBlizzard * 0.92);
           }
           gl_FragColor = vec4(col, 1.0);

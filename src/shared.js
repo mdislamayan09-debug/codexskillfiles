@@ -202,7 +202,9 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   col = mix(col, fogCol, fogF);
   // falling snow: the far walls and peaks fade out into the snowfall, to the tone of the sky behind them (a range
   // standing behind a nearer crest showed through it as a dark outline hung in the sky)
-  col = mix(col, fogCol * 1.12, uSnowfall * 0.96 * (1.0 - exp(-max(dist - 500.0, 0.0) / 2500.0)));   // (the near walls keep their darks)
+  // (round 85: the far air under snowfall a fifth darker and bluer, as measured on the reference's valley end, and
+  // thinner, so rock a kilometre off still shows dark through it)
+  col = mix(col, fogCol * vec3(0.9, 1.0, 1.07), uSnowfall * 0.96 * (1.0 - exp(-max(dist - 500.0, 0.0) / 3400.0)));   // (the near walls keep their darks)
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     // Valley fog as a layer of air, not paint: a bank lies between the valley floor and a ceiling a hundred metres

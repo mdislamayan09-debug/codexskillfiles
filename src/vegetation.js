@@ -78,7 +78,8 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
       #ifdef CONIFER_SNOW
-      sk *= mix(0.6, 0.85, uSnowfall);   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
+      sk *= mix(0.6, 0.68, uSnowfall);   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
+      // was mix(0.6, 0.85, uSnowfall)   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
       #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
@@ -1215,6 +1216,12 @@ function rockMaterial(surf = {}, bare = false) {
         vec3 q = p * sc + 0.16 * vec3(vnoise(p.yz * sc * 2.3), vnoise(p.zx * sc * 2.3 + 5.0), vnoise(p.xy * sc * 2.3 + 9.0));
         return crackCell(q.zy * vec2(1.0, 1.7)) * w.x + crackCell(q.xz * 1.15) * w.y + crackCell(q.xy * vec2(1.0, 1.7) + 4.3) * w.z;
       }
+      // noise laid on the three planes and blended by the surface's facing (round 85). Every pattern on the rock used
+      // to be a 2-D noise of a slanted projection of the position, which runs out into streaks on any face that lies
+      // along the projection: the 'stretched, smeared texture' on upright faces.
+      vec3 gTW = vec3(0.0, 1.0, 0.0);
+      float tnz(vec3 p) { return vnoise(p.zy) * gTW.x + vnoise(p.xz + 13.7) * gTW.y + vnoise(p.xy + 29.3) * gTW.z; }
+      float tfb(vec3 p) { return fbm2(p.zy) * gTW.x + fbm2(p.xz + 13.7) * gTW.y + fbm2(p.xy + 29.3) * gTW.z; }
       float gCrack = 0.0;
       float rockCrack(vec3 p) {
         // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
@@ -1250,8 +1257,9 @@ function rockMaterial(surf = {}, bare = false) {
       #include <color_fragment>
       // smooth world normal: snow and moss follow the rounded form, not individual triangles
       vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
-      float n1 = fbm2(vWPos.xz*0.8 + vWPos.y*0.6);
-      float n2 = vnoise(vec2(vWPos.x+vWPos.z, vWPos.y)*3.0);
+      gTW = pow(abs(wn), vec3(6.0)); gTW /= (gTW.x + gTW.y + gTW.z);
+      float n1 = tfb(vWPos * 0.8);
+      float n2 = tnz(vWPos * 3.0);
       // weathered granite: warm grey-brown, as the reference's ledge, not slate blue
       vec3 base = mix(srgbR(vec3(128,118,104)), srgbR(vec3(98,90,80)), n1);
       base = mix(base, srgbR(vec3(130,112,90)), smoothstep(0.6, 0.8, vnoise(vec2(vWPos.y*1.5, vWPos.x*0.2))) * 0.6);
@@ -1281,7 +1289,7 @@ function rockMaterial(surf = {}, bare = false) {
       {
         // granite from a pace away: an even grey-tan body speckled with crystals (dark mica, pale feldspar), rain-stained
         // in streaks down its faces
-        float sp1 = vnoise(vWPos.xz * 95.0 + vWPos.y * 71.0), sp2 = vnoise(vWPos.xy * 230.0 - vWPos.z * 170.0), sp3 = vnoise(vWPos.zy * 41.0 + vWPos.x * 33.0);
+        float sp1 = tnz(vWPos * 95.0), sp2 = tnz(vWPos * 230.0 + 3.0), sp3 = tnz(vWPos * 41.0 + 7.0);
         float nearG = smoothstep(34.0, 9.0, length(vWPos - cameraPosition));
         base *= mix(1.0, 0.8 + 0.4 * (sp1 * 0.45 + sp2 * 0.3 + sp3 * 0.25), nearG);
         base = mix(base, srgbR(vec3(50,48,46)), smoothstep(0.72, 0.82, sp1) * 0.5 * nearG);
@@ -1293,7 +1301,7 @@ function rockMaterial(surf = {}, bare = false) {
       // close to, the stone has grain: crystal-sized speckle and pitting the half-metre scan cannot carry
       {
         float nearR = smoothstep(26.0, 5.0, length(vWPos - cameraPosition));
-        float grain = vnoise(vWPos.xz * 61.0 + vWPos.y * 47.0) * 0.6 + vnoise(vWPos.xy * 143.0 - vWPos.z * 97.0) * 0.4;
+        float grain = tnz(vWPos * 61.0) * 0.6 + tnz(vWPos * 143.0 + 5.0) * 0.4;
         #ifndef BARE_LEDGE
         base *= mix(1.0, 0.72 + 0.56 * grain, nearR);
         #endif
@@ -1315,7 +1323,7 @@ function rockMaterial(surf = {}, bare = false) {
         float cN2 = kN > 0.5 ? crackNet(vWPos + 5.0, wn, 4.6) : 1.0;
         // (hairline, and not all of one weight: some joints open and dark, most barely a seam. Drawn evenly they were
         // the veins of a marble slab)
-        float wgt = 0.25 + 0.75 * smoothstep(0.35, 0.7, vnoise(vWPos.xz * 0.55 + vWPos.y * 0.8 + 2.0));
+        float wgt = 0.25 + 0.75 * smoothstep(0.35, 0.7, tnz(vWPos * 0.55 + 2.0));
         float lineN = smoothstep(0.034, 0.008, cN) * kN * wgt, lineF = smoothstep(0.06, 0.015, cF) * kF, line2 = smoothstep(0.04, 0.008, cN2) * smoothstep(0.5, 1.0, kN) * (1.0 - wgt);
         base *= 1.0 - 0.55 * lineN - 0.5 * lineF - 0.22 * line2;
         // (the stone a shade darker for a hand's width either side of a joint, where water stands)
@@ -1327,7 +1335,7 @@ function rockMaterial(surf = {}, bare = false) {
       {
         float stormK = uSnowfall * smoothstep(0.35, 0.75, rcl.r);
         base = mix(base, base * vec3(0.34, 0.42, 0.56), stormK);   // (near black: the frame's dark anchor, as the reference's cliff band is)
-        float rime = stormK * smoothstep(0.38, 0.72, fbm2(vec2(vWPos.x + vWPos.z, vWPos.y * 2.2) / 3.5) + 0.25 * (vnoise(vWPos.xz * 3.0 + vWPos.y * 2.0) - 0.5));
+        float rime = stormK * smoothstep(0.38, 0.72, tfb(vWPos / 3.5) + 0.25 * (tnz(vWPos * 3.0) - 0.5));
         base = mix(base, vec3(0.6, 0.66, 0.76), rime * 0.1);
       }
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
@@ -1339,27 +1347,28 @@ function rockMaterial(surf = {}, bare = false) {
       // in drifts and crusts, not a smooth white cap: the grey stone and its lichen show through
       // (round grains of one size on a noise grid read as polka dots on a big ledge; these are torn, mixed-size flecks)
       // clean patches of old snow lying on the flats, with a ragged edge; elsewhere only a sparse frost of flecks
-      float fleck = smoothstep(0.74, 0.8, vnoise(vWPos.xz * 7.0 + vWPos.y * 5.0) * 0.55 + vnoise(vWPos.xz * 19.0 - vWPos.y * 11.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
-      float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
+      float fleck = smoothstep(0.74, 0.8, tnz(vWPos * 7.0) * 0.55 + tnz(vWPos * 19.0 + 2.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
+      float drift = smoothstep(0.4, 0.52, tfb(vWPos * 0.45 + 7.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
       // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
       // facets read as paper laid on the rock)
       // (its edge broken into grains and flecks: a clean edge was a white paper cut-out laid on the stone)
-      float topS = smoothstep(0.72, 0.95, wn.y) * smoothstep(0.3, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.2 * (vnoise(vWPos.xz * 47.0) - 0.5) + 0.16 * (vnoise(vWPos.xz * 130.0 + vWPos.y * 90.0) - 0.5));
-      // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
-      // (lying on what faces up, in patches: drawn out along one grain it was white streaks smeared into the creases)
-      // (and only on what is near level: on the rounded shoulders it ran down the faces like dripped wax)
-      rsnow = max(rsnow * max(drift, 0.7 * fleck) * smoothstep(0.66, 0.86, wn.y), 0.86 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.5 + 0.5 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * 2.7 + 1.9))));
+      // (round 85: one crisp, ragged edge. Snow lies on what faces up, in patches, and stops at a line broken at every
+      // scale from a pace to a finger; faded in over a range of slope it lay on the rock as soft white blobs.)
+      float sEdge = wn.y + 0.2 * (tnz(vWPos * 2.3) - 0.5) + 0.12 * (tnz(vWPos * 9.0 + 3.0) - 0.5) + 0.08 * (tnz(vWPos * 37.0 + 6.0) - 0.5);
+      float patchS = smoothstep(0.4, 0.47, tfb(vWPos * 0.55 + 3.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
+      float topS = smoothstep(0.86, 0.895, sEdge) * patchS;
+      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(topS * 0.93, 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
-      base *= vec3(0.8, 0.87, 0.98) * (0.74 + 0.4 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
+      base *= vec3(0.8, 0.87, 0.98) * (0.74 + 0.4 * smoothstep(0.25, 0.75, tfb(vWPos * 0.23 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
       // crust lichens, in crisp-edged crinkled patches a hand or two across: pale grey-green, ochre, and the black one
       // that grows in the damp streaks
-      float crink = 0.22 * (vnoise(vWPos.xz * 23.0 + vWPos.y * 17.0) - 0.5) + 0.1 * (vnoise(vWPos.xy * 61.0 + vWPos.z * 43.0) - 0.5);
+      float crink = 0.22 * (tnz(vWPos * 23.0) - 0.5) + 0.1 * (tnz(vWPos * 61.0 + 4.0) - 0.5);
       #ifdef BARE_LEDGE
       // (a pace from the lens lichen is a scatter of hand-sized crusts, not a map of continents: at the boulders' scale
       // it lay on the ledge in crisp camouflage shapes)
@@ -1367,11 +1376,11 @@ function rockMaterial(surf = {}, bare = false) {
       #else
       float lsc = 1.0, lK = 1.0;
       #endif
-      float lichen = smoothstep(0.56, 0.6, vnoise((vWPos.xz * 1.7 + vWPos.y * 2.3) * lsc) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      float lichen = smoothstep(0.56, 0.6, tnz(vWPos * 1.7 * lsc) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28 * lK);
-      float ochre = smoothstep(0.66, 0.7, vnoise((vWPos.xz * 2.3 - vWPos.y * 1.9) * lsc + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      float ochre = smoothstep(0.66, 0.7, tnz(vWPos * 2.3 * lsc + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22 * lK);
-      float blackL = smoothstep(0.64, 0.68, vnoise((vWPos.zy * 2.9 + vWPos.x * 2.1) * lsc - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
+      float blackL = smoothstep(0.64, 0.68, tnz(vWPos * 2.9 * lsc - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
       base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3 * lK);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
@@ -1527,7 +1536,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.35 });   // (a light frost: straw and ochre still show against the snow)
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.5, 1.45, 1.35) }), 1, leafExtra, { frost: 0.6 });   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];

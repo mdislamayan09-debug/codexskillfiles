@@ -971,3 +971,24 @@ and mountain depth (snow ride).
   not been moved to the shot yet when the dressing runs, so the lens position is worked out from the shot.)
 - **Pine-belt grass** is let further in under the trees and broken into clumps a few paces across: no ruled
   green stripe beside the trail.
+
+**Critic scores.** Round 84: 4 / **4** / 5. Snow ride back to 4 ("cold blue-grey grade and exposure sit close to
+the reference"). Its first item is now the backdrop: "right wall a pale near-white mass with stair-step banding,
+no exposed dark rock; the valley ends in one blank wedge where the reference stacks five ridgelines". Pines:
+rider/horse first, then ground ("blurred smear, flecks that read as decals"), trunks, no dapple.
+
+### Round 85
+- **Rock patterns are triplanar** (`tnz`, `tfb` in the rock shader). Every pattern on a rock (mottle, lichen,
+  speckle, snow flecks, drift, crack weight) was a 2-D noise of a slanted projection of the position, which
+  runs out into streaks on any face lying along the projection: the "stretched, smeared texture" the critic
+  has named for ten rounds. Now each is laid on the three planes and blended by the surface's facing.
+- **Ledge snow has one crisp ragged edge**: it lies on what faces up, in patches, and stops at a line broken
+  at every scale from a pace to a finger (faded over a range of slope it was soft white blobs). Tufts on the
+  blocks are brighter and more frosted; the twig brush is off the block tops.
+- **Storm sky and far air measured against the reference**: ours was a fifth too light and greyer, the sky
+  flat (p5 153 against 91). Ceiling darker and bluer with deep masses and pale rifts; far air under snowfall
+  darker, bluer and thinner (rock a kilometre off still shows dark).
+- **Conifers stay dark under falling snow** (snow load 0.68, was 0.85: every tree was a white cone); single
+  old pines stand out on the valley floor at every distance.
+- **Horse in the storm**: flakes caught all over the coat's upper side, sheen off, the trough under it barely
+  darker than the field (an overcast casts no shadow pool). Collar fur greyer.

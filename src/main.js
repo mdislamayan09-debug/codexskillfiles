@@ -845,6 +845,19 @@ async function init() {
           veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rt3() * 6.28, old ? 0.45 + rt3() * 0.5 : 0.55 + rt3() * rt3() * 1.5, old ? tl[Math.floor(rt3() * tl.length)] : firs[Math.floor(rt3() * firs.length)]);
         }
       }
+      // and single old pines standing out on the floor at every distance, dark boles and ragged crowns against the
+      // snow: they are what gives the middle ground its depth
+      {
+        const tl = veg.groups.tall;
+        let sdl = 811;
+        const rl2 = () => ((sdl = (sdl * 16807) % 2147483647) / 2147483647);
+        if (tl.length) for (let i = 0; i < 16; i++) {
+          const ahead = 45 + rl2() * 260, side = (rl2() < 0.5 ? -1 : 1) * (9 + ahead * 0.07 + rl2() * (10 + ahead * 0.3));
+          const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
+          if (world.splatAt(x, z).wet > 0.3 || world.normalAt(x, z).y < 0.8) continue;
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rl2() * 6.28, 0.42 + rl2() * 0.4, tl[Math.floor(rl2() * tl.length)]);
+        }
+      }
       // (the boulder groups above are thrown wide enough to land on the bench: taken off its face again)
       if (G.benchBox) {
         const [x0, z0, x1, z1] = G.benchBox, flr = world.heightAt(px, pz) + 3;
@@ -1205,8 +1218,8 @@ async function init() {
         // dome's shoulder: russet brush in low dense clumps and fine frosted tufts, a dozen or so to a block)
         for (let q = 0; q < 5; q++) {
           const a = rr() * 6.28, rad = (0.05 + rr() * 0.3) * sc, cx3 = x + Math.cos(a) * rad, cz3 = z + Math.sin(a) * rad, yy = by - 0.05 * sc - (rad / (0.35 * sc)) ** 2 * 0.1 * sc;
-          if (q % 2 === 0) for (let k = 0; k < 3; k++) veg.bushes.add(cx3 + (rr() - 0.5) * 0.5, yy - 0.06, cz3 + (rr() - 0.5) * 0.5, rr() * 6.28, 0.3 + rr() * 0.28, 7 + Math.floor(rr() * 2));
-          else for (let k = 0; k < 5; k++) veg.bushes.add(cx3 + (rr() - 0.5) * 0.8, yy - 0.03, cz3 + (rr() - 0.5) * 0.8, rr() * 6.28, 0.14 + rr() * 0.14, 9);
+          // (tufts only on the blocks: the twig brush, seen from a pace away against the sky, was a white cut-out over a black hole)
+          for (let k = 0; k < 5; k++) veg.bushes.add(cx3 + (rr() - 0.5) * 0.8, yy - 0.03, cz3 + (rr() - 0.5) * 0.8, rr() * 6.28, 0.14 + rr() * 0.14, 9);
         }
       };
       // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one

@@ -481,9 +481,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         // (churned, not a smooth dark band: clods and kicked-up snow break the trough's shade, and under falling snow
         // with no sun to cast its walls' shadow it is only a little darker than the field)
         float churn = 0.55 * vnoise(xz * 7.0) + 0.45 * vnoise(xz * 19.0 + 3.0);
-        float deep = mix(0.52, 0.74, uSnowfall) + 0.3 * (churn - 0.5);
+        float deep = mix(0.52, 0.9, min(1.0, uSnowfall * 1.7)) + 0.26 * (churn - 0.5);   // (under an overcast a trough casts no shadow: a dark blue pool under the horse contradicted the sky)
         c *= mix(1.0, deep, trough * snowAmt) * (1.0 - 0.3 * pit * snowAmt);
-        c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt * (1.0 - 0.5 * uSnowfall));   // compacted, shadowed blue
+        c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt * (1.0 - min(1.0, uSnowfall * 1.7)));   // compacted, shadowed blue
         c *= 1.0 + 0.16 * lip * snowAmt;
         rough = mix(rough, 0.75, trough * snowAmt);
       }

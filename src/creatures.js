@@ -217,6 +217,11 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             // standing on the white were table legs set down on a cloth)
             float cake = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.62, 0.18, vRest.y + 0.12 * (vnoise(vRest.xz * 31.0 + vRest.y * 9.0) - 0.5)) * (0.55 + 0.45 * vnoise(vRest.xy * 70.0 + vRest.z * 50.0));
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.85, 0.9), cake * 0.8);
+            // and flakes caught all over the coat's upper side, thick along the croup and back, the winter coat dull under them
+            float cold = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.12, 1.0, 0.9), 0.12 * cold);
+            float fl = smoothstep(0.62, 0.8, vnoise(vRest.xz * 140.0 + vRest.y * 60.0) * 0.6 + vnoise(vRest.xz * 47.0 - vRest.y * 20.0) * 0.4) * smoothstep(-0.1, 0.7, wn.y);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), fl * 0.6 * cold);
           }`}
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
@@ -280,7 +285,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
             // (the streaks fade out as they near a pixel's width: beating against the pixel grid they wove the rump into twill)
             float streak = mix(1.0, 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0)), smoothstep(0.5, 0.18, length(fwidth(vRest)) * 64.0));
-            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - 0.8 * uSnowfall);
+            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - min(1.0, uSnowfall * 1.5));
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
@@ -868,7 +873,7 @@ export class Human {
         const trim = lump(new THREE.TorusGeometry(0.138, 0.042, 10, 30), 0.05, 60); trim.rotateX(Math.PI / 2); trim.scale(1.12, 1.0, 1.17);
         const tm2 = mesh(trim, std({ map: furTex_(0x8c7c64), roughness: 0.95 })); tm2.position.copy(at(bones.head, 0, hy - 0.012, hz)); tm2.rotation.x = -0.1; bones.head.add(tm2);
         const col = lump(new THREE.TorusGeometry(0.15, 0.056, 10, 30), 0.06, 46); col.rotateX(Math.PI / 2); col.scale(1.36, 0.8, 1.1);
-        const cm2 = mesh(col, std({ map: furTex_(0xb9aa8c), roughness: 0.95 })); cm2.position.set(-bones.spine.userData.rest.x, MH.rest.neck[1] - 0.045 - bones.spine.userData.rest.y, MH.rest.neck[2] - 0.03 - bones.spine.userData.rest.z); cm2.rotation.x = 0.22; bones.spine.add(cm2);
+        const cm2 = mesh(col, std({ map: furTex_(0xa39c8e), roughness: 0.95 })); cm2.position.set(-bones.spine.userData.rest.x, MH.rest.neck[1] - 0.045 - bones.spine.userData.rest.y, MH.rest.neck[2] - 0.03 - bones.spine.userData.rest.z); cm2.rotation.x = 0.22; bones.spine.add(cm2);
       }
       // on the real body the rolled collar carries the pelt; only a short soft fringe on its rim
       if (MH) bones.spine.add(mesh(furCards(0, 0, MH.rest.neck[2] - 0.035, 0.125, MH.rest.neck[1] + 0.06, MH.rest.neck[1] + 0.1, 80, 0.032, bones.spine), colFur, false));
