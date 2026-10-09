@@ -276,7 +276,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // a built knoll or yard lies under snow whatever its height and shape (a convex top above the crest line was
   // stripped to dark rock like a wind-scoured summit)
   if (uSnowPad.w > 0.0) {
-    float pad = uSnowPad.w * smoothstep(uSnowPad.z, uSnowPad.z * 0.55, length(xz - uSnowPad.xy)) * (1.0 - smoothstep(0.16, 0.3, slope));
+    float pad = uSnowPad.w * smoothstep(uSnowPad.z, uSnowPad.z * 0.55, length(xz - uSnowPad.xy)) * (1.0 - smoothstep(0.36, 0.5, slope));   // (the knoll's own flanks too: bare at a quarter slope, they showed as blurred dark smears)
     snowAmt = mix(snowAmt, smoothstep(0.3, 0.7, snowC) * (1.0 - 0.8 * smoothstep(0.45, 0.85, road)), pad);
     rockAmt *= 1.0 - pad;
   }
@@ -427,8 +427,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         float wall = smoothstep(0.7, 0.25, dmin) * smoothstep(0.0, 0.3, dmin);
         vec2 g = -toC * (wall * 1.5 - lip * 0.8);
         tn = normalize(tn + vec3(g, 0.0) * snowAmt);
-        c *= mix(1.0, 0.52, trough * snowAmt) * (1.0 - 0.3 * pit * snowAmt);
-        c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt);   // compacted, shadowed blue
+        // (churned, not a smooth dark band: clods and kicked-up snow break the trough's shade, and under falling snow
+        // with no sun to cast its walls' shadow it is only a little darker than the field)
+        float churn = 0.55 * vnoise(xz * 7.0) + 0.45 * vnoise(xz * 19.0 + 3.0);
+        float deep = mix(0.52, 0.74, uSnowfall) + 0.3 * (churn - 0.5);
+        c *= mix(1.0, deep, trough * snowAmt) * (1.0 - 0.3 * pit * snowAmt);
+        c = mix(c, c * vec3(0.8, 0.88, 1.05), (trough * 0.7 + pit * 0.5) * snowAmt * (1.0 - 0.5 * uSnowfall));   // compacted, shadowed blue
         c *= 1.0 + 0.16 * lip * snowAmt;
         rough = mix(rough, 0.75, trough * snowAmt);
       }
@@ -436,7 +440,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     // glints: single crystals near the lens turned just right to mirror the sky (they wink as the view moves)
     if (fp < 0.06) {
       vec3 vv = normalize(cameraPosition - wp);
-      float glint = step(0.988, hash12(floor(xz * 48.0) + floor(vv.xz * 9.0) * 17.0)) * snowAmt * smoothstep(0.06, 0.015, fp);
+      // (none under falling snow: there is no sun for a crystal to mirror, and in the trough's shade they stood in rows of white dots)
+      float glint = step(0.988, hash12(floor(xz * 48.0) + floor(vv.xz * 9.0) * 17.0)) * snowAmt * smoothstep(0.06, 0.015, fp) * (1.0 - uSnowfall);
       c = mix(c, vec3(1.0), glint * 0.6);
       rough = mix(rough, 0.03, glint);
     }

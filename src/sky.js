@@ -61,16 +61,20 @@ float cloudDen(vec3 p, float cov){
   // flat dark bases, towering rounded tops
   // (in a storm the slab flattens into a low deck, a thin lumpy layer seen from beneath, not towering cumulus)
   // (a deck with body: a thin sheet let the sun straight through and its underside came out pale and even)
-  float prof = smoothstep(0.0, 0.08, h) * smoothstep(mix(1.0, 0.9, uStorm), mix(0.45 + 0.4 * weather, 0.3 + 0.25 * weather, uStorm), h);
+  // (only inside falling snow is the cloud a flat deck. A storm standing in clear air keeps its towers: heaped
+  // cumulus with dark bellies and lit heads, which is what the ray march is good at; flattened and looked at from a
+  // lookout it was streaks)
+  float fl = uStorm * uBlizzard;
+  float prof = smoothstep(0.0, 0.08, h) * smoothstep(mix(1.0, 0.9, fl), mix(0.45 + 0.4 * weather, 0.3 + 0.25 * weather, fl), h);
   // (a tighter edge band and finer, stronger erosion: defined cauliflower cells rather than soft blobs)
   // (the 8-bit shape noise is dithered by the detail noise and taken through a wider edge band: a narrow band
   // stretched a few grey levels into contour lines across the thin parts of the deck)
   float d = remap(lo.r * prof + (texture(tCloud, p / 1900.0).g - 0.5) * 0.06, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
   if (d <= 0.0) return 0.0;
   float det = texture(tCloud, p / 760.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
-  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * mix(0.68, 0.4, uStorm), 1.0, 0.0, 1.0);   // (soft billows in a storm, not crisp fair-weather cauliflower)
+  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * mix(0.68, 0.4, fl), 1.0, 0.0, 1.0);   // (soft billows in a storm, not crisp fair-weather cauliflower)
   // a finer erosion pass where the cloud is thin: crisp wisps and torn edges instead of a soft, magnified blur
-  if (d > 0.0 && d < 0.6) d = remap(d, texture(tCloud, p / 260.0 + vec3(uTime * 0.0006, 0.0, 0.0)).g * 0.32 * (1.0 - 0.75 * uStorm), 1.0, 0.0, 1.0);
+  if (d > 0.0 && d < 0.6) d = remap(d, texture(tCloud, p / 260.0 + vec3(uTime * 0.0006, 0.0, 0.0)).g * 0.32 * (1.0 - 0.75 * fl), 1.0, 0.0, 1.0);
   return d * c;
 }
 float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }
@@ -241,7 +245,7 @@ export class Sky {
             float ci = fbm(vec2(uv.x*0.45, uv.y*1.1) + 20.0 + uTime*0.002);
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
-          if (uStorm > 0.01 && uBlizzard < 0.99) col = mix(col, stormDeck(d, s, day), uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.05, d.y));
+          if (uStorm > 0.01 && uBlizzard < 0.99) col = mix(col, stormDeck(d, s, day), 0.38 * uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.05, d.y));   // (a grey ground behind the towers)
           // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
           // (right up to the zenith: seen from inside falling snow the deck is a pale, softly mottled ceiling, not the
           // dark slate underside of a dry storm; its cells still show through)

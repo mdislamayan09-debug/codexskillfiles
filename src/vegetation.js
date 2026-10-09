@@ -351,7 +351,7 @@ function buildPine(seed, kind = 'pine') {
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
       // (spruce are ragged too: boughs of uneven length, the crown fuller to one side, a tier missing here and there;
       // every bough the same length made each tree a turned cone)
-      const lr = tall ? r * (0.6 + rnd() * 0.65) : kind === 'fir' ? r * (0.5 + rnd() * 0.72) * (1 + lop * Math.cos(a - lopA)) : r;
+      const lr = tall ? r * (0.6 + rnd() * 0.65) : kind === 'fir' ? r * (0.72 + rnd() * 0.7) * (1 + lop * Math.cos(a - lopA)) : r;
       // cross cards: one lying along the branch, one standing on its edge, so the silhouette reads from the side
       // and from above; each bough is three sprays along its length (sagging further out), so it reads as tufts
       // with sky between them rather than one flat sheet
@@ -1269,7 +1269,9 @@ function rockMaterial(surf = {}, bare = false) {
       float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
       // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
       rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.5 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.35 + 0.65 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * vec2(7.0, 2.1) + vWPos.y * 3.0))));
-      base *= vec3(1.3, 1.2, 1.04);   // weathered ledge granite, warm against the snow
+      // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
+      // lighter and tan where that one is blue-grey under the overcast)
+      base *= vec3(0.86, 0.9, 0.97) * (0.62 + 0.62 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
@@ -1279,7 +1281,7 @@ function rockMaterial(surf = {}, bare = false) {
       float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28);
       float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.36);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22);
       float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
       base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -1767,9 +1769,9 @@ export class Vegetation {
           // snow on the upper boughs, fading out with distance: a few-pixel tree with a white cap is what turns a
           // far forest into salt-and-pepper speckle
           float dCam = length(cameraPosition - vW);
-          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.32 * smoothstep(520.0, 220.0, dCam));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
+          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * mix(0.2, 0.34, smoothstep(900.0, 250.0, dCam)));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
           // (and from afar a snow-country spruce is frosted blue-grey, not a black cone on the white)
-          alb = mix(alb, vec3(0.2, 0.25, 0.32), 0.5 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam));
+          alb = mix(alb, vec3(0.24, 0.31, 0.37), 0.55 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam));
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
@@ -1784,7 +1786,7 @@ export class Vegetation {
             vec3 cAlb = mix(pow(vec3(34.0, 46.0, 26.0) / 255.0, vec3(2.2)), pow(vec3(52.0, 62.0, 32.0) / 255.0, vec3(2.2)), cn);
             cAlb = mix(cAlb, mix(pow(vec3(26.0, 50.0, 20.0) / 255.0, vec3(2.2)), pow(vec3(40.0, 68.0, 26.0) / 255.0, vec3(2.2)), cn), icl.g);
             cAlb = mix(cAlb, mix(pow(vec3(124.0, 58.0, 22.0) / 255.0, vec3(2.2)), pow(vec3(158.0, 112.0, 32.0) / 255.0, vec3(2.2)), cn), icl.b * 0.85);
-            cAlb = mix(cAlb, pow(vec3(30.0, 38.0, 36.0) / 255.0, vec3(2.2)), smoothstep(0.4, 0.8, icl.r));   // matches the snow-country canopy
+            cAlb = mix(cAlb, pow(vec3(42.0, 54.0, 58.0) / 255.0, vec3(2.2)), smoothstep(0.4, 0.8, icl.r));   // matches the snow-country canopy
             vec3 nT = normalAt(vW.xz);
             float ndlT = max(dot(nT, normalize(uSunDir)), 0.0);
             vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.2 * ao);

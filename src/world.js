@@ -704,7 +704,7 @@ export class World {
     const n = this.n, R = 10, inv = 1 / (2 * R * CELL);
     const ridged = (x, z) => {
       let s = 0, a = 1, f = 1, w = 1, norm = 0;
-      for (let o = 0; o < 4; o++) { let r = 1 - Math.abs(n.noise(x * f + o * 7.3, z * f - o * 3.1)); r *= r; s += r * a * w; norm += a; w = Math.min(1, r * 1.6); a *= 0.5; f *= 2.1; }
+      for (let o = 0; o < 3; o++) { let r = 1 - Math.abs(n.noise(x * f + o * 7.3, z * f - o * 3.1)); r *= r; s += r * a * w; norm += a; w = Math.min(1, r * 1.6); a *= 0.5; f *= 2.1; }
       return s / norm;
     };
     for (let j = R; j < RES - R; j++) {
@@ -718,7 +718,8 @@ export class World {
         const a = Math.max(smoothstep(0.46, 0.9, g), 0.7 * smoothstep(540, 720, h) * smoothstep(0.15, 0.4, g)) * smoothstep(0.35, 0.65, snow);
         if (a <= 0) continue;
         const x = i * CELL - HALF;
-        H[k] = h + a * (30 * (ridged(x / 190, z / 190) - 0.42) + 8 * (ridged(x / 60 + 9.1, z / 60 - 4.4) - 0.42));
+        // (big buttresses, little fine relief: at 8 m the small ones broke every face into a speckle of rock and snow)
+        H[k] = h + a * (30 * (ridged(x / 190, z / 190) - 0.42) + 3 * (ridged(x / 60 + 9.1, z / 60 - 4.4) - 0.42));
       }
     }
   }
@@ -746,7 +747,7 @@ export class World {
         const swarm = smoothstep(-0.25, 0.35, n3.noise(x / 420 + 2.2, z / 420 - 5.1));
         const a1 = n.noise(u / 60 + 0.35 * n3.noise(v / 140, u / 140), v / 300 + 11.3);
         const a2 = n.noise(u / 25 - 4.4, v / 130 + 3.9);
-        const cut = 8 * Math.pow(1 - Math.min(1, Math.abs(a1) * 2.4), 2) + 3.2 * Math.pow(1 - Math.min(1, Math.abs(a2) * 2.2), 2);
+        const cut = 8 * Math.pow(1 - Math.min(1, Math.abs(a1) * 2.4), 2) + 1.2 * Math.pow(1 - Math.min(1, Math.abs(a2) * 2.2), 2);
         H[k] = src[k] - cut * amt * (0.25 + 0.75 * swarm);
       }
     }

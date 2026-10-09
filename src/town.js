@@ -150,6 +150,9 @@ export class Town {
           if (tcl.r > 0.05) {
             float upN = normalize(cross(dFdx(vWPos), dFdy(vWPos))).y;
             float snowT = smoothstep(0.35, 0.8, tcl.r) * smoothstep(0.35, 0.75, abs(upN) + 0.2 * (vnoise(vWPos.xz * 2.0) - 0.5));
+            // (lying in drifts with the shingles showing between, as wind leaves a roof: loaded edge to edge, every roof was
+            // a clean white slab)
+            snowT *= 0.3 + 0.7 * smoothstep(0.38, 0.62, vnoise(vWPos.xz * 0.45 + vWPos.y * 0.8) * 0.65 + vnoise(vWPos.xz * 1.7) * 0.35);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.88, 0.93), snowT);
           }
         }`,

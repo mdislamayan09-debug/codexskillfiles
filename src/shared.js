@@ -221,8 +221,9 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
         // (thin enough that the floor's timber and river show through it, thick only in its banks)
         // (seen down into from above, the sight line crosses the layer in a couple of hundred metres, so the banks are
         // thick and the air between them clear; from inside the layer the same air is a thin veil)
-        float m = 1.0 - exp(-Lb * uMist * (0.02 + 2.6 * bankN * bankN) / mix(800.0, 1500.0, step(yc, h1)));
-        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.6));
+        float m = 1.0 - exp(-Lb * uMist * (0.02 + 2.6 * bankN * bankN) / mix(1500.0, 1500.0, step(yc, h1)));
+        // (a veil the floor's timber and river show through, not a white lid on the valley)
+        col = mix(col, mix(vec3(0.66, 0.73, 0.84) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(m, 0.0, 0.42));
       }
     }
     // and a thin band of low cloud a few hundred metres up, in torn rags, also a layer the sight line runs through:

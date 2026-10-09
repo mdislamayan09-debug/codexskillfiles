@@ -975,9 +975,9 @@ async function init() {
           const stand = (x, z, h) => {
             const alt = 1 - SS(h + 40 * n.noise(x / 170, z / 170), 440, 585);
             if (alt <= 0) return 0;
-            const mass = SS(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.14, 0.02);
+            const mass = SS(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.3, -0.12);
             const lap = (world.heightAt(x + 18, z) + world.heightAt(x - 18, z) + world.heightAt(x, z + 18) + world.heightAt(x, z - 18)) / 4 - h;   // > 0 in a drainage
-            return alt * Math.max(mass * (0.4 + 0.6 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0));
+            return alt * Math.max(mass * (0.6 + 0.4 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0));
           };
           // the base scatter's lone trees over the same ground are taken out: the stands are planted whole below
           {
@@ -999,9 +999,11 @@ async function init() {
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
-          if (firs.length) for (let f = 150; f < 3700; f += 4.6) {
+          // (and grown timber, twenty metres and more: a floor of ten-metre saplings was a sprinkle of black spikes
+          // under which the homestead's buildings stood like warehouses)
+          if (firs.length) for (let f = 150; f < 3700; f += 5.8) {
             const half = 260 + f * 0.5;
-            for (let r = -half; r < half; r += 4.6) {
+            for (let r = -half; r < half; r += 5.8) {
               const jx = (rf() - 0.5) * 12, jz = (rf() - 0.5) * 12;   // (thrown well off the grid: half a cell's jitter left rows showing on thin slopes)
               const x = c.x + d0.x * (f + jx) + rt0.x * (r + jz), z = c.z + d0.z * (f + jx) + rt0.z * (r + jz), pick = rf(), sc = rf() * rf();
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
@@ -1011,7 +1013,7 @@ async function init() {
               if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.5 + 0.48 * (1 - THREE.MathUtils.smoothstep(h, 320, 500)))) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.5 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.38 + sc * 1.25, firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants)
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.75 + sc * 1.9, firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants)
               added++;
             }
           }
@@ -1043,7 +1045,8 @@ async function init() {
             for (const L of [veg.trees, veg.rocks]) { const wetIt = (it) => it.z < -1850 && world.splatAt(it.x, it.z).wet > 0.4; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
           }
         }
-        const KD = 205, kx = c.x + d0.x * KD + rt0.x * 34, kz = c.z + d0.z * KD + rt0.z * 34;
+        // (three hundred metres off: at two hundred the buildings were a third again the size of the reference's cabin)
+        const KD = 300, kx = c.x + d0.x * KD + rt0.x * 48, kz = c.z + d0.z * KD + rt0.z * 48;
         const kTop = c.y - KD * Math.tan(0.12 + Math.atan(0.44 * Math.tan(THREE.MathUtils.degToRad((s.fov || 40) / 2))));
         const ax = c.x + d0.x * 34 + rt0.x * 10, az = c.z + d0.z * 34 + rt0.z * 10, aTop = Math.min(world.heightAt(ax, az) + 2, c.y - 24);
         const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
@@ -1077,13 +1080,13 @@ async function init() {
         // (to scale with the cabin: at twice this size the buildings were toys under them)
         for (const [f, r, sc, tall] of [[6, -34, 1.5, 0], [-4, -40, 1.15, 0], [14, -44, 1.8, 0], [22, -30, 1.3, 0], [-10, -52, 0.9, 0],
           [2, 33, 1.7, 0], [12, 40, 1.25, 0], [-6, 44, 1.45, 0], [20, 30, 1.0, 0], [-14, 36, 0.8, 0],
-          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 0.82, tall);
+          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 1.35, tall);
         // and a broken ring of spruce on the crown itself, close round the buildings on three sides (open toward the lens)
         // (thick, of every height, a few old pines standing over them: a ring of thin spires round a bald top was a toy)
         for (let i = 0; i < 80; i++) {
           const a = rk() * 6.28, rr4 = 24 + rk() * 36, f = Math.cos(a) * rr4, r = Math.sin(a) * rr4;
           if (f < -4 && Math.abs(r) < 24) continue;
-          plant(f, r, i % 6 === 0 ? 0.55 + rk() * 0.25 : 0.7 + rk() * rk() * 1.0, i % 6 === 0 ? 1 : 0);
+          plant(f, r, i % 6 === 0 ? 0.7 + rk() * 0.3 : 0.9 + rk() * rk() * 1.5, i % 6 === 0 ? 1 : 0);
         }
         // the knoll's own slopes broken with rock and brush, so it is ground and not an iced dome
         for (let i = 0; i < 70; i++) {
@@ -1095,8 +1098,13 @@ async function init() {
           // and timber thick down the knoll's far and side slopes: the cabin nestles in dark spruce, as the reference's
           const a = rk() * 6.28, rr2 = 36 + rk() * 120, f = Math.cos(a) * rr2, r = Math.sin(a) * rr2;
           if (f < 6 && Math.abs(r) < 40 + Math.max(0, -f) * 0.25) continue;   // (the lens's sight of the yard kept clear)
-          plant(f, r, 0.5 + rk() * 0.75, 0);
+          plant(f, r, 0.8 + rk() * 1.3, 0);
         }
+        // (the stand's shaded-floor tint taken off the knoll and the sightline to it: left under cleared ground it lay on the
+        // snow as dark blotches)
+        for (let f = -150; f <= 150; f += 5) for (let r = -150; r <= 150; r += 5) if (f * f + r * r < 150 * 150) world.setForest(kx + f, kz + r, 3.2, 0);
+        for (let t = 0; t <= 1; t += 0.012) world.setForest(c.x + (kx - c.x) * t, c.z + (kz - c.z) * t, 26, 0);
+        world.touchSplat();
       }
       // and the light: the shot waits for a break in the deck to lie on the homestead and the ledge, with cloud
       // shade on the slopes beyond (the offset of the deck's shadow field is searched for that)
@@ -1138,7 +1146,7 @@ async function init() {
         const by = Math.max(g - 0.14 * sc, top - 0.76 * sc) + 0.62 * sc;
         for (let q = 0; q < 5; q++) {
           const a = rr() * 6.28, rad = rr() * 0.3 * sc, drop = (rad / (0.3 * sc)) ** 2 * 0.22 * sc;
-          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.35 + rr() * 0.5, [9, 9, 7, 8, 9][Math.floor(rr() * 5)]);
+          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.2 + rr() * 0.3, [9, 9, 7, 8, 9][Math.floor(rr() * 5)]);   // (small: at twice this size they were agave fans)
         }
       };
       // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one
@@ -1177,7 +1185,7 @@ async function init() {
         const hit = groundAt(bnx, bny, 24);
         if (!hit) continue;
         const [x, g, z] = hit, k = rr();
-        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : 7 + Math.floor(rr() * 2));   // (no dead stalks: they stood about the ledge as stakes)
+        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.25 + rr() * 0.5) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : 7 + Math.floor(rr() * 2));   // (no dead stalks: they stood about the ledge as stakes)
       }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
       // way down the near ground, so it reads as a mountainside rather than a blank white wedge
