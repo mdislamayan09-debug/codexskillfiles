@@ -312,18 +312,21 @@ function buildPine(seed, kind = 'pine') {
   const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
     // dead lower branch stubs on the bare trunk
-    for (let i = 0; i < 16; i++) {
-      const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.5 + rnd() * 1.6 * (y / base);
+    for (let i = 0; i < 9; i++) {
+      const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.3 + rnd() * 1.1 * (y / base);
       const b0 = bole((y - 1.4) / (height - 3.8));
-      wood.push(branchGeo(b0, new THREE.Vector3(b0.x + Math.cos(a) * L, y - 0.2 - rnd() * 0.4, b0.z + Math.sin(a) * L), 0.06, 0.02, 4));
+      wood.push(branchGeo(b0, new THREE.Vector3(b0.x + Math.cos(a) * L, y - (rnd() - 0.2) * 0.6 * L, b0.z + Math.sin(a) * L), 0.05, 0.015, 4));
     }
-    // and a few real dead limbs: thick at the bole, drooping, snapped short or ending in a fork of bare twigs
-    for (let i = 0; i < 5; i++) {
-      const y = base * (0.35 + rnd() * 0.6), a = rnd() * 6.28, L = 1.6 + rnd() * 2.6, b0 = bole((y - 1.4) / (height - 3.8));
-      const mid = new THREE.Vector3(b0.x + Math.cos(a) * L * 0.55, y - 0.15 - rnd() * 0.3, b0.z + Math.sin(a) * L * 0.55);
-      const tip = new THREE.Vector3(b0.x + Math.cos(a + 0.25) * L, y - 0.6 - rnd() * 0.9, b0.z + Math.sin(a + 0.25) * L);
-      wood.push(branchGeo(b0, mid, 0.085, 0.05, 5), branchGeo(mid, tip, 0.05, 0.016, 4));
-      if (rnd() < 0.7) wood.push(branchGeo(mid, new THREE.Vector3(mid.x + Math.cos(a - 0.9) * L * 0.4, mid.y + 0.1, mid.z + Math.sin(a - 0.9) * L * 0.4), 0.03, 0.008, 3));
+    // and real dead limbs: thick at the bole, sagging under their own weight, bending off their line and lifting a
+    // little at the tip, with a broken side shoot or two (straight spikes set at one angle read as pegs in a pole)
+    for (let i = 0; i < 6; i++) {
+      const y = base * (0.3 + rnd() * 0.65), a = rnd() * 6.28, L = 1.4 + rnd() * 3.2, b0 = bole((y - 1.4) / (height - 3.8));
+      const bendA = (rnd() - 0.5) * 0.9, droop = 0.25 + rnd() * 0.5, lift = rnd() * 0.5;
+      const Pt = (t, da, dy) => new THREE.Vector3(b0.x + Math.cos(a + da) * L * t, y + dy, b0.z + Math.sin(a + da) * L * t);
+      const p1 = Pt(0.35, bendA * 0.2, -droop * L * 0.12), p2 = Pt(0.72, bendA * 0.6, -droop * L * 0.3), p3 = Pt(1, bendA, -droop * L * 0.3 + lift * L * 0.18);
+      wood.push(branchGeo(b0, p1, 0.085, 0.06, 5), branchGeo(p1, p2, 0.06, 0.035, 5), branchGeo(p2, p3, 0.035, 0.012, 4));
+      if (rnd() < 0.7) wood.push(branchGeo(p1, new THREE.Vector3(p1.x + Math.cos(a - 0.9) * L * 0.3, p1.y + 0.12, p1.z + Math.sin(a - 0.9) * L * 0.3), 0.03, 0.008, 3));
+      if (rnd() < 0.5) wood.push(branchGeo(p2, new THREE.Vector3(p2.x + Math.cos(a + 1.0) * L * 0.25, p2.y - 0.1, p2.z + Math.sin(a + 1.0) * L * 0.25), 0.022, 0.006, 3));
     }
   }
   // each variant has its own habit: narrow spire-like subalpine firs to broad, heavy spruces

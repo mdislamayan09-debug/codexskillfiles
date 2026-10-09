@@ -155,7 +155,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
   vec3 roadC = dirt * 1.08;
   // a dry, dusty tread through the pines, brown dirt rather than a pale road
-  roadC = mix(roadC, roadC * vec3(0.8, 0.7, 0.58), pineK);   // (dark, damp woodland dirt: a pale tread read as a sand path)
+  roadC = mix(roadC, roadC * vec3(1.0, 0.92, 0.82), pineK);   // (dark, damp woodland dirt: a pale tread read as a sand path)
   if (road > 0.05) {
     vec4 gv = texA(L_GRAVEL, xz, 1.8, 4.3);
     roadC = mix(roadC, gv.rgb * vec3(0.95, 0.88, 0.78), 0.35 * D);
@@ -295,7 +295,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // graded road)
   float rr = smoothstep(0.35, 0.75, road - 0.2 * pineK + (micro-0.5)*0.25);
   c = mix(c, roadC, rr); tn = mix(tn, dN, rr);
-  c = mix(c, forestFloor * 0.92, rr * pineK * 0.75 * smoothstep(0.4, 0.62, fbm2(xz / 2.7 + 5.0) + 0.2 * (micro - 0.5)));
+  c = mix(c, forestFloor * 0.92, rr * pineK * 0.38 * smoothstep(0.4, 0.62, fbm2(xz / 2.7 + 5.0) + 0.2 * (micro - 0.5)));
   // (over the tread as well as the duff: litter falls on a trail too)
   // close to the lens the duff is a litter of fallen twigs and rusty needle clusters lying every way (drawn here, by
   // the thousand, where the modelled twigs and cones could only ever be a sprinkle on a smooth floor)
@@ -316,7 +316,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
       c = mix(c, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8) * (1.0 - 0.35 * rr));
     }
   }
-  float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des);
+  float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des) * (1.0 - pineK);
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
   // a used trail up close: hoofprints pressed into it, stones bedded in the tread, roots snaking across in the woods

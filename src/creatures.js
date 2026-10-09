@@ -261,7 +261,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             vec3 Ls = normalize((viewMatrix * vec4(normalize(vec3(uSunDir.x * 0.6, 1.0, uSunDir.z * 0.6)), 0.0)).xyz);
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
             float streak = 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0));
-            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak;
+            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - 0.5 * uSnowfall);
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
@@ -954,7 +954,7 @@ const COATS = {
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
-  redbay: { coat: 0x653a24, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
+  redbay: { coat: 0x56341f, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
   chestnut: { coat: 0x8a4422, points: 0x6a3418, mane: 0x6a3016, belly: 0x9a5530, pinto: 0 },
   deer: { coat: 0x8a6440, points: 0x5a4430, mane: 0x6a5038, belly: 0xd8ccb8, pinto: 0 },
   sheep: { coat: 0xd2c8b4, points: 0x2a2420, mane: 0xc8bea8, belly: 0xc0b6a0, pinto: 0 },
@@ -1250,7 +1250,7 @@ export class Quadruped {
     const body = bones.body;
     // warm saddle-brown leather (the hide texture is dark; lift it into the mid tones the references show)
     // (worn, oiled and dusty: at 0.55 roughness with a strong lift the bags and seat read as orange plastic)
-    const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(0.78, 0.6, 0.47), roughness: 0.82 });   // dark, used saddle leather
+    const leather = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(0.5, 0.4, 0.33), roughness: 0.82 });   // dark, used saddle leather
     const blanket = std({ map: memoTex('blanket', () => blanketTexture(r)), color: new THREE.Color(0.42, 0.47, 0.56), roughness: 0.95 });   // (faded grey-blue: the red read as orange plastic under the rider)
     const bl = sweep([{ p: V(0, 1.69, -0.42), rx: 0.44, ry: 0.035 }, { p: V(0, 1.71, 0.02), rx: 0.46, ry: 0.035 }, { p: V(0, 1.7, 0.3), rx: 0.44, ry: 0.035 }], 14);
     const bp = bl.attributes.position;
@@ -1297,7 +1297,7 @@ export class Quadruped {
     });
     for (const sx of [-0.28, 0.28]) {
       const end = new THREE.CircleGeometry(0.085, 18); end.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2); end.scale(1, 0.9, 1); end.translate(sx, 1.82, -0.52);
-      body.add(mesh(end, std({ map: spiral, color: new THREE.Color(0.6, 0.55, 0.5), roughness: 1 })));
+      body.add(mesh(end, std({ map: spiral, color: new THREE.Color(0.36, 0.36, 0.36), roughness: 1 })));
     }
     for (const sx of [-0.16, 0.16]) { const st = new THREE.TorusGeometry(0.089, 0.011, 6, 20); st.rotateY(Math.PI / 2); st.scale(1, 0.92, 1); st.translate(sx, 1.82, -0.52); body.add(mesh(st, std({ color: 0x2a1a10, roughness: 0.5 }))); }
     for (const s of [-1, 1]) {

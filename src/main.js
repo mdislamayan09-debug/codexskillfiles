@@ -260,7 +260,7 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
-    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.42, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
+    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.2, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -880,6 +880,15 @@ async function init() {
           const [x, z] = at(ahead, side);
           veg.bushes.add(x, world.heightAt(x, z) - 0.02, z, rr() * 6.28, 0.07 + rr() * 0.09, Math.floor(rr() * 3));
         }
+        // stones bedded in the verges, a few of them boulders, and fallen branches lying where they dropped
+        for (let i = 0; i < 34; i++) {
+          const [x, z] = at(-2 + rr() * 34, (rr() < 0.5 ? -1 : 1) * (1.5 + rr() * rr() * 12)), sc = 0.16 + rr() * rr() * 0.5;
+          veg.rocks.add(x, world.heightAt(x, z) - 0.3 * sc, z, rr() * 6.28, sc, Math.floor(rr() * 2));
+        }
+        for (let i = 0; i < 14; i++) {
+          const [x, z] = at(1 + rr() * 30, (rr() < 0.5 ? -1 : 1) * (2.2 + rr() * 11));
+          veg.logs.add(x, world.heightAt(x, z) - 0.02, z, rr() * 6.28, 0.16 + rr() * 0.2, Math.floor(rr() * 3));
+        }
         const pines = veg.groups.pine;
         if (pines.length) for (let i = 0; i < 5; i++) {
           const [x, z] = at(8 + rr() * 30, (rr() < 0.5 ? -1 : 1) * (5 + rr() * 12));
@@ -1357,7 +1366,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.19 * W.blizzard) * (1 + 0.2 * (G.forestK || 0));   // (the eye opens up a little under a canopy)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.19 * W.blizzard) * (1 + 0.45 * (G.forestK || 0));   // (the eye opens up under a canopy, where half the sky's light is shut out)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);
