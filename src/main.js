@@ -286,7 +286,7 @@ async function init() {
       // from behind with its feet at the bottom edge and the rider's hat just under half way down; ?rideold is the close
       // three-quarter framing of rounds 50-78)
       if (params.has('rideold')) return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true };
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, expK: 1.12, camRel: [0.45, 2.5, -5.4], lookRel: [-3.4, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.62 }, snowDress: true }; },
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, expK: 1.12, camRel: [0.45, 2.4, -4.5], lookRel: [-3.0, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.62 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -1236,7 +1236,7 @@ async function init() {
           if (line.length > 2) {
             const xs = line.map((q) => q[0]), zs = line.map((q) => q[1]);
             world.eraseWet(Math.min(...xs) - 260, Math.min(...zs) - 40, Math.max(...xs) + 260, Math.max(...zs) + 40);
-            world.paintCreek(line, 11, 1.2);
+            world.paintCreek(line, 15, 1.2);
             for (const L of [veg.trees, veg.rocks]) { const wetIt = (it) => it.z < -1850 && world.splatAt(it.x, it.z).wet > 0.4; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
           }
         }

@@ -545,7 +545,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.5, 0.62, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
   // (grey-blue ice half drifted over with snow: bare and dark, every frozen braid on a valley floor was a black pond)
-  c = mix(c, mix(srgb(vec3(104,124,144)), snow, 0.6 * smoothstep(0.4, 0.7, vnoise(xz * 0.35) * 0.6 + vnoise(xz * 0.11 + 3.0) * 0.4)) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);
+  // (round 97: from a distance a river's ice is dark, swept bare by the wind down its length: half drifted over, the
+  // river on a valley floor could not be found from a lookout)
+  float farIce = smoothstep(350.0, 1100.0, length(wp - cameraPosition));
+  c = mix(c, mix(mix(srgb(vec3(104,124,144)), srgb(vec3(50,66,88)), farIce), snow, mix(0.6, 0.18, farIce) * smoothstep(0.4, 0.7, vnoise(xz * 0.35) * 0.6 + vnoise(xz * 0.11 + 3.0) * 0.4)) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);
   tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);   // (dark grey-blue ice: paler, the creek vanished into the snow from the saddle)
   // (river ice is scuffed and snow-dusted, not a mirror: glossy, it threw back the bright horizon and a river
   // seen from a height came out paler than the snow round it)

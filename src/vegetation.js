@@ -87,7 +87,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
       diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * FROST_K * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
       // (a plant in two or three is russet: dead heather and willow, the warm note against the snow)
-      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.3, 1.25, 0.7), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * RUSSET_K * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
+      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.5, 1.25, 0.62), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * RUSSET_K * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3 * FROST_K);
       #endif
     }
@@ -1380,7 +1380,10 @@ function rockMaterial(surf = {}, bare = false) {
       }
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
-      base *= vec3(0.8, 0.87, 0.98) * (0.74 + 0.4 * smoothstep(0.25, 0.75, tfb(vWPos * 0.23 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
+      // (round 97: warm again, a tan-grey granite, and a third lighter: it is the picture's warm note against the blue
+      // distance. Cooled to match the valley it made the whole frame one steel blue)
+      // (in clear air only: under falling snow the stone stays the wet slate that anchors the storm frame)
+      base *= mix(vec3(1.3, 1.2, 1.04), vec3(0.8, 0.87, 0.98), min(1.0, uSnowfall * 1.6)) * (0.8 + 0.4 * smoothstep(0.25, 0.75, tfb(vWPos * 0.23 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
@@ -1573,7 +1576,7 @@ export class Vegetation {
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(lv), (x, y) => y * 0.3)), material: bigMat, depth: windDepthMaterial(bigT, 1) }] });
     }
     const twigT = twigTexture();
-    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.55 });   // (russet under a light frost: fully frosted, the brush was a white cut-out)
+    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.3, russet: 0.9 });   // (russet under a light frost: fully frosted, the brush was a white cut-out)
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(990 + i), tw = [];
       for (let k = 0; k < 5; k++) { const g = new THREE.PlaneGeometry(1.1 + rnd() * 0.5, 1.0 + rnd() * 0.4); g.translate(0, 0.45, 0); g.rotateY((k / 5) * Math.PI + rnd() * 0.4); tw.push(g); }
@@ -1586,7 +1589,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.3, 1.26, 1.18) }), 1, leafExtra, { frost: 0.6, russet: 0.22 });   // (frosted grey-straw, each tuft its own tone: all one orange-tan they were paper fans)   // (a light frost: straw and ochre still show against the snow)
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.4, 1.3, 1.08) }), 1, leafExtra, { frost: 0.45, russet: 0.4 });   // (frosted grey-straw, each tuft its own tone: all one orange-tan they were paper fans)   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];

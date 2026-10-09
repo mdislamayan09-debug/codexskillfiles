@@ -108,7 +108,7 @@ const DUST_FRAG = /* glsl */ `
     float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.55, 0.95, wn.y) * (0.55 + 0.45 * vnoise(vWPos.xz * 40.0 + vWPos.y * 13.0));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.85), dust * 0.45);
     // under a snowstorm's overcast everything takes the grey-blue of the light: colours go quiet
-    { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.32 * ovc) * mix(vec3(1.0), vec3(0.88, 0.94, 1.04), ovc); }
+    { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.1 * ovc) * mix(vec3(1.0), vec3(0.95, 0.97, 1.01), ovc); }
   }`;
 // One texture per recipe and one material per set of parameters, shared by every character. A horse's tack was
 // some forty meshes (each strap, ring and buckle its own material) and a town of riders two and a half thousand
@@ -160,7 +160,7 @@ function buildBones(spec) {
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
 const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8, 0.95, 0.95'; // coat (index 3) is worn leather
 // (a groomed coat has a satin sheen, not a gloss: at 0.6 the horse read as polished plastic)
-const ROUGH_QUAD = '0.84, 0.8, 0.35, 0.55, 0.78, 0.76, 0.72, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
+const ROUGH_QUAD = '0.92, 0.9, 0.35, 0.55, 0.78, 0.76, 0.72, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
 function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.4, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.4, 0.3, 0.22), envMapIntensity: 1.05 })
@@ -251,7 +251,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.05, 0.12, vWPos.y));
         // under a snowstorm's overcast everything takes the grey-blue of the light: colours go quiet (the bay stood in the
         // storm orange-red, as if lit by another sky)
-        { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.32 * ovc) * mix(vec3(1.0), vec3(0.88, 0.94, 1.04), ovc); }
+        // (round 97: a little only. A third greyed, horse and rider were a dark grey shape on blue; in the reference their
+        // warm brown is the frame's one accent)
+        { float ovc = min(1.0, uSnowfall * 1.6); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.1 * ovc) * mix(vec3(1.0), vec3(0.95, 0.97, 1.01), ovc); }
       }`,
     onShader: (s) => {
       Object.entries(uniforms).forEach(([k, u]) => (s.uniforms[k] = u));
@@ -307,7 +309,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
             // (the streaks fade out as they near a pixel's width: beating against the pixel grid they wove the rump into twill)
             float streak = mix(1.0, 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0)), smoothstep(0.5, 0.18, length(fwidth(vRest)) * 64.0));
-            totalEmissiveRadiance += (diffuseColor.rgb * 1.5 + 0.008) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - min(1.0, uSnowfall * 1.5));
+            totalEmissiveRadiance += (diffuseColor.rgb * 0.8 + 0.004) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - min(1.0, uSnowfall * 1.5));
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
@@ -329,7 +331,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 // ===================================================================================== HUMANS
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
-  winter: { coat: 0x5e4a36, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x86765f, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
+  winter: { coat: 0x73573a, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x86765f, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
   arthur: { coat: 0x4c3524, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x55483a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
@@ -1132,7 +1134,7 @@ function quadPrims(kind, QB) {
   add(EL(muzzle, [0.07 * hs, 0.08 * hs, 0.08 * hs]), sheep ? QL.points : QL.muzzle, 'head', 0.04);
   for (const s of [-1, 1]) {
     const ear = sheep ? RC([s * 0.08, H[1] + 0.02, H[2] - 0.04], [s * 0.2, H[1] - 0.02, H[2] - 0.06], 0.03, 0.02)
-      : RC([s * 0.06, H[1] + 0.1 * hs, H[2] - 0.04], [s * (deer ? 0.13 : 0.08), H[1] + (deer ? 0.26 : 0.24) * hs, H[2] - 0.06], deer ? 0.04 : 0.032, 0.012);
+      : RC([s * 0.06, H[1] + 0.1 * hs, H[2] - 0.04], [s * (deer ? 0.13 : 0.085), H[1] + (deer ? 0.26 : 0.2) * hs, H[2] - 0.06], deer ? 0.04 : 0.036, deer ? 0.012 : 0.02);   // (a horse's ear is a short leaf: long and needle-tipped they were a cat's)
     add(ear, sheep ? QL.points : QL.coat, 'head', 0.02);
     const nos = EL([s * 0.035, muzzle[1] - 0.01, muzzle[2] + 0.06 * hs], [0.018, 0.02, 0.02]); nos.sub = true; P.push(nos);
     const eyeSock = EL([s * 0.1 * hs, H[1] + 0.02, H[2] + 0.05], [0.02, 0.022, 0.025]); eyeSock.sub = true; P.push(eyeSock);
@@ -1501,9 +1503,10 @@ export class Quadruped {
     {
       const coils = [];
       for (let k = 0; k < 5; k++) {
-        const cg = new THREE.TorusGeometry(0.17 + 0.012 * Math.sin(k * 2.3), 0.011, 5, 26);
-        cg.rotateY(Math.PI / 2 + (k - 2) * 0.05); cg.rotateX((k - 2) * 0.07);
-        cg.translate(-0.485 - k * 0.01, 1.5 - 0.004 * k, -0.5 + (k % 2) * 0.012);   // (over the near-side bag, where a lens behind and to the left sees it)
+        // (thin rope in a long hanging loop, each turn its own size: five even rings were a tyre on the bag)
+        const cg = new THREE.TorusGeometry(0.13 + 0.02 * Math.sin(k * 2.3), 0.007, 5, 26);
+        cg.scale(1, 1.5 + 0.12 * Math.sin(k * 1.7), 1); cg.rotateY(Math.PI / 2 + (k - 2) * 0.07); cg.rotateX((k - 2) * 0.05);
+        cg.translate(-0.4 - k * 0.006, 1.47 - 0.01 * k, -0.2 + (k % 2) * 0.012);   // (over the near-side bag, where a lens behind and to the left sees it)
         coils.push(cg);
       }
       body.add(mesh(mergeGeometriesSafe(coils), std({ color: 0x463b2c, roughness: 0.95 })));   // (old hemp: pale, the key light made a yellow hoop of it)

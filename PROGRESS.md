@@ -1181,3 +1181,19 @@ sea level, so down there it was seventeen kilometres off, marched in coarse step
   before the last contrast pass against the reference's 67/106/134/183 (it was 89/109/128/180 and flat).
 - A painted panorama of cloud ranks (`stormPano`, `?pano`) was tried first and is kept switched off: smooth
   noise profiles, however thresholded, read as smears of paint beside the marched cloud's real shading.
+
+**Critic scores.** Round 96: 3.5 / **4.5** / **5.5** (total 13.5). The storm sky dropped from the vista's first
+complaint to its fourth; first is now colour: "steel-blue monochrome; B has warm tan rock with lichen, rust-brown
+brush, green-black conifers against cool blue distance" (I cooled the rock in round 79 after a critic called it
+sandstone: over-corrected). Snow ride: "no atmospheric depth", and the rider I desaturated last round is now
+"dark grey on blue with no colour accent" where the reference's warm brown rider "pops": reverted in 97.
+
+### Round 97: colour
+- **Vista: warm against cool.** The foreground rock is a tan-grey granite again and a third lighter (in clear air
+  only: under falling snow the same stone stays wet slate, the storm frame's dark anchor); brush is russet under
+  a light frost (0.9), tufts ochre-straw. The frame's bottom third measures 91 (reference 87).
+- **Snow ride.** Falling snow takes the valley by degrees (a quarter gone at a kilometre, two-thirds at two);
+  the rider is a warm tan again and the horse keeps its red (greyed last round they were "a dark grey shape on
+  blue"); lens a metre closer. River ice is dark from a distance, and the vista's river wider.
+- **Horse**: ears short leaves (they were "cat-like spikes"), coat rougher (0.92) with half the sheen.
+  **Lariat** a thin rope in a long hanging loop ("a perfect torus", "a tyre").
