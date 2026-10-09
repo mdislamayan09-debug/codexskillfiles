@@ -1057,3 +1057,19 @@ also says there is no snow on them; the mane shows as "a blue strip"; trunks sti
 - **Trunks stand in the ground**: the butt swells into the floor in a curve with longer buttress roots; the
   bark is dark with shade and banked duff at its foot; each tree has its own tone and warmth, weathering in
   broad patches round and up the bole, grey-green lichen low on it.
+
+**Critic scores.** Round 89: 4 / 4 / 5. The snow ride has held 4 for two rounds (it sat at 3 for most of 79-87).
+Both riding shots: the horse and rider are the first item again ("the same rebuild lifts both").
+
+### Round 90
+- **Plants grow on the rock itself.** The ledge's planting was done on the ground, which under the outcrop is
+  buried inside the blocks, so almost none of it showed (ten rounds of "no vegetation on the foreground rock").
+  Now each plant is set where a ray from the lens strikes the blocks' own surface (`InstancedMesh` raycast)
+  wherever it faces up enough to hold soil: ~200 clumps of frosted grass and russet brush along every shelf.
+  Two brush plants in three are russet whatever the frost; tufts are ochre under a light frost. The vista's
+  bottom third now measures 85 against the reference's 87 (it was 100).
+- **Dry storm sky**: cells run together into great masses where the weather map is thick, with a high pale
+  overcast showing bright through the breaks (dark slate there made white puffs on navy); bellies darker,
+  tint nearly neutral.
+- **Rock close to**: fine bedding lines and grain at two scales, the fine normal lay at 0.85; hair-thin snow in
+  the fine up-facing joints (a hand wide along the big joints it was white lightning: withdrawn).

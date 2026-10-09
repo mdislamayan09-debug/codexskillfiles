@@ -1332,20 +1332,44 @@ async function init() {
       // (round 79) and what the reference's ledge is thick with: russet brush in dense low domes (three or four plants
       // grown into one another) and frosted grass in fine tufts (many small ones together, not one broad fan), in the
       // pockets between the rocks all across the bottom of the frame
-      for (let i = 0; i < 34; i++) {
-        const bnx = -1.02 + rr() * 2.04, bny = -0.98 + rr() * 0.5;
+      // (round 90: three times as many, and of some size: the reference's lower third is thick with it)
+      for (let i = 0; i < 110; i++) {
+        const bnx = -1.02 + rr() * 2.04, bny = -0.99 + rr() * 0.62;
         if (hidesHome(bnx, bny)) continue;
         const hit = groundAt(bnx, bny, 26);
         if (!hit) continue;
         const [x, g, z, t] = hit;
         if (t < 2.4) continue;
         if (i % 3 === 0) {
-          const s0 = 0.34 + rr() * 0.3;
+          const s0 = 0.4 + rr() * 0.4;
           for (let q = 0; q < 4; q++) { const bx = x + (rr() - 0.5) * 0.5 * s0 * 2, bz = z + (rr() - 0.5) * 0.5 * s0 * 2; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.08, bz, rr() * 6.28, s0 * (0.75 + rr() * 0.4), 7 + Math.floor(rr() * 2)); }
         } else for (let q = 0; q < 7; q++) {
           const bx = x + (rr() - 0.5) * 0.9, bz = z + (rr() - 0.5) * 0.9;
-          veg.bushes.add(bx, world.heightAt(bx, bz) - 0.03, bz, rr() * 6.28, 0.14 + rr() * 0.16, 9);
+          veg.bushes.add(bx, world.heightAt(bx, bz) - 0.03, bz, rr() * 6.28, 0.16 + rr() * 0.2, 9);
         }
+      }
+      // (round 90) What grows on the rock itself. The pockets above are found on the ground, which under the outcrop is
+      // buried inside the blocks, so almost none of that planting showed. Here each plant is set where a ray from the
+      // lens strikes the blocks' own surface, wherever that surface faces up enough to hold soil: frosted grass in
+      // fine tufts thick along every shelf, russet brush in low clumps.
+      {
+        veg.rocks.update(camera.position, true);
+        const targets = [];
+        for (const v of [4, 5, 6, 7, 8]) for (const m of veg.rocks.meshes[v] || []) { m.boundingSphere = null; m.updateMatrixWorld(); targets.push(m); }
+        let planted = 0;
+        for (let i = 0; i < 300 && targets.length; i++) {
+          const nx = -1.02 + rr() * 2.04, ny = -1.0 + rr() * (nx < -0.1 ? 1.25 : 0.42);
+          if (hidesHome(nx, ny)) continue;
+          n2.set(nx, ny); rc.setFromCamera(n2, camera); rc.far = 30;
+          const hit = rc.intersectObjects(targets, false)[0];
+          if (!hit || hit.distance < 2.8 || !hit.face || hit.face.normal.y < 0.62) continue;
+          const { x, y, z } = hit.point, brush = rr() < 0.22;
+          if (brush) for (let k = 0; k < 3; k++) veg.bushes.add(x + (rr() - 0.5) * 0.35, y - 0.07, z + (rr() - 0.5) * 0.35, rr() * 6.28, 0.3 + rr() * 0.3, 7 + Math.floor(rr() * 2));
+          else for (let k = 0; k < 4; k++) veg.bushes.add(x + (rr() - 0.5) * 0.4, y - 0.03, z + (rr() - 0.5) * 0.4, rr() * 6.28, 0.13 + rr() * 0.17, 9);
+          planted++;
+        }
+        rc.far = Infinity;
+        G.ledgePlants = planted;
       }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
       // way down the near ground, so it reads as a mountainside rather than a blank white wedge

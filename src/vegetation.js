@@ -87,7 +87,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
       diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * FROST_K * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
       // (a plant in two or three is russet: dead heather and willow, the warm note against the snow)
-      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.3, 1.15, 0.6), step(0.58, hash12(floor(${pos}.xz * 1.3) + 5.0)) * 0.7 * FROST_K * smoothstep(0.4, 0.85, cl.r));
+      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.6, 1.3, 0.62), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * 0.8 * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3 * FROST_K);
       #endif
     }
@@ -1225,7 +1225,7 @@ function rockMaterial(surf = {}, bare = false) {
       vec3 gTW = vec3(0.0, 1.0, 0.0);
       float tnz(vec3 p) { return vnoise(p.zy) * gTW.x + vnoise(p.xz + 13.7) * gTW.y + vnoise(p.xy + 29.3) * gTW.z; }
       float tfb(vec3 p) { return fbm2(p.zy) * gTW.x + fbm2(p.xz + 13.7) * gTW.y + fbm2(p.xy + 29.3) * gTW.z; }
-      float gCrack = 0.0;
+      float gCrack = 0.0, gCrackSnow = 0.0;
       float rockCrack(vec3 p) {
         // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
         float a = vnoise(vec2(dot(p, vec3(0.71, 0.3, 0.6)), dot(p, vec3(-0.25, 0.9, 0.33))) * 0.9);
@@ -1242,7 +1242,7 @@ function rockMaterial(surf = {}, bare = false) {
           vec3 wn1 = rockTriN(vWPos, wn0, 4.6);
           // the finer grain only where it resolves (close ledges)
           vec3 wn2 = rockTriN(vWPos + 3.1, wn1, 0.8);
-          vec3 wnP = normalize(mix(wn1, wn2, 0.55 * smoothstep(30.0, 6.0, camD)));
+          vec3 wnP = normalize(mix(wn1, wn2, 0.85 * smoothstep(30.0, 6.0, camD)));
           normal = normalize((viewMatrix * vec4(wnP, 0.0)).xyz);
           // the cracks are cut into the surface: their walls catch the light and hold shade
           {
@@ -1331,6 +1331,7 @@ function rockMaterial(surf = {}, bare = false) {
         base *= 1.0 - 0.55 * lineN - 0.5 * lineF - 0.22 * line2;
         // (the stone a shade darker for a hand's width either side of a joint, where water stands)
         base *= 1.0 - 0.08 * smoothstep(0.3, 0.0, cN) * kN * wgt - 0.12 * smoothstep(0.3, 0.0, cF) * kF;
+        gCrackSnow = smoothstep(0.04, 0.01, cN) * kN;   // (the fine joints only, hair-thin: a hand wide along the big ones they were white lightning drawn on the rock)
         gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 * wgt + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
       }
       vec4 rcl = climateAt(vWPos.xz);
@@ -1362,8 +1363,18 @@ function rockMaterial(surf = {}, bare = false) {
       float sEdge = wn.y + 0.2 * (tnz(vWPos * 2.3) - 0.5) + 0.12 * (tnz(vWPos * 9.0 + 3.0) - 0.5) + 0.08 * (tnz(vWPos * 37.0 + 6.0) - 0.5);
       float patchS = smoothstep(0.4, 0.47, tfb(vWPos * 0.55 + 3.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
       // (in a storm it settles on every ledge and top)
-      float topS = smoothstep(0.86, 0.895, sEdge) * mix(patchS, 1.0, min(1.0, uSnowfall * 1.5) * 0.85);
-      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(topS * 0.93, 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
+      float topS = smoothstep(0.85, 0.905, sEdge) * mix(patchS, 1.0, min(1.0, uSnowfall * 1.5) * 0.85);
+      // (round 90) and it packs into the joints: every crack that faces the sky at all holds a line of snow, which is
+      // what ties the white to the rock's own structure (patches alone lay on it like cut paper)
+      float crevS = gCrackSnow * smoothstep(0.45, 0.75, wn.y) * smoothstep(0.4, 0.6, tnz(vWPos * 1.9 + 4.0)) * 0.7;
+      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(max(topS * 0.93, crevS * 0.88), 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
+      // close to, the stone is sharp: fine bedding lines a hand apart, and grain at two scales
+      {
+        float nearK = smoothstep(30.0, 6.0, length(vWPos - cameraPosition));
+        float lines = smoothstep(0.06, 0.0, abs(fract(vWPos.y * 5.5 + 0.9 * tnz(vWPos * 0.9) + 0.25 * tnz(vWPos * 4.0)) - 0.5)) * smoothstep(0.75, 0.3, wn.y);
+        base *= 1.0 - 0.3 * lines * nearK * (0.4 + 0.6 * tnz(vWPos * 1.3 + 9.0));
+        base *= mix(1.0, (0.8 + 0.4 * tnz(vWPos * 14.0)) * (0.88 + 0.24 * tnz(vWPos * 45.0 + 2.0)), nearK);
+      }
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
       base *= vec3(0.8, 0.87, 0.98) * (0.74 + 0.4 * smoothstep(0.25, 0.75, tfb(vWPos * 0.23 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
@@ -1557,7 +1568,7 @@ export class Vegetation {
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(lv), (x, y) => y * 0.3)), material: bigMat, depth: windDepthMaterial(bigT, 1) }] });
     }
     const twigT = twigTexture();
-    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: true });
+    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.55 });   // (russet under a light frost: fully frosted, the brush was a white cut-out)
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(990 + i), tw = [];
       for (let k = 0; k < 5; k++) { const g = new THREE.PlaneGeometry(1.1 + rnd() * 0.5, 1.0 + rnd() * 0.4); g.translate(0, 0.45, 0); g.rotateY((k / 5) * Math.PI + rnd() * 0.4); tw.push(g); }
@@ -1570,7 +1581,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.5, 1.45, 1.35) }), 1, leafExtra, { frost: 0.6 });   // (a light frost: straw and ochre still show against the snow)
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.5, 1.42, 1.2) }), 1, leafExtra, { frost: 0.4 });   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];
