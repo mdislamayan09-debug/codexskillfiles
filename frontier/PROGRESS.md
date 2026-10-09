@@ -1316,7 +1316,9 @@ ride "a bright white band against darker cloud, like cut paper". Reshaped in rou
   in the snow ride the far ridge stands as a bright band against darker cloud.
 
 ### Handing over (2026-10-09)
-The owner asked for the work to be pushed so another Claude account can carry on. This machine is not signed in
-to GitHub, so nothing could be pushed from it. Prepared instead: `scripts/handoff_header.md` rewritten for round
-104, `latest_frames/w104_*`, the all-in-one handoff file regenerated with `scripts/build_handoff.py`, and a
-merge commit on top of the GitHub branch's `37e68cf` ready to push as a fast-forward.
+The owner asked for the work to be pushed so another Claude account can carry on, and stopped the loop.
+`scripts/handoff_header.md` was rewritten for round 104, `latest_frames/w104_*` refreshed, the all-in-one handoff
+file regenerated with `scripts/build_handoff.py`, and rounds 50-104 pushed to the GitHub branch as one merge
+commit ("Merge rounds 50-104") on top of `37e68cf`. Two things had to be sorted out first: the machine was not
+signed in to GitHub (the owner entered a personal access token in the terminal), and GitHub refused commits that
+carried the owner's private email (error GH007), so all 63 were rewritten to the account's no-reply address.

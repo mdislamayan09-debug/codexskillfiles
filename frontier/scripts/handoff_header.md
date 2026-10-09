@@ -291,12 +291,15 @@ here in rounds 79–102. The crag material change is the one worth trying; it is
 
 - **GitHub:** `mdislamayan09-debug/codexskillfiles`, branch `claude/aaa-open-world-game-c2ao5o`. The project is
   `frontier/`; this file sits beside it at the top level.
-- Rounds 50–104 were made in a separate local repository rebuilt from the round-49 handoff file, on a machine
-  that was **not signed in to GitHub**. They were prepared as one merge commit on top of the branch's commit
-  `37e68cf`. **Check `git log` on the branch: if it shows "Merge rounds 50-104", the repository is current. If
-  its last commit is still "Rebuild the all-in-one handoff with round 49", the push never happened and this
-  file is ahead of the repository: extract it (section 0), commit `frontier/` and this file on the branch, and
-  push.**
+- Rounds 50–104 were made in a separate local repository rebuilt from the round-49 handoff file and **pushed
+  on 2026-10-09** as one merge commit, "Merge rounds 50-104", on top of the branch's commit `37e68cf` (its second
+  parent carries the individual commits, with paths relative to `frontier/`). The repository and this file hold
+  the same work.
+- The repository's default branch on GitHub is a different one (`claude/nifty-mendel-ebwsko`): open the game's
+  branch by name, or it looks as if nothing was pushed.
+- **Commit as** `mdislamayan09-debug <251683113+mdislamayan09-debug@users.noreply.github.com>`. The account
+  rejects pushes that expose a private email (GH007); commits carrying the owner's own addresses had to be
+  rewritten before the push went through.
 - **Artifact:** a playable single-page build was once published as a claude.ai artifact from
   `scripts/make_artifact.py` on the first account. It is long out of date.
 

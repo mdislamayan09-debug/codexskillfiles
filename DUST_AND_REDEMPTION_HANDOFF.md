@@ -291,12 +291,15 @@ here in rounds 79–102. The crag material change is the one worth trying; it is
 
 - **GitHub:** `mdislamayan09-debug/codexskillfiles`, branch `claude/aaa-open-world-game-c2ao5o`. The project is
   `frontier/`; this file sits beside it at the top level.
-- Rounds 50–104 were made in a separate local repository rebuilt from the round-49 handoff file, on a machine
-  that was **not signed in to GitHub**. They were prepared as one merge commit on top of the branch's commit
-  `37e68cf`. **Check `git log` on the branch: if it shows "Merge rounds 50-104", the repository is current. If
-  its last commit is still "Rebuild the all-in-one handoff with round 49", the push never happened and this
-  file is ahead of the repository: extract it (section 0), commit `frontier/` and this file on the branch, and
-  push.**
+- Rounds 50–104 were made in a separate local repository rebuilt from the round-49 handoff file and **pushed
+  on 2026-10-09** as one merge commit, "Merge rounds 50-104", on top of the branch's commit `37e68cf` (its second
+  parent carries the individual commits, with paths relative to `frontier/`). The repository and this file hold
+  the same work.
+- The repository's default branch on GitHub is a different one (`claude/nifty-mendel-ebwsko`): open the game's
+  branch by name, or it looks as if nothing was pushed.
+- **Commit as** `mdislamayan09-debug <251683113+mdislamayan09-debug@users.noreply.github.com>`. The account
+  rejects pushes that expose a private email (GH007); commits carrying the owner's own addresses had to be
+  rewritten before the push went through.
 - **Artifact:** a playable single-page build was once published as a claude.ai artifact from
   `scripts/make_artifact.py` on the first account. It is long out of date.
 
@@ -312,7 +315,7 @@ The archive is below, `frontier/...` paths with sizes. It includes:
 |---|---|---|
 | `frontier/.gitignore` | 66 | utf8 |
 | `frontier/GAUNTLET_PROMPT.md` | 1,636 | utf8 |
-| `frontier/PROGRESS.md` | 101,377 | utf8 |
+| `frontier/PROGRESS.md` | 101,618 | utf8 |
 | `frontier/README.md` | 5,858 | utf8 |
 | `frontier/WORLD_PLAN.md` | 4,927 | utf8 |
 | `frontier/index.html` | 1,006 | utf8 |
@@ -375,7 +378,7 @@ The archive is below, `frontier/...` paths with sizes. It includes:
 | `frontier/scripts/dem_preview.py` | 2,134 | utf8 |
 | `frontier/scripts/errlog.mjs` | 1,376 | utf8 |
 | `frontier/scripts/glcheck.mjs` | 2,646 | utf8 |
-| `frontier/scripts/handoff_header.md` | 24,323 | base64 |
+| `frontier/scripts/handoff_header.md` | 24,540 | base64 |
 | `frontier/scripts/label_test.mjs` | 663 | utf8 |
 | `frontier/scripts/launch.mjs` | 1,305 | utf8 |
 | `frontier/scripts/make_artifact.py` | 1,121 | utf8 |
@@ -452,7 +455,7 @@ Fan out subagents and ultracode.
 ```
 
 <<<END FILE>>>
-<<<FILE path="frontier/PROGRESS.md" encoding="utf8" sha256="b79a9d1886b8ca6d460b5cfec5c8c1665425de7a73993a9d21cfae93fa031dcd" bytes="101377">>>
+<<<FILE path="frontier/PROGRESS.md" encoding="utf8" sha256="4b15a0eb263a55eb39560c64e4402c773120b716478d7bc45eba546f7ce5c847" bytes="101618">>>
 # Dust & Redemption — gauntlet progress
 
 Live log of the gauntlet loop (see `GAUNTLET_PROMPT.md`). Each round: the builder captures real in-game
@@ -1771,10 +1774,12 @@ ride "a bright white band against darker cloud, like cut paper". Reshaped in rou
   in the snow ride the far ridge stands as a bright band against darker cloud.
 
 ### Handing over (2026-10-09)
-The owner asked for the work to be pushed so another Claude account can carry on. This machine is not signed in
-to GitHub, so nothing could be pushed from it. Prepared instead: `scripts/handoff_header.md` rewritten for round
-104, `latest_frames/w104_*`, the all-in-one handoff file regenerated with `scripts/build_handoff.py`, and a
-merge commit on top of the GitHub branch's `37e68cf` ready to push as a fast-forward.
+The owner asked for the work to be pushed so another Claude account can carry on, and stopped the loop.
+`scripts/handoff_header.md` was rewritten for round 104, `latest_frames/w104_*` refreshed, the all-in-one handoff
+file regenerated with `scripts/build_handoff.py`, and rounds 50-104 pushed to the GitHub branch as one merge
+commit ("Merge rounds 50-104") on top of `37e68cf`. Two things had to be sorted out first: the machine was not
+signed in to GitHub (the owner entered a personal access token in the terminal), and GitHub refused commits that
+carried the owner's private email (error GH007), so all 63 were rewritten to the account's no-reply address.
 
 <<<END FILE>>>
 <<<FILE path="frontier/README.md" encoding="utf8" sha256="801e3448b68dc3b64eebd450c23e82112149e9b101f8e5abe8d4f3687175c2b1" bytes="5858">>>
@@ -125795,7 +125800,7 @@ fs.writeFileSync('glcheck.out.json', JSON.stringify(out, null, 1));
 await browser.close();
 
 <<<END FILE>>>
-<<<FILE path="frontier/scripts/handoff_header.md" encoding="base64" sha256="39282e17b0b8ca6b9f6611319f5c19db64a127cb60bc3d9194ced72b51fd1821" bytes="24323">>>
+<<<FILE path="frontier/scripts/handoff_header.md" encoding="base64" sha256="941c70a311fc952fcf38cc53fd6997a087e085bca1e37c377abf89a65332aba9" bytes="24540">>>
 IyBEVVNUICYgUkVERU1QVElPTjogY29tcGxldGUgcHJvamVjdCBoYW5kb2ZmIChvbmUgZmlsZSkKClRoaXMgc2luZ2xlIGZpbGUgY29udGFpbnMgdGhlIHdo
 b2xlIHByb2plY3Q6Ci0gdGhlIGdvYWwsIGluIHRoZSBvd25lcidzIG93biB3b3JkcwotIHRoZSBwbGFuIGFuZCB0aGUgY3VycmVudCBzdGF0ZQotIHRoZSBm
 dWxsIHByb2dyZXNzIGhpc3RvcnkgYW5kIGNyaXRpYyBzY29yZXMKLSB0aGUgd29ya2luZyBtZXRob2QgKHRoZSAiZ2F1bnRsZXQgbG9vcCIpIGFuZCBldmVy
@@ -126055,18 +126060,20 @@ aW1pdDogcmVsYXVuY2ggaXQuCi0gKipUaGUgYnVpbHQtaW4gYnJvd3NlciBwYW5lIGNhbm5vdCBtZWFz
 IDB4MCBjYW52YXMpOiB1c2UgYHNjcmlwdHMvcGVyZi5tanNgLgoKIyMgOC4gUmVwb3NpdG9yeSBhbmQgaGlzdG9yeQoKLSAqKkdpdEh1YjoqKiBgbWRpc2xh
 bWF5YW4wOS1kZWJ1Zy9jb2RleHNraWxsZmlsZXNgLCBicmFuY2ggYGNsYXVkZS9hYWEtb3Blbi13b3JsZC1nYW1lLWMyYW81b2AuIFRoZSBwcm9qZWN0IGlz
 CiAgYGZyb250aWVyL2A7IHRoaXMgZmlsZSBzaXRzIGJlc2lkZSBpdCBhdCB0aGUgdG9wIGxldmVsLgotIFJvdW5kcyA1MOKAkzEwNCB3ZXJlIG1hZGUgaW4g
-YSBzZXBhcmF0ZSBsb2NhbCByZXBvc2l0b3J5IHJlYnVpbHQgZnJvbSB0aGUgcm91bmQtNDkgaGFuZG9mZiBmaWxlLCBvbiBhIG1hY2hpbmUKICB0aGF0IHdh
-cyAqKm5vdCBzaWduZWQgaW4gdG8gR2l0SHViKiouIFRoZXkgd2VyZSBwcmVwYXJlZCBhcyBvbmUgbWVyZ2UgY29tbWl0IG9uIHRvcCBvZiB0aGUgYnJhbmNo
-J3MgY29tbWl0CiAgYDM3ZTY4Y2ZgLiAqKkNoZWNrIGBnaXQgbG9nYCBvbiB0aGUgYnJhbmNoOiBpZiBpdCBzaG93cyAiTWVyZ2Ugcm91bmRzIDUwLTEwNCIs
-IHRoZSByZXBvc2l0b3J5IGlzIGN1cnJlbnQuIElmCiAgaXRzIGxhc3QgY29tbWl0IGlzIHN0aWxsICJSZWJ1aWxkIHRoZSBhbGwtaW4tb25lIGhhbmRvZmYg
-d2l0aCByb3VuZCA0OSIsIHRoZSBwdXNoIG5ldmVyIGhhcHBlbmVkIGFuZCB0aGlzCiAgZmlsZSBpcyBhaGVhZCBvZiB0aGUgcmVwb3NpdG9yeTogZXh0cmFj
-dCBpdCAoc2VjdGlvbiAwKSwgY29tbWl0IGBmcm9udGllci9gIGFuZCB0aGlzIGZpbGUgb24gdGhlIGJyYW5jaCwgYW5kCiAgcHVzaC4qKgotICoqQXJ0aWZh
-Y3Q6KiogYSBwbGF5YWJsZSBzaW5nbGUtcGFnZSBidWlsZCB3YXMgb25jZSBwdWJsaXNoZWQgYXMgYSBjbGF1ZGUuYWkgYXJ0aWZhY3QgZnJvbQogIGBzY3Jp
-cHRzL21ha2VfYXJ0aWZhY3QucHlgIG9uIHRoZSBmaXJzdCBhY2NvdW50LiBJdCBpcyBsb25nIG91dCBvZiBkYXRlLgoKIyMgOS4gRW1iZWRkZWQgZmlsZSBp
-bmRleAoKVGhlIGFyY2hpdmUgaXMgYmVsb3csIGBmcm9udGllci8uLi5gIHBhdGhzIHdpdGggc2l6ZXMuIEl0IGluY2x1ZGVzOgotIGFsbCBzb3VyY2UsIHNj
-cmlwdHMgYW5kIGRvY3MKLSBgcHVibGljL2AgYXNzZXRzIChERU0gcGF0Y2hlcywgQ0MwIHRleHR1cmVzLCB0aGUgaHVtYW4gdGVtcGxhdGUpCi0gYHJlZmVy
-ZW5jZXMvYDogdGhlIHRocmVlIHRhcmdldCBpbWFnZXMgYW5kIGZpdmUgb2xkZXIgUkRSMiBiYXIgZnJhbWVzCi0gYGxhdGVzdF9mcmFtZXMvYDogdGhlIGxh
-dGVzdCBjYXB0dXJlcywgYXMgSlBFRwo=
+YSBzZXBhcmF0ZSBsb2NhbCByZXBvc2l0b3J5IHJlYnVpbHQgZnJvbSB0aGUgcm91bmQtNDkgaGFuZG9mZiBmaWxlIGFuZCAqKnB1c2hlZAogIG9uIDIwMjYt
+MTAtMDkqKiBhcyBvbmUgbWVyZ2UgY29tbWl0LCAiTWVyZ2Ugcm91bmRzIDUwLTEwNCIsIG9uIHRvcCBvZiB0aGUgYnJhbmNoJ3MgY29tbWl0IGAzN2U2OGNm
+YCAoaXRzIHNlY29uZAogIHBhcmVudCBjYXJyaWVzIHRoZSBpbmRpdmlkdWFsIGNvbW1pdHMsIHdpdGggcGF0aHMgcmVsYXRpdmUgdG8gYGZyb250aWVyL2Ap
+LiBUaGUgcmVwb3NpdG9yeSBhbmQgdGhpcyBmaWxlIGhvbGQKICB0aGUgc2FtZSB3b3JrLgotIFRoZSByZXBvc2l0b3J5J3MgZGVmYXVsdCBicmFuY2ggb24g
+R2l0SHViIGlzIGEgZGlmZmVyZW50IG9uZSAoYGNsYXVkZS9uaWZ0eS1tZW5kZWwtZWJ3c2tvYCk6IG9wZW4gdGhlIGdhbWUncwogIGJyYW5jaCBieSBuYW1l
+LCBvciBpdCBsb29rcyBhcyBpZiBub3RoaW5nIHdhcyBwdXNoZWQuCi0gKipDb21taXQgYXMqKiBgbWRpc2xhbWF5YW4wOS1kZWJ1ZyA8MjUxNjgzMTEzK21k
+aXNsYW1heWFuMDktZGVidWdAdXNlcnMubm9yZXBseS5naXRodWIuY29tPmAuIFRoZSBhY2NvdW50CiAgcmVqZWN0cyBwdXNoZXMgdGhhdCBleHBvc2UgYSBw
+cml2YXRlIGVtYWlsIChHSDAwNyk7IGNvbW1pdHMgY2FycnlpbmcgdGhlIG93bmVyJ3Mgb3duIGFkZHJlc3NlcyBoYWQgdG8gYmUKICByZXdyaXR0ZW4gYmVm
+b3JlIHRoZSBwdXNoIHdlbnQgdGhyb3VnaC4KLSAqKkFydGlmYWN0OioqIGEgcGxheWFibGUgc2luZ2xlLXBhZ2UgYnVpbGQgd2FzIG9uY2UgcHVibGlzaGVk
+IGFzIGEgY2xhdWRlLmFpIGFydGlmYWN0IGZyb20KICBgc2NyaXB0cy9tYWtlX2FydGlmYWN0LnB5YCBvbiB0aGUgZmlyc3QgYWNjb3VudC4gSXQgaXMgbG9u
+ZyBvdXQgb2YgZGF0ZS4KCiMjIDkuIEVtYmVkZGVkIGZpbGUgaW5kZXgKClRoZSBhcmNoaXZlIGlzIGJlbG93LCBgZnJvbnRpZXIvLi4uYCBwYXRocyB3aXRo
+IHNpemVzLiBJdCBpbmNsdWRlczoKLSBhbGwgc291cmNlLCBzY3JpcHRzIGFuZCBkb2NzCi0gYHB1YmxpYy9gIGFzc2V0cyAoREVNIHBhdGNoZXMsIENDMCB0
+ZXh0dXJlcywgdGhlIGh1bWFuIHRlbXBsYXRlKQotIGByZWZlcmVuY2VzL2A6IHRoZSB0aHJlZSB0YXJnZXQgaW1hZ2VzIGFuZCBmaXZlIG9sZGVyIFJEUjIg
+YmFyIGZyYW1lcwotIGBsYXRlc3RfZnJhbWVzL2A6IHRoZSBsYXRlc3QgY2FwdHVyZXMsIGFzIEpQRUcK
 <<<END FILE>>>
 <<<FILE path="frontier/scripts/label_test.mjs" encoding="utf8" sha256="2a4fd1c7fe80cd23441016de333a1c0500a709b1afc29fbd5d78730dbe6be582" bytes="663">>>
 import { Human } from '../src/creatures.js';
