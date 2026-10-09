@@ -1275,3 +1275,14 @@ dashes that do not sit on ledges; the base meets the ground in a hard line with 
   keep their snow flecks out to 1.6 km: dark trees with snow on their boughs at every distance.
 - **A ridden horse carries its head** (neck raised 0.2 rad on the rein when a shot poses it): the head hung
   small and low ahead of the saddle. Ears shorter and blunter.
+
+**Critic scores.** Round 102: 4 / 4 / 5. Play-mode frame rate re-measured after this session's shader work:
+13.2 fps at 1512x982 ungoverned (it was 14.5), and the governor settles at about 24 fps at scale 0.56 (25):
+roughly a tenth slower. Vista's first item this time: "no atmospheric layering: the valley ends in a flat,
+detail-free pale-blue wedge; B stacks six or more receding ridgelines with fog pooled between".
+
+### Round 103
+- **Interlocking spurs beyond the map** (`backdrop.js`, `?nospurs`): the valley's sides send spurs down across
+  its floor from left and right in turn at 1.8, 3.2, 5, 7.4, 10.5 and 15 km, each higher than the last with a
+  jagged crest, so looking up the valley the eye meets ridgeline behind ridgeline, paler and paler, to a jagged
+  skyline. Before, the open floor ran twenty kilometres to one pale wedge. Both snow shots look up this valley.

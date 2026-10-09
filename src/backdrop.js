@@ -44,6 +44,8 @@ export class Backdrop {
       const t = u * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
       return side === 0 ? [-1 + 2 * f, -1] : side === 1 ? [1, -1 + 2 * f] : side === 2 ? [1 - 2 * f, 1] : [-1, 1 - 2 * f];
     };
+    const SPURS = [[1800, 200, 1], [3200, 300, -1], [5000, 430, 1], [7400, 620, -1], [10500, 900, 1], [15000, 1300, -1]];
+    const NOSPURS = typeof location !== 'undefined' && /[?&]nospurs\b/.test(location.search);
     for (let i = 0; i < SEG; i++) {
       const [ux, uz] = perim(i / SEG);
       const ex = ux * (HALF - 6), ez = uz * (HALF - 6);
@@ -82,7 +84,16 @@ export class Backdrop {
         // as smooth white dunes, plain to see from a lookout over the valley's mouth)
         const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 1300, Math.abs(x - vx))
           + 70 * (ridged(x / 430 + 1.7, z / 430 - 6.2, 4) - 0.4) * sstep(vw * 0.6, vw + 700, Math.abs(x - vx)) * sstep(9000, 3000, d);
-        const regionH = north * snowV + desert * desertH + sea * seaH + hills * hillH;
+        // (round 103) interlocking spurs: beyond the map the valley's sides send spurs down across its floor from left and
+        // right in turn, each further and higher than the last, so the eye going up the valley meets ridgeline behind
+        // ridgeline, paler and paler, instead of one open floor running to a pale wedge at the horizon
+        let spur = 0;
+        if (dn > 0 && !NOSPURS) for (const [d0, A, sg] of SPURS) {
+          const w = 0.2 * d0 + 220, g = Math.exp(-(((dn - d0) / w) ** 2));
+          if (g < 0.01) continue;
+          spur = Math.max(spur, A * g * sstep(-0.9, 0.5, (x - vx) * sg / vw) * (0.72 + 0.56 * ridged(x / 800 + d0 * 0.001, z / 800, 3)));
+        }
+        const regionH = north * (snowV + spur) + desert * desertH + sea * seaH + hills * hillH;
         // carry the map's own edge heights out, then rise into the region's relief
         // (in the north the ranges' own relief takes over within a kilometre, and crags stand on the ground between:
         // carried out for 2.6 km, the edge's profile lay beyond the map as smooth extruded dunes)
