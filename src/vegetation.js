@@ -300,7 +300,10 @@ function buildPine(seed, kind = 'pine') {
   // trunk in two tapering sections (flared base, then a steady taper to the leader)
   // lodgepole/ponderosa trunks: slim poles, not redwood columns
   const r0 = (kind === 'tall' ? 0.31 : 0.24) + rnd() * 0.09;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
+  // (the butt swells into the ground in a curve: one straight taper met the floor like a post in a hole)
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.22, 0), r0 * 2.0, r0 * 1.42, 12));
+  wood.push(branchGeo(new THREE.Vector3(0, 0.22, 0), new THREE.Vector3(0, 0.7, 0), r0 * 1.42, r0 * 1.14, 12));
+  wood.push(branchGeo(new THREE.Vector3(0, 0.7, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.14, r0, 12));
   // (the bole in five sections, wandering a little off its line as it climbs: one straight taper read as a turned pole)
   const topX = (rnd() - 0.5) * 0.9, topZ = (rnd() - 0.5) * 0.9, bendA = rnd() * 6.28, bend = (kind === 'tall' ? 0.35 : 0.18) * (0.4 + rnd());
   const bole = (t) => new THREE.Vector3(topX * t + Math.cos(bendA) * bend * Math.sin(t * Math.PI) + Math.cos(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3), 1.4 + (height - 3.8) * t, topZ * t + Math.sin(bendA) * bend * Math.sin(t * Math.PI) + Math.sin(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3));
@@ -308,7 +311,7 @@ function buildPine(seed, kind = 'pine') {
   for (let k = 0; k < 5; k++) wood.push(branchGeo(bole(k / 5), bole((k + 1) / 5), boleR(k / 5), boleR((k + 1) / 5), 10));
   // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
   for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (kind === 'tall' ? 1.2 + rnd() * 0.45 : 1.6 + rnd() * 0.9);   // (a slight swell on the old boles, not a tent skirt)
+    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (kind === 'tall' ? 2.1 + rnd() * 0.9 : 1.9 + rnd() * 0.9);   // (a slight swell on the old boles, not a tent skirt)
     wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.3, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.35, 0.7 + rnd() * 0.4, Math.sin(a) * r0 * 0.35), r0 * 0.28, r0 * 0.45, 7));   // rounder, lower buttresses
   }
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
@@ -1396,11 +1399,41 @@ export class Vegetation {
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
     const cb = conBarkTextures(6, [92, 76, 64], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
+    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0, { fragColor: `#include <color_fragment>
+      {
+        // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
+        // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
+        float above = vWPos.y - heightAt(vWPos.xz);
+        diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
+        float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
+        diffuseColor.rgb *= (0.76 + 0.48 * tone) * mix(vec3(1.06, 1.0, 0.92), vec3(0.94, 1.0, 1.06), hash12(floor(vTreePos.xz * 0.37) + 8.0));
+        float ang = atan(vWPos.x - vTreePos.x, vWPos.z - vTreePos.z);
+        float patchB = fbm2(vec2(sin(ang) * 1.1 + tone * 9.0, vWPos.y * 0.2 + cos(ang) * 1.1));
+        diffuseColor.rgb *= 0.78 + 0.44 * smoothstep(0.3, 0.7, patchB);
+        // grey-green lichen on the shaded side of the lower bole
+        float lich = smoothstep(0.55, 0.7, fbm2(vec2(ang * 2.0 + tone * 5.0, vWPos.y * 0.9))) * smoothstep(7.0, 1.0, above) * smoothstep(0.2, 0.8, above);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.23, 0.17) * (0.7 + 0.6 * tone), lich * 0.4 * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r)));
+      }` });
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
     const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0, { fragColor: `#include <color_fragment>
+      {
+        // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
+        // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
+        float above = vWPos.y - heightAt(vWPos.xz);
+        diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
+        float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
+        diffuseColor.rgb *= (0.76 + 0.48 * tone) * mix(vec3(1.06, 1.0, 0.92), vec3(0.94, 1.0, 1.06), hash12(floor(vTreePos.xz * 0.37) + 8.0));
+        float ang = atan(vWPos.x - vTreePos.x, vWPos.z - vTreePos.z);
+        float patchB = fbm2(vec2(sin(ang) * 1.1 + tone * 9.0, vWPos.y * 0.2 + cos(ang) * 1.1));
+        diffuseColor.rgb *= 0.78 + 0.44 * smoothstep(0.3, 0.7, patchB);
+        // grey-green lichen on the shaded side of the lower bole
+        float lich = smoothstep(0.55, 0.7, fbm2(vec2(ang * 2.0 + tone * 5.0, vWPos.y * 0.9))) * smoothstep(7.0, 1.0, above) * smoothstep(0.2, 0.8, above);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.23, 0.17) * (0.7 + 0.6 * tone), lich * 0.4 * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r)));
+      }` });
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)

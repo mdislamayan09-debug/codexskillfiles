@@ -696,7 +696,9 @@ async function init() {
         // between them and the lens. The reference's valley is closed in by spurs coming down from either side one
         // behind another, dark rock on their flanks and timber along their crests, each a tone paler than the last.
         // Three are raised here: left at 330 m, right at 560 m, left again at 820 m.
-        const spurs = [[520, 520, 190, 330, 115, 26], [770, -560, 240, 560, -95, 30], [1060, 600, 270, 830, 70, 42]].map(([a0, s0, h0, a1, s1, h1]) => {
+        // (round 89: their toes carried in to the valley's axis, so they stand one behind another in the gap between the
+        // walls, where the lens sees them: ending a hundred metres aside, the first was hidden behind the cliff)
+        const spurs = (params.has('spursold') ? [[520, 520, 190, 330, 115, 26], [770, -560, 240, 560, -95, 30], [1060, 600, 270, 830, 70, 42]] : [[520, 520, 190, 390, 42, 38], [800, -560, 240, 640, -6, 46], [1100, 600, 270, 930, 40, 62]]).map(([a0, s0, h0, a1, s1, h1]) => {
           const [ax2, az2] = P(a0, s0), [bx2, bz2] = P(a1, s1), fl = world.heightAt(px, pz);
           world.raiseSpur(ax2, az2, fl + h0, bx2, bz2, fl + h1, { side: 1.05, round: 0.0005, top: 16, flat0: 9, reach: 330, rough: 3.2, sag: 0 });
           return [ax2, az2, bx2, bz2];
@@ -752,10 +754,27 @@ async function init() {
             if (r2() < 0.18) { const off = sgn * (6.5 + r2() * 2.5), x = cx + nx * off, z = cz + nz * off, sc = 0.7 + r2() * 1.3; veg.rocks.add(x, world.heightAt(x, z) - 0.45 * sc, z, r2() * 6.28, sc, 2 + Math.floor(r2() * 2)); }
           }
         }
+        // (round 89) and rock on the spurs' flanks: bands of outcrop standing out of the snow along each one's steeper
+        // side, so the middle distance has dark faces at three removes, each paler in the snowfall than the last
+        {
+          const bigR = [6, 7, 8];
+          for (const [ax2, az2, bx2, bz2] of spurs) {
+            const dx2 = bx2 - ax2, dz2 = bz2 - az2, L2 = Math.hypot(dx2, dz2);
+            for (let t = 0.08; t < 0.98; t += 0.05 + r2() * 0.05) for (const sgn of [-1, 1]) {
+              // down the flank from the crest to where it has lost a third of its height
+              const cx3 = ax2 + dx2 * t, cz3 = az2 + dz2 * t, hc = world.heightAt(cx3, cz3);
+              let off = 6; while (off < 150 && world.heightAt(cx3 - dz2 / L2 * off * sgn, cz3 + dx2 / L2 * off * sgn) > hc - Math.max(8, (hc - world.heightAt(px, pz)) * (0.2 + 0.4 * r2()))) off += 4;
+              const x = cx3 - dz2 / L2 * off * sgn, z = cz3 + dx2 / L2 * off * sgn;
+              if (world.normalAt(x, z).y > 0.9 || r2() < 0.3) continue;
+              const sc = 9 + r2() * 9;
+              veg.rocks.add(x, world.heightAt(x, z) - 0.25 * sc, z, r2() * 6.28, sc, bigR[Math.floor(r2() * 3)]);
+            }
+          }
+        }
         // timber along the spurs' crests and down their gentler ground, ragged pines among the spruce
         {
           const firs2 = veg.groups.fir, tl2 = veg.groups.tall;
-          if (firs2.length) for (const [ax2, az2, bx2, bz2] of spurs) for (let i = 0; i < 150; i++) {
+          if (firs2.length) for (const [ax2, az2, bx2, bz2] of spurs) for (let i = 0; i < 380; i++) {
             const t = r2(), off = (r2() - 0.5) * 2 * (25 + 150 * r2());
             const dx2 = bx2 - ax2, dz2 = bz2 - az2, L2 = Math.hypot(dx2, dz2), x = ax2 + dx2 * t - dz2 / L2 * off, z = az2 + dz2 * t + dx2 / L2 * off;
             if (world.normalAt(x, z).y < 0.72 || world.splatAt(x, z).wet > 0.3) continue;

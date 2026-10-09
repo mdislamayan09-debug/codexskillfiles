@@ -211,6 +211,15 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (fine flecks melting into the coat, thicker along the top line: broad white blotches read as a pinto's patches)
           // (a soft veil lying on what faces up, thicker in places: as separate flecks it read as noise sprayed on the coat)
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(${kind === 'human' ? '0.4, 0.9' : '0.62, 0.98'}, wn.y) * (0.3 + 0.7 * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 19.0 + vRest.y * 7.0) + 0.4 * vnoise(vRest.xz * 55.0 - vRest.y * 20.0)));
+          ${kind === 'human' ? `{
+            // (round 89: lying in clumps with an edge, grainy, thick on the shoulders and hat. As a soft veil it was read
+            // as a plastic highlight on the coat, not as snow)
+            float cold = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r);
+            float g = 0.55 * vnoise(vRest.xz * 26.0 + vRest.y * 9.0) + 0.3 * vnoise(vRest.xz * 70.0 - vRest.y * 30.0) + 0.15 * vnoise(vRest.xz * 190.0 + vRest.y * 80.0);
+            float clump = smoothstep(0.8, 0.85, wn.y + (g - 0.5) * 0.55);   // (on what faces the sky only: looser, it lay down his back in pinto patches)
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.89, 0.94) * (0.9 + 0.2 * vnoise(vRest.xz * 300.0)), clump * cold * 0.92);
+            dust = 0.0;
+          }` : ''}
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.7' : '0.2'});
           ${kind === 'human' ? '' : `{
             // a horse wading through powder is caked with it to the knees and hocks, thinning upward (clean dark legs
@@ -222,8 +231,10 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.12, 1.0, 0.9), 0.12 * cold);
             float fl = smoothstep(0.62, 0.8, vnoise(vRest.xz * 140.0 + vRest.y * 60.0) * 0.6 + vnoise(vRest.xz * 47.0 - vRest.y * 20.0) * 0.4) * smoothstep(-0.1, 0.7, wn.y);
             // (a soft dusting lying along the top line, a few flakes below it: sprinkled evenly the coat was salt-and-pepper)
-            float lie = smoothstep(0.45, 0.95, wn.y) * (0.45 + 0.55 * vnoise(vRest.xz * 9.0 + vRest.y * 4.0));
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), (fl * 0.22 + lie * 0.5) * cold);
+            // (clumps with an edge along the croup and back: a soft veil there was read as a wet sheen)
+            float gq = 0.55 * vnoise(vRest.xz * 17.0 + vRest.y * 6.0) + 0.3 * vnoise(vRest.xz * 50.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 150.0);
+            float lie = smoothstep(0.84, 0.89, wn.y + (gq - 0.5) * 0.5);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.89, 0.94), max(fl * 0.22, lie * 0.9) * cold);
           }`}
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
@@ -875,9 +886,9 @@ export class Human {
       // the cap (bare, the dome was a helmet) and a broad shearling collar lying on the shoulders
       if (MH) {
         const lump = (g, amp, f) => { const q = g.attributes.position; for (let k = 0; k < q.count; k++) { const x = q.getX(k), y = q.getY(k), z = q.getZ(k), s = 1 + amp * (Math.sin(x * f + z * f * 0.6 + 1.3) * Math.sin(y * f * 1.1 + x * f * 0.4) + 0.6 * Math.sin(z * f * 1.7 + y * f * 0.9)); q.setXYZ(k, x * s, y * (0.6 + 0.4 * s), z * s); } g.computeVertexNormals(); return g; };
-        const trim = lump(new THREE.TorusGeometry(0.138, 0.042, 10, 30), 0.05, 60); trim.rotateX(Math.PI / 2); trim.scale(1.12, 1.0, 1.17);
-        const tm2 = mesh(trim, std({ map: furTex_(0x8c7c64), roughness: 0.95 })); tm2.position.copy(at(bones.head, 0, hy - 0.012, hz)); tm2.rotation.x = -0.1; bones.head.add(tm2);
-        const col = lump(new THREE.TorusGeometry(0.15, 0.056, 10, 30), 0.06, 46); col.rotateX(Math.PI / 2); col.scale(1.36, 0.8, 1.1);
+        const trim = lump(new THREE.TorusGeometry(0.14, 0.036, 10, 30), 0.09, 60); trim.rotateX(Math.PI / 2); trim.scale(1.12, 1.25, 1.17);
+        const tm2 = mesh(trim, std({ map: furTex_(0x5a4a3a), roughness: 0.95 }));   // (the cap's own dark fur: paler, it was a beige band round a beanie) tm2.position.copy(at(bones.head, 0, hy - 0.012, hz)); tm2.rotation.x = -0.1; bones.head.add(tm2);
+        const col = lump(new THREE.TorusGeometry(0.15, 0.06, 10, 30), 0.12, 46); col.rotateX(Math.PI / 2); col.scale(1.36, 0.8, 1.1);
         const cm2 = mesh(col, std({ map: furTex_(0xa39c8e), roughness: 0.95 })); cm2.position.set(-bones.spine.userData.rest.x, MH.rest.neck[1] - 0.045 - bones.spine.userData.rest.y, MH.rest.neck[2] - 0.03 - bones.spine.userData.rest.z); cm2.rotation.x = 0.22; bones.spine.add(cm2);
       }
       // on the real body the rolled collar carries the pelt; only a short soft fringe on its rim
@@ -1245,7 +1256,7 @@ export class Quadruped {
       }
       const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.22, 1.17);
       cards.push(forelock);
-      const maneHair = std({ map: hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, color: 0xffffff });
+      const maneHair = std({ map: hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.95, envMapIntensity: 0.25, color: 0xffffff });   // (matte: at 0.6 it mirrored the sky as a blue strip along the neck)
       const mm = new THREE.Mesh(mergeGeometriesSafe(cards), maneHair);
       mm.position.set(-bones.neck.userData.rest.x, -bones.neck.userData.rest.y, -bones.neck.userData.rest.z);
       mm.castShadow = true; bones.neck.add(mm);

@@ -1041,3 +1041,19 @@ the fine ripple).
 - **Storm grade tints mid tones and shade only**; highlights stay neutral white (uniform, the frame was cobalt).
 - **Snow under overcast is shaded by its broad forms only** (with the fine relief it was crumpled foil); ripple
   and fine relief eased under snowfall.
+
+**Critic scores.** Round 88: 4 / **4** / **6**: total 14, level with the best (round 72). The vista's margin is
+"the narrowest of the three"; the snow ride's left cliff "is the only surface that holds up". Noted: the soft
+snow dusting on rider and horse is being read as gloss ("plastic highlights", "wet sheen") while the critic
+also says there is no snow on them; the mane shows as "a blue strip"; trunks still "perfect cylinders".
+
+### Round 89
+- **Snow ride: ridges stand one behind another in the gap.** The three spurs' toes are carried in to the valley's
+  axis (ending a hundred metres aside, the first was hidden behind the cliff and the others behind the timber),
+  with bands of outcrop on their flanks and three times the timber on their crests (`?spursold` to compare).
+- **Snow on rider and horse lies in clumps with an edge**, on what faces the sky only (shoulders, hat, bedroll,
+  croup). As a soft veil it was read as "plastic highlights" and "wet sheen". Hat trim is the cap's own dark fur.
+- **Mane is matte** (it mirrored the sky as a blue strip along the neck).
+- **Trunks stand in the ground**: the butt swells into the floor in a curve with longer buttress roots; the
+  bark is dark with shade and banked duff at its foot; each tree has its own tone and warmth, weathering in
+  broad patches round and up the bole, grey-green lichen low on it.
