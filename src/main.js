@@ -76,6 +76,14 @@ async function init() {
   const town = new Town(world, scene, surf);
   setLoad(0.7, 'Planting forests…'); await tick();
   const veg = new Vegetation(world, scene, renderer, QUALITY, surf);
+  // the cliffs' strata are tilted now the country is planted (see World.terraceCliffs), and what stands on them re-seated
+  if (!params.has('leveldip')) {
+    const layers = [veg.trees, veg.bushes, veg.rocks, veg.crags, veg.logs];
+    const seat = layers.map((L) => L.items.filter((it) => it.z < -1480).map((it) => [it, world.heightAt(it.x, it.z)]));
+    world.terraceCliffs(true);
+    for (const list of seat) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
+    veg.refreshImpostors();
+  } else world._preCut = null;
   for (const g of veg.grass) g.layers.set(1);
   setLoad(0.82, 'Filling the rivers…'); await tick();
   const water = new Water(scene, renderer, { reflections: QUALITY >= 0.7, resScale: QUALITY > 1 ? 0.75 : QUALITY >= 1 ? 0.5 : 0.35, normals: surf.water });
@@ -265,7 +273,7 @@ async function init() {
     // (round 79: framed as the reference is: the lens above the rider's shoulder looking down the trail, the rider left of
     // centre with the hat a third down and the frame cutting the horse at the croup, the trail running up to the right;
     // ?pinesold is the level, right-of-centre framing of rounds 50-78)
-    return { time: 16.35, fov: 35, sunGap: params.has('pinesold') || params.has('nogap') ? null : [48, 190, 7.5], volDensity: params.has('pinesold') ? 0.0036 : 0.0026, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.35, 2.3, -4.95], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.35, 2.4, 22], turn: params.has('pt') ? +params.get('pt') : -0.62, stride: 0.16, trailDress: true }; },
+    return { time: 16.35, fov: 35, sunGap: params.has('pinesold') || params.has('nogap') ? null : [48, 190, 7.5], volDensity: params.has('pinesold') ? 0.0036 : 0.0026, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.23, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.35, 2.3, -4.95], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.35, 2.4, 22], turn: params.has('pt') ? +params.get('pt') : -0.62, stride: 0.16, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -1657,7 +1665,8 @@ async function init() {
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);
-    U.uCharFill.value = 0.05 + 0.22 * (G.forestK || 0) * (1 - U.uNight.value);
+    // (and under a storm's overcast, where the whole sky is the light: figures stood in it as black cut-outs)
+    U.uCharFill.value = 0.05 + (0.22 * (G.forestK || 0) + 0.2 * sky.weather.storm) * (1 - U.uNight.value);
     if (G.keyShaft) U.uCanopySpot.value.set(player.hpos.x, player.hpos.y + 1.7, player.hpos.z, G.keyShaft); else U.uCanopySpot.value.w = 0;
     town.update(dt, U.uNight.value, sky.weather.storm);
     veg.update(camera.position);

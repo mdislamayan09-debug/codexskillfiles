@@ -234,7 +234,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             // (clumps with an edge along the croup and back: a soft veil there was read as a wet sheen)
             float gq = 0.55 * vnoise(vRest.xz * 17.0 + vRest.y * 6.0) + 0.3 * vnoise(vRest.xz * 50.0 - vRest.y * 20.0) + 0.15 * vnoise(vRest.xz * 150.0);
             float lie = smoothstep(0.84, 0.89, wn.y + (gq - 0.5) * 0.5);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.89, 0.94), max(fl * 0.22, lie * 0.9) * cold);
+            // (round 92: flakes only, thicker along the top line. In clumps the snow lay on the croup as a pinto's patches)
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.89, 0.94), fl * (0.25 + 0.45 * smoothstep(0.5, 0.95, wn.y)) * cold + 0.0 * lie);
           }`}
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
@@ -322,7 +323,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 // ===================================================================================== HUMANS
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
-  winter: { coat: 0x46382c, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x5e4a38, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
+  winter: { coat: 0x5e4a36, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x86765f, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
   arthur: { coat: 0x3c2c20, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x55483a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
@@ -887,9 +888,11 @@ export class Human {
       if (MH) {
         const lump = (g, amp, f) => { const q = g.attributes.position; for (let k = 0; k < q.count; k++) { const x = q.getX(k), y = q.getY(k), z = q.getZ(k), s = 1 + amp * (Math.sin(x * f + z * f * 0.6 + 1.3) * Math.sin(y * f * 1.1 + x * f * 0.4) + 0.6 * Math.sin(z * f * 1.7 + y * f * 0.9)); q.setXYZ(k, x * s, y * (0.6 + 0.4 * s), z * s); } g.computeVertexNormals(); return g; };
         const trim = lump(new THREE.TorusGeometry(0.14, 0.036, 10, 30), 0.09, 60); trim.rotateX(Math.PI / 2); trim.scale(1.12, 1.25, 1.17);
-        const tm2 = mesh(trim, std({ map: furTex_(0x5a4a3a), roughness: 0.95 }));   // (the cap's own dark fur: paler, it was a beige band round a beanie) tm2.position.copy(at(bones.head, 0, hy - 0.012, hz)); tm2.rotation.x = -0.1; bones.head.add(tm2);
-        const col = lump(new THREE.TorusGeometry(0.15, 0.06, 10, 30), 0.12, 46); col.rotateX(Math.PI / 2); col.scale(1.36, 0.8, 1.1);
-        const cm2 = mesh(col, std({ map: furTex_(0xa39c8e), roughness: 0.95 })); cm2.position.set(-bones.spine.userData.rest.x, MH.rest.neck[1] - 0.045 - bones.spine.userData.rest.y, MH.rest.neck[2] - 0.03 - bones.spine.userData.rest.z); cm2.rotation.x = 0.22; bones.spine.add(cm2);
+        const tm2 = mesh(trim, std({ map: furTex_(0x8f7f69), roughness: 0.95 }));   // (the cap's own dark fur: paler, it was a beige band round a beanie) tm2.position.copy(at(bones.head, 0, hy - 0.012, hz)); tm2.rotation.x = -0.1; bones.head.add(tm2);
+        // (round 92: close round the neck. A hand wider than the shoulders and lumpy, it stood out to one side like a
+        // snow-capped rock on the rider's shoulder)
+        const col = lump(new THREE.TorusGeometry(0.135, 0.052, 10, 30), 0.05, 46); col.rotateX(Math.PI / 2); col.scale(1.14, 0.72, 1.0);
+        const cm2 = mesh(col, std({ map: furTex_(0x8e8474), roughness: 0.95 })); cm2.position.set(-bones.spine.userData.rest.x, MH.rest.neck[1] - 0.045 - bones.spine.userData.rest.y, MH.rest.neck[2] - 0.03 - bones.spine.userData.rest.z); cm2.rotation.x = 0.22; bones.spine.add(cm2);
       }
       // on the real body the rolled collar carries the pelt; only a short soft fringe on its rim
       if (MH) bones.spine.add(mesh(furCards(0, 0, MH.rest.neck[2] - 0.035, 0.125, MH.rest.neck[1] + 0.06, MH.rest.neck[1] + 0.1, 80, 0.032, bones.spine), colFur, false));
@@ -1029,7 +1032,7 @@ const COATS = {
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
-  redbay: { coat: 0x4a2f1f, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
+  redbay: { coat: 0x643a26, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
   chestnut: { coat: 0x8a4422, points: 0x6a3418, mane: 0x6a3016, belly: 0x9a5530, pinto: 0 },
   deer: { coat: 0x8a6440, points: 0x5a4430, mane: 0x6a5038, belly: 0xd8ccb8, pinto: 0 },
   sheep: { coat: 0xd2c8b4, points: 0x2a2420, mane: 0xc8bea8, belly: 0xc0b6a0, pinto: 0 },
@@ -1444,6 +1447,17 @@ export class Quadruped {
     body.add(mesh(stock, std({ color: 0x3a2416, roughness: 0.68 })));   // dark oiled walnut, not a pale lit block
     const rope = new THREE.TorusGeometry(0.12, 0.018, 6, 16); rope.rotateY(Math.PI / 2); rope.translate(0.24, 1.73, 0.22);
     body.add(mesh(rope, std({ color: 0x9a845a })));
+    // a coiled lariat hanging on the off side behind the rider's leg, as the reference's rig carries one
+    {
+      const coils = [];
+      for (let k = 0; k < 5; k++) {
+        const cg = new THREE.TorusGeometry(0.17 + 0.012 * Math.sin(k * 2.3), 0.011, 5, 26);
+        cg.rotateY(Math.PI / 2 + (k - 2) * 0.05); cg.rotateX((k - 2) * 0.07);
+        cg.translate(0.485 + k * 0.01, 1.5 - 0.004 * k, -0.5 + (k % 2) * 0.012);   // (over the near-side bag, where a lens behind and to the left sees it)
+        coils.push(cg);
+      }
+      body.add(mesh(mergeGeometriesSafe(coils), std({ color: 0x64553e, roughness: 0.95 })));   // (old hemp: pale, the key light made a yellow hoop of it)
+    }
     // bridle + reins on the head
     const hr = bones.head.userData.rest;
     const br = new THREE.TorusGeometry(0.115, 0.012, 4, 14); br.rotateY(Math.PI / 2); br.scale(1, 1.1, 0.8); br.translate(0, -0.02, 0.21);

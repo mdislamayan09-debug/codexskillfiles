@@ -1090,3 +1090,20 @@ the new plants are "fans of crossed quads in one saturated orange-tan" (over-war
 - **Storm sky**: the breaks are bright (the lightest thing in the sky), cloud bellies lighter, masses less merged.
 - (Pitfall again: a comment appended after `.map(` swallowed the arrow function. Never comment a line that
   continues.)
+
+**Critic scores.** Round 91: 4 / 3.5 / 5. Snow ride's first item: the right mountainside "visibly terraced like
+a quantised heightmap" (the level strata; tilted in round 92). Pines: the figure, then trunks "striped
+cylinders, evenly saturated orange-red", canopy "painterly leaf cards". Vista: forest "black-and-white speckle
+with no distance filtering".
+
+### Round 92
+- **Cliff strata dip ten degrees and bend** instead of lying level ("visibly terraced like a quantised
+  heightmap"). Done in two steps, `World.terraceCliffs()` then `terraceCliffs(true)` after planting, because a
+  first attempt that changed the heights before planting reshuffled every tree, rock and bush in the world
+  (planting draws its random numbers according to the ground it finds): the pine shot moved and a cactus stood
+  beside the desert rider. `?leveldip` keeps the level beds. The shader's beds and cliff bands dip with them.
+- **Winter rider as the reference's**: tan shearling coat, a close fur collar (the wide lumpy one stood out like
+  a rock on his shoulder), tan fur hat; a brighter blood bay with flakes on it and no snow patches; figures
+  take 0.2 more sky fill under a storm's overcast (they were black cut-outs); a coiled lariat on the near side.
+- **Bark**: furrows wander three times as far, plates are short, furrow contrast lower, tone grey-brown and
+  darker (the saturated cinnamon lit up orange-red in the low sun). Pine exposure 1.23.

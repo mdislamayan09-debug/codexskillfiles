@@ -1415,6 +1415,8 @@ export class Vegetation {
         // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
         // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
         float above = vWPos.y - heightAt(vWPos.xz);
+        // (grey-brown, not cinnamon: in a low sun the saturated bark lit up orange-red on every bole)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.94), 0.5) * 0.62;
         diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
         float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);

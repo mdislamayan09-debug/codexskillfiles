@@ -395,7 +395,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         float camDc = length(wp - cameraPosition);
         float along = dot(xz, vec2(0.8, -0.6));
         // (beds of uneven thickness: all one height, a face was a flight of stairs)
-        float q0 = (wp.y + 0.1 * dot(xz, vec2(0.6, 0.8)) + 2.6 * fbm2(xz / 34.0)) / 4.4;
+        float q0 = (wp.y + 0.19 * dot(xz, vec2(0.92, 0.38)) + 5.0 * fbm2(xz / 60.0) + 2.6 * fbm2(xz / 34.0)) / 4.4;   // (dipping with the cut beds)
         float q = q0 + 0.55 * vnoise(vec2(q0 * 0.6, 5.0)) + 0.25 * vnoise(vec2(q0 * 1.7, 9.0)), f = fract(q), bi = floor(q);
         float kMid = smoothstep(1500.0, 500.0, camDc), kNear = smoothstep(520.0, 140.0, camDc);
         rock *= mix(1.0, 0.8 + 0.42 * hash12(vec2(bi, 3.0)), steep * kMid);
@@ -416,7 +416,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         if (band > 0.0) {
           float camDc = length(wp - cameraPosition);
           float zone = smoothstep(0.46, 0.6, fbm2(xz / 110.0 + 3.7) + 0.5 * (slope - 0.2));
-          float q0 = (wp.y + 0.1 * dot(xz, vec2(0.6, 0.8)) + 5.0 * fbm2(xz / 60.0)) / 9.0;
+          float q0 = (wp.y + 0.19 * dot(xz, vec2(0.92, 0.38)) + 9.0 * fbm2(xz / 90.0) + 5.0 * fbm2(xz / 60.0)) / 9.0;
           float q = q0 + 0.6 * vnoise(vec2(q0 * 0.6, 5.0)), f = fract(q), bi = floor(q);
           float along = dot(xz, vec2(0.8, -0.6));
           float run = smoothstep(0.4, 0.55, fbm2(vec2(along / 40.0 + bi * 5.0, bi * 1.9)));

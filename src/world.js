@@ -758,8 +758,13 @@ export class World {
   // and the ledges hold the snow. Here every steep face in the snow country is re-cut that way: within each stratum
   // the ground lies back as a bench and then stands up as a riser, the strata dipping and wandering along the face.
   // The terrain shader's slope rule then lays snow on the benches and bares the risers by itself.
-  terraceCliffs() {
-    const H = this.heights, C = this.climate, src = new Float32Array(H);
+  // Run once while the world is built, with the beds near level, and once more (retilt) after the country is planted,
+  // when the same beds are re-cut dipping ten degrees. In two steps because planting draws its random numbers
+  // according to the ground it finds: any change to the heights it sees moves every tree, rock and bush in the world.
+  terraceCliffs(retilt = false) {
+    const H = this.heights, C = this.climate, src = retilt ? this._preCut : new Float32Array(H);
+    if (!src) return;
+    if (!retilt) this._preCut = src;
     const n = this.n, R = 3, inv = 1 / (2 * R * CELL);
     // the strata: beds of uneven thickness (thin shelves, thick cliff-forming bands), each with its own habit: a hard
     // bed stands up sheer above a narrow ledge, a soft one lies back as a ramp of snow
@@ -790,9 +795,15 @@ export class World {
         amt *= 0.3 + 0.7 * smoothstep(-0.35, 0.3, n.noise(x / 150 + 9.1, z / 150 - 4.2) + 0.4 * n.noise(x / 47 - 2.2, z / 47 + 6.6));
         // the bedding dips across the range and wanders, so ledges run on for a way, pinch out and step
         const dip = 0.05 * x + 0.03 * z + 26 * n.noise(x / 360 + 3.3, z / 360 - 1.7) + 6 * n.noise(x / 110 - 6.1, z / 110 + 2.9);
-        H[k] = lerp(h, cut(h + dip) - dip, amt);
+        const level = lerp(h, cut(h + dip) - dip, amt);
+        if (!retilt) { H[k] = level; continue; }
+        // (round 92: tilted and folded. Lying within three degrees of level, the beds drew contour lines across every wall,
+        // which read as a heightmap's stair-steps, not strata: now they dip ten degrees and bend)
+        const dipT = 0.17 * x + 0.07 * z + 70 * n.noise(x / 360 + 3.3, z / 360 - 1.7) + 14 * n.noise(x / 110 - 6.1, z / 110 + 2.9);
+        H[k] += lerp(h, cut(h + dipT) - dipT, amt) - level;
       }
     }
+    if (retilt) { this._preCut = null; if (this.heightTex) this.heightTex.needsUpdate = true; }
   }
 
   // Bilinear height sample — matches the GPU sampler exactly.
