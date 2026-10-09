@@ -91,7 +91,11 @@ export class Backdrop {
         if (dn > 0 && !NOSPURS) for (const [d0, A, sg] of SPURS) {
           const w = 0.2 * d0 + 220, g = Math.exp(-(((dn - d0) / w) ** 2));
           if (g < 0.01) continue;
-          spur = Math.max(spur, A * g * sstep(-0.9, 0.5, (x - vx) * sg / vw) * (0.72 + 0.56 * ridged(x / 800 + d0 * 0.001, z / 800, 3)));
+          // (round 104: each runs down from its own wall to die out past the valley's axis, so its crest is a long slant
+          // across the view, and its skyline is a few broad summits. Spanning the valley at full height each was a dam
+          // with a level top, and with a tooth every four hundred metres the far ones were a saw blade.)
+          const q = (x - vx) * sg / vw, lat = Math.pow(Math.min(1, Math.max(0, (q + 0.8) / 2.6)), 0.75);
+          spur = Math.max(spur, A * g * lat * (0.78 + 0.44 * ridged(x / 2600 + d0 * 0.0013, z / 2600, 4)));
         }
         const regionH = north * (snowV + spur) + desert * desertH + sea * seaH + hills * hillH;
         // carry the map's own edge heights out, then rise into the region's relief

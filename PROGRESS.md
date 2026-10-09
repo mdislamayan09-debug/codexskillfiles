@@ -1286,3 +1286,15 @@ detail-free pale-blue wedge; B stacks six or more receding ridgelines with fog p
   its floor from left and right in turn at 1.8, 3.2, 5, 7.4, 10.5 and 15 km, each higher than the last with a
   jagged crest, so looking up the valley the eye meets ridgeline behind ridgeline, paler and paler, to a jagged
   skyline. Before, the open floor ran twenty kilometres to one pale wedge. Both snow shots look up this valley.
+
+**Critic scores.** Round 103: 4 / 3 / 5. The new spurs read badly as built: "a pale-blue sawtooth cutout with no
+interior shading" over "a flat grey slab with hard horizontal lines, which reads as a far plane or a clipped
+terrain edge" (each spur spanned the valley at full height, a dam, with evenly toothed crests); in the snow
+ride "a bright white band against darker cloud, like cut paper". Reshaped in round 104.
+
+### Round 104 (built and captured, not yet scored by the critic)
+- **Far spurs reshaped**: each runs down from its own wall and dies out past the valley's axis, so its crest is a
+  long slant across the view with a few broad summits (spanning the valley at full height each was a dam with a
+  level top, and with a tooth every four hundred metres the far ones were a saw blade).
+- Still open on the far distance: the backdrop's ranges are pale, with little interior shading under the haze;
+  in the snow ride the far ridge stands as a bright band against darker cloud.
