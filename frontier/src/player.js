@@ -44,7 +44,9 @@ export class Player {
   attachRider() {
     if (this.mounted) {
       this.horse.body.add(this.rider.root);
-      this.rider.root.position.set(0, 0.9, -0.1);
+      // (a big man on his horse, as the references' rider is: at life size beside our deep-bodied horse he sat like a boy)
+      this.rider.root.scale.setScalar(1.15);
+      this.rider.root.position.set(0, 0.775, -0.05);   // (down into the seat)
       this.rider.root.rotation.set(0, 0, 0);
     } else {
       this.scene.add(this.rider.root);
@@ -113,7 +115,7 @@ export class Player {
     const coldK = W.climateAt(this.hpos.x, this.hpos.z).snow;
     this.snowDepth = THREE.MathUtils.smoothstep(coldK, 0.45, 0.8);
     if (coldK > 0.55) this.setOutfit('winter'); else if (coldK < 0.4) this.setOutfit('arthur');
-    this.horse.root.position.y -= 0.55 * this.snowDepth;
+    this.horse.root.position.y -= 0.22 * this.snowDepth;   // (to the cannons, not the hocks: deeper, the horse read as a legless block)
     // (snow rings round the legs read as white saucers under the hooves: left off)
     this.horse.root.rotation.y = this.hyaw;
     // pitch horse to terrain slope

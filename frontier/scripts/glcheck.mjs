@@ -1,12 +1,9 @@
 // Find draw calls that GL rejects (sampler/texture mismatch) and name the program behind them.
-import { chromium } from 'playwright';
+import { launch } from './launch.mjs';
 import fs from 'node:fs';
 const url = process.argv[2];
 const shot = process.argv[3] || 'snowride';
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
-});
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 await page.addInitScript(() => {
   window.__bad = new Map();

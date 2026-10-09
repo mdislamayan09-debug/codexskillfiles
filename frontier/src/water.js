@@ -122,6 +122,11 @@ export class Water {
     const w = Math.max(64, Math.floor(size.x * this.resScale)), h = Math.max(64, Math.floor(size.y * this.resScale));
     if (this.rt.width !== w || this.rt.height !== h) this.rt.setSize(w, h);
     if (camera.position.y < WATER_LEVEL) return;
+    // the mirror pass draws the whole world a second time: it is skipped when no water lies in reach of the lens,
+    // and otherwise taken on alternate frames (a rippled surface hides a frame's lag)
+    if (this.needed === false) return;
+    this.tick = (this.tick || 0) + 1;
+    if (this.every > 1 && this.tick % this.every !== 1 % this.every) return;
     // mirror camera
     const mc = this.mirrorCam;
     mc.copy(camera);

@@ -660,6 +660,9 @@ export class World {
     }
     this.cabinH = this.cabinH ?? this.cabinHeight();
     this.smoothMountains();
+    this.cragSlopes();
+    this.erodeSlopes();
+    this.terraceCliffs();
     this.genMs = performance.now() - t0;
     if (typeof document === 'undefined' && typeof window === 'undefined') return; // node: no GPU textures
     this.heightTex = new THREE.DataTexture(this.heights, RES, RES, THREE.RedFormat, THREE.FloatType);
@@ -692,6 +695,117 @@ export class World {
     }
   }
 
+  // Crags. The elevation data is thirty-metre survey ground blown up to two-metre cells: every mountainside is a
+  // smooth ramp with a smooth skyline. On steep and on high ground a ridged relief is laid over it, sharp-crested
+  // buttresses a couple of hundred metres apart with smaller ones on their flanks, tens of metres high. That is
+  // what gives a face steps too steep for snow (dark rock) beside ledges that hold it, and a skyline with teeth.
+  cragSlopes() {
+    const H = this.heights, C = this.climate, src = new Float32Array(H);
+    const n = this.n, R = 10, inv = 1 / (2 * R * CELL);
+    const ridged = (x, z) => {
+      let s = 0, a = 1, f = 1, w = 1, norm = 0;
+      for (let o = 0; o < 3; o++) { let r = 1 - Math.abs(n.noise(x * f + o * 7.3, z * f - o * 3.1)); r *= r; s += r * a * w; norm += a; w = Math.min(1, r * 1.6); a *= 0.5; f *= 2.1; }
+      return s / norm;
+    };
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const g = Math.hypot(src[k + R] - src[k - R], src[k + R * RES] - src[k - R * RES]) * inv, h = src[k];
+        // faces steeper than about 25 degrees, and the high tops whatever their slope
+        const a = Math.max(smoothstep(0.46, 0.9, g), 0.7 * smoothstep(540, 720, h) * smoothstep(0.15, 0.4, g)) * smoothstep(0.35, 0.65, snow);
+        if (a <= 0) continue;
+        const x = i * CELL - HALF;
+        // (big buttresses, little fine relief: at 8 m the small ones broke every face into a speckle of rock and snow)
+        H[k] = h + a * (30 * (ridged(x / 190, z / 190) - 0.42) + 3 * (ridged(x / 60 + 9.1, z / 60 - 4.4) - 0.42));
+      }
+    }
+  }
+
+  // Erosion. Smoothed elevation data carries a mountain's broad form and none of what water and avalanche do to
+  // it: every slope is one even ramp, shaded as one airbrushed surface with a ruler-straight skyline. Here the
+  // snow-country slopes are cut by gullies running down the fall line: narrow V-cuts along the zero lines of a
+  // noise stretched downhill, so they wander, branch and die out, in two sizes. Their walls are steep, so the
+  // ground's own slope rule bares them to rock: dark veins down a white face, and a skyline with notches in it.
+  erodeSlopes() {
+    const H = this.heights, C = this.climate, src = new Float32Array(H);
+    const n = this.n2, n3 = this.n3, R = 4, inv = 1 / (2 * R * CELL);
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const gx = (src[k + R] - src[k - R]) * inv, gz = (src[k + R * RES] - src[k - R * RES]) * inv, g = Math.hypot(gx, gz);
+        const amt = smoothstep(0.22, 0.6, g) * smoothstep(0.35, 0.65, snow);
+        if (amt <= 0) continue;
+        const x = i * CELL - HALF, dx = gx / g, dz = gz / g;          // (dx, dz) points uphill
+        const u = x * -dz + z * dx, v = x * dx + z * dz;                // across the slope, and up it
+        // where the gullies are cut at all: in swarms, with clean faces between
+        const swarm = smoothstep(-0.25, 0.35, n3.noise(x / 420 + 2.2, z / 420 - 5.1));
+        const a1 = n.noise(u / 60 + 0.35 * n3.noise(v / 140, u / 140), v / 300 + 11.3);
+        const a2 = n.noise(u / 25 - 4.4, v / 130 + 3.9);
+        const cut = 8 * Math.pow(1 - Math.min(1, Math.abs(a1) * 2.4), 2) + 1.2 * Math.pow(1 - Math.min(1, Math.abs(a2) * 2.2), 2);
+        H[k] = src[k] - cut * amt * (0.25 + 0.75 * swarm);
+      }
+    }
+  }
+
+  // Mountain geology. A heightfield of smoothed elevation data has no cliffs: its steep faces are even ramps that
+  // shade as one airbrushed slab. Real faces are cut along their bedding into rock bands standing between ledges,
+  // and the ledges hold the snow. Here every steep face in the snow country is re-cut that way: within each stratum
+  // the ground lies back as a bench and then stands up as a riser, the strata dipping and wandering along the face.
+  // The terrain shader's slope rule then lays snow on the benches and bares the risers by itself.
+  // Run once while the world is built, with the beds near level, and once more (retilt) after the country is planted,
+  // when the same beds are re-cut dipping ten degrees. In two steps because planting draws its random numbers
+  // according to the ground it finds: any change to the heights it sees moves every tree, rock and bush in the world.
+  terraceCliffs(retilt = false) {
+    const H = this.heights, C = this.climate, src = retilt ? this._preCut : new Float32Array(H);
+    if (!src) return;
+    if (!retilt) this._preCut = src;
+    const n = this.n, R = 3, inv = 1 / (2 * R * CELL);
+    // the strata: beds of uneven thickness (thin shelves, thick cliff-forming bands), each with its own habit: a hard
+    // bed stands up sheer above a narrow ledge, a soft one lies back as a ramp of snow
+    const rs = mulberry32(this.seed * 7 + 5), beds = [];
+    // (mostly thick: thin beds laid hairline snow shelves across a wall, which from a distance read as white
+    // squiggles drawn on it; cliff-forming bands tens of metres high stand between broad benches)
+    for (let b = -200; b < 1500;) { const t = 16 + 46 * rs() * rs() + (rs() < 0.3 ? 34 : 0), hard = 0.35 + 0.65 * rs(); beds.push([b, t, 0.5 - 0.3 * hard, 0.5 + 0.3 * hard * (0.5 + 0.5 * rs())]); b += t; }
+    const cut = (u) => {
+      let lo = 0, hi = beds.length - 1;
+      while (lo < hi) { const m = (lo + hi + 1) >> 1; if (beds[m][0] <= u) lo = m; else hi = m - 1; }
+      const [b, t, a, c] = beds[lo];
+      return b + smoothstep(a, c, (u - b) / t) * t;
+    };
+    for (let j = R; j < RES - R; j++) {
+      const z = j * CELL - HALF;
+      if (z > -1500) break;
+      for (let i = R; i < RES - R; i++) {
+        const k = j * RES + i, snow = C[k * 4] / 255;
+        if (snow < 0.35) continue;
+        const g = Math.hypot(src[k + R] - src[k - R], src[k + R * RES] - src[k - R * RES]) * inv;   // rise over run
+        // (true cliffs only, steeper than about 40 degrees: cut into the ordinary valley sides as well, the benches
+        // drew contour lines round every mountain seen from a lookout)
+        let amt = smoothstep(0.82, 1.3, g) * smoothstep(0.35, 0.65, snow);
+        if (amt <= 0) continue;
+        const x = i * CELL - HALF, h = src[k];
+        // not every part of a face shows its bedding: gullies and aprons of scree and drift run down between the
+        // buttresses
+        amt *= 0.3 + 0.7 * smoothstep(-0.35, 0.3, n.noise(x / 150 + 9.1, z / 150 - 4.2) + 0.4 * n.noise(x / 47 - 2.2, z / 47 + 6.6));
+        // the bedding dips across the range and wanders, so ledges run on for a way, pinch out and step
+        const dip = 0.05 * x + 0.03 * z + 26 * n.noise(x / 360 + 3.3, z / 360 - 1.7) + 6 * n.noise(x / 110 - 6.1, z / 110 + 2.9);
+        const level = lerp(h, cut(h + dip) - dip, amt);
+        if (!retilt) { H[k] = level; continue; }
+        // (round 92: tilted and folded. Lying within three degrees of level, the beds drew contour lines across every wall,
+        // which read as a heightmap's stair-steps, not strata: now they dip ten degrees and bend)
+        const dipT = 0.17 * x + 0.07 * z + 70 * n.noise(x / 360 + 3.3, z / 360 - 1.7) + 14 * n.noise(x / 110 - 6.1, z / 110 + 2.9);
+        H[k] += lerp(h, cut(h + dipT) - dipT, amt) - level;
+      }
+    }
+    if (retilt) { this._preCut = null; if (this.heightTex) this.heightTex.needsUpdate = true; }
+  }
+
   // Bilinear height sample — matches the GPU sampler exactly.
   // level a yard into the slope (a homestead set down after load): within r the ground takes the height at the
   // centre, easing back to the natural slope over `fall` metres; the GPU copy is re-uploaded
@@ -712,13 +826,132 @@ export class World {
       if (d > R) continue;
       const k = (j * RES + i) * 4 + 2;
       this.splat[k] = Math.round(this.splat[k] * (1 - smoothstep(R, r, d)));
-      // and trampled: a yard worked every day is churned, dirty snow round the buildings, so from a lookout the
-      // homestead reads as a lived-in clearing rather than a white box on a white shelf
-      const yard = smoothstep(r * 1.05, r * 0.45, d + 6 * Math.sin(i * 0.9 + j * 1.3));
-      this.splat[k - 2] = Math.max(this.splat[k - 2], Math.round(150 * yard));
     }
     this.splatTex.needsUpdate = true;
     return h0;
+  }
+
+  // Set-building: raise a spur, a rounded crest running out from (ax, az) at height ah and down to a knoll standing
+  // at (bx, bz), height bh. Ground is only ever raised. Returns the box of ground that may have changed.
+  raiseSpur(ax, az, ah, bx, bz, bh, { side = 0.52, round = 0.0032, top = 30, reach = 230, rough = 1, sag = 8, flat0 = 5 } = {}) {
+    const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+    const x0 = Math.min(ax, bx) - reach, x1 = Math.max(ax, bx) + reach, z0 = Math.min(az, bz) - reach, z1 = Math.max(az, bz) + reach;
+    const i0 = Math.max(0, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z1 + HALF) / CELL));
+    const n = this.n;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = i * CELL - HALF, z = j * CELL - HALF;
+      const t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+      const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+      // the crest sags into a saddle behind the knoll, which stands as its own broad top
+      // (the crest runs down to a saddle lying below the knoll's top and climbs the last stretch onto it, so the top
+      // stands clear of its own approach when seen from up the crest)
+      const crest = lerp(ah, bh - sag, Math.min(1, t / 0.7)) + sag * smoothstep(0.7, 1, t);
+      const flat = lerp(flat0, top, smoothstep(0.72, 1, t));
+      const target = crest - side * Math.max(0, d - flat) - round * d * d + rough * (3.2 * n.noise(x / 34 + 4.2, z / 34 - 7.7) + 1.3 * n.noise(x / 13 - 1.1, z / 13 + 3.9) + 0.4 * n.noise(x / 5 + 2.3, z / 5 - 6.1));
+      const k = j * RES + i;
+      if (target > this.heights[k]) {
+        const lift = target - this.heights[k];
+        this.heights[k] = target;
+        this.splat[k * 4] = 0; this.splat[k * 4 + 1] = 0;                       // no road or creek carried up onto it
+        this.splat[k * 4 + 2] = Math.round(this.splat[k * 4 + 2] * (1 - smoothstep(0, 5, lift)));   // open snow where the ground is newly made
+      }
+    }
+    this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
+    return [x0, z0, x1, z1];
+  }
+
+  // Set-building: wind drifts. Open snow within R of a point is heaped into long drifts lying across the wind
+  // with scoops between them (real relief the light can rake, where the heightfield was a billiard table).
+  sculptDrifts(cx, cz, R, amp = 0.45) {
+    const n = this.n2;
+    const i0 = Math.max(1, Math.floor((cx - R + HALF) / CELL)), i1 = Math.min(RES - 2, Math.ceil((cx + R + HALF) / CELL));
+    const j0 = Math.max(1, Math.floor((cz - R + HALF) / CELL)), j1 = Math.min(RES - 2, Math.ceil((cz + R + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = i * CELL - HALF, z = j * CELL - HALF, d = Math.hypot(x - cx, z - cz), k = j * RES + i;
+      if (d > R || this.climate[k * 4] < 150) continue;
+      const g = Math.hypot(this.heights[k + 1] - this.heights[k - 1], this.heights[k + RES] - this.heights[k - RES]) / (2 * CELL);
+      const w = smoothstep(R, R * 0.65, d) * (1 - smoothstep(0.12, 0.3, g)) * (1 - smoothstep(60, 120, this.splat[k * 4 + 1]));
+      if (w <= 0) continue;
+      const u = x * 0.93 + z * 0.36, v = -x * 0.36 + z * 0.93;
+      const ridge = 1 - Math.abs(n.noise(u / 13, v / 34));   // sharp-backed drifts
+      this.heights[k] += amp * w * (1.5 * (ridge * ridge - 0.45) + 0.6 * n.noise(u / 5 + 3.1, v / 11 - 2.2) + 1.6 * n.noise(u / 47 - 1.3, v / 60 + 4.4));
+    }
+    this.heightTex.needsUpdate = true;
+  }
+  // Set-building: a frozen creek along a line of points: the splat's wet channel painted (ice down the middle,
+  // willow and gravel along the banks, from the ground shader) and the bed sunk a little into the snow.
+  paintCreek(pts, half = 4.5, depth = 0.7) {
+    for (let s = 0; s < pts.length - 1; s++) {
+      const [ax, az] = pts[s], [bx, bz] = pts[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz, R = half + 5;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - R + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((Math.max(ax, bx) + R + HALF) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(az, bz) - R + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((Math.max(az, bz) + R + HALF) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * CELL - HALF, z = j * CELL - HALF, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+        const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)) + 1.2 * this.n3.noise(x / 9, z / 9), k = j * RES + i;
+        if (d > R) continue;
+        const wet = Math.round(235 * smoothstep(R, half * 0.35, d));
+        if (wet > this.splat[k * 4 + 1]) { this.splat[k * 4 + 1] = wet; this.splat[k * 4 + 2] = Math.round(this.splat[k * 4 + 2] * (1 - wet / 255)); }
+        const bed = (this.creekBed || (this.creekBed = new Map()));
+        const cut = depth * smoothstep(half + 3, half * 0.3, d);
+        if (cut > (bed.get(k) || 0)) { this.heights[k] -= cut - (bed.get(k) || 0); bed.set(k, cut); }
+      }
+    }
+    this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
+  }
+
+  // Set-building: steep ground inside a box cut into rock risers and snow ledges every `step` metres (the bedding
+  // dipping and wandering a little), as terraceCliffs does for the map's own cliffs.
+  ledgeBox(x0, z0, x1, z1, step = 8, minG = 0.7) {
+    const i0 = Math.max(1, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 2, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(1, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 2, Math.ceil((z1 + HALF) / CELL));
+    const W = i1 - i0 + 1, out = new Float32Array(W * (j1 - j0 + 1)), H = this.heights, n = this.n3;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * RES + i, h = H[k], x = i * CELL - HALF, z = j * CELL - HALF;
+      const g = Math.hypot(H[k + 1] - H[k - 1], H[k + RES] - H[k - RES]) / (2 * CELL);
+      const amt = smoothstep(minG, minG + 0.45, g);
+      const dip = 0.04 * x + 0.025 * z + 2.5 * n.noise(x / 70 + 1.3, z / 70 - 4.1);
+      const u = (h + dip) / step, f = u - Math.floor(u);
+      out[(j - j0) * W + (i - i0)] = lerp(h, (Math.floor(u) + smoothstep(0.36, 0.64, f)) * step - dip, amt);
+    }
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) H[j * RES + i] = out[(j - j0) * W + (i - i0)];
+    this.heightTex.needsUpdate = true;
+  }
+  // Set-building: the splat's forest channel set (not only raised) within r of a point, and its wet channel cleared in
+  // a box (an old creek line taken off the map before a river is painted)
+  setForest(x, z, r, v) {
+    const i0 = Math.max(0, Math.round((x - r + HALF) / CELL)), i1 = Math.min(RES - 1, Math.round((x + r + HALF) / CELL));
+    const j0 = Math.max(0, Math.round((z - r + HALF) / CELL)), j1 = Math.min(RES - 1, Math.round((z + r + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.splat[(j * RES + i) * 4 + 2] = v;
+  }
+  eraseWet(x0, z0, x1, z1) {
+    const i0 = Math.max(0, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z1 + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.splat[(j * RES + i) * 4 + 1] = 0;
+    this.splatTex.needsUpdate = true;
+  }
+  // Set-building: timber. The forest channel of the splat raised to v within r metres of a point (the ground
+  // under a planted stand is then shaded as forest floor, not open snow). Call touchSplat() when done.
+  paintForest(x, z, r, v = 220) {
+    const i0 = Math.max(0, Math.round((x - r + HALF) / CELL)), i1 = Math.min(RES - 1, Math.round((x + r + HALF) / CELL));
+    const j0 = Math.max(0, Math.round((z - r + HALF) / CELL)), j1 = Math.min(RES - 1, Math.round((z + r + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = (j * RES + i) * 4 + 2; if (this.splat[k] < v) this.splat[k] = v; }
+  }
+  touchSplat() { this.splatTex.needsUpdate = true; }
+  // Set-building: a used track or a trampled yard (the splat's road channel) along a line of points.
+  paintTrack(pts, half = 2.2) {
+    for (let s = 0; s < pts.length - 1; s++) {
+      const [ax, az] = pts[s], [bx, bz] = pts[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, R = half + 3;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - R + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((Math.max(ax, bx) + R + HALF) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(az, bz) - R + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((Math.max(az, bz) + R + HALF) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * CELL - HALF, z = j * CELL - HALF, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+        const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)) + 1.5 * this.n3.noise(x / 6, z / 6), k = (j * RES + i) * 4;
+        const v = Math.round(240 * smoothstep(R, half * 0.5, d));
+        if (v > this.splat[k]) this.splat[k] = v;
+      }
+    }
+    this.splatTex.needsUpdate = true;
   }
 
   heightAt(x, z) {

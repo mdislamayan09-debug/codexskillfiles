@@ -174,7 +174,11 @@ export class NPCs {
     for (const a of this.actors) {
       const dist = a.pos.distanceTo(ppos);
       const active = dist < 420;
-      a.root.visible = dist < 600;
+      // (drawn only where they can be seen as more than a speck, and casting shadows only close by: every actor is
+      // several draw calls in each pass, and a town's worth of them was the whole frame budget)
+      a.root.visible = dist < 340;
+      const near = dist < 120;
+      if (a.shadowNear !== near) { a.shadowNear = near; a.root.traverse((o) => { if (o.isMesh) { if (o.userData.cast0 === undefined) o.userData.cast0 = o.castShadow; o.castShadow = near && o.userData.cast0; } }); }
       if (!active) continue;
       if (a.dead) {
         a.deadT += dt;

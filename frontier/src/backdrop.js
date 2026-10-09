@@ -44,6 +44,8 @@ export class Backdrop {
       const t = u * 4, side = Math.floor(t) % 4, f = t - Math.floor(t);
       return side === 0 ? [-1 + 2 * f, -1] : side === 1 ? [1, -1 + 2 * f] : side === 2 ? [1 - 2 * f, 1] : [-1, 1 - 2 * f];
     };
+    const SPURS = [[1800, 200, 1], [3200, 300, -1], [5000, 430, 1], [7400, 620, -1], [10500, 900, 1], [15000, 1300, -1]];
+    const NOSPURS = typeof location !== 'undefined' && /[?&]nospurs\b/.test(location.search);
     for (let i = 0; i < SEG; i++) {
       const [ux, uz] = perim(i / SEG);
       const ex = ux * (HALF - 6), ez = uz * (HALF - 6);
@@ -78,11 +80,30 @@ export class Backdrop {
         const vx = -725 - 0.5 * dn + 450 * Math.sin(dn / 6000) * sstep(2000, 8000, dn) - 800 * Math.sin(dn / 15000 + 1.2) * sstep(6000, 14000, dn);
         const vw = 560 + 0.07 * dn;
         const floor = 210 + dn * 0.01 + 30 * fbm(x / 1500, z / 1500, 3);
-        const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 2800, Math.abs(x - vx));
-        const regionH = north * snowV + desert * desertH + sea * seaH + hills * hillH;
+        // (walls rising within a kilometre or so of the floor: a bowl three kilometres wide lay beyond the map's edge
+        // as smooth white dunes, plain to see from a lookout over the valley's mouth)
+        const snowV = floor + Math.max(0, snowH - 180) * sstep(vw * 0.5, vw + 1300, Math.abs(x - vx))
+          + 70 * (ridged(x / 430 + 1.7, z / 430 - 6.2, 4) - 0.4) * sstep(vw * 0.6, vw + 700, Math.abs(x - vx)) * sstep(9000, 3000, d);
+        // (round 103) interlocking spurs: beyond the map the valley's sides send spurs down across its floor from left and
+        // right in turn, each further and higher than the last, so the eye going up the valley meets ridgeline behind
+        // ridgeline, paler and paler, instead of one open floor running to a pale wedge at the horizon
+        let spur = 0;
+        if (dn > 0 && !NOSPURS) for (const [d0, A, sg] of SPURS) {
+          const w = 0.2 * d0 + 220, g = Math.exp(-(((dn - d0) / w) ** 2));
+          if (g < 0.01) continue;
+          // (round 104: each runs down from its own wall to die out past the valley's axis, so its crest is a long slant
+          // across the view, and its skyline is a few broad summits. Spanning the valley at full height each was a dam
+          // with a level top, and with a tooth every four hundred metres the far ones were a saw blade.)
+          const q = (x - vx) * sg / vw, lat = Math.pow(Math.min(1, Math.max(0, (q + 0.8) / 2.6)), 0.75);
+          spur = Math.max(spur, A * g * lat * (0.78 + 0.44 * ridged(x / 2600 + d0 * 0.0013, z / 2600, 4)));
+        }
+        const regionH = north * (snowV + spur) + desert * desertH + sea * seaH + hills * hillH;
         // carry the map's own edge heights out, then rise into the region's relief
-        const t = sstep(0, 2600, d);
-        const h = eh * (1 - t) + regionH * t - (k === 0 ? 6 : 0);
+        // (in the north the ranges' own relief takes over within a kilometre, and crags stand on the ground between:
+        // carried out for 2.6 km, the edge's profile lay beyond the map as smooth extruded dunes)
+        const t = sstep(0, 2600 - 1600 * north, d);
+        const crag = north * 55 * (ridged(x / 310 + 4.1, z / 310 - 2.7, 4) - 0.42) * sstep(0, 260, d) * sstep(8000, 2500, d);
+        const h = eh * (1 - t) + regionH * t + crag - (k === 0 ? 6 : 0);
         const v = i * (RINGS + 1) + k;
         pos[v * 3] = x; pos[v * 3 + 1] = h; pos[v * 3 + 2] = z;
         info[v * 4] = north; info[v * 4 + 1] = desert; info[v * 4 + 2] = sea * t; info[v * 4 + 3] = autumn;
@@ -122,7 +143,8 @@ export class Backdrop {
       const hills = Math.max(0, 1 - north - desert - sea);
       const m = fbm(x / 1700, z / 1700, 4);
       // north: timber in the valleys and on the lower slopes, snow above, rock on the steep faces
-      const timber = sstep(0.42, 0.62, m) * sstep(1050, 700, h + (m - 0.5) * 300) * sstep(0.6, 0.8, ny);
+      // (closed timber on the valley floors and lower slopes, thinning to a treeline, as on the map itself)
+      const timber = Math.max(sstep(0.42, 0.62, m) * sstep(1050, 700, h + (m - 0.5) * 300), (0.45 + 0.55 * sstep(0.3, 0.5, m)) * sstep(640, 470, h + (m - 0.5) * 160)) * sstep(0.6, 0.8, ny);
       let cN = mix3(SNOW, mix3(TIMBER, SNOWTIMBER, 0.35), timber * 0.85);
       cN = mix3(cN, ROCK, sstep(0.66, 0.5, ny + (m - 0.5) * 0.15) * 0.85);
       // ridge country
@@ -160,8 +182,16 @@ export class Backdrop {
             g += vec2(dn2.y, -dn2.x) * gl.x + dn2 * gl.y * 0.35;
           }
           float steep = 1.0 - wn.y;
-          vec3 pn = normalize(wn - vec3(g.x, 0.0, g.y) * (0.25 + 1.6 * steep));
+          // (fading with distance: under haze its shading was all that showed of a far range, and it read as marbling)
+          vec3 pn = normalize(wn - vec3(g.x, 0.0, g.y) * (0.55 + 1.6 * steep) * mix(1.0, 0.3, smoothstep(2500.0, 7000.0, dist)));   // (rock ribs on the gentler faces too)
           normal = normalize((viewMatrix * vec4(pn, 0.0)).xyz);
+          // timber is trees with snow between them: crowns a few pixels across while they can be told apart
+          {
+            float lum0 = dot(diffuseColor.rgb, vec3(0.333));
+            float tim = smoothstep(0.34, 0.1, lum0) * smoothstep(0.02, 0.05, diffuseColor.b) * step(diffuseColor.r, diffuseColor.b * 1.2);
+            float sp = smoothstep(0.42, 0.7, vnoise(p / 6.5) * 0.6 + vnoise(p / 19.0 + 3.1) * 0.4) * (1.0 - smoothstep(4000.0, 9000.0, dist));
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.55, 0.62), tim * sp * 0.6);
+          }
           float snowy = smoothstep(0.3, 0.55, dot(diffuseColor.rgb, vec3(0.333)));
           float rockT = smoothstep(0.8, 0.6, pn.y + 0.14 * (vnoise(p / 41.0) - 0.5));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.075, 0.075, 0.08), rockT * snowy * 0.9);

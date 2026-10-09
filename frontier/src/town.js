@@ -150,6 +150,9 @@ export class Town {
           if (tcl.r > 0.05) {
             float upN = normalize(cross(dFdx(vWPos), dFdy(vWPos))).y;
             float snowT = smoothstep(0.35, 0.8, tcl.r) * smoothstep(0.35, 0.75, abs(upN) + 0.2 * (vnoise(vWPos.xz * 2.0) - 0.5));
+            // (lying in drifts with the shingles showing between, as wind leaves a roof: loaded edge to edge, every roof was
+            // a clean white slab)
+            snowT *= 0.3 + 0.7 * smoothstep(0.38, 0.62, vnoise(vWPos.xz * 0.45 + vWPos.y * 0.8) * 0.65 + vnoise(vWPos.xz * 1.7) * 0.35);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.88, 0.93), snowT);
           }
         }`,
@@ -160,6 +163,7 @@ export class Town {
       red: std({ map: plankTexture(3, [140, 58, 44]) }),
       redV: std({ map: plankTexture(13, [134, 54, 40], true) }),
       bareV: std({ map: plankTexture(14, null, true) }),
+      logBrown: std({ map: plankTexture(15, [88, 66, 50], true) }),   // dark weathered timber
       teal: std({ map: plankTexture(4, [84, 104, 96]) }),
       cream: std({ map: plankTexture(5, [186, 174, 146]) }),
       blue: std({ map: plankTexture(6, [92, 104, 120]) }),
@@ -689,7 +693,7 @@ export class Town {
     const m = new THREE.Matrix4().makeRotationY(rotY);
     const at = (lx, lz) => new THREE.Vector3(lx, 0, lz).applyMatrix4(m).add(new THREE.Vector3(x, 0, z));
     const bp = at(-17, -7);
-    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 9, 13, 4.8, 'bare');
+    this.barn(bp.x, bp.z, rotY + Math.PI / 2, 7, 10, 3.9, 'logBrown');   // a low log-brown barn, not a grey box bigger than the house
     // the corral: split poles on posts, round a trampled pen beside the barn
     const cc = at(-15, 12), cm = new THREE.Matrix4().makeRotationY(rotY + 0.1).setPosition(cc.x, 0, cc.z);
     const W = 16, D = 11, pts = [];

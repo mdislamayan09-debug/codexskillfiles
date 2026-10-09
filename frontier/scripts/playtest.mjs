@@ -1,13 +1,10 @@
 // Smoke-test real gameplay input: start, ride, gallop, dismount, aim, fire, Dead Eye, map, mount.
 // usage: node scripts/playtest.mjs [url]
-import { chromium } from 'playwright';
+import { launch } from './launch.mjs';
 import fs from 'node:fs';
 
 const url = process.argv[2] || 'http://localhost:4173/?q=low';
-const browser = await chromium.launch({
-  executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

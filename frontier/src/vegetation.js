@@ -1,7 +1,7 @@
 // Vegetation: GPU grass fields, procedural trees (oak / pine / cypress) with distant impostors,
 // bushes, ferns and rocks. Everything is instanced and streamed around the camera.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { U, GLSL_COMMON, GLSL_FOG_PARS, GLSL_SUNSHADOW, patchMaterial } from './shared.js';
 import { HALF, WORLD_SIZE, TOWN, RANCH, CAMP, CHURCH, CABIN } from './world.js';
 import { mulberry32, Simplex2 } from './noise.js';
@@ -42,6 +42,16 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
   #include <color_fragment>
   {
     vec4 cl = climateAt(${pos}.xz);
+    #ifndef CONIFER_SNOW
+    #ifdef USE_MAP
+    {
+      // every shrub and broadleaf crown its own shade: yellow-green new growth, dark old leaf, a few going brown
+      float pv = hash12(floor(${pos}.xz * 1.7) + 2.3);
+      diffuseColor.rgb *= mix(vec3(0.7, 0.76, 0.7), vec3(1.08, 1.02, 0.74), pv) * mix(vec3(1.0), vec3(1.1, 0.86, 0.62), step(0.86, fract(pv * 7.31)));
+      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.0, 1.02, 0.86), diffuseColor.rgb, 0.68);   // (olive: full-strength, the card green was aquarium plastic)
+    }
+    #endif
+    #endif
     #ifdef AUTUMN_LEAVES
     if (cl.b > 0.02) {
       float th = hash12(floor(${pos}.xz * 0.37) + 7.0);
@@ -59,43 +69,74 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // a spruce bough carries a load of snow along its upper side: on the standing cards the half above the
       // stem is white too, so each bough reads as a white shelf over dark needles
       // (in clumps along the bough, not a full coat: evenly coated firs read as frosted Christmas trees)
-      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.54, 0.66, vMapUv.y + 0.1 * (hash12(floor(vWPos.xz * 5.0 + vWPos.y * 4.0)) - 0.5)) * smoothstep(0.3, 0.6, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)));
+      // (broken and uneven, and on fewer boughs: a clean band on every card striped each spruce white and green like a
+      // candy cane)
+      sk = max(sk, smoothstep(0.35, 0.8, cl.r) * (1.0 - smoothstep(0.35, 0.6, up)) * smoothstep(0.58, 0.74, vMapUv.y + 0.22 * (vnoise(vWPos.xz * 3.1 + vWPos.y * 2.3) - 0.5)) * smoothstep(0.45, 0.7, hash12(floor(vWPos.xz * 1.3 + vWPos.y * 0.9) + 3.3)) * 0.8);
       #endif
       #if defined(FROST_ALL) && defined(USE_MAP)
       // and snow lodged in the upper crown of the brush, in clumps (snowless brush read as grey pom-poms on the snow)
       sk = max(sk, smoothstep(0.4, 0.85, cl.r) * smoothstep(0.5, 0.8, vMapUv.y) * smoothstep(0.35, 0.65, hash12(floor(vWPos.xz * 6.0 + vWPos.y * 5.0))));
       #endif
+      #ifdef CONIFER_SNOW
+      sk *= mix(0.42, 0.5, uSnowfall);   // (round 102: dark trees with snow on their boughs: at 0.6 the firs round the homestead were white cones in front of a black forest)   // (round 85: at 0.85 every tree in the storm was a white cone; the reference's are dark with snow on the boughs)
+      // was mix(0.6, 0.85, uSnowfall)   // (laden while the snow falls) dark green under a dusting: heavier, every spruce stood as a white cone
+      #endif
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), sk * 0.85);
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.22);
+      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * FROST_K * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
+      // (a plant in two or three is russet: dead heather and willow, the warm note against the snow)
+      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.5, 1.25, 0.62), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * RUSSET_K * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3 * FROST_K);
       #endif
     }
     #ifdef FROST_ALL
     // desert scrub is sun-bleached grey-tan, not dark twigs
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.43, 0.33) * (0.7 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), cl.a * 0.75);
     #endif
+    #ifdef CONIFER_SNOW
+    // inside a stand the needles are dark masses against the lit air (one mid green, the canopy was soft green card)
+    diffuseColor.rgb *= mix(1.0, 0.62, uCanopy);
+    #else
+    // and the broadleaf scrub under them takes the light bounced about the floor (it stood as black cut-outs)
+    diffuseColor.rgb *= mix(1.0, 1.5, uCanopy);
+    #endif
   }`;
-function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false } = {}) {
+function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false, russet = 0.7 } = {}) {
   return patchMaterial(mat, {
     sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + `#define RUSSET_K ${russet.toFixed(2)}\n` + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? `#define FROST_ALL\n#define FROST_K ${(frost === true ? 1 : frost).toFixed(2)}\n` : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
 }
-function windDepthMaterial(map, flutter = 0) {
+// porous: inside a stand (uCanopy), the share of a crown's volume, in blocks a couple of metres through and fixed in
+// the world, that lets the sun straight through. There the roof's shade is drawn by the gap pattern every lit
+// surface and the lit air share (canopyGaps), which a shadow map of solid cards cannot hold: as solid cards every
+// crown threw one unbroken shadow and a stand's floor lay in even shade, with none of the sun pools a real one has.
+// Trunks keep their real shadows, which fall as bars across the pools. A lone tree in the open casts its full shadow.
+function windDepthMaterial(map, flutter = 0, porous = 0) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5, side: THREE.DoubleSide });
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n#define LEAF_FLUTTER ${flutter.toFixed(2)}\n${WIND_VERT}`)
-      .replace('#include <begin_vertex>', WIND_BODY);
+      .replace('#include <common>', `#include <common>\n${GLSL_COMMON}\n#define LEAF_FLUTTER ${flutter.toFixed(2)}\n${WIND_VERT}\nvarying vec3 vSW;`)
+      .replace('#include <begin_vertex>', WIND_BODY + `
+        { vec4 sw = vec4(position, 1.0);
+          #ifdef USE_INSTANCING
+            sw = instanceMatrix * sw;
+          #endif
+          vSW = (modelMatrix * sw).xyz; }`);
+    if (porous > 0) shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSW;\nuniform float uCanopy;')
+      .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>
+        { vec3 q = floor(vSW / vec3(2.3, 1.7, 2.3)); if (fract(sin(dot(q, vec3(12.9898, 78.233, 37.719))) * 43758.5453) < ${porous.toFixed(2)} * uCanopy) discard; }`);
   };
+  m.customProgramCacheKey = () => 'wd' + flutter + '_' + porous;
   return m;
 }
 
@@ -120,7 +161,9 @@ const LEAF_EMISSIVE = /* glsl */ `
     diffuseColor.rgb *= 1.0 - UNDERSIDE_DARK * smoothstep(0.0, -0.5, dot(normalize(vNormal), normalize(vViewPosition)));
     // seen against the sun a bough is mostly its own shadow: card normals alone would light the near side
     diffuseColor.rgb *= 1.0 - BACKLIT_DARK * pow(max(dot(vdir, normalize(uSunDir)), 0.0), 1.5) * smoothstep(-0.05, 0.15, uSunDir.y);
-    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS;
+    // (most where the foliage is thin: the fringe of a spray lights up against the sun while its dense middle stays dark)
+    float thinK = 1.0 + 2.6 * (1.0 - smoothstep(0.5, 0.98, diffuseColor.a));
+    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 1.05, 0.45) * uSunColor * gSunVis * back * LEAF_TRANS * thinK;
   }
 `;
 
@@ -264,26 +307,46 @@ function buildPine(seed, kind = 'pine') {
   // trunk in two tapering sections (flared base, then a steady taper to the leader)
   // lodgepole/ponderosa trunks: slim poles, not redwood columns
   const r0 = (kind === 'tall' ? 0.31 : 0.24) + rnd() * 0.09;
-  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.35, r0, 10));
-  wood.push(branchGeo(new THREE.Vector3(0, 1.4, 0), new THREE.Vector3((rnd() - 0.5) * 0.9, height - 2.4, (rnd() - 0.5) * 0.9), r0, 0.05, 9));
+  // (the butt swells into the ground in a curve: one straight taper met the floor like a post in a hole)
+  wood.push(branchGeo(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.22, 0), r0 * 2.0, r0 * 1.42, 12));
+  wood.push(branchGeo(new THREE.Vector3(0, 0.22, 0), new THREE.Vector3(0, 0.7, 0), r0 * 1.42, r0 * 1.14, 12));
+  wood.push(branchGeo(new THREE.Vector3(0, 0.7, 0), new THREE.Vector3(0, 1.4, 0), r0 * 1.14, r0, 12));
+  // (the bole in five sections, wandering a little off its line as it climbs: one straight taper read as a turned pole)
+  const topX = (rnd() - 0.5) * 0.9, topZ = (rnd() - 0.5) * 0.9, bendA = rnd() * 6.28, bend = (kind === 'tall' ? 0.35 : 0.18) * (0.4 + rnd());
+  const bole = (t) => new THREE.Vector3(topX * t + Math.cos(bendA) * bend * Math.sin(t * Math.PI) + Math.cos(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3), 1.4 + (height - 3.8) * t, topZ * t + Math.sin(bendA) * bend * Math.sin(t * Math.PI) + Math.sin(bendA * 2.3) * bend * 0.3 * Math.sin(t * 6.3));
+  const boleR = (t) => 0.05 + (r0 - 0.05) * Math.pow(1 - t, 0.8);
+  for (let k = 0; k < 5; k++) wood.push(branchGeo(bole(k / 5), bole((k + 1) / 5), boleR(k / 5), boleR((k + 1) / 5), 10));
   // root flare: buttress roots spreading into the duff instead of a pole stuck in the ground
   for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (1.6 + rnd() * 0.9);
+    const a = (i / 5) * Math.PI * 2 + rnd() * 0.8, L = r0 * (kind === 'tall' ? 2.1 + rnd() * 0.9 : 1.9 + rnd() * 0.9);   // (a slight swell on the old boles, not a tent skirt)
     wood.push(branchGeo(new THREE.Vector3(Math.cos(a) * L, -0.3, Math.sin(a) * L), new THREE.Vector3(Math.cos(a) * r0 * 0.35, 0.7 + rnd() * 0.4, Math.sin(a) * r0 * 0.35), r0 * 0.28, r0 * 0.45, 7));   // rounder, lower buttresses
   }
   const whorls = kind === 'tall' ? 30 + Math.floor(rnd() * 5) : 20 + Math.floor(rnd() * 6);
   const base = kind === 'tall' ? height * (0.42 + rnd() * 0.12) : kind === 'fir' ? 0.5 + rnd() * 0.4 : 2.5 + rnd() * 1.5;
   if (kind === 'tall') {
     // dead lower branch stubs on the bare trunk
-    for (let i = 0; i < 16; i++) {
-      const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.5 + rnd() * 1.6 * (y / base);
-      wood.push(branchGeo(new THREE.Vector3(0, y, 0), new THREE.Vector3(Math.cos(a) * L, y - 0.2 - rnd() * 0.4, Math.sin(a) * L), 0.06, 0.02, 4));
+    for (let i = 0; i < 9; i++) {
+      const y = 2 + Math.pow(rnd(), 0.7) * (base - 1), a = rnd() * 6.28, L = 0.3 + rnd() * 1.1 * (y / base);
+      const b0 = bole((y - 1.4) / (height - 3.8));
+      wood.push(branchGeo(b0, new THREE.Vector3(b0.x + Math.cos(a) * L, y - (rnd() - 0.2) * 0.6 * L, b0.z + Math.sin(a) * L), 0.05, 0.015, 4));
+    }
+    // and real dead limbs: thick at the bole, sagging under their own weight, bending off their line and lifting a
+    // little at the tip, with a broken side shoot or two (straight spikes set at one angle read as pegs in a pole)
+    for (let i = 0; i < 6; i++) {
+      const y = base * (0.3 + rnd() * 0.65), a = rnd() * 6.28, L = 1.4 + rnd() * 3.2, b0 = bole((y - 1.4) / (height - 3.8));
+      const bendA = (rnd() - 0.5) * 0.9, droop = 0.25 + rnd() * 0.5, lift = rnd() * 0.5;
+      const Pt = (t, da, dy) => new THREE.Vector3(b0.x + Math.cos(a + da) * L * t, y + dy, b0.z + Math.sin(a + da) * L * t);
+      const p1 = Pt(0.35, bendA * 0.2, -droop * L * 0.12), p2 = Pt(0.72, bendA * 0.6, -droop * L * 0.3), p3 = Pt(1, bendA, -droop * L * 0.3 + lift * L * 0.18);
+      wood.push(branchGeo(b0, p1, 0.085, 0.06, 5), branchGeo(p1, p2, 0.06, 0.035, 5), branchGeo(p2, p3, 0.035, 0.012, 4));
+      if (rnd() < 0.7) wood.push(branchGeo(p1, new THREE.Vector3(p1.x + Math.cos(a - 0.9) * L * 0.3, p1.y + 0.12, p1.z + Math.sin(a - 0.9) * L * 0.3), 0.03, 0.008, 3));
+      if (rnd() < 0.5) wood.push(branchGeo(p2, new THREE.Vector3(p2.x + Math.cos(a + 1.0) * L * 0.25, p2.y - 0.1, p2.z + Math.sin(a + 1.0) * L * 0.25), 0.022, 0.006, 3));
     }
   }
   // each variant has its own habit: narrow spire-like subalpine firs to broad, heavy spruces
   // (fuller firs: the narrow spires read as spindly spikes against the reference's broad, snow-loaded spruce)
   const spread = (kind === 'tall' ? 3.3 : kind === 'fir' ? 3.2 : 3.4) * (kind === 'fir' ? 0.85 + rnd() * 0.45 : 0.85 + rnd() * 0.3);
   const tall = kind === 'tall';
+  const lop = 0.1 + rnd() * 0.3, lopA = rnd() * 6.28;
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
@@ -292,26 +355,30 @@ function buildPine(seed, kind = 'pine') {
     const r = tall
       ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
       : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
-    const n = tall ? 5 + Math.floor(rnd() * 4) : 9 + Math.floor(rnd() * 4);
+    if (kind === 'fir' && t > 0.12 && t < 0.86 && rnd() < 0.1) continue;
+    const n = tall ? 5 + Math.floor(rnd() * 4) : kind === 'fir' ? 7 + Math.floor(rnd() * 5) : 9 + Math.floor(rnd() * 4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
-      const lr = tall ? r * (0.6 + rnd() * 0.65) : r;
+      // (spruce are ragged too: boughs of uneven length, the crown fuller to one side, a tier missing here and there;
+      // every bough the same length made each tree a turned cone)
+      const lr = tall ? r * (0.6 + rnd() * 0.65) : kind === 'fir' ? r * (0.72 + rnd() * 0.7) * (1 + lop * Math.cos(a - lopA)) : r;
       // cross cards: one lying along the branch, one standing on its edge, so the silhouette reads from the side
       // and from above; each bough is three sprays along its length (sagging further out), so it reads as tufts
       // with sky between them rather than one flat sheet
       for (const vert of [false, true]) {
         const r = lr;
-        for (let sgi = 0; sgi < 3; sgi++) {
-          const t0 = 0.08 + sgi * 0.3, Ls = r * (0.5 - sgi * 0.07), Ws = r * (vert ? 0.28 : 0.4) * (1 - sgi * 0.14);
+        // (five small sprays to a bough: three big ones showed as flat dark sheets with holes in them)
+        for (let sgi = 0; sgi < 5; sgi++) {
+          const t0 = 0.06 + sgi * 0.185, Ls = r * (0.33 - sgi * 0.03), Ws = r * (vert ? 0.2 : 0.28) * (1 - sgi * 0.09);
           const g = new THREE.PlaneGeometry(Ls, Ws);
-          g.translate(r * t0 + Ls * 0.5, -sgi * sgi * 0.05 * r, 0);
+          g.translate(r * t0 + Ls * 0.5, -sgi * sgi * 0.02 * r, 0);
           g.rotateY((rnd() - 0.5) * 0.35);
           if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.5);
           else g.rotateX((rnd() - 0.5) * 0.4);
           g.rotateZ(-droop);
           g.rotateY(a);
-          g.translate(0, y, 0);
+          { const bq = bole(Math.min(1, Math.max(0, (y - 1.4) / (height - 3.8)))); g.translate(bq.x, y, bq.z); }   // (on the bole where it stands at this height)
           const p = g.attributes.position, nn = g.attributes.normal;
           for (let k = 0; k < p.count; k++) {
             const v = new THREE.Vector3(p.getX(k), 0, p.getZ(k)).normalize();
@@ -333,7 +400,7 @@ function buildPine(seed, kind = 'pine') {
     g.rotateX((rnd() - 0.5) * 0.6);
     g.rotateZ(0.35 + (i / 6) * 0.35);
     g.rotateY((i / 6) * Math.PI * 2 * 1.6 + rnd());
-    g.translate(0, y, 0);
+    g.translate(topX, y, topZ);
     leaves.push(g);
   }
   for (let i = 0; i < 2; i++) {
@@ -341,7 +408,7 @@ function buildPine(seed, kind = 'pine') {
     g.translate(0.4, 0, 0);
     g.rotateZ(Math.PI / 2 - (rnd() - 0.5) * 0.3);
     g.rotateY(i * Math.PI / 2 + rnd() * 0.4);
-    g.translate(0, height - 1.2, 0);
+    g.translate(topX, height - 1.2, topZ);
     leaves.push(g);
   }
   const woodG = setSway(mergeGeometries(wood.map((g) => g.index ? g.toNonIndexed() : g)), (x, y) => (y / height) ** 2 * 0.5);
@@ -484,8 +551,21 @@ function buildLog(seed) {
   const rnd = mulberry32(seed);
   const L = 5 + rnd() * 8, r = 0.28 + rnd() * 0.22;
   // settled into the duff (not resting on top of it), the bole sagging a little where it spans a hollow
-  const parts = [branchGeo(new THREE.Vector3(-L / 2, r * 0.42, 0), new THREE.Vector3(0, r * 0.3, 0), r, r * 0.9, 9),
-    branchGeo(new THREE.Vector3(0, r * 0.3, 0), new THREE.Vector3(L / 2, r * 0.4, (rnd() - 0.5) * 0.4), r * 0.9, r * 0.78, 9)];
+  // (a swollen, knotted, out-of-round bole, flattened where it lies: two smooth cylinders read as a striped tube)
+  const trunk = new THREE.CylinderGeometry(r * 0.78, r, L, 16, 22, true).toNonIndexed();
+  {
+    const tp = trunk.attributes.position, tu = trunk.attributes.uv, ph = rnd() * 6.28;
+    for (let k = 0; k < tp.count; k++) {
+      const t = tp.getY(k), a = Math.atan2(tp.getZ(k), tp.getX(k)), rad = Math.hypot(tp.getX(k), tp.getZ(k));
+      const kn = 1 + 0.1 * Math.sin(a * 2 + t * 0.9 + ph) + 0.07 * Math.sin(a * 5 - t * 2.3) + 0.09 * Math.sin(t * 3.7 + ph) * Math.sin(a * 3 + ph) + 0.16 * Math.exp(-((t - L * 0.18) ** 2) / 0.05) + 0.12 * Math.exp(-((t + L * 0.27) ** 2) / 0.04);
+      let y = Math.sin(a) * rad * kn, z = Math.cos(a) * rad * kn;
+      y = Math.max(y, -rad * 0.6);                                   // settled into the duff
+      tp.setXYZ(k, t, y + r * 0.36 - 0.05 * Math.cos(t / L * Math.PI), z);
+      tu.setXY(k, tu.getX(k) * 2, tu.getY(k) * L * 0.5);
+    }
+    trunk.computeVertexNormals();
+  }
+  const parts = [trunk];
   for (let i = 0; i < 5; i++) { // snapped branch stubs
     const x = (rnd() - 0.5) * L * 0.8, a = rnd() * 6.28;
     parts.push(branchGeo(new THREE.Vector3(x, r * 0.8, 0), new THREE.Vector3(x + 0.3, r * 0.8 + Math.cos(a) * 0.9, Math.sin(a) * 0.9), 0.07, 0.03, 4));
@@ -674,7 +754,9 @@ class ScatterLayer {
   update(pos, force = false) {
     if (!force && pos.distanceToSquared(this.last) < 64) return;
     this.last.copy(pos);
-    const R = this.radius, R2 = R * R;
+    // (big outcrops are drawn much further out than the boulders round them: a cliff built of them a quarter-mile off
+    // was simply not there)
+    const RN = this.radius, RN2 = RN * RN, farR = this.farRadius || 0, R = Math.max(RN, farR), farR2 = farR * farR;
     const counts = this.variants.map(() => 0);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
@@ -685,7 +767,8 @@ class ScatterLayer {
       if (!list) continue;
       for (const it of list) {
         const dx = it.x - pos.x, dz = it.z - pos.z;
-        if (dx * dx + dz * dz > R2) continue;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > RN2 && !(d2 < farR2 && it.v >= this.farFrom && it.s >= 6)) continue;
         const v = it.v;
         if (counts[v] >= this.capacity) continue;
         if (this.lean) {
@@ -843,15 +926,19 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       vec3 objectNormal = cRot * normal;
     `,
     vertexBody: /* glsl */ `
+      {
+        vec4 cp = projectionMatrix * (viewMatrix * vec4(xz.x, heightAt(xz) + 0.1, xz.y, 1.0));
+        if (cp.w < -3.5 || abs(cp.x) > cp.w * 1.15 + 4.0 || abs(cp.y) > cp.w * 1.25 + 4.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      }
       vec4 sp = splatAt(xz);
       vec4 cl = climateAt(xz);
       float dist = length(xz - cam);
       float dens = ${mode === 'stone'
         ? 'max(sp.b * 0.55, max(smoothstep(0.3, 0.8, sp.r) * 0.22, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
-        : 'smoothstep(0.25, 0.6, sp.b) * (1.0 - smoothstep(0.2, 0.5, sp.r)) * (1.0 - cl.a)'};
+        : 'max(smoothstep(0.25, 0.6, sp.b), 0.85 * smoothstep(-700.0, -1250.0, xz.y)) * (1.0 - smoothstep(0.3, 0.62, sp.r) * mix(1.0, 0.5, smoothstep(-700.0, -1250.0, xz.y))) * (1.0 - cl.a)'};   // (cones and twigs lie on a woodland tread too)
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
       // gathered in drifts and clusters (under a tree, along a runnel), bare between: never an even sprinkle
-      dens *= smoothstep(0.32, 0.72, fbm2(xz / 6.5 + ${(seed * 3.7).toFixed(2)})) * 1.9;
+      dens *= smoothstep(0.24, 0.66, fbm2(xz / 6.5 + ${(seed * 3.7).toFixed(2)})) * 1.9;
       vDes = cl.a;
       float keep = step(aOff.w, dens);
       float sc = mix(${smin.toFixed(3)}, ${smax.toFixed(3)}, fract(aOff.z * 13.7 + aOff.w * 7.1)) * keep;
@@ -905,15 +992,26 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec2 xz = aOff.xy + floor((cam - aOff.xy) / TILE + 0.5) * TILE;
       float dist = length(xz - cam);
       float fade = smoothstep(RADIUS, RADIUS*0.72, dist) * smoothstep(INNER*0.8, INNER, dist);
-      vec4 sp = splatAt(xz);
       float h0 = heightAt(xz);
+      // Clumps outside the lens's view are thrown out here, before any of the work below. The field is a square
+      // all round the camera and three clumps in four are behind it or off to the side; each used to run this whole
+      // shader for every one of its vertices, which cost more than any other part of the frame.
+      {
+        vec4 cp = projectionMatrix * (viewMatrix * vec4(xz.x, h0 + 0.3, xz.y, 1.0));
+        if (cp.w < -2.5 || abs(cp.x) > cp.w * 1.15 + 3.5 || cp.y > cp.w * 1.2 + 3.5 || cp.y < -cp.w * 1.2 - 3.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      }
+      vec4 sp = splatAt(xz);
       vec3 nrm = normalAt(xz);
       float slope = 1.0 - nrm.y;
       float edgeN = (vnoise(xz * 0.9) - 0.5) * 0.35 + (vnoise(xz * 3.1) - 0.5) * 0.12;
-      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
+      float pineRd = smoothstep(-700.0, -1250.0, xz.y);
+      float dens = (1.0 - smoothstep(mix(0.2, 0.42, pineRd), mix(0.45, 0.8, pineRd), sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(700.0, 860.0, h0);
-      dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
+      // (in the pine belt the grass is let further in under the trees and broken into clumps a few paces across: held
+      // to the strip between the tread and the timber it ran beside the trail as a ruled green stripe)
+      dens *= 1.0 - mix(0.85, 0.5, pineRd) * smoothstep(0.3, 0.8, sp.b);
+      dens *= mix(1.0, smoothstep(0.34, 0.58, fbm2(xz / 5.5 + 5.0)), pineRd * 0.9);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
       float field = fbm2(xz/26.0);
@@ -927,7 +1025,7 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       dens *= 1.0 - 0.2 * smoothstep(0.5, 0.9, sp.b) * smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.05, 0.4, sp.r));   // (much more and the floor went bare)
       // and in the pine woods it grows in drifts where the light gets in, open duff between them (a clump every few
       // metres everywhere read as tufts dotted over the floor at regular spacing)
-      dens *= mix(1.0, smoothstep(0.38, 0.6, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
+      dens *= mix(1.0, smoothstep(0.16, 0.42, field + 0.15 * (vnoise(xz / 3.1) - 0.5)), smoothstep(-700.0, -1250.0, xz.y) * (1.0 - smoothstep(0.3, 0.7, gcl.r)));
       float alive = smoothstep(aOff.z - 0.02, aOff.z + 0.25, dens); // soft, ragged edges at roads/yards
       float macro = fbm2(xz/380.0);
       float dry = smoothstep(0.42, 0.68, macro + 0.15*fbm2(xz/11.0 + 3.0));
@@ -964,9 +1062,10 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       // pine-belt grass: olive-green clumps mixed with cured straw ones (each clump its own), never one lime green
       {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
-        vec3 pg = mix(srgbV(vec3(130,140,70)), srgbV(vec3(160,160,92)), aOff.w);
-        vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
-        vec3 pc = mix(pg, ps, clamp(step(0.62, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 1.2 * (0.75 + 0.5 * midV);
+        // (round 79: greyer and darker: in a sunlit gap the yellow-green lit up as a strip of lime down the trail)
+        vec3 pg = mix(srgbV(vec3(100,114,64)), srgbV(vec3(126,134,80)), aOff.w);   // (pale yellow-green where the sun finds it; its own shade keeps it olive)
+        vec3 ps = mix(srgbV(vec3(138,124,86)), srgbV(vec3(120,110,80)), aOff.w);   // (cured straw, not bleached: in a shaft of sun the paler clumps burned out white)
+        vec3 pc = mix(pg, ps, clamp(step(0.5, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.6 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
       }
       vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
@@ -1018,6 +1117,9 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
   const sx = 1 + (seed % 3) * 0.3, sz = 0.8 + (seed % 5) * 0.12;
   // fractured granite: a handful of joint planes shear the boulder into flat faces and hard edges, like the split
   // blocks and slabs in the references, instead of a pebble
+  const lerp1 = (a, b, t) => a + (b - a) * t;
+  const jr = mulberry32(seed * 13 + 5), jointM = new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler((jr() - 0.5) * 0.3, jr() * 6.28, (jr() - 0.5) * 0.3))), jointMi = jointM.clone().invert();
+  const jstep = [0.3 + jr() * 0.16, 0.2 + jr() * 0.1, 0.34 + jr() * 0.16], jo = [jr(), jr(), jr()];
   const cuts = [];
   if (fractured) {
     const rr = mulberry32(seed * 7 + 1);
@@ -1030,12 +1132,66 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
     v.fromBufferAttribute(p, i);
     const d = 1 + (fractured ? 0.22 : 0.32) * n.fbm(v.x * 1.4 + seed, v.y * 1.4 + v.z, 4) + (fractured ? 0.05 : 0.12) * n.noise(v.x * 5, v.z * 5 + v.y * 3);
     v.multiplyScalar(d);
-    for (const c of cuts) { const t = v.dot(c.n) - c.o; if (t > 0) v.addScaledVector(c.n, -t * 0.97); }
+    if (cutDepth > 0.2) {
+      // jointed rock: bedding planes and two sets of upright joints at right angles break it into stacked blocks
+      // and stepped ledges (planes cut at random angles made crystal shards, not an outcrop)
+      v.applyMatrix3(jointM);
+      const wob = 0.06 * n.noise(v.x * 1.3 + 7.1, v.z * 1.3 - 2.2);
+      // (each face a plateau, each edge a short rounded riser: on a fine mesh the blocks come out with weathered,
+      // rounded arrises; snapped hard to the lattice on a coarse one they were faceted shards)
+      const soft = (x, st, o, k) => { const q = x / st + o, f = q - Math.floor(q) - 0.5; return (Math.floor(q) + 0.5 + 0.5 * Math.tanh(k * f) / Math.tanh(k * 0.5) - o) * st; };
+      // (the big outcrop variants: joints closer together and the blocks well rounded, a weathered mass split by
+      // cracks; at the boulders' spacing a rock six metres tall was three huge boxes)
+      // (round 79: the big ones only half way to the lattice, on softer steps: a weathered mass with ledges in it, its
+      // joints drawn as cracks by the surface. Three-quarters snapped, an outcrop was a pile of boxes with pointed corners)
+      // (round 80: between the two. Three-quarters snapped it was boxes, under half it was melted wax: now planes and
+      // ledges with worn arrises, under a level top where snow can lie)
+      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 4.6 + 2.4 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
+      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.62 : 0.9);
+      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.74 : 0.93);
+      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.62 : 0.9);
+      // (a broken, tilted top, not a table: cut dead level the blocks were stumps iced with snow, twice as broad in the frame)
+      // (round 100: a broken top, not a tilted plane. The cut was a ramp, so every big block had one flat sloping face
+      // meeting its sides in knife-straight edges, and from the lookout the corner of the nearest stood up as a wedge)
+      if (big) { const cap = 0.58 + 0.05 * v.x + 0.03 * v.z + 0.13 * n.noise(v.x * 2.1 + 3.0, v.z * 2.1 - 1.0) + 0.05 * n.noise(v.x * 5.3 - 2.0, v.z * 5.3 + 4.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.3; }
+      v.applyMatrix3(jointMi);
+      // weathering: faces spalled and pitted a little
+      if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
+    } else for (const c of cuts) { const t = v.dot(c.n) - c.o; if (t > 0) v.addScaledVector(c.n, -t * 0.97); }
     // facet/strata flattening
     v.y = Math.round(v.y * 6) / 6 * 0.12 + v.y * 0.88;
     v.x *= sx; v.z *= sz;
     if (v.y < -0.2) v.y = -0.2 - (v.y + 0.2) * 0.2;
     p.setXYZ(i, v.x, v.y * 0.75, v.z);
+  }
+  // deep-cut blocks come out much smaller than the unit boulder: bring the crown back to the same height, so
+  // placement by scale means the same thing for every variant
+  if (cutDepth > 0.2) {
+    let top = 0, wide = 0;
+    for (let i = 0; i < p.count; i++) { top = Math.max(top, p.getY(i)); wide = Math.max(wide, Math.hypot(p.getX(i), p.getZ(i))); }
+    g.scale(0.56 / wide, 0.62 / top, 0.56 / wide);   // a block about as tall as it is broad
+    // hard edges where the joint planes meet (smoothed across them, a split block shaded as a rounded lump); the fine
+    // mesh carries its own rounded edges and takes smooth normals
+    if (detail > 12) {
+      // (round 80) fins and spikes worn off: where a sliver of the lump crossed a lattice cell it stood up as a blade.
+      // Each vertex that stands well proud of its neighbours' mean is drawn back toward it; ledges and faces keep.
+      const idx = g.index.array, nb = Array.from({ length: p.count }, () => new Set());
+      for (let t = 0; t < idx.length; t += 3) { const a = idx[t], b = idx[t + 1], c = idx[t + 2]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+      const tmp = new Float32Array(p.count * 3);
+      for (let it = 0; it < 4; it++) {
+        for (let i = 0; i < p.count; i++) {
+          let ax = 0, ay = 0, az = 0; const m = nb[i].size || 1;
+          for (const j of nb[i]) { ax += p.getX(j); ay += p.getY(j); az += p.getZ(j); }
+          ax /= m; ay /= m; az /= m;
+          const dx = p.getX(i) - ax, dy = p.getY(i) - ay, dz = p.getZ(i) - az, d = Math.hypot(dx, dy, dz);
+          const k = 0.25 + 0.65 * Math.min(1, Math.max(0, (d - 0.004) / 0.012));   // a light relax everywhere, hard on what sticks out
+          tmp[i * 3] = p.getX(i) - dx * k; tmp[i * 3 + 1] = p.getY(i) - dy * k; tmp[i * 3 + 2] = p.getZ(i) - dz * k;
+        }
+        for (let i = 0; i < p.count; i++) p.setXYZ(i, tmp[i * 3], tmp[i * 3 + 1], tmp[i * 3 + 2]);
+      }
+      g.computeVertexNormals(); return g;
+    }
+    return toCreasedNormals(g, 0.7);
   }
   g.computeVertexNormals();
   return g;
@@ -1049,7 +1205,7 @@ function rockMaterial(surf = {}, bare = false) {
     fragHead: (bare ? '#define BARE_LEDGE\n' : '') + /* glsl */ `uniform sampler2D tRockA; uniform sampler2D tRockN; vec3 srgbR(vec3 c){ return pow(c/255.0, vec3(2.2)); }
       // triplanar scanned relief in world space (whiteout blend), so a boulder scaled up to a ledge keeps its grain
       vec3 rockTriN(vec3 p, vec3 n, float sc) {
-        vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 w = pow(abs(n), vec3(12.0)); w /= (w.x + w.y + w.z);
         vec3 tx = texture(tRockN, p.zy / sc).xyz * 2.0 - 1.0;
         vec3 ty = texture(tRockN, p.xz / sc).xyz * 2.0 - 1.0;
         vec3 tz = texture(tRockN, p.xy / sc).xyz * 2.0 - 1.0;
@@ -1058,6 +1214,30 @@ function rockMaterial(surf = {}, bare = false) {
         tz = vec3(tz.xy + n.xy, abs(tz.z) * n.z);
         return normalize(tx.zyx * w.x + ty.xzy * w.y + tz.xyz * w.z);
       }
+      // A network of cracks: the borders between scattered cells, laid on each of the three planes (cells broader than
+      // tall on upright faces, as bedded rock breaks). Returns the distance to the nearest border in cell units.
+      float crackCell(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        float d1 = 9.0, d2 = 9.0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+          vec2 g = vec2(float(x), float(y));
+          float d = length(g + hash22(i + g) - f);
+          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+        }
+        return d2 - d1;
+      }
+      float crackNet(vec3 p, vec3 n, float sc) {
+        vec3 w = pow(abs(n), vec3(8.0)); w /= (w.x + w.y + w.z);
+        vec3 q = p * sc + 0.16 * vec3(vnoise(p.yz * sc * 2.3), vnoise(p.zx * sc * 2.3 + 5.0), vnoise(p.xy * sc * 2.3 + 9.0));
+        return crackCell(q.zy * vec2(1.0, 1.7)) * w.x + crackCell(q.xz * 1.15) * w.y + crackCell(q.xy * vec2(1.0, 1.7) + 4.3) * w.z;
+      }
+      // noise laid on the three planes and blended by the surface's facing (round 85). Every pattern on the rock used
+      // to be a 2-D noise of a slanted projection of the position, which runs out into streaks on any face that lies
+      // along the projection: the 'stretched, smeared texture' on upright faces.
+      vec3 gTW = vec3(0.0, 1.0, 0.0);
+      float tnz(vec3 p) { return vnoise(p.zy) * gTW.x + vnoise(p.xz + 13.7) * gTW.y + vnoise(p.xy + 29.3) * gTW.z; }
+      float tfb(vec3 p) { return fbm2(p.zy) * gTW.x + fbm2(p.xz + 13.7) * gTW.y + fbm2(p.xy + 29.3) * gTW.z; }
+      float gCrack = 0.0, gCrackSnow = 0.0, gStrataSnow = 0.0;
       float rockCrack(vec3 p) {
         // joint lines: thin dark seams where two noise fields cross mid-value, a few per metre at most
         float a = vnoise(vec2(dot(p, vec3(0.71, 0.3, 0.6)), dot(p, vec3(-0.25, 0.9, 0.33))) * 0.9);
@@ -1071,34 +1251,128 @@ function rockMaterial(surf = {}, bare = false) {
         {
           vec3 wn0 = normalize(inverseTransformDirection(normal, viewMatrix));
           float camD = length(vWPos - cameraPosition);
-          vec3 wn1 = rockTriN(vWPos, wn0, 2.6);
+          vec3 wn1 = rockTriN(vWPos, wn0, 4.6);
           // the finer grain only where it resolves (close ledges)
           vec3 wn2 = rockTriN(vWPos + 3.1, wn1, 0.8);
-          vec3 wnP = normalize(mix(wn1, wn2, 0.55 * smoothstep(30.0, 6.0, camD)));
+          vec3 wnP = normalize(mix(wn1, wn2, 0.85 * smoothstep(30.0, 6.0, camD)));
           normal = normalize((viewMatrix * vec4(wnP, 0.0)).xyz);
+          // the cracks are cut into the surface: their walls catch the light and hold shade
+          {
+            float hgt = -gCrack;
+            vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition);
+            float hx = dFdx(hgt), hy = dFdy(hgt);
+            vec3 r1 = cross(dpdy, normal), r2 = cross(normal, dpdx);
+            float det = dot(dpdx, r1);
+            vec3 grad = sign(det) * (hx * r1 + hy * r2);
+            normal = normalize(abs(det) * normal - grad);
+          }
         }`);
     },
     fragColor: /* glsl */ `
       #include <color_fragment>
       // smooth world normal: snow and moss follow the rounded form, not individual triangles
       vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
-      float n1 = fbm2(vWPos.xz*0.8 + vWPos.y*0.6);
-      float n2 = vnoise(vec2(vWPos.x+vWPos.z, vWPos.y)*3.0);
+      gTW = pow(abs(wn), vec3(6.0)); gTW /= (gTW.x + gTW.y + gTW.z);
+      float n1 = tfb(vWPos * 0.8);
+      float n2 = tnz(vWPos * 3.0);
       // weathered granite: warm grey-brown, as the reference's ledge, not slate blue
       vec3 base = mix(srgbR(vec3(128,118,104)), srgbR(vec3(98,90,80)), n1);
       base = mix(base, srgbR(vec3(130,112,90)), smoothstep(0.6, 0.8, vnoise(vec2(vWPos.y*1.5, vWPos.x*0.2))) * 0.6);
       {
-        vec3 w = pow(abs(wn), vec3(4.0)); w /= (w.x + w.y + w.z);
-        vec3 ra = texture(tRockA, vWPos.zy / 2.6).rgb * w.x + texture(tRockA, vWPos.xz / 2.6).rgb * w.y + texture(tRockA, vWPos.xy / 2.6).rgb * w.z;
+        vec3 w = pow(abs(wn), vec3(12.0)); w /= (w.x + w.y + w.z);   // (a narrow blend: two projections of the scan's grain crossed into a weave on oblique faces)
+        // (a wider lay of the scan: at 2.6 m it tiled in plain panels across any crag bigger than a boulder)
+        vec3 ra = texture(tRockA, vWPos.zy / 4.6).rgb * w.x + texture(tRockA, vWPos.xz / 4.6).rgb * w.y + texture(tRockA, vWPos.xy / 4.6).rgb * w.z;
+        // (a second lay of the scan, turned and shifted, mixed in by patches: one lay repeats as a weave on any flat face)
+        {
+          vec3 q2 = vWPos / 7.3 + 0.41;   // (not turned: its grain crossed the first lay's into a weave)
+          vec3 ra2 = texture(tRockA, q2.zy).rgb * w.x + texture(tRockA, q2.xz).rgb * w.y + texture(tRockA, q2.xy).rgb * w.z;
+          ra = mix(ra, ra2, smoothstep(0.46, 0.54, vnoise(vWPos.xz / 6.0 + vWPos.y / 5.0)));
+        }
         // and the scan again at ledge scale, so a big outcrop is not one tile repeated
-        vec3 rb = texture(tRockA, vWPos.zy / 9.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 9.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 9.0 + 0.37).rgb * w.z;
-        base *= clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
+        vec3 rb = texture(tRockA, vWPos.zy / 23.0 + 0.37).rgb * w.x + texture(tRockA, vWPos.xz / 23.0 + 0.37).rgb * w.y + texture(tRockA, vWPos.xy / 23.0 + 0.37).rgb * w.z;
+        float scanL = clamp(dot(ra, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.35, 2.2) * mix(1.0, clamp(dot(rb, vec3(0.2126, 0.7152, 0.0722)) / 0.13, 0.55, 1.6), 0.6);
+        #ifdef BARE_LEDGE
+        // (only a little of the scan: a half-metre photograph stretched over a three-metre block a pace from the lens
+        // read as smeared marble)
+        base *= mix(1.0, scanL, 0.1);   // (round 79: less still: its blotches, stretched to a metre, were camouflage)
+        #else
+        base *= scanL;
+        #endif
       }
       base *= 0.85 + 0.2*n2;
+      #ifdef BARE_LEDGE
+      {
+        // granite from a pace away: an even grey-tan body speckled with crystals (dark mica, pale feldspar), rain-stained
+        // in streaks down its faces
+        float sp1 = tnz(vWPos * 95.0), sp2 = tnz(vWPos * 230.0 + 3.0), sp3 = tnz(vWPos * 41.0 + 7.0);
+        float nearG = smoothstep(34.0, 9.0, length(vWPos - cameraPosition));
+        base *= mix(1.0, 0.8 + 0.4 * (sp1 * 0.45 + sp2 * 0.3 + sp3 * 0.25), nearG);
+        base = mix(base, srgbR(vec3(50,48,46)), smoothstep(0.72, 0.82, sp1) * 0.5 * nearG);
+        base = mix(base, srgbR(vec3(188,180,168)), smoothstep(0.74, 0.86, sp2) * 0.4 * nearG);
+        float streak = smoothstep(0.45, 0.75, vnoise(vec2(dot(vWPos.xz, vec2(0.7, 0.7)) * 3.2, vWPos.y * 0.45)));
+        base *= 1.0 - 0.12 * streak * smoothstep(0.75, 0.3, wn.y);   // (faint: strong, the stains were a texture smeared down the face)
+      }
+      #endif
+      // close to, the stone has grain: crystal-sized speckle and pitting the half-metre scan cannot carry
+      {
+        float nearR = smoothstep(26.0, 5.0, length(vWPos - cameraPosition));
+        float grain = tnz(vWPos * 61.0) * 0.6 + tnz(vWPos * 143.0 + 5.0) * 0.4;
+        #ifndef BARE_LEDGE
+        base *= mix(1.0, 0.72 + 0.56 * grain, nearR);
+        #endif
+      }
       // dark joint seams
       // (faint: dark winding seams at full strength read as the veins of wet marble, not jointed granite)
-      base *= 1.0 - 0.25 * rockCrack(vWPos) * smoothstep(40.0, 8.0, length(vWPos - cameraPosition));
+      float jointK = rockCrack(vWPos) * smoothstep(40.0, 8.0, length(vWPos - cameraPosition));
+      #ifdef BARE_LEDGE
+      base *= 1.0 - 0.08 * jointK;
+      #else
+      base *= 1.0 - 0.22 * jointK;
+      #endif
+      // cracks: the rock's joints drawn on it as thin dark lines, a close network a pace across and a coarse one that
+      // still reads on a cliff a quarter-mile off
+      {
+        float camDc = length(vWPos - cameraPosition);
+        float kN = smoothstep(48.0, 12.0, camDc), kF = smoothstep(700.0, 120.0, camDc) * smoothstep(8.0, 40.0, camDc);
+        float cN = kN > 0.0 ? crackNet(vWPos, wn, 1.45) : 1.0, cF = kF > 0.0 ? crackNet(vWPos + 17.0, wn, 0.24) : 1.0;
+        float cN2 = kN > 0.5 ? crackNet(vWPos + 5.0, wn, 4.6) : 1.0;
+        // (hairline, and not all of one weight: some joints open and dark, most barely a seam. Drawn evenly they were
+        // the veins of a marble slab)
+        float wgt = 0.25 + 0.75 * smoothstep(0.35, 0.7, tnz(vWPos * 0.55 + 2.0));
+        float lineN = smoothstep(0.034, 0.008, cN) * kN * wgt, lineF = smoothstep(0.06, 0.015, cF) * kF, line2 = smoothstep(0.04, 0.008, cN2) * smoothstep(0.5, 1.0, kN) * (1.0 - wgt);
+        base *= 1.0 - 0.55 * lineN - 0.5 * lineF - 0.22 * line2;
+        // (the stone a shade darker for a hand's width either side of a joint, where water stands)
+        base *= 1.0 - 0.08 * smoothstep(0.3, 0.0, cN) * kN * wgt - 0.12 * smoothstep(0.3, 0.0, cF) * kF;
+        gCrackSnow = smoothstep(0.04, 0.01, cN) * kN;   // (the fine joints only, hair-thin: a hand wide along the big ones they were white lightning drawn on the rock)
+        gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 * wgt + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
+      }
+      #ifdef BARE_LEDGE
+      // (round 101) strata. A cliff built of these blocks had cracks a pace apart and nothing at the scale of the cliff:
+      // "a scaled-up boulder". The rock is bedded in the world, three metres or so to a bed: each bed its own shade
+      // on the upright faces, shade under the lip of the bed above, and a line of snow lying on the ledge at its foot.
+      {
+        float camDb = length(vWPos - cameraPosition);
+        float bq = vWPos.y / 3.2 + 0.35 * tnz(vWPos * 0.11) + 0.12 * tnz(vWPos * 0.5 + 3.0);
+        float bf = fract(bq), bi = floor(bq);
+        float steepB = smoothstep(0.78, 0.4, wn.y);
+        float kB = smoothstep(1200.0, 80.0, camDb) * smoothstep(5.0, 16.0, camDb);
+        base *= mix(1.0, 0.8 + 0.4 * hash12(vec2(bi, 5.0)), steepB * kB);
+        base *= 1.0 - 0.5 * smoothstep(0.86, 1.0, bf) * steepB * kB;
+        // (in runs a few paces long, some beds thick with it and some bare: ruled the length of the cliff it was stripes)
+        float runS = smoothstep(0.44, 0.58, tnz(vec3(vWPos.x, bi * 3.0, vWPos.z) * 0.5 + 2.0) * 0.7 + 0.3 * hash12(vec2(bi, 11.0)));
+        gStrataSnow = smoothstep(0.0, 0.04, bf) * smoothstep(0.1 + 0.2 * hash12(vec2(bi, 2.0)), 0.07, bf) * steepB * kB * runS;
+        // (and each bed stands out a hand at its foot, in the light: the snow lines lie on steps, not on a smooth face)
+        gCrack -= (smoothstep(0.34, 0.0, bf) * 0.22 - smoothstep(0.82, 1.0, bf) * 0.16) * steepB * kB;
+      }
+      #endif
       vec4 rcl = climateAt(vWPos.xz);
+      // under falling snow the stone is wet and dark, slate blue as the sky that lights it, with rime blown onto its faces
+      {
+        float stormK = uSnowfall * smoothstep(0.35, 0.75, rcl.r);
+        base = mix(base, base * vec3(0.34, 0.42, 0.56), stormK);   // (near black: the frame's dark anchor, as the reference's cliff band is)
+        float rime = stormK * smoothstep(0.38, 0.72, tfb(vWPos / 3.5) + 0.25 * (tnz(vWPos * 3.0) - 0.5));
+        base = mix(base, vec3(0.6, 0.66, 0.76), rime * 0.1);
+      }
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
@@ -1108,19 +1382,61 @@ function rockMaterial(surf = {}, bare = false) {
       // in drifts and crusts, not a smooth white cap: the grey stone and its lichen show through
       // (round grains of one size on a noise grid read as polka dots on a big ledge; these are torn, mixed-size flecks)
       // clean patches of old snow lying on the flats, with a ragged edge; elsewhere only a sparse frost of flecks
-      float fleck = smoothstep(0.74, 0.8, vnoise(vWPos.xz * 7.0 + vWPos.y * 5.0) * 0.55 + vnoise(vWPos.xz * 19.0 - vWPos.y * 11.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
-      float drift = smoothstep(0.4, 0.52, fbm2(vWPos.xz * 0.45 + vWPos.y * 0.3 + 7.0) + 0.1 * (vnoise(vWPos.xz * 6.0) - 0.5));
+      float fleck = smoothstep(0.74, 0.8, tnz(vWPos * 7.0) * 0.55 + tnz(vWPos * 19.0 + 2.0) * 0.45) * smoothstep(0.1, 0.5, wn.y);
+      float drift = smoothstep(0.4, 0.52, tfb(vWPos * 0.45 + 7.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
       // (a boulder's crown out in the snowfields keeps its cap: bare-topped boulders read as dark slabs on the snow)
       #ifdef BARE_LEDGE
-      rsnow *= max(drift * 0.6, 0.6 * fleck);
+      // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
+      // facets read as paper laid on the rock)
+      // (its edge broken into grains and flecks: a clean edge was a white paper cut-out laid on the stone)
+      // (round 85: one crisp, ragged edge. Snow lies on what faces up, in patches, and stops at a line broken at every
+      // scale from a pace to a finger; faded in over a range of slope it lay on the rock as soft white blobs.)
+      float sEdge = wn.y + 0.2 * (tnz(vWPos * 2.3) - 0.5) + 0.12 * (tnz(vWPos * 9.0 + 3.0) - 0.5) + 0.08 * (tnz(vWPos * 37.0 + 6.0) - 0.5);
+      float patchS = smoothstep(0.4, 0.47, tfb(vWPos * 0.55 + 3.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
+      // (in a storm it settles on every ledge and top)
+      float topS = smoothstep(0.85, 0.905, sEdge) * mix(patchS, 1.0, min(1.0, uSnowfall * 1.5) * 0.85);
+      // (round 90) and it packs into the joints: every crack that faces the sky at all holds a line of snow, which is
+      // what ties the white to the rock's own structure (patches alone lay on it like cut paper)
+      float crevS = gCrackSnow * smoothstep(0.45, 0.75, wn.y) * smoothstep(0.4, 0.6, tnz(vWPos * 1.9 + 4.0)) * 0.7;
+      rsnow = smoothstep(0.35, 0.75, rcl.r) * max(max(max(topS * 0.93, crevS * 0.88), gStrataSnow * 0.86), 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
+      // close to, the stone is sharp: fine bedding lines a hand apart, and grain at two scales
+      {
+        float nearK = smoothstep(30.0, 6.0, length(vWPos - cameraPosition));
+        float lines = smoothstep(0.06, 0.0, abs(fract(vWPos.y * 5.5 + 0.9 * tnz(vWPos * 0.9) + 0.25 * tnz(vWPos * 4.0)) - 0.5)) * smoothstep(0.75, 0.3, wn.y);
+        base *= 1.0 - 0.3 * lines * nearK * (0.4 + 0.6 * tnz(vWPos * 1.3 + 9.0));
+        base *= mix(1.0, (0.8 + 0.4 * tnz(vWPos * 14.0)) * (0.88 + 0.24 * tnz(vWPos * 45.0 + 2.0)), nearK);
+      }
+      // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
+      // lighter and tan where that one is blue-grey under the overcast)
+      // (round 97: warm again, a tan-grey granite, and a third lighter: it is the picture's warm note against the blue
+      // distance. Cooled to match the valley it made the whole frame one steel blue)
+      // (in clear air only: under falling snow the stone stays the wet slate that anchors the storm frame)
+      base *= mix(vec3(1.3, 1.2, 1.04), vec3(0.8, 0.87, 0.98), min(1.0, uSnowfall * 1.6)) * (0.8 + 0.4 * smoothstep(0.25, 0.75, tfb(vWPos * 0.23 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
-      float lichen = smoothstep(0.55, 0.75, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(138,140,124)), lichen * 0.5);                // pale grey-green crust lichen, not moss
-      // and the warm ochre crust lichen of the reference's granite, in scattered rosettes
-      float ochre = smoothstep(0.7, 0.82, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0)) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,128,82)), ochre * 0.45);
+      // crust lichens, in crisp-edged crinkled patches a hand or two across: pale grey-green, ochre, and the black one
+      // that grows in the damp streaks
+      float crink = 0.22 * (tnz(vWPos * 23.0) - 0.5) + 0.1 * (tnz(vWPos * 61.0 + 4.0) - 0.5);
+      #ifdef BARE_LEDGE
+      // (a pace from the lens lichen is a scatter of hand-sized crusts, not a map of continents: at the boulders' scale
+      // it lay on the ledge in crisp camouflage shapes)
+      float lsc = 3.4, lK = 0.45;
+      #else
+      float lsc = 1.0, lK = 1.0;
+      #endif
+      float lichen = smoothstep(0.56, 0.6, tnz(vWPos * 1.7 * lsc) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28 * lK);
+      float ochre = smoothstep(0.66, 0.7, tnz(vWPos * 2.3 * lsc + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.22 * lK);
+      float blackL = smoothstep(0.64, 0.68, tnz(vWPos * 2.9 * lsc - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
+      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3 * lK);
+      // snow banked against the foot of the rock, a ragged apron climbing it a pace or so (it met the snowfield on a ruled line)
+      {
+        float aboveR = vWPos.y - heightAt(vWPos.xz);
+        float bank = smoothstep(0.35, 0.75, rcl.r) * smoothstep(1.5, 0.25, aboveR + 1.3 * (vnoise(vWPos.xz * 0.55 + 3.0) - 0.5) + 0.5 * (vnoise(vWPos.xz * 2.3) - 0.5));
+        rsnow = max(rsnow, bank * 0.95);
+      }
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,
@@ -1134,11 +1450,53 @@ export class Vegetation {
     this.scene = scene;
     const barkMat = windMaterial(new THREE.MeshStandardMaterial({ map: barkTexture(5), roughness: 0.95 }), 0);
     const cb = conBarkTextures(6, [92, 76, 64], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0);
+    const pineBark = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.92 }), 0, { fragColor: CLIMATE_FRAG('vTreePos') + `
+      {
+        // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
+        // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
+        float above = vWPos.y - heightAt(vWPos.xz);
+        // (grey-brown, not cinnamon: in a low sun the saturated bark lit up orange-red on every bole)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.94), 0.5) * 0.62;
+        // (round 98: inside a stand a bole is a dark shape against the lit air, as the reference's are: lit by the forest's
+        // raised exposure they stood orange-brown in their own shade. And both barks now: the grey-brown above had been
+        // given to the spruce bark only, and the pine shot's ponderosas stayed cinnamon for six rounds)
+        diffuseColor.rgb *= mix(1.0, 0.72, uCanopy);   // (0.5 took them to black with no bark in them)
+        diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
+        float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
+        diffuseColor.rgb *= (0.76 + 0.48 * tone) * mix(vec3(1.06, 1.0, 0.92), vec3(0.94, 1.0, 1.06), hash12(floor(vTreePos.xz * 0.37) + 8.0));
+        float ang = atan(vWPos.x - vTreePos.x, vWPos.z - vTreePos.z);
+        float patchB = fbm2(vec2(sin(ang) * 1.1 + tone * 9.0, vWPos.y * 0.2 + cos(ang) * 1.1));
+        diffuseColor.rgb *= 0.78 + 0.44 * smoothstep(0.3, 0.7, patchB);
+        // grey-green lichen on the shaded side of the lower bole
+        float lich = smoothstep(0.55, 0.7, fbm2(vec2(ang * 2.0 + tone * 5.0, vWPos.y * 0.9))) * smoothstep(7.0, 1.0, above) * smoothstep(0.2, 0.8, above);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.23, 0.17) * (0.7 + 0.6 * tone), lich * 0.4 * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r)));
+      }` });
     // ponderosa: cinnamon-orange plates between dark fissures (the grey-brown spruce bark on the pines read as
     // smooth grey poles down a sunlit forest)
-    const cbP = conBarkTextures(11, [118, 80, 60], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
-    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0);
+    const cbP = conBarkTextures(11, [82, 60, 48], quality >= 2 ? 512 : 256, quality >= 2 ? 1024 : 512);
+    const ponderosaBark = windMaterial(new THREE.MeshStandardMaterial({ map: cbP.map, normalMap: cbP.normalMap, normalScale: new THREE.Vector2(1.9, 1.9), roughness: 0.9 }), 0, { fragColor: CLIMATE_FRAG('vTreePos') + `
+      {
+        // (round 89) a bole stands in the ground, and no two are one colour: its foot is dark with shade and banked duff,
+        // each tree has its own tone, and weathering lies on it in broad patches round and up the trunk
+        float above = vWPos.y - heightAt(vWPos.xz);
+        // (grey-brown, not cinnamon: in a low sun the saturated bark lit up orange-red on every bole)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.04, 1.0, 0.94), 0.5) * 0.62;
+        // (round 98: inside a stand a bole is a dark shape against the lit air, as the reference's are: lit by the forest's
+        // raised exposure they stood orange-brown in their own shade. And both barks now: the grey-brown above had been
+        // given to the spruce bark only, and the pine shot's ponderosas stayed cinnamon for six rounds)
+        diffuseColor.rgb *= mix(1.0, 0.5, uCanopy);
+        diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
+        float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);
+        diffuseColor.rgb *= (0.76 + 0.48 * tone) * mix(vec3(1.06, 1.0, 0.92), vec3(0.94, 1.0, 1.06), hash12(floor(vTreePos.xz * 0.37) + 8.0));
+        float ang = atan(vWPos.x - vTreePos.x, vWPos.z - vTreePos.z);
+        float patchB = fbm2(vec2(sin(ang) * 1.1 + tone * 9.0, vWPos.y * 0.2 + cos(ang) * 1.1));
+        diffuseColor.rgb *= 0.78 + 0.44 * smoothstep(0.3, 0.7, patchB);
+        // grey-green lichen on the shaded side of the lower bole
+        float lich = smoothstep(0.55, 0.7, fbm2(vec2(ang * 2.0 + tone * 5.0, vWPos.y * 0.9))) * smoothstep(7.0, 1.0, above) * smoothstep(0.2, 0.8, above);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.23, 0.17) * (0.7 + 0.6 * tone), lich * 0.4 * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r)));
+      }` });
     // leaves and needles are near-matte: without this, card normals at grazing angles mirror the bright sky
     // (Fresnel) and every bough reads frosted
     const leafExtra = { onShader: (s) => { s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>', LEAF_EMISSIVE)
@@ -1169,7 +1527,7 @@ export class Vegetation {
       const b = buildPine(300 + i * 23);
       this.treeBuilds.push({ kind: 'pine', height: b.height, parts: [
         { geometry: b.wood, material: ponderosaBark },
-        { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) },
+        { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1, 1.08) },
       ] });
     }
     const cypMat = leafMat(cypTex, 0xc8d0b0);
@@ -1187,7 +1545,7 @@ export class Vegetation {
     const addB = (group, kind, b, parts) => { G[group].push(this.treeBuilds.length); this.treeBuilds.push({ kind, height: b.height, parts }); };
     for (let i = 0; i < 4; i++) {
       const b = buildPine(700 + i * 29, 'tall');
-      addB('tall', 'pine', b, [{ geometry: b.wood, material: ponderosaBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1) }]);
+      addB('tall', 'pine', b, [{ geometry: b.wood, material: ponderosaBark }, { geometry: b.leaves, material: tuftMat, depth: windDepthMaterial(tuftTex, 1, 1.08) }]);
     }
     // dead snags, silver-grey and barkless
     const snagMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), color: new THREE.Color(1.55, 1.5, 1.45), roughness: 0.95 }), 0);   // weathered silver-grey
@@ -1240,7 +1598,8 @@ export class Vegetation {
       const c = new THREE.Vector3(0, 0.5, 0);
       for (let k = 0; k < 7; k++) cards.push(cardGeo(1.3 + rnd() * 0.6, new THREE.Vector3((rnd() - 0.5) * 1.2, 0.45 + rnd() * 0.5, (rnd() - 0.5) * 1.2), c, rnd, 1, 0.9));
       const g = leafAO(setSway(mergeGeometries(cards), (x, y) => y * 0.25));
-      bushBuilds.push({ parts: [{ geometry: g, material: oakMats[i % 3], depth: windDepthMaterial(oakTex[i % 3], 1) }] });
+      // (thin leaves that glow when the sun is behind them)
+      bushBuilds.push({ parts: [{ geometry: g, material: leafMat(oakTex[i % 3], 0x8f977c, true, 0.42, 0.14), depth: windDepthMaterial(oakTex[i % 3], 1) }] });
     }
     // ferns (3, 4), big-leaf jungle plants (5, 6), dry scrub (7, 8)
     const fernT = fernTexture(), fernMat = leafMat(fernT, 0xb8bc9e);   // (muted: a saturated card green reads as pasted on)
@@ -1261,7 +1620,7 @@ export class Vegetation {
       bushBuilds.push({ parts: [{ geometry: leafAO(setSway(mergeGeometries(lv), (x, y) => y * 0.3)), material: bigMat, depth: windDepthMaterial(bigT, 1) }] });
     }
     const twigT = twigTexture();
-    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: true });
+    const twigMat = windMaterial(new THREE.MeshStandardMaterial({ map: twigT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.3, russet: 0.9 });   // (russet under a light frost: fully frosted, the brush was a white cut-out)
     for (let i = 0; i < 2; i++) {
       const rnd = mulberry32(990 + i), tw = [];
       for (let k = 0; k < 5; k++) { const g = new THREE.PlaneGeometry(1.1 + rnd() * 0.5, 1.0 + rnd() * 0.4); g.translate(0, 0.45, 0); g.rotateY((k / 5) * Math.PI + rnd() * 0.4); tw.push(g); }
@@ -1274,7 +1633,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.4, 1.3, 1.08) }), 1, leafExtra, { frost: 0.45, russet: 0.4 });   // (frosted grey-straw, each tuft its own tone: all one orange-tan they were paper fans)   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];
@@ -1289,20 +1648,38 @@ export class Vegetation {
     }
     this.bushes = new ScatterLayer(scene, bushBuilds, Math.round(6000 * Math.max(1, quality * quality)), 140 * Math.sqrt(quality));
     // fallen logs on forest floors
-    const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: pineBark }] }));
+    // an old fallen trunk: grey weathered bark, moss and lichen along its upper side (the trees' own bark, laid on
+    // its side, read as a striped tube)
+    const logMat = windMaterial(new THREE.MeshStandardMaterial({ map: cb.map, normalMap: cb.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), color: new THREE.Color(0.5, 0.47, 0.45), roughness: 0.96 }), 0, {
+      fragColor: `#include <color_fragment>
+        {
+          vec3 wn = normalize(inverseTransformDirection(normalize(vNormal), viewMatrix));
+          float n1 = fbm2(vWPos.xz * 1.6 + vWPos.y * 2.0), n2 = vnoise(vWPos.xz * 9.0 + vWPos.y * 7.0);
+          diffuseColor.rgb *= 0.75 + 0.5 * n1;
+          float moss = smoothstep(0.25, 0.75, wn.y + (n1 - 0.5) * 0.9) * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r));
+          // (in patches along the top, the grey bark showing between: mossed all over, a log was a green wedge)
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.055, 0.07, 0.03) * (0.7 + 0.7 * n2), moss * 0.7 * smoothstep(0.35, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.7)));
+        }` });
+    const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: logMat }] }));
     this.logs = new ScatterLayer(scene, logBuilds, 1200, 170 * Math.sqrt(quality));
 
     // rocks
     const rMat = rockMaterial(surf), rMatBare = rockMaterial(surf, true);
+    rMatBare.envMapIntensity = 1.25;   // (open to the whole sky on a summit: at the boulders' 0.55 its shaded faces went near black)
     // 4 and 5: the fractured blocks again in wind-scoured bare granite, for lookout ledges
     // (the ledge blocks are cut by twice the joint planes, deeper: split granite with flat faces and hard edges, not
     // rounded lumps)
-    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 5, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
+    const rockBuilds = [0, 1, 2, 3, 4, 5].map((i) => ({ parts: [{ geometry: i >= 4 ? rockGeometry(i + 7, true, 12, 14, 0.1) : rockGeometry(i + 3, i >= 2), material: i >= 4 ? rMatBare : rMat }] }));
+    // 6-8: outcrop blocks for a lookout's own ledge, stood several metres tall beside the lens: cut right through by
+    // many joint planes into stacked, square-shouldered blocks (the boulders above, scaled up, are smooth domes)
+    for (const sd of [31, 47, 58]) rockBuilds.push({ parts: [{ geometry: rockGeometry(sd, true, quality >= 2 ? 44 : 22, 30, 0.34), material: rMatBare }] });
     this.rocks = new ScatterLayer(scene, rockBuilds, 3000, 420);
+    this.rocks.farFrom = 6; this.rocks.farRadius = 1500;
     // crags: big split granite blocks breaking out of the steep snowy mountainsides, drawn out to the far slopes so
     // the faces read as rock with snow on its ledges rather than a smooth heightfield
-    // (bare-ledge granite: with the snowfield boulders' full snow crown, crags on a cliff read as white pills)
-    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd, true, 2), material: rMatBare }] }));
+    // (jointed blocks with hard edges and flat tops for the snow to lie on: the rounded boulder, scaled up to a crag,
+    // was a pillow with a white cap)
+    const cragBuilds = [5, 6, 9].map((sd) => ({ parts: [{ geometry: rockGeometry(sd + 40, true, 5, 22, 0.28).scale(1.7, 1.5, 1.7), material: rMat }] }));
     this.crags = new ScatterLayer(scene, cragBuilds, 6000, 2600);
 
     this.quality = quality;
@@ -1317,27 +1694,39 @@ export class Vegetation {
     this.grass = [];
     if (quality > 0) {
       const q = quality;
-      this.grass.push(makeGrass(scene, 0.3 / Math.sqrt(q), 28, 0.6, 0));
-      this.grass.push(makeGrass(scene, 0.7 / Math.sqrt(q), 85, 1.2, 24));
+      // (clump counts grow with the square of this: past 1.5 the lawn costs a third of the frame for little gain)
+      const gq = Math.min(q, 1.5);
+      this.grass.push(makeGrass(scene, 0.3 / Math.sqrt(gq), 28, 0.6, 0));
+      this.grass.push(makeGrass(scene, 0.7 / Math.sqrt(gq), 85, 1.2, 24));
       // forest-floor clutter
       const cone = (() => {
-        const c = new THREE.ConeGeometry(0.045, 0.13, 7, 3); c.rotateZ(Math.PI / 2); c.translate(0, 0.035, 0);
+        // (an ovoid, as a fallen cone is: the pointed cone primitive lay about the floor as dark triangular chips)
+        const c = new THREE.SphereGeometry(0.036, 12, 9); c.scale(1.75, 0.95, 1);
+        // open scales standing out all over it: a spiky silhouette, as a fallen cone has (the smooth ovoid was a pebble)
+        { const cp = c.attributes.position; for (let i = 0; i < cp.count; i++) { const k = 1 + 0.42 * (((i * 2654435761) >>> 0) % 1000 / 1000 > 0.5 ? 1 : 0) * (0.5 + 0.5 * Math.sin(i * 1.7)); cp.setXYZ(i, cp.getX(i) * k, cp.getY(i) * k, cp.getZ(i) * k); } c.computeVertexNormals(); }
+        c.translate(0, 0.03, 0);
         const p = c.attributes.position, col = new Float32Array(p.count * 3);
         // (vertex colours are linear: these are dark, weathered cone browns, not the pale chips they read as before)
-        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.16 * v; col[i * 3 + 1] = 0.1 * v; col[i * 3 + 2] = 0.055 * v; }
+        for (let i = 0; i < p.count; i++) { const v = 0.7 + 0.3 * ((i * 7) % 5) / 4; col[i * 3] = 0.105 * v; col[i * 3 + 1] = 0.066 * v; col[i * 3 + 2] = 0.04 * v; }
         c.setAttribute('color', new THREE.BufferAttribute(col, 3)); return c;
       })();
-      const twig = (() => { const t = new THREE.CylinderGeometry(0.018, 0.03, 1.0, 5); t.rotateZ(Math.PI / 2); t.translate(0, 0.02, 0); return t; })();
+      // a fallen twig: a bent stick with two side shoots (a plain cylinder read as a dropped dowel), and a longer
+      // dead bough with its branchlets
+      const stick = (segs) => mergeGeometries(segs.map(([ax, az, bx, bz, r0, r1, y]) => { const L = Math.hypot(bx - ax, bz - az); const t = new THREE.CylinderGeometry(r1, r0, L, 5); t.rotateZ(Math.PI / 2); t.rotateY(-Math.atan2(bz - az, bx - ax)); t.translate((ax + bx) / 2, y ?? 0.018, (az + bz) / 2); return t; }));
+      const twig = stick([[-0.5, 0, 0.04, 0.035, 0.016, 0.013], [0.04, 0.035, 0.5, -0.05, 0.013, 0.006], [-0.12, 0.01, 0.16, 0.2, 0.009, 0.004], [0.14, 0.03, 0.36, -0.17, 0.008, 0.003]]);
+      const bough = stick([[-1.4, 0, -0.3, 0.1, 0.045, 0.036, 0.04], [-0.3, 0.1, 0.8, -0.05, 0.036, 0.024, 0.035], [0.8, -0.05, 1.5, 0.12, 0.024, 0.01, 0.03], [-0.7, 0.05, -0.2, 0.55, 0.02, 0.008, 0.05], [0.1, 0.06, 0.7, -0.5, 0.018, 0.007, 0.06], [0.5, -0.02, 0.95, 0.4, 0.014, 0.005, 0.07], [-1.0, 0.02, -0.75, -0.4, 0.016, 0.006, 0.05]]);
       const stone = (() => {
         const st = new THREE.IcosahedronGeometry(0.5, 1), p = st.attributes.position;
-        for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.6, p.getZ(i) * k); }
+        for (let i = 0; i < p.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.4, p.getZ(i) * k); }   // flat, bedded stones
         st.computeVertexNormals(); st.translate(0, 0.12, 0); return st;
       })();
       this.clutter = [
         // (denser: clustering leaves bare duff between the drifts of cones and fallen sticks)
-        makeClutter(scene, cone, { spacing: 0.62 / Math.sqrt(q), radius: 26, smin: 0.8, smax: 1.4, color: 0xffffff, seed: 3 }),
-        makeClutter(scene, twig, { spacing: 1.9 / Math.sqrt(q), radius: 34, smin: 0.4, smax: 1.3, color: 0x5a4632, flat: true, seed: 5 }),
-        makeClutter(scene, stone, { spacing: 3.2 / Math.sqrt(q), radius: 40, smin: 0.1, smax: 0.45, color: 0x4c4840, roughness: 0.9, mode: 'stone', seed: 9 }),
+        makeClutter(scene, cone, { spacing: 0.8 / Math.sqrt(q), radius: 24, smin: 0.6, smax: 1.3, color: 0xffffff, seed: 3 }),
+        // (weathered grey-brown and plentiful: the reference's floor is strewn with them)
+        makeClutter(scene, twig, { spacing: 0.62 / Math.sqrt(q), radius: 28, smin: 0.3, smax: 1.3, color: 0x4d3b2b, flat: true, seed: 5 }),   // (dark, barked: pale and straight they were spilled matchsticks)
+        makeClutter(scene, bough, { spacing: 4.6 / Math.sqrt(q), radius: 44, smin: 0.6, smax: 1.3, color: 0x3a2b20, flat: true, seed: 11 }),
+        makeClutter(scene, stone, { spacing: 1.7 / Math.sqrt(q), radius: 36, smin: 0.1, smax: 0.5, color: 0x8c8a84, roughness: 0.78, mode: 'stone', seed: 9 }),
       ];
     }
   }
@@ -1425,7 +1814,7 @@ export class Vegetation {
         // the pine belt's middle storey: young full-skirted firs among the tall clear boles, and the mature pines
         // of mixed ages (one size of tall pine in an even stand read as planted poles)
         if (pz < -700 && cl.snow <= 0.45 && cl.jungle <= 0.45 && !swamp && !beach) {
-          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.68 + rc() * 0.62;
+          if (rc() < 0.15) { v = G.fir[Math.floor(rc() * G.fir.length)]; s = 0.42 + rc() * 0.45; } else s *= 0.68 + rc() * 0.46;
         }
         this.trees.add(px, h - 0.2, pz, r() * 6.28, s, v);
         // the pine woods' floor is shrubby under the trees too (tree cells used to skip their undergrowth, leaving
@@ -1577,7 +1966,11 @@ export class Vegetation {
           // snow on the upper boughs, fading out with distance: a few-pixel tree with a white cap is what turns a
           // far forest into salt-and-pepper speckle
           float dCam = length(cameraPosition - vW);
-          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * 0.32 * smoothstep(520.0, 220.0, dCam));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
+          alb = mix(alb, vec3(0.84, 0.87, 0.92), smoothstep(0.35, 0.8, icl.r) * smoothstep(-0.5, 0.4, q.y + 0.5 * (hash12(floor(vUv * 90.0)) - 0.5)) * mix(0.3, 0.38, smoothstep(1600.0, 250.0, dCam)));   // (whiter, the crown vanished into the snow and fog and left a bare pin)
+          // (and from afar a snow-country spruce is frosted blue-grey, not a black cone on the white)
+          // (round 98: dark under their snow, as timber is in a storm: frosted pale they were the colour of the slope behind)
+          alb = mix(alb, vec3(0.24, 0.31, 0.37), 0.55 * smoothstep(0.35, 0.8, icl.r) * smoothstep(160.0, 700.0, dCam) * (1.0 - 0.75 * uSnowfall));
+          alb *= 1.0 - 0.35 * uSnowfall * smoothstep(0.35, 0.8, icl.r);
           vec3 toCam = normalize(cameraPosition - vW);
           vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x));
           vec3 N = normalize(right * q.x * 0.8 + vec3(0.0, 0.55 + 0.35 * q.y, 0.0) + toCam * 0.6);
@@ -1592,7 +1985,7 @@ export class Vegetation {
             vec3 cAlb = mix(pow(vec3(34.0, 46.0, 26.0) / 255.0, vec3(2.2)), pow(vec3(52.0, 62.0, 32.0) / 255.0, vec3(2.2)), cn);
             cAlb = mix(cAlb, mix(pow(vec3(26.0, 50.0, 20.0) / 255.0, vec3(2.2)), pow(vec3(40.0, 68.0, 26.0) / 255.0, vec3(2.2)), cn), icl.g);
             cAlb = mix(cAlb, mix(pow(vec3(124.0, 58.0, 22.0) / 255.0, vec3(2.2)), pow(vec3(158.0, 112.0, 32.0) / 255.0, vec3(2.2)), cn), icl.b * 0.85);
-            cAlb = mix(cAlb, pow(vec3(30.0, 38.0, 36.0) / 255.0, vec3(2.2)), smoothstep(0.4, 0.8, icl.r));   // matches the snow-country canopy
+            cAlb = mix(cAlb, pow(vec3(42.0, 54.0, 58.0) / 255.0, vec3(2.2)), smoothstep(0.4, 0.8, icl.r));   // matches the snow-country canopy
             vec3 nT = normalAt(vW.xz);
             float ndlT = max(dot(nT, normalize(uSunDir)), 0.0);
             vec3 litT = cAlb * (uSunColor * ndlT * 0.3 * terrainSunShadow(vW + vec3(0.0, 2.0, 0.0)) + uFogColor * 0.2 * ao);

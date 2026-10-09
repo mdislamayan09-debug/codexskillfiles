@@ -297,11 +297,11 @@ export class SnowTrail {
           float along = vUv.y;
           float lane = min(abs(across - 0.32), abs(across - 0.68));
           float pit = smoothstep(0.62, 0.8, vnoise(vec2(across * 6.0, along * 2.2))) * smoothstep(0.2, 0.05, lane);
-          vec3 trough = vec3(0.6, 0.66, 0.76);       // shadowed, compacted snow
+          vec3 trough = vec3(0.76, 0.8, 0.87);       // shadowed, compacted snow (darker, it lay under the horse as a blue blob)
           vec3 rim = vec3(0.94, 0.95, 0.97);         // thrown-up snow on the lips
           float edge = smoothstep(0.32, 0.5, abs(across - 0.5));
           vec3 col = mix(trough * (0.9 + 0.2 * vnoise(vWPos.xz * 4.0)), rim, edge);
-          col = mix(col, vec3(0.45, 0.5, 0.6), pit * 0.7);
+          col = mix(col, vec3(0.6, 0.65, 0.74), pit * 0.7);
           diffuseColor.rgb = col;
           diffuseColor.a = smoothstep(0.5, 0.36, abs(across - 0.5)) * 0.92 * smoothstep(0.0, 0.04, along);
         }`,

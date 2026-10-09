@@ -201,14 +201,16 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x / W, v = y / H;
     // a long, slow wander plus an irregular one (higher-frequency periodic warp made the furrows read as worms)
-    const warp = 0.012 * Math.sin(TAU * 2 * v + ph[0]) + 0.03 * (vn(N1, u, v) - 0.5) + 0.01 * (vn(N2, u, v) - 0.5);
+    // (round 92: the furrows wander three times as far and the plates are short: ruler-straight ridges a foot and a
+    // half long were read, every round, as a stripe pattern stretched up a cylinder)
+    const warp = 0.012 * Math.sin(TAU * 2 * v + ph[0]) + 0.085 * (vn(N1, u, v) - 0.5) + 0.03 * (vn(N2, u, v) - 0.5);
     const r1 = Math.pow(Math.abs(Math.sin(Math.PI * 9 * (u + warp))), 0.45 + 0.3 * vn(N3, u, v));
     const r2 = Math.pow(Math.abs(Math.sin(Math.PI * 14 * (u + 1.4 * warp + 0.031) + ph[3])), 0.7);
     let ridge = 0.68 * r1 + 0.32 * r2;
     // horizontal cracks break the ridges into plates of uneven length, staggered from ridge to ridge
     const col = Math.floor(9 * (u + warp) + 9) % 9;
-    const crackLine = Math.abs(Math.sin(Math.PI * (4 * v + 0.37 * col + 0.15 * Math.sin(TAU * 2 * u + ph[4]) + 0.5 * (vn(N4, u + warp, v) - 0.5))));
-    const crack = Math.max(0, 1 - crackLine / 0.07);
+    const crackLine = Math.abs(Math.sin(Math.PI * (7 * v + 0.37 * col + 0.15 * Math.sin(TAU * 2 * u + ph[4]) + 0.9 * (vn(N4, u + warp, v) - 0.5))));
+    const crack = Math.max(0, 1 - crackLine / 0.1);
     ridge *= 1 - 0.75 * crack;
     // fine fibrous grain along the ridges, and flaky scale on the plate faces
     const grain = 0.5 + 0.5 * Math.sin(TAU * (60 * u + 9 * Math.sin(TAU * 5 * v + ph[5])));
@@ -221,7 +223,7 @@ export function conBarkTextures(seed = 9, base = [92, 70, 56], W = 512, H = 1024
   const [c, g] = canvas(W, H), img = g.createImageData(W, H), d = img.data;
   for (let k = 0; k < W * H; k++) {
     const h = hgt[k], t = tone[k];
-    const lit = 0.18 + 0.95 * Math.pow(h, 0.8);
+    const lit = 0.3 + 0.8 * Math.pow(h, 0.8);
     const warm = 0.88 + 0.28 * t;                                 // ridges vary from grey-brown to rusty
     const R = base[0] * lit * warm * 1.06, G = base[1] * lit * (0.94 + 0.1 * t), B = base[2] * lit * 0.94;
     d[k * 4] = R; d[k * 4 + 1] = G; d[k * 4 + 2] = B; d[k * 4 + 3] = 255;

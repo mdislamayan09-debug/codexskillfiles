@@ -88,209 +88,217 @@ The images live in `frontier/references/`. The critic compares each against our 
 `latest_frames/*.jpg` are our latest frames, for comparison. `references/bar_*.jpg` (the other five)
 are older RDR2 frames from the earlier world v1.
 
+`latest_frames/w104_<shot>.jpg` is our frame and `w104_<shot>_sbs.jpg` the same frame beside its reference.
+
 ## 3. Scores so far (blind critic, 10 = indistinguishable from the reference)
 
-| Round | pines | snowride | snowvista | Notes |
-|---|---|---|---|---|
-| 28–40 | 3–4 | 2–3 | 2–4 | the slow climb (see PROGRESS.md) |
-| 42 | 5 | 4 | 4 | first real lookout composition |
-| 43 | 4 | 3 | 4 | dense young firs walled in the pine trail |
-| 45 | 4 | 5 | 4 | |
-| 46 | 4 | 4 | 3.5 | |
-| 47 | 4 | 5 | 3 | vista went milky (haze); fixes are in later commits |
+Order is pines / snowride / snowvista. Every verdict in every round was "clearly" (the critic always tells which
+frame is ours).
 
-**Round 49** (the latest frames in `latest_frames/w49_*.jpg`, rendered supersampled at `ss=1.5`) has been
-captured but **not yet critiqued**; run the blind critic on it first. By eye:
-- The vista made a clear step forward: a dark flat storm deck with breaks of light, crisper mountains, textured
-  forests, and the homestead with chimney smoke in the lower centre.
-- The pines frame is lusher (ferns and shrub drifts along a softer trail) but darker, with the sun hidden.
-- The rider still shows a dark triangle on the coat's upper back, and a pale bar beside the saddle (the rifle
-  scabbard or stock area in `addTack`). Investigate both.
-- The snow ride moved to a new canyon spot (the creek-seeking search). It shows:
-  - a big pale cliff wall on the left, and a thin white line running across it. Find out what draws that line;
-    suspects are a road splat, a frozen-fall streak or a rib.
-  - white "pill" crags on the cliff face. Fixed afterwards: crags now use the bare-granite material.
-  - pinto-like snow speckles on the horse's rump. Fixed afterwards: lighter snow on animals.
+| Rounds | Scores | Notes |
+|---|---|---|
+| 28–49 | 3–5 / 2–5 / 2–4 | the earlier account's work (see PROGRESS.md) |
+| 50–62 | 4 / 3–5 / 3–4.5 | GPU captures, volumetric shafts from the shadow map, performance work |
+| 64–77 | 3–4 / 3–5 / 3–5 | best total 14 at round 72 (4/5/5) |
+| 78–87 | 4 / 3 (4 once) / 5 (6 at round 80) | heaped storm cumulus, grown timber, rebuilt horse legs/tail, coats with thickness |
+| 88 | 4 / 4 / 6 | total 14 again |
+| 89–94 | 4 / 3.5–4 / 5 (6 at round 92) | "at thumbnail size this nearly passes" (vista, round 92) |
+| 95–103 | 3.5–4 / 3–4.5 / 5–5.5 | 96: 3.5/4.5/5.5 · 97–102: 4/4/5 · 103: 4/3/5 |
+| 104 | not scored | far spurs reshaped; captured (`latest_frames/w104_*`), critic not run |
 
-  The valley, firs and snowfield read well.
+**The plain reading:** totals have stayed between 12 and 14 for twenty-seven rounds (77–103) while the frames
+changed a great deal. The vista is the strongest shot (5–6). Both riding shots sit at 3–4, and the critic's first
+item on them is almost always the horse and rider as assets ("clay mannequin", "toy", "plastic"). On single items
+the critic now reverses itself from round to round (rim light "a toon outline" at one setting and "no rim light"
+at the next; foreground rock "steel-blue monochrome" when cool and "a hue that does not belong" when warm):
+that is the noise floor of the method. Never reversed: the horse and rider, bare ground in the pines, the sky and
+far-distance layering in the vista.
 
-The commits captured in round 49 (rounds 48 and 49) add:
-- a low storm deck
-- warm forest haze and longer shafts
-- matte split granite
-- patchier mist
-- a dressed pine floor
-- snow on brush and riders
-- timber that thins upslope
-- a forest-free homestead yard
-- fixes to the tail, coat and tack
-- a creek-seeking snow ride location
-- 2× snowfall
-
-Committed after the round 49 capture started, so not yet rendered:
-- bedded strata and snow lying on the ledges of snow-country cliffs (`terrain.js`)
-- a trampled, dirty-snow yard round the vista homestead (`world.stampPad`)
-- crags in bare granite, and lighter snow on the horse
+**An open question for the owner (asked several times, not yet answered):** whether to download free CC0 scanned
+assets (Poly Haven textures, about 100 MB, and/or a scanned or modelled horse and rider). Nothing has been
+downloaded; all work so far is code-only. Do not download without the owner's yes.
 
 ## 4. The working method: the gauntlet loop
 
-1. **Build:** `cd frontier && npx vite build` (into `dist/`). **Never rebuild `dist/` while a capture is running
-   from it.** For probes, build elsewhere: `npx vite build --outDir /tmp/distB --emptyOutDir`.
-2. **Capture** (headless Chromium with SwiftShader software WebGL; one frame takes 5–15 min at 1280x720, longer
-   when supersampled):
+Everything runs from `frontier/`. Set-up once on a new machine:
+```bash
+cd frontier && npm install && npx playwright install chromium
+python3 -m venv ../.venv && ../.venv/bin/pip install pillow numpy
+```
+
+1. **Build, capture and compare in one step** (about 3 s a frame on the M4's GPU through ANGLE/Metal):
    ```bash
-   cd frontier && mkdir -p ../work/w50
-   CANVAS=1 OUT=../work/w50 nohup sh scripts/capture.sh "capture&ss=1.5" snowvista,pines,snowride 4 1280x720 > ../work/w50.log 2>&1 &
+   sh scripts/snap.sh ../work/w105 pines,snowride,snowvista 8 | tail -9
+   ../.venv/bin/python scripts/stack.py ../work/w105 ../work/w105/all.jpg pines,snowride,snowvista 1700
    ```
-   - `capture.sh` serves `dist/` on port 4180 and runs `scripts/shoot.mjs`. It writes `<shot>.png`.
-   - `ss=1.5` supersamples. Headless Chromium has devicePixelRatio 1, while the owner's Mac renders at 2×, so
-     unsupersampled frames show alpha-test aliasing a player never sees.
-   - The other biome shots are `autumn`, `desert`, `jungle` (and the older `vista`, `forest`, `ranch`, ...).
-3. **Pairs:** `python3 scripts/make_pairs.py ../work/w50 references ../work/critic/round50`. This makes
-   `<shot>_A.jpg`/`_B.jpg`, randomly ordered, plus a key json one level up. Never show the key to the critic.
-4. **Blind critic:** a background general-purpose sub-agent with exactly this prompt (paths adjusted):
-   > You are a harsh, experienced AAA art director doing a blind comparison. In the folder <DIR> there are three pairs of images: pines_A.jpg / pines_B.jpg, snowride_A.jpg / snowride_B.jpg, snowvista_A.jpg / snowvista_B.jpg. In each pair, one image is a frame from Red Dead Redemption 2 (the quality bar) and the other is from a real-time WebGL game trying to match it. You do not know which is which. Do NOT read any key/json file anywhere; judge only from the pixels. Use the Read tool to view each image. For each pair: 1. Say which image (A or B) you believe is the RDR2 bar and how confident you are ("clearly" or "narrowly"). 2. Score the OTHER image (the challenger) 1–10 against the bar, where 10 = indistinguishable from the bar in quality and realism, 5 = clearly a competent game but obviously behind, 1 = crude. 3. Name the single biggest gap that gives the challenger away, then the next five gaps in order of impact. Be concrete and visual: say where in the frame (left third, foreground, sky, etc.), what is wrong (shape, scale, material, lighting, colour, density, composition, depth), and what it should look like instead, as the bar shows it. Avoid generic advice. Be honest and specific; do not be polite. Keep the whole answer under 700 words, in this format per pair: PAIR <name>: bar = <A|B> (<clearly|narrowly>); challenger score <n>/10 / Biggest gap: ... / Next: 1) ... 2) ... 3) ... 4) ... 5) ...
-5. **Measure as well as look.** Compare region luminance and saturation against the reference with PIL and
-   numpy: mean luminance per vertical third, 5th and 95th percentiles, HSV saturation. Several of the big wins
-   came from numbers (for example, the vista measured 25% too dark; the pine floor 0.6× too dark, then too pale).
-6. **Fix the top gaps, build, and probe if needed.** `node scripts/probe.mjs 'http://127.0.0.1:4181/?capture'
-   <shot> '<js expr using G>' out.png 960x540` against a second server on 4181 serving `/tmp/distB`. It prints
-   shader compile errors. `window.__game` (G) exposes `G.dbg = {world, veg, sky, backdrop, scene, camera, U,
-   THREE, CABIN, renderer, post, town}`. `scripts/probe_multi.mjs` renders several camera views in one page
-   load. Probes default to cinematic quality only when no `q=` is given; `q=high` is a lower preset.
-7. **Commit and push** after a verified build. End messages with any attribution the environment asks for.
-   Refresh `latest_frames/` with the new round's frames (as JPEG) and regenerate this all-in-one file with
-   `python3 scripts/build_handoff.py`. It packs every tracked file under `frontier/` behind this brief, which
-   lives in `scripts/handoff_header.md`.
-8. **Repeat.** Log each round in `frontier/PROGRESS.md`.
+   - `snap.sh <out> [shots] [frames] [WxH] [query]` runs `npx vite build`, then `capture.sh` (serves `dist/` on
+     port 4180, `scripts/shoot.mjs`), then `sbs.py`, which writes `<shot>_sbs.jpg` (ours left, reference right)
+     and prints tone numbers for both: mean luminance per vertical third, 5th/95th percentiles, saturation, mean
+     colour. **Read the numbers every time**: a shader compile error shows up as a near-black frame with wild
+     numbers, not as an error message.
+   - Each shot gets a fresh page (`FRESH=1`, the default), so one shot's raised ground and planted timber never
+     leak into another's frame. The default query is `capture&ss=1.5` (supersampled; headless Chromium has
+     devicePixelRatio 1 where the owner's Mac has 2).
+   - `scripts/launch.mjs` is the shared browser launcher: `GL=metal` by default on macOS, `GL=swiftshader` as the
+     software fallback (minutes per frame).
+   - Other shots for regression checks: `gallop,ranch,town,forest,swamp,autumn,desert,jungle,vista`.
+2. **Probe** one shot with a JS expression, without the full capture:
+   ```bash
+   pgrep -f "http.server 4181" >/dev/null || (nohup python3 -m http.server 4181 --directory dist --bind 127.0.0.1 >/dev/null 2>&1 &)
+   sh scripts/p.sh snowvista ../work/w105/p.png '(()=>{ const U = G.dbg.U; return U.uMist.value; })()'
+   ```
+   `p.sh` rebuilds `dist/` first, so **never run it (or any build) while a capture is running**. To probe without
+   rebuilding: `node scripts/probe.mjs "http://127.0.0.1:4181/?capture&ss=1.5" <shot> "<expr>" out.png 1280x720`.
+   `window.__game` is `G`; `G.dbg = {world, veg, sky, backdrop, scene, camera, U, THREE, CABIN, renderer, post,
+   town}`. Also: `scripts/turntable.mjs <url> studio <prefix>` (six views of horse and rider) with
+   `scripts/sheet.py`, `scripts/perf.mjs <url> [WxH] [dpr] [secs]` (play-mode frame rate), `probe_multi.mjs`,
+   `mapdump.mjs`, `errlog.mjs`.
+3. **Pairs:** `../.venv/bin/python scripts/make_pairs.py ../work/w105 references ../work/critic/round105`
+   (random A/B order; the key is written one level up as `round105_key.json`; never show it to the critic).
+4. **Blind critic:** a background `general-purpose` sub-agent (model `opus`) with exactly this prompt, path
+   adjusted. If it dies on a usage limit, launch it again.
+   > You are a harsh, blind art critic for real-time game graphics. Do not flatter. In the directory "<DIR>" there are three pairs of images: pines_A.jpg / pines_B.jpg, snowride_A.jpg / snowride_B.jpg, snowvista_A.jpg / snowvista_B.jpg. In each pair, one image is a frame from a shipped AAA open-world western game, and the other is a frame from a browser (WebGL) game that is trying to reproduce the same scene. You are NOT told which is which. Read ONLY those six image files with the Read tool (the path contains spaces; pass it exactly). Do not read any other file, do not look for key files, do not run any commands. For each pair, report: 1. Which image (A or B) is the AAA frame, and how sure you are: "clearly", "probably", or "cannot tell". 2. A score from 1 to 10 for the OTHER image: how close it comes to the AAA frame in realism and finish (10 = indistinguishable, 5 = a decent mid-budget game, 1 = programmer art). Be strict and use the same scale for all three. 3. The five most damaging visible gaps in the weaker image, most damaging first. Be concrete and specific about WHERE in the frame and WHAT is wrong (shape, material, lighting, density, colour, scale), so an engineer can act on each one. No generic advice. 4. One thing the weaker image does well, if anything. Finish with a three-line summary: the three scores, and the single change that would raise each score most.
+5. **Measure as well as look.** Crop the same region from our frame and the reference with PIL and compare
+   luminance percentiles and mean colour. Check the crop first: one measurement this run sampled forest floor
+   where the rider's back was meant to be, and drove a wrong fix. The references are 1920x1280 with letterbox
+   bars; `sbs.py` crops them to rows 0.078–0.922.
+6. **Fix the top gaps, capture, look at the sheet, commit, log the round in `PROGRESS.md`**, refresh
+   `latest_frames/` and, before handing over, regenerate this file: `python3 scripts/build_handoff.py` (it packs
+   every git-tracked file under `frontier/` behind this brief, which lives in `scripts/handoff_header.md`).
+7. **Push** when the machine is signed in to GitHub (section 8). The owner wants the loop kept running: do not
+   stop it on a plateau; report the plateau honestly and pick the next lever.
 
 ## 5. Architecture (frontier/)
 
-- `index.html`, `src/main.js`: boot, the quality presets (`?q=low|med|high|ultra|cinematic`, cinematic is the
-  default), the game loop, the HUD, and **the cinematic shots (`G.shots`) with their per-shot scene dressing in
-  `G.setShot`**. The dressing blocks are `trailDress` (pines), `snowDress` (snowride) and `foreground` (vista),
-  together with `G.findVista` (the ray-marched lookout search), `G.findCanyonRide` and the eye adaptation. Also
-  `veg.refreshImpostors()` after dressing.
-- `src/world.js`: the 8192 m world, a 4096² heightmap at cinematic quality, generated in worker threads.
-  - Climates: snow north (z < -1300), the pine belt (z -700..-1300), heartlands and town at the centre,
-    autumn west, desert south-west, bayou, a jungle coast and ocean south-east.
-  - **Real DEM patches** (`public/terrain/*.png/json`): the Kawuneeche valley strip in the north, a Yosemite
-    canyon (the snowride location), Monument Valley desert, Na Pali jungle, Cades Cove autumn.
-  - The forest splat (it now has groves on flat valley floors and timber thinning upslope), roads and rivers.
-  - `stampPad()` levels a yard and clears its forest tint at runtime.
-- `src/terrain.js`: the terrain shader (`terrainAlbedo`). It layers grass, the forest floor (with a pine needle
-  duff layer), dirt and road, rock, and snow:
-  - the snow/rock split by slope
-  - curvature ribs, wind-scoured crests and erosion runnels down the fall line
-  - frozen falls and the frozen creek with its willow corridor
-  - snow drifts and the horse-trail trench (`uTrail`)
-  - the far-forest canopy tint
-- `src/vegetation.js`: the trees and the scatter.
-  - Trees: `buildPine` makes the kinds pine, tall and fir; the conifer cards come from `textures.js`, a dense
-    spray for firs and a bottlebrush tuft for pines; ponderosa bark is cinnamon, spruce bark grey.
-  - Other trees: oak, palm, jungle, cypress, cactus, snags.
-  - Instanced ScatterLayers: `trees` (near radius 190·sqrt(q) m, then **billboard impostors out to 4.2 km at
-    cinematic**), `bushes` (variants 0-2 leafy, 3-4 fern, 5-6 big-leaf, 7-8 frosted twig brush, 9 bunchgrass,
-    10 dead stalks), `rocks` (0-3; 4-5 are bare split ledge granite), `crags`, `logs`.
-  - The rock material: triplanar scanned relief, lichen, snow patches, BARE_LEDGE.
-  - The grass shader, the forest clutter (cones, twigs, stones), and the climate tinting of foliage (snow load
-    on boughs, autumn).
-- `src/sky.js`: the sky, ray-marched clouds (112 steps at cinematic; storm flattens them into a low deck), the
-  sun and fog colour, and weather (storm, blizzard, humid, dry) from the climate under the camera or a shot's
-  `weather` override.
-- `src/shared.js`: the shared uniforms `U`, `patchMaterial()` (injects the fog/atmosphere, cloud shadows and the
-  far-depth squeeze into every material), and `applyAtmosphere` (height fog, sun scattering, mist banks and
-  rags).
-- `src/post.js`: GTAO, screen-space sun shafts, bloom, and the film grade. The grade has a forest branch (teal
-  shade, gold light, a highlight shoulder) and a storm branch (steel blue).
-- `src/backdrop.js`: the 70 km ring of distant ranges beyond the map edge. The north valley continues north-west.
-  It has per-pixel erosion relief.
-- `src/creatures.js`: humans (built from a MakeHuman-style template with clothing pushed out from the skin,
-  outfits `arthur`/`winter`, and others), horses (procedural body, mane and tail cards, tack: saddle, bedroll,
-  bags, rifle), and deer and sheep.
-- `src/player.js`: riding and walking; the horse sinks into deep snow.
-- Others: `src/town.js` (Copper Hollow, the ranch, the camp, the trapper's cabin, `addHomestead()`), `src/fx.js`
-  (particles, snowfall, snow trail), `src/water.js`, `src/audio.js`, `src/hud.js`, `src/input.js`,
-  `src/assets.js` (scanned CC0 textures and the procedural litter and needle layers), `src/textures.js`
-  (procedural textures).
-- `scripts/`:
-  - capture and probe tooling: `shoot.mjs`, `capture.sh`, `probe.mjs`, `probe_multi.mjs`, `make_pairs.py`
-  - DEM baking (`bake_dem.py`, `bake_patch.py`) and `build_human.py`
-  - `make_artifact.py`, which packs `dist/` into a single shareable HTML page
-- `WORLD_PLAN.md` is the world design. `PROGRESS.md` is the round-by-round log (read it). `GAUNTLET_PROMPT.md`
-  is the original loop brief.
+- `index.html`, `src/main.js`: boot, quality presets (`?q=low|med|high|ultra|cinematic`, cinematic is the
+  default), the game loop, the HUD, the frame governor (`?nogov`, `?ss=`), and **the cinematic shots
+  (`G.shots`) with their per-shot set-building in `G.setShot`**: `trailDress` (pines), `snowDress` (snowride),
+  `foreground` (vista). A shot can set: `time`, `fov`, `player`, `camRel`/`lookRel`/`turn` or `cam`/`look`,
+  `weather {storm, blizzard}`, `coat` (horse), `stride` (holds the horse mid-walk), `expK`, `volDensity`,
+  `volFalloff`, `keyShaft`, `sunGap [from, to, halfWidth]` (fells a lane toward the sun), `deck [base, top,
+  lensY]` (cloud slab), `coverAdd`. `veg.refreshImpostors()` runs after dressing.
+  - Comparison switches kept in the URL: `?pinesold`, `?nogap`, `?rideold`, `?canyonride`, `?nocliff`,
+    `?lowbrow`, `?spursold`, `?vistaridge`, `?vistalow`, `?vistasearch`, `?hightimber`, `?nomeadows`, `?wedge`,
+    `?highdeck`, `?deck=a,b,c`, `?st=`, `?cv=`, `?leveldip`, `?nospurs`, `?pano`.
+- `src/world.js`: the 8192 m world, a 4096² heightmap at cinematic, real DEM patches in `public/terrain/`.
+  Set-building helpers used by the shots: `raiseSpur`, `stampPad`, `sculptDrifts`, `paintCreek`, `paintTrack`,
+  `paintForest`, `setForest`, `eraseWet`, `ledgeBox`, `touchSplat`. `terraceCliffs()` cuts bedded strata into
+  true cliffs at build time and `terraceCliffs(true)` re-cuts them tilted **after** planting (see pitfalls).
+- `src/terrain.js`: the terrain shader (`terrainAlbedo`): grass, forest floor, pine duff with drawn needle
+  litter, dirt and tread, rock, snow. In snow country: the snow/rock split (read over the whole face beyond
+  250 m: `farSnowK`), the "Snow-country cliffs" block (beds, joints, snow ledges near; ribs and buttresses far),
+  frozen river ice (dark from afar), the horse's trough, drift shading under overcast, the far-forest canopy.
+- `src/vegetation.js`: trees (`buildPine`: pine, tall, fir; flared butts; bark shader with grounding, per-tree
+  tone and lichen, darkened inside a stand by `uCanopy`), instanced `ScatterLayer`s (`trees` with billboard
+  impostors to 4.2 km; `bushes` 0-2 leafy, 3-4 fern, 5-6 big-leaf, 7-8 twig brush, 9 bunchgrass, 10 stalks;
+  `rocks` 0-3 boulders, 4-5 bare ledge slabs, **6-8 big jointed outcrops** drawn to 1.5 km when scale ≥ 6;
+  `crags`; `logs`), `rockGeometry` (joint lattice, spike relax, broken top), the rock shader (triplanar noise
+  `tnz`/`tfb`, crack networks `crackNet`, world-space strata with ledge snow, snow banked at the foot, warm tan
+  in clear air and wet slate under snowfall), grass, forest clutter, climate tinting (`CLIMATE_FRAG`: snow load,
+  frost `FROST_K`, russet `RUSSET_K`).
+- `src/sky.js`: sky, ray-marched clouds (`uDeck` = slab base, top and lens height; 176 steps in capture, 80 in
+  play), the storm cloud body modelled in panorama near the horizon, the blizzard ceiling, sun, fog colour,
+  weather. `src/shared.js`: uniforms `U` (`uSnowfall`, `uMist`, `uBankBase`, `uCanopy`, `uCanopySpot`,
+  `uCharFill`, `uSnowPad`, `uNoise`, ...), `patchMaterial()`, `canopyGaps`, `applyAtmosphere` (height fog,
+  valley bank and rag layers integrated along the ray, snowfall haze by distance).
+- `src/post.js`: GTAO, **volumetric sunlight ray-marched through the sun shadow map**, bloom, the grade (forest
+  and storm branches). `src/backdrop.js`: the 70 km ring beyond the map; in the north the valley continues with
+  interlocking spurs (`SPURS`).
+- `src/creatures.js`: the rider is a scanned CC0 human body (MakeHuman) with clothes pushed off the skin
+  (`mhTemplate`, `tailorCoat`), outfits `arthur` and `winter`; hat, satchel and strap, holster on the thigh,
+  boots with soles, stirrups that ride on the feet. The horse is sculpted from primitives (`quadPrims`,
+  `quadBones`): angled hind legs, a tail of a solid core with hair locks, a mane fitted to the neck's measured
+  width, tack in `addTack` (saddle, blanket, bedroll, bags, lariat, rifle). `src/player.js`: riding (rider scale
+  1.15), snow sink. Others as before: `town.js`, `fx.js`, `water.js`, `audio.js`, `hud.js`, `input.js`,
+  `assets.js`, `textures.js`.
+- `scripts/`: `snap.sh`, `capture.sh`, `shoot.mjs`, `launch.mjs`, `p.sh`, `probe.mjs`, `probe_multi.mjs`,
+  `sbs.py`, `stack.py`, `sheet.py`, `make_pairs.py`, `turntable.mjs`, `perf.mjs`, `proftoggle.mjs`,
+  `mapdump.mjs`, `errlog.mjs`, `build_handoff.py` + `handoff_header.md`, DEM baking, `build_human.py`,
+  `make_artifact.py`.
+- `PROGRESS.md` is the round-by-round log with the critic's own words: **read rounds 78–104 before changing
+  anything**, most ideas have been tried once.
 
-Key coordinates: CABIN ≈ (-460, -2496) (moved by DEM meta); the pine trail runs in the pine belt; the north
-valley axis runs at x ≈ -750 from z -4096 to -1950 (floor about 200 m, flanks 500–1000 m).
+Play-mode performance on the M4 (measured at round 102 with `scripts/perf.mjs`): 13 fps at 1512x982 with the
+governor off, about 24 fps where the governor settles (render scale 0.56), 5 fps at native retina.
 
-## 6. Latest critic notes (round 47) and the to-do list
+## 6. Where it stands (round 104) and what to do next
 
-**Pines (4):**
-- The floor is a bare plane with stamped grass tufts. A dressed floor was added after round 47; verify it.
-- The light shafts read as a bloom halo and starburst, and the trunk under the sun glows. The shafts were
-  softened and lengthened; the next step is **true volumetric shafts that ray-march the sun shadow map**.
-- Trees look cloned and evenly spaced; trunks look smooth.
-- The grade reads as olive-grey; a teal and gold grade was added.
-- The path has a hard edge and evenly scattered chips.
-- The rider and horse look like a clay mannequin with a plank tail; the tail, coat and tack were improved.
+**Pines (4).** Framing, tone numbers and light direction match the reference (thirds 100/74/46 against
+107/72/50). What the critic names every round: (1) the rider and horse as assets; (2) the ground: a blurred
+tread with too little on it (the reference has cones, stones, grass blades and twigs on every square metre, lit
+and casting shadows); (3) trunks read as straight cylinders, the canopy as blobby cards with no needle sprays
+against the sky; (4) the shafts are broad even bands, not broken by branches; no fine dapple on the floor.
 
-**Snow ride (5):**
-- The rider has no snow on him (snow clumps were added), and the hat and scarf are smooth.
-- The cliff is a smooth slab with no ledges, strata or icefalls. Next: snow ledges and strata on steep rock.
-- The snow surface is a flat tiling normal; the legs stood on top of it (the horse now sinks 0.55 m).
-- Shrubs read as snowless pom-poms (they now carry snow and the pale bud dots are gone).
-- Snowfall is sparse with no fog banks (2× flakes added, mist kept in blizzard).
-- A clump of cloned firs blocked the valley (clusters now pushed to the sides).
+**Snow ride (3–4).** (1) horse and rider; (2) the far walls and the valley's depth: pale masses, few planes;
+(3) the snowfield: one ripple texture, no trench behind the horse; (4) trees one model in a row; (5) flakes are
+uniform round dots. The left cliff (six tiers of big outcrops with strata and banked snow) is the part that has
+come furthest.
 
-**Snow vista (3):**
-- The terrain reads as smooth heightfield lumps with a blotchy camouflage snow mask and pepper-dot forest
-  everywhere. Thinning timber and erosion runnels were added; more is needed.
-- There is no focal point: the homestead (`G.findVista` → `town.addHomestead` on a stamped yard) is a tiny box
-  about 550 m away. It needs to be nearer and larger, on a knoll.
-- The haze is milky and even (patchier mist was added); the reference has stacked ridges and low fog banks.
-- The clouds were cotton balls (now a storm deck).
-- The rocks were blobby wet marble (now split matte granite).
-- Brush was salted with white dots (fixed).
+**Snow vista (5–6).** (1) the far distance: the reference stacks six or more ridges with mist between them; ours
+now has spurs beyond the map but their surfaces are pale and unshaded under the haze (round 104, unscored);
+(2) the sky: heavy cloud with lit breaks in the reference; ours is a dark mass with paler billows; (3) forest
+distribution still reads as scatter; (4) the foreground outcrop's rock is soft beside the reference's fractured
+granite and frosted grass; (5) the river and homestead are small and plain.
 
-**Biggest remaining levers:**
-1. Real volumetric light from the shadow map, in the forest and through storm breaks.
-2. Mountain geology: strata and ledges, sharper ridges, rock on steep faces.
-3. Character and horse asset quality: fur hat, coat detail, a horse with real hair and muscle.
-4. A homestead focal point at about 150–250 m.
-5. Snow surface micro-detail: wind ripples and sastrugi, without tiling.
-6. A frozen river reading in both snow shots.
-7. Check the other biome shots (autumn, desert, jungle) for regressions from global changes, then improve them.
+**Levers not yet tried, in my order:**
+1. Shade the backdrop's far ranges: rock on steep faces and snowfields that survive the haze (`backdrop.js`
+   vertex colours and its shader), and mist banks lying between the spurs.
+2. A hoof trench behind the horse in the snow ride that is actually visible (`uTrail` trough is too subtle
+   under overcast), and wind-drawn streaks in the falling snow (`fx.js`).
+3. Needle sprays for the pine canopy cards against the sky (`textures.js` `pineTuftTexture`) and branch-broken
+   shafts (the canopy gap pattern in `shared.js` `canopyGaps` is a noise; real trunks and boughs should cut it).
+4. Real geometry on the pine tread: more cones, stones and grass blades close to the lens (`makeClutter`).
+5. With the owner's yes: scanned ground/rock textures and a real horse-and-rider model. I believe this is what
+   moves the riding shots past 4.
+
+**Four small edits that exist only on the GitHub branch and are not in this code** (commits 3dbb47e, 7cd17bc
+and 7c41534 were made after the file this run started from): a `ledgeSnow` strata block in `terrain.js`, a trampled
+yard in `world.stampPad`, lighter snow on the horse, and crags switched to the bare-ledge material
+(`rMat` → `rMatBare` on the `cragBuilds` line of `vegetation.js`). The first three were reworked independently
+here in rounds 79–102. The crag material change is the one worth trying; it is untested with this rock shader.
 
 ## 7. Pitfalls and lessons (do not relearn these)
 
-- **Probes default to cinematic quality only when no `q=` is given.** `q=high` is a much lower preset (2560
-  heightmap, 1.25 km billboards), so probe at cinematic to judge the far forest.
-- **Don't run two captures at once.** Both bind port 4180 and race on the same output files. If a command is
-  interrupted, check `pgrep -af shoot` before starting another.
-- **A comment on the same line can swallow code.** A `// comment` placed on the same line as an object literal
-  once commented out a shader argument. Always build before committing.
-- **Shader compile errors are silent in the image.** Read the probe or capture log for `THREE.WebGLProgram` and
-  `ERROR`. The "GL_INVALID_OPERATION mismatch between texture format and sampler type" warnings are
-  pre-existing, happen at init, and are harmless.
-- **The forest effects are confined below the snow line.** Forest haze, shafts, exposure lift and the forest
-  grade made the snowy vista milky until restricted.
-- **Billboards are built once at load.** Call `veg.refreshImpostors()` after clearing or adding trees at runtime,
-  otherwise distant cleared trees remain.
-- **Frame-space placement grows rocks.** A rock grown down to far-fallen ground also grows sideways across the
-  frame, so it is capped. Ground-bedded slabs sized by distance work better.
-- **Changing `r()` call counts in `scatter()` reshuffles the whole world.** Use the separate stream `rc()` for
-  new randomness.
-- **Critic scores vary by ±1 between runs.** Trust repeated, consistent complaints over a single score.
-- **The owner rejects tool calls sometimes.** If a command is interrupted, check what actually ran (a rejected
-  chain had partly executed once).
+- **A trailing `// comment` swallows code.** It bit three more times this run: after `.map(`, after an object
+  literal, and on a line holding several statements. Put comments on their own line.
+- **Batch edits with `assert`:** when one match string fails, earlier files in the same script are already
+  written and the failing file is not. Grep for what applied before going on.
+- **In zsh, `$c:frontier` applies the `:f` modifier.** Write `"$c":frontier`.
+- **Planting follows the ground.** Any change to heights *before* vegetation is planted moves every tree, rock
+  and bush in the world (a cactus appeared beside the desert rider). Cut new relief after planting and re-seat
+  what stands on it (`terraceCliffs(true)` in `main.js`). Likewise, changing `r()` call counts in `scatter()`
+  reshuffles the world: use `rc()`.
+- **Shot dressing runs before the camera is moved.** Work out the lens position from the shot's `camRel`.
+- **Ground-based planting under outcrops is buried.** Set plants where a ray from the lens strikes the rock
+  meshes themselves (`rc.intersectObjects` on `veg.rocks.meshes[v]`, after `veg.rocks.update`).
+- **Two materials, one fix.** There are two bark materials (`pineBark`, `ponderosaBark`) and the pine shot uses
+  the second; a fix applied to one of a pair of look-alike lines does nothing in the frame you are judging.
+- **GLSL scope:** a variable declared inside an `if` block is not visible after it; the capture comes back
+  nearly black with no error in the image. Check the tone numbers and the capture log.
+- **Identify the object before fixing it.** The vista's "wedge" was named for twenty rounds and was the corner
+  of a different rock from the one a quick raycast picked. List candidates with their projected positions.
+- **Over-correction.** Most single-item complaints have a history in `PROGRESS.md` of being fixed too far and
+  then reversed (rock warm/cool, rim light, trunk brightness, snow on the horse, storm blue). Move half way.
+- **Do not run two captures at once**, and never rebuild `dist/` during one.
+- **Probes default to cinematic quality only when no `q=` is given.**
+- **Shader compile errors are silent in the image.** The "GL_INVALID_OPERATION mismatch between texture format
+  and sampler type" warnings at start-up are old and harmless.
+- **Billboards are built once at load:** call `veg.refreshImpostors()` after adding or clearing trees.
+- **Critic scores vary by ±1 between runs**, and a critic sub-agent can die on a usage limit: relaunch it.
+- **The built-in browser pane cannot measure performance** (hidden tab, 0x0 canvas): use `scripts/perf.mjs`.
 
 ## 8. Repository and history
 
-- **GitHub:** `mdislamayan09-debug/codexskillfiles`, branch `claude/aaa-open-world-game-c2ao5o` (the latest
-  commit at handoff is `79f93d6`, "Round 49 fixes ..."). The project lives in `frontier/`. If you can reach
-  the repo, `git log` there has the full history. If not, this file is self-contained.
-- **Artifact:** a playable single-page build was published as a claude.ai artifact (v12) from
-  `scripts/make_artifact.py`. It is tied to the old account, so publish a new one if needed.
+- **GitHub:** `mdislamayan09-debug/codexskillfiles`, branch `claude/aaa-open-world-game-c2ao5o`. The project is
+  `frontier/`; this file sits beside it at the top level.
+- Rounds 50–104 were made in a separate local repository rebuilt from the round-49 handoff file, on a machine
+  that was **not signed in to GitHub**. They were prepared as one merge commit on top of the branch's commit
+  `37e68cf`. **Check `git log` on the branch: if it shows "Merge rounds 50-104", the repository is current. If
+  its last commit is still "Rebuild the all-in-one handoff with round 49", the push never happened and this
+  file is ahead of the repository: extract it (section 0), commit `frontier/` and this file on the branch, and
+  push.**
+- **Artifact:** a playable single-page build was once published as a claude.ai artifact from
+  `scripts/make_artifact.py` on the first account. It is long out of date.
 
 ## 9. Embedded file index
 
