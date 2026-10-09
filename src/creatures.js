@@ -196,7 +196,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             float seam = smoothstep(0.006, 0.0, abs(vRest.x)) * step(vRest.z, -0.04) * step(vRest.y, 1.45);  // centre back
             seam = max(seam, smoothstep(0.007, 0.0, abs(vRest.y - 1.43)) * step(vRest.z, -0.02));           // yoke
             seam = max(seam, smoothstep(0.006, 0.0, abs(abs(vRest.x) - 0.185)) * step(vRest.y, 1.3));       // side seams
-            diffuseColor.rgb *= 1.0 - 0.45 * seam * float(lb == 3);
+            diffuseColor.rgb *= 1.0 - 0.7 * seam * float(lb == 3);
             // creases bunch where the coat folds over the saddle
             float crease = (sin(vRest.y * 140.0 + vnoise(vRest.xz * 30.0) * 5.0) * 0.5 + 0.5) * smoothstep(1.12, 0.95, vRest.y) * smoothstep(0.7, 0.85, vRest.y);
             diffuseColor.rgb *= 1.0 - 0.12 * crease * float(lb == 3);
@@ -262,7 +262,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               : `bool cloth = lab == 1 || lab == 2 || lab == 3 || lab == 4 || lab == 9;
                  if (cloth) hgt = (sin(vRest.y * 115.0 + vnoise(vRest.xz * 24.0) * 7.0) * 0.5 + 0.5) * (lab == 3 ? 0.0007 : 0.003) * vnoise(vRest.xy * 9.0 + vRest.z * 5.0) + vnoise(vRest.xy * 700.0 + vRest.z * 500.0) * 0.00035
                    // (leather crinkles: creases a finger wide running every way, deepest where the coat bends)
-                   + (lab == 3 ? (abs(vnoise(vRest.xy * 34.0 + vRest.z * 21.0) - 0.5) * 0.0042 + abs(vnoise(vRest.yx * 71.0 - vRest.z * 47.0) - 0.5) * 0.0018) : 0.0);
+                   + (lab == 3 ? (abs(vnoise(vRest.xy * 58.0 + vRest.z * 37.0) - 0.5) * 0.0016 + abs(vnoise(vRest.yx * 120.0 - vRest.z * 80.0) - 0.5) * 0.0009) : 0.0);   // (a grain, not lumps: at twice the size and depth the back was knobbled hide)
                  else if (lab == 0 || lab == 11 || lab == 12) hgt = vnoise(vRest.xy * 320.0 + vRest.z * 210.0) * 0.0005;
                  else if (lab == 13 || lab == 14) hgt = vnoise(vec2(vRest.x * 260.0 + vRest.z * 190.0, vRest.y * 70.0)) * 0.0024 + vnoise(vRest.xy * 900.0 + vRest.z * 700.0) * 0.0008; // fur
                  else if (lab == 5 || lab == 8 || lab == 10) hgt = vnoise(vRest.xy * 140.0 + vRest.z * 90.0) * 0.0008;`}
@@ -597,7 +597,7 @@ function tailorCoat(pos, lab, R, G, index, n, winter) {
     // long folds falling from the shoulder blades, a little fuller toward the hem
     // (long folds falling from the shoulder blades, deepening toward the hem, and creases bunched across the small of
     // the back where a rider sits: deep enough to catch the light as folds)
-    const fold = (0.0058 * Math.sin(a * 9 + 1.3 * Math.sin(y * 14)) * (0.25 + (y1 - y) * 2.0) + 0.0055 * Math.sin(y * 46 + 2.0 * Math.sin(a * 3)) * Math.exp(-((y - (y0 + 0.2)) ** 2) / 0.012)) * (winter ? 1.2 : 1);
+    const fold = (0.0032 * Math.sin(a * 9 + 1.3 * Math.sin(y * 14)) * (0.25 + (y1 - y) * 2.0) + 0.003 * Math.sin(y * 46 + 2.0 * Math.sin(a * 3)) * Math.exp(-((y - (y0 + 0.2)) ** 2) / 0.012)) * (winter ? 1.2 : 1);
     const rt = Math.max(r, dr[yi][a0] * (1 - t) + dr[yi][a1] * t) + fold * w;
     const k = 1 + (rt / Math.max(r, 1e-4) - 1) * w;
     pos[i * 3] *= k; pos[i * 3 + 2] = cz[yi] + (pos[i * 3 + 2] - cz[yi]) * k;
@@ -969,7 +969,9 @@ export class Human {
     } else if (mode === 'ride') {
       this.hips.position.y = H0 + Math.sin(horsePhase * Math.PI * 2 * (gait > 2 ? 1 : 2)) * (0.01 + 0.025 * gait);
       this.spine.rotation.x = 0.06 * gait + Math.cos(horsePhase * Math.PI * 2) * 0.02 * gait;
-      for (const l of Lg) { l.hp.rotation.x = -1.2; l.hp.rotation.z = l.s * 0.42; l.kn.rotation.x = 1.4; l.an.rotation.x = -0.25; }
+      // (a long western leg: the thigh sloping down and the shin a little behind the knee. Thigh level and shin plumb, he
+      // sat on the horse like a man on a kitchen chair)
+      for (const l of Lg) { l.hp.rotation.x = -0.98; l.hp.rotation.z = l.s * 0.47; l.kn.rotation.x = 1.08; l.an.rotation.x = -0.1; }
       // elbows out a little and hands low over the horn: the arms read beside the body from behind
       for (const a of A) { a.sh.rotation.x = -0.42; a.sh.rotation.z = a.s * 0.2; a.el.rotation.x = -1.15; a.wr.rotation.x = 0.2; }
     } else {
@@ -1069,14 +1071,16 @@ function quadPrims(kind, QB) {
   if (sheep) {
     add(RC([0, 1.42, 0.6], [0, 1.52, 0.86], 0.24, 0.14), QL.coat, 'neck', 0.1);
   } else {
-    add(RC([0, 1.42, 0.62], [0, 1.9, 0.96], deer ? 0.17 : 0.23, deer ? 0.09 : 0.12), QL.coat, 'neck', 0.1);
-    add(RC([0, 1.62, 0.55], [0, 2.0, 0.9], deer ? 0.08 : 0.11, 0.07), QL.coat, 'neck', 0.08); // crest
-    if (!deer) add(RC([0, 1.7, 0.5], [0, 2.07, 0.92], 0.055, 0.04), QL.mane, 'neck', 0.02, { labelBias: 0.01 }); // mane ridge
+    // (round 88: the horse's neck a hand longer and its head a fifth longer: measured, the neck was 0.6 m and the head
+    // 0.5 m, a pony's on a draught horse's body, which is what read as 'a short stub with an undersized head')
+    add(RC([0, 1.42, 0.62], deer ? [0, 1.9, 0.96] : [0, 1.99, 1.04], deer ? 0.17 : 0.23, deer ? 0.09 : 0.125), QL.coat, 'neck', 0.1);
+    add(RC([0, 1.62, 0.55], deer ? [0, 2.0, 0.9] : [0, 2.09, 0.98], deer ? 0.08 : 0.11, 0.07), QL.coat, 'neck', 0.08); // crest
+    if (!deer) add(RC([0, 1.7, 0.5], [0, 2.15, 1.0], 0.055, 0.04), QL.mane, 'neck', 0.02, { labelBias: 0.01 }); // mane ridge
   }
   // head (angled down-forward)
-  const H = sheep ? [0, 1.55, 0.95] : [0, 1.98, 1.06];
-  const muzzle = sheep ? [0, 1.38, 1.18] : deer ? [0, 1.66, 1.36] : [0, 1.6, 1.38];
-  const hs = sheep ? 0.85 : deer ? 0.82 : 1.1;
+  const H = sheep ? [0, 1.55, 0.95] : deer ? [0, 1.98, 1.06] : [0, 2.07, 1.13];
+  const muzzle = sheep ? [0, 1.38, 1.18] : deer ? [0, 1.66, 1.36] : [0, 1.61, 1.53];
+  const hs = sheep ? 0.85 : deer ? 0.82 : 1.16;
   add(EL(H, [0.11 * hs, 0.12 * hs, 0.14 * hs]), sheep ? QL.points : QL.coat, 'head', 0.05);
   add(RC([H[0], H[1] - 0.04, H[2] + 0.04], muzzle, 0.1 * hs, 0.06 * hs), sheep ? QL.points : QL.coat, 'head', 0.06);
   add(EL([0, H[1] - 0.12 * hs, H[2] + 0.04], [0.1 * hs, 0.12 * hs, 0.11 * hs]), sheep ? QL.points : QL.coat, 'head', 0.06); // jowl
@@ -1212,7 +1216,7 @@ export class Quadruped {
     }
     const at = (bone, x, y, z) => V(x, y, z).sub(bone.userData.rest);
     // eyes
-    const H = kind === 'sheep' ? [0, 1.55, 0.95] : [0, 1.98, 1.06];
+    const H = kind === 'sheep' ? [0, 1.55, 0.95] : kind === 'deer' ? [0, 1.98, 1.06] : [0, 2.07, 1.13];
     for (const s of [-1, 1]) {
       const e = mesh(new THREE.SphereGeometry(0.024, 10, 8), std({ color: 0x0a0806, roughness: 0.1 }), false);
       e.position.copy(at(bones.head, s * 0.1 * (kind === 'horse' ? 1 : 0.84), H[1] + 0.02, H[2] + 0.055)); bones.head.add(e);
@@ -1223,9 +1227,10 @@ export class Quadruped {
       const cards = [];
       // (one unbroken fall of hair lying down the off side of the neck, in two layers, each lock overlapping the next:
       // separate cards turned every way stood up along the crest as a row of black teeth)
-      for (const [layer, side, hang, n] of [[0, 1, 0.3, 26], [1, 1, 0.22, 22], [2, -1, 0.1, 18]]) for (let i = 0; i < n; i++) {
+      // (and a fall on the near side too: from that side the neck was bald)
+      for (const [layer, side, hang, n] of [[0, 1, 0.3, 28], [1, 1, 0.22, 24], [2, -1, 0.24, 26], [3, -1, 0.15, 20]]) for (let i = 0; i < n; i++) {
         const t0 = i / n, t1 = (i + 1.6) / n;
-        const crest = (t) => V(0, 1.66 + Math.min(1, t) * 0.4, 0.46 + Math.min(1, t) * 0.47);
+        const crest = (t) => V(0, 1.66 + Math.min(1, t) * 0.49, 0.46 + Math.min(1, t) * 0.55);
         const a = crest(t0), b = crest(t1), L = hang * (1 - 0.35 * t0) * (0.8 + r() * 0.4);
         const out = side * (0.035 + layer * 0.012), sw = (r() - 0.5) * 0.05;
         const pa = [a.x, a.y + 0.012, a.z, b.x, b.y + 0.012, b.z,
@@ -1238,7 +1243,7 @@ export class Quadruped {
         g2.computeVertexNormals();
         cards.push(g2);
       }
-      const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.12, 1.1);
+      const forelock = new THREE.PlaneGeometry(0.08, 0.16); forelock.translate(0, -0.06, 0); forelock.rotateX(-0.6); forelock.translate(0, 2.22, 1.17);
       cards.push(forelock);
       const maneHair = std({ map: hairTex_(new THREE.Color(C.mane).lerp(new THREE.Color(0x4a3420), 0.35).getHex()), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, color: 0xffffff });
       const mm = new THREE.Mesh(mergeGeometriesSafe(cards), maneHair);
@@ -1430,11 +1435,11 @@ export class Quadruped {
     body.add(mesh(rope, std({ color: 0x9a845a })));
     // bridle + reins on the head
     const hr = bones.head.userData.rest;
-    const br = new THREE.TorusGeometry(0.115, 0.012, 4, 14); br.rotateY(Math.PI / 2); br.scale(1, 1.1, 0.8); br.translate(0, -0.08, 0.14);
+    const br = new THREE.TorusGeometry(0.115, 0.012, 4, 14); br.rotateY(Math.PI / 2); br.scale(1, 1.1, 0.8); br.translate(0, -0.02, 0.21);
     bones.head.add(mesh(br, leather));
-    const nose = new THREE.TorusGeometry(0.085, 0.012, 4, 14); nose.rotateX(Math.PI / 2 - 0.9); nose.translate(0, -0.26, 0.2);
+    const nose = new THREE.TorusGeometry(0.085, 0.012, 4, 14); nose.rotateX(Math.PI / 2 - 0.87); nose.translate(0, -0.25, 0.4);
     bones.head.add(mesh(nose, leather));
-    const reinPts = [V(0.08, -0.3, 0.25), V(0.14, -0.38, -0.1), V(0.12, -0.25, -0.55)];
+    const reinPts = [V(0.08, -0.31, 0.45), V(0.15, -0.4, 0.0), V(0.12, -0.25, -0.55)];
     bones.head.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(reinPts), 8, 0.008, 4), leather));
     bones.head.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(reinPts.map((p) => V(-p.x, p.y, p.z))), 8, 0.008, 4), leather));
   }

@@ -1026,3 +1026,18 @@ is near white whatever the weather, so every far face is veiled pale. Fixed in r
   ledge of the outcrops in a storm.
 - **Snow ride lens** closer (5.4 m), exposure +7%. **Storm grade** bluer by (0.95, 1.01, 1.07): both storm
   references measured bluer than ours; snow ride now 113/136/169 against 109/141/177.
+
+**Critic scores.** Round 87: 4 / 3 / 5. Snow ride: "whole frame tinted cobalt" (my uniform blue multiply: the
+reference measures bluer on average, but its highlights are neutral white and its blue is in the shade and the
+air), "snow surface one uniform crinkle, like crumpled foil" (the drift shading I strengthened also amplified
+the fine ripple).
+
+### Round 88
+- **The horse's neck and head are a horse's length.** Measured, the neck was 0.6 m and the head 0.5 m: a pony's
+  on a draught horse's body ("short stub, undersized head"). Neck a hand longer, head a fifth longer (0.6 m),
+  bridle and reins refitted; the mane falls on the near side too.
+- **The rider sits a long western leg** (thigh sloping down, shin a little behind the knee; he sat like a man
+  on a kitchen chair) and is 1.15x. Leather relief is a grain, not lumps; seams drawn stronger.
+- **Storm grade tints mid tones and shade only**; highlights stay neutral white (uniform, the frame was cobalt).
+- **Snow under overcast is shaded by its broad forms only** (with the fine relief it was crumpled foil); ripple
+  and fine relief eased under snowfall.

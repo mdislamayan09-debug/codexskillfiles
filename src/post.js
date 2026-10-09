@@ -200,7 +200,9 @@ const GradeShader = {
       // and a firmer S-curve, so the storm frame has true darks in rock and timber and bright snow, not one mid band
       col = mix(col, col * col * (3.0 - 2.0 * col) * 1.08, uStorm * 0.25);
       // (round 87: both storm references measure bluer than ours by about this much)
-      col *= mix(vec3(1.0), vec3(0.95, 1.01, 1.07), uStorm);
+      // (round 88: in the mid tones and shade only. Over the whole range the frame went cobalt: the reference's snow reaches
+      // a neutral white and its blue is in the shade and the air)
+      col *= mix(vec3(1.0), mix(vec3(0.94, 1.01, 1.09), vec3(1.03, 1.0, 0.97), smoothstep(0.42, 0.8, dot(col, vec3(0.2126, 0.7152, 0.0722)))), uStorm);
       // night: blue shift
       col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse

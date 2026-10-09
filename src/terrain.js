@@ -443,14 +443,16 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     float rip = sin(ph) * smoothstep(3.0, 0.6, fp);
     float drift = fbm2(xz / 11.0);
     // (smooth, wind-laid snow: the finer terms dimpled the whole field like orange peel)
-    vec2 dg = wdir * rip * 0.1 * mix(0.3, 1.0, drift) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.16
+    vec2 dg = wdir * rip * 0.1 * mix(0.3, 1.0, drift) * (1.0 - 0.7 * uSnowfall) + (vec2(fbm2(xz / 6.0 + 1.3), fbm2(xz / 6.0 - 2.1)) - 0.45) * 0.16 * (1.0 - 0.6 * uSnowfall)
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
     // under a snowing sky the light still has a direction (the paler sky up the valley): faces turned to it are
     // lighter, lee faces and hollows darker and bluer, which is all that shows a drift's shape
     {
-      float litS = dot(normalize(n + vec3(-dg.x, 0.0, -dg.y) * 0.7), normalize(vec3(0.8, 0.55, 0.28)));
+      // (the broad forms only: shaded with the fine relief too, the field was crumpled foil)
+      vec2 dgS = (vec2(vnoise(xz / 9.0 + 1.3), vnoise(xz / 9.0 - 2.1)) - 0.5) * 0.34 + (vec2(vnoise(xz / 31.0 + 5.1), vnoise(xz / 31.0 - 3.7)) - 0.5) * 0.8;
+      float litS = dot(normalize(n + vec3(-dgS.x, 0.0, -dgS.y) * 0.7), normalize(vec3(0.8, 0.55, 0.28)));
       float shade = smoothstep(0.25, 0.9, litS);
       float ovc = min(1.0, uSnowfall * 1.6);
       c *= mix(1.0, 0.66 + 0.5 * shade, ovc * snowAmt);
