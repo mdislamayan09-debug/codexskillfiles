@@ -260,13 +260,13 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
-    return { time: 16.35, fov: 35, volDensity: 0.0045, volFalloff: 0.016, expK: 1.2, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
+    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: 1.18, keyShaft: 1.9, player: [x, z, yaw], camRel: [1.25, 2.15, -5.0], lookRel: [-0.45, 1.8, 22], turn: -0.62, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
       const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); // (framed as the reference: the whole horse, its feet near the bottom edge and the rider's hat four-tenths down)
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.5, -5.6], lookRel: [-2.4, 0.44, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -288,7 +288,10 @@ async function init() {
     // finds looks into a side notch with no floor in view. The lens stands on a rock knob built up from the
     // shoulder (see the lookout's dressing), high enough to see over the timber below it.
     if (!params.has('vistasearch')) {
-      const S = { cx: -1060, cz: -1990, lift: 85, tx: -600, tz: -3500 }, PITCH0 = -0.12, D0 = 1200;
+      // (round 76: higher, on the west ridge five hundred metres above the floor, looking north-north-east over the
+      // valley's length to the ranges beyond the map: from the shoulder a dome two kilometres off closed the view
+      // like a bowl; from here the eye runs down into the valley and out over ridge after ridge to the horizon)
+      const S = params.has('vistalow') ? { cx: -1060, cz: -1990, lift: 85, tx: -600, tz: -3500 } : { cx: -1800, cz: -2500, lift: 6, tx: -620, tz: -4000 }, PITCH0 = params.has('vistalow') ? -0.12 : -0.15, D0 = 1200;
       const az0 = Math.atan2(S.tx - S.cx, S.tz - S.cz), ch0 = world.heightAt(S.cx, S.cz) + S.lift;
       const lx0 = S.cx + Math.sin(az0) * D0, lz0 = S.cz + Math.cos(az0) * D0;
       G.vistaCache = { cx: S.cx, cz: S.cz, ch: ch0, tx: lx0, tz: lz0, th: ch0 + Math.tan(PITCH0) * D0 - world.heightAt(lx0, lz0), home: null, knob: true };
@@ -663,10 +666,13 @@ async function init() {
           const [m0x, m0z] = P(-40, 0), [m1x, m1z] = P(6, 0), mh = world.heightAt(px, pz) + 6.5;
           world.raiseSpur(m0x, m0z, mh - 0.5, m1x, m1z, mh, { side: 0.11, round: 0.0005, top: 16, flat0: 12, reach: 170, rough: 0.25, sag: 0 });
         }
-        world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 0.5);
+        world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 0.85);
         const [b0x, b0z] = P(62, 50), [b1x, b1z] = P(215, 66);
-        const bh = Math.max(world.heightAt(b0x, b0z), world.heightAt(b1x, b1z)) + 21;
-        world.raiseSpur(b0x, b0z, bh, b1x, b1z, bh + 6, { side: 2.6, round: 0, top: 26, flat0: 20, reach: 70, rough: 1.4, sag: 0 });
+        const bh = Math.max(world.heightAt(b0x, b0z), world.heightAt(b1x, b1z)) + 30;
+        world.raiseSpur(b0x, b0z, bh, b1x, b1z, bh + 6, { side: 1.5, round: 0, top: 26, flat0: 20, reach: 80, rough: 1.4, sag: 0 });
+        // its face cut into rock risers and snow ledges, as the reference's cliff band is (a single smooth ramp shaded
+        // as one dark hump, whatever was stood against it)
+        world.ledgeBox(Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90, 7.5);
         // The middle distance. The canyon's own walls stand a kilometre off, pale in the falling snow, with nothing
         // between them and the lens. The reference's valley is closed in by spurs coming down from either side one
         // behind another, dark rock on their flanks and timber along their crests, each a tone paler than the last.
@@ -688,7 +694,8 @@ async function init() {
         const r2 = () => ((sd2 = (sd2 * 16807) % 2147483647) / 2147483647);
         // (in three tiers from foot to rim, standing proud of the face and close enough to hide the ground behind them:
         // buried in the slope, each showed one flat side like a panel let into a smooth dome)
-        for (const [out, s0, s1, lift] of [[33.5, 7, 5, 0.3], [30, 6, 5, 0.42], [26.5, 5, 4, 0.5]]) for (let a = 50; a <= 230; a += 5.5 + r2() * 4.5) {
+        // (now only talus at the foot: the face itself is rock)
+        for (const [out, s0, s1, lift] of []) for (let a = 50; a <= 230; a += 9 + r2() * 14) {
           const side = 50 + (a - 62) * 0.105 - out - r2() * 2.5, [x, z] = P(a, side), sc = s0 + r2() * s1;
           veg.crags.add(x, world.heightAt(x, z) - sc * (0.93 - lift), z, r2() * 6.28, sc, Math.floor(r2() * 3));
         }
@@ -747,7 +754,9 @@ async function init() {
       }
       // the midground the reference's valley is built from: split granite outcrops breaking the snow either side
       // of the open lane, and clusters of snow-laden spruce of mixed sizes stepping back up the valley
-      for (let gi = 0; gi < 9; gi++) {
+      // (none now: the bench's cliff and the spurs are the valley's rock, and these jointed blocks, standing alone on
+      // the snow, were pale boxes)
+      for (let gi = 0; gi < 0; gi++) {
         // (inside the lens's field: at 40-170 m out a crag 40 m aside was already past the frame edge)
         const ahead = 40 + rr() * 130, side = (gi % 2 ? 1 : -1) * (9 + ahead * 0.12 + rr() * 18);
         const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, sc = 2.5 + rr() * 4.5;
@@ -1019,6 +1028,7 @@ async function init() {
         if (kTop > world.heightAt(kx, kz)) world.raiseSpur(ax, az, aTop, kx, kz, kTop, { top: 50, side: 0.36, round: 0.0011 });   // (gentle flanks that hold their snow: steeper, the knoll stood on dark rock walls like a pedestal)
         for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
         world.stampPad(kx, kz, 27, 24);
+        U.uSnowPad.value.set(kx, kz, 135, 1);
         const hr = Math.atan2(c.x - kx, c.z - kz) + 0.6;
         town.addHomestead(kx, kz, hr);
         // the yard trodden to dirty snow between the buildings, and a sled track leaving it down the back of the knoll
@@ -1363,11 +1373,14 @@ async function init() {
         if (lo > 1e8) lo = world.heightAt(camera.position.x, camera.position.z);
         U.uBankBase.value += (lo - U.uBankBase.value) * (G.frame < 3 ? 1 : 0.2);
       }
+      // and the height fog rests on that floor too: from a ridge five hundred metres above the valley the layer was
+      // taken to lie at the ridge's own foot, and everything below it filled to a white bowl
+      if (U.uMist.value > 0.01) U.uFogBase.value = Math.min(U.uFogBase.value, U.uBankBase.value);
     }
     const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y = 0; camFwd.normalize();
     const shadowFocus = camera.position.clone().addScaledVector(camFwd, 95);
     shadowFocus.y = world.heightAt(shadowFocus.x, shadowFocus.z);
-    sky.ambientK = 1 - 0.45 * (G.forestK || 0) * (1 - U.uNight.value);
+    sky.ambientK = 1 - 0.25 * (G.forestK || 0) * (1 - U.uNight.value);
     sky.update(!G.freezeTime && G.started ? dt : 0, shadowFocus);
     sky.mesh.position.copy(camera.position);
     U.uFogDensity.value *= G.mistK || 1;
@@ -1381,7 +1394,7 @@ async function init() {
       const W = sky.weather;
       // (a storm with clear air under it is not dim; the woods open up a little under their canopy)
       // (falling snow under a heavy deck is dim: the reference's snowfield sits a stop under paper white)
-      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.19 * W.blizzard) * (1 + 0.45 * (G.forestK || 0));   // (the eye opens up under a canopy, where half the sky's light is shut out)
+      const target = 1.12 * (1 - 0.3 * into * (1 - 0.3 * (G.forestK || 0))) * (1 - 0.3 * W.storm * (1 - W.blizzard)) * (1 - 0.1 * W.blizzard) * (1 + 0.45 * (G.forestK || 0));   // (the eye opens up under a canopy, where half the sky's light is shut out)
       renderer.toneMappingExposure += (target * (G.expK ?? 1) - renderer.toneMappingExposure) * (G.frame < 3 ? 1 : Math.min(1, rdt * 1.5));
     }
     U.uCanopy.value = (G.canopyK ?? 1) * (G.forestK || 0) * (1 - U.uNight.value);

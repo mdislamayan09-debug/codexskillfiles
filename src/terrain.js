@@ -92,6 +92,7 @@ vec3 triN(float l, vec3 wp, vec3 n, float s){
 }
 vec3 gDbg = vec3(0.0);   // debug view: snow, rock, slope
 // the trail ploughed by the horse through deep snow (recent path, oldest first), carved into the snow shading
+uniform vec4 uSnowPad;
 uniform vec2 uTrail[48];
 uniform float uTrailN;
 vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
@@ -271,6 +272,13 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   snowAmt *= 1.0 - 0.8 * smoothstep(0.45, 0.85, road) * smoothstep(0.3, 0.7, snowC);
   rockAmt = max(rockAmt, ribs * 0.55);
   rockAmt = max(rockAmt, scour * smoothstep(0.3, 0.6, snowC) * 0.8);
+  // a built knoll or yard lies under snow whatever its height and shape (a convex top above the crest line was
+  // stripped to dark rock like a wind-scoured summit)
+  if (uSnowPad.w > 0.0) {
+    float pad = uSnowPad.w * smoothstep(uSnowPad.z, uSnowPad.z * 0.55, length(xz - uSnowPad.xy)) * (1.0 - smoothstep(0.16, 0.3, slope));
+    snowAmt = mix(snowAmt, smoothstep(0.3, 0.7, snowC) * (1.0 - 0.8 * smoothstep(0.45, 0.85, road)), pad);
+    rockAmt *= 1.0 - pad;
+  }
   // desert sand and coastal beaches
   vec4 sA = texA(L_SAND, xz, 3.0, 8.0);
   vec3 sN = texN(L_SAND, xz, 3.0);
@@ -387,6 +395,14 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
             + (vec2(fbm2(xz / 26.0 + 5.1), fbm2(xz / 26.0 - 3.7)) - 0.45) * 0.55;   // wind drifts and scoops
     tn = normalize(mix(tn, normalize(vec3(-dg, 1.0)), snowAmt));
     c *= mix(1.0, 0.9 + 0.14 * drift, snowAmt);
+    // under a snowing sky the light still has a direction (the paler sky up the valley): faces turned to it are
+    // lighter, lee faces and hollows darker and bluer, which is all that shows a drift's shape
+    {
+      float litS = dot(normalize(n + vec3(-dg.x, 0.0, -dg.y) * 0.7), normalize(vec3(0.8, 0.55, 0.28)));
+      float shade = smoothstep(0.25, 0.9, litS);
+      c *= mix(1.0, 0.72 + 0.42 * shade, uSnowfall * snowAmt);
+      c = mix(c, c * vec3(0.9, 0.96, 1.08), (1.0 - shade) * 0.5 * uSnowfall * snowAmt);
+    }
     // the horse's trail: a churned trough about a metre wide with thrown-up lips and hoof pits, shaded by its walls
     if (uTrailN > 1.5 && fp < 0.5) {
       float dmin = 1e9, sAt = 0.0, acc = 0.0; vec2 toC = vec2(0.0), tAt = vec2(1.0, 0.0);

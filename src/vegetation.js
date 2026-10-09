@@ -333,6 +333,7 @@ function buildPine(seed, kind = 'pine') {
   // (fuller firs: the narrow spires read as spindly spikes against the reference's broad, snow-loaded spruce)
   const spread = (kind === 'tall' ? 3.3 : kind === 'fir' ? 3.2 : 3.4) * (kind === 'fir' ? 0.85 + rnd() * 0.45 : 0.85 + rnd() * 0.3);
   const tall = kind === 'tall';
+  const lop = 0.1 + rnd() * 0.3, lopA = rnd() * 6.28;
   for (let w = 0; w < whorls; w++) {
     const t = w / whorls;
     const y = base + t * (height - base);
@@ -341,20 +342,24 @@ function buildPine(seed, kind = 'pine') {
     const r = tall
       ? spread * (0.5 + 0.5 * Math.pow(1 - t, 0.6)) * (t > 0.82 ? (1 - t) / 0.18 : 1) + 0.45
       : Math.pow(1 - t, 0.9) * (spread + rnd() * 0.6) + (kind === 'fir' ? 0.45 : 0.55);
-    const n = tall ? 5 + Math.floor(rnd() * 4) : 9 + Math.floor(rnd() * 4);
+    if (kind === 'fir' && t > 0.12 && t < 0.86 && rnd() < 0.1) continue;
+    const n = tall ? 5 + Math.floor(rnd() * 4) : kind === 'fir' ? 7 + Math.floor(rnd() * 5) : 9 + Math.floor(rnd() * 4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * (tall ? 1.4 : 0.7) + w;
       const droop = 0.18 + rnd() * 0.25 + (1 - t) * 0.25 + (kind === 'fir' ? 0.18 : 0);
-      const lr = tall ? r * (0.6 + rnd() * 0.65) : r;
+      // (spruce are ragged too: boughs of uneven length, the crown fuller to one side, a tier missing here and there;
+      // every bough the same length made each tree a turned cone)
+      const lr = tall ? r * (0.6 + rnd() * 0.65) : kind === 'fir' ? r * (0.5 + rnd() * 0.72) * (1 + lop * Math.cos(a - lopA)) : r;
       // cross cards: one lying along the branch, one standing on its edge, so the silhouette reads from the side
       // and from above; each bough is three sprays along its length (sagging further out), so it reads as tufts
       // with sky between them rather than one flat sheet
       for (const vert of [false, true]) {
         const r = lr;
-        for (let sgi = 0; sgi < 3; sgi++) {
-          const t0 = 0.08 + sgi * 0.3, Ls = r * (0.5 - sgi * 0.07), Ws = r * (vert ? 0.28 : 0.4) * (1 - sgi * 0.14);
+        // (five small sprays to a bough: three big ones showed as flat dark sheets with holes in them)
+        for (let sgi = 0; sgi < 5; sgi++) {
+          const t0 = 0.06 + sgi * 0.185, Ls = r * (0.33 - sgi * 0.03), Ws = r * (vert ? 0.2 : 0.28) * (1 - sgi * 0.09);
           const g = new THREE.PlaneGeometry(Ls, Ws);
-          g.translate(r * t0 + Ls * 0.5, -sgi * sgi * 0.05 * r, 0);
+          g.translate(r * t0 + Ls * 0.5, -sgi * sgi * 0.02 * r, 0);
           g.rotateY((rnd() - 0.5) * 0.35);
           if (!vert) g.rotateX(Math.PI / 2 + (rnd() - 0.5) * 0.5);
           else g.rotateX((rnd() - 0.5) * 0.4);
@@ -1115,10 +1120,12 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       // (each face a plateau, each edge a short rounded riser: on a fine mesh the blocks come out with weathered,
       // rounded arrises; snapped hard to the lattice on a coarse one they were faceted shards)
       const soft = (x, st, o, k) => { const q = x / st + o, f = q - Math.floor(q) - 0.5; return (Math.floor(q) + 0.5 + 0.5 * Math.tanh(k * f) / Math.tanh(k * 0.5) - o) * st; };
-      const kx = detail > 12 ? 9 + 5 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
-      v.x = lerp1(v.x, soft(v.x + wob, jstep[0], jo[0], kx), 0.9);
-      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1], jo[1], kx + 3), 0.93);
-      v.z = lerp1(v.z, soft(v.z - wob, jstep[2], jo[2], kx), 0.9);
+      // (the big outcrop variants: joints closer together and the blocks well rounded, a weathered mass split by
+      // cracks; at the boulders' spacing a rock six metres tall was three huge boxes)
+      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 5.5 + 3 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
+      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.74 : 0.9);
+      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.8 : 0.93);
+      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.74 : 0.9);
       v.applyMatrix3(jointMi);
       // weathering: faces spalled and pitted a little
       if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
@@ -1258,7 +1265,7 @@ function rockMaterial(surf = {}, bare = false) {
       // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
       // facets read as paper laid on the rock)
       float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
-      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.8 * smoothstep(0.35, 0.75, rcl.r) * topS);
+      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.62 * smoothstep(0.35, 0.75, rcl.r) * topS);
       base *= vec3(1.22, 1.2, 1.17);   // weathered grey ledge granite
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
@@ -1267,11 +1274,11 @@ function rockMaterial(surf = {}, bare = false) {
       // that grows in the damp streaks
       float crink = 0.22 * (vnoise(vWPos.xz * 23.0 + vWPos.y * 17.0) - 0.5) + 0.1 * (vnoise(vWPos.xy * 61.0 + vWPos.z * 43.0) - 0.5);
       float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.5);
+      base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28);
       float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.34);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.2);
       float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
-      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.5);
+      base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
       diffuseColor.rgb = base;
     `,

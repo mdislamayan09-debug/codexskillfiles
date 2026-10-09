@@ -86,7 +86,7 @@ uniform vec4 uCanopySpot;
       vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
       vec2 q = vec2(dot(wp, R), dot(wp, Up));
       float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18 + (mistN(q / 19.0 + 4.4) - 0.5) * 0.2;   // (pools a metre or two across, gathered where the roof is thin)
-      float gap = 0.02 + 0.98 * smoothstep(0.52, 0.63, n);   // (about a quarter of the floor in sun: soft-edged shafts, dark air between)
+      float gap = 0.02 + 0.98 * smoothstep(0.545, 0.655, n);   // (about a quarter of the floor in sun: soft-edged shafts, dark air between)
   // a shot's key light: one gap in the roof whose shaft falls on a chosen point (the rider), as a cinematographer
   // would wait for or cut
   if (uCanopySpot.w > 0.0) { vec2 q0 = vec2(dot(uCanopySpot.xyz, R), dot(uCanopySpot.xyz, Up)); gap = max(gap, smoothstep(uCanopySpot.w, uCanopySpot.w * 0.5, length(q - q0))); }
@@ -117,7 +117,7 @@ uniform vec4 uCanopySpot;
       float jit = ign(gl_FragCoord.xy + fract(uTime * 0.37) * 97.0);
       float mu = dot(rd, uSunDir);
       // dusty air: a strong forward lobe (the glare round the sun) on a broad one (beams seen from the side)
-      float phase = mix(hg(0.7, mu), hg(0.1, mu), 0.7);   // (mostly a broad lobe: beams show from the side and from below, not only round the sun)
+      float phase = mix(hg(0.7, mu), hg(0.1, mu), 0.55);   // (mostly a broad lobe: beams show from the side and from below, not only round the sun)
       float lit = 0.0, amb = 0.0, tPrev = 0.0, T = 1.0;
       for (int i = 0; i < N; i++) {
         float f = (float(i) + jit) / float(N);

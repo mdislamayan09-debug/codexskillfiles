@@ -807,3 +807,24 @@ first time (round 67, the new lookout).
 crown), larger stones and fallen branches along the verges, curved dead limbs, clustered softer shafts, more
 colour separation in the forest grade; darker, less orange tack; a less saturated red bay with less sheen in
 snow; re-check the nine other shots (not re-run since round 68).
+
+### Rounds 74-76
+- **Pines.** A canopy: full-crowned pines and spruce standing back from the lane (the stand of old boles alone had
+  no boughs in frame); five small sprays to a bough instead of three big ones; a rutted track with grass at its
+  edges; stones and fallen branches on the verges; dead limbs that sag and bend; shafts in clusters with soft
+  edges; less haze, more ambient light under the roof.
+- **Vista: a higher lookout** (`?vistalow` brings back the shoulder): the west ridge five hundred metres above
+  the floor, looking north-north-east over ridge after ridge to the horizon. The height fog now rests on the
+  valley floor ahead (`uBankBase`), not at the ridge's foot (which filled everything below to a white bowl).
+  The mid-height mist is a layer the sight line crosses, like the valley bank. `uSnowPad` keeps a built knoll
+  under snow whatever its height (above the crest line its convex top was stripped to dark rock). The outcrop's
+  joints are closer and its blocks rounded: a weathered mass split by cracks, not three boxes.
+- **Storm sky, painted** (`stormDeck` in `sky.js`): two layers on the planes they hang at, density from smooth
+  warped noise stretched so there are true thick masses and true breaks, shaded by which way the surface faces
+  the sun, dark where thick, pale at torn edges, over a bright overcast. Used when a storm stands in clear air
+  (the ray-marched slab at a low angle kept coming out as streaks on a flat ground).
+- **Snow ride.** The left bench is a thirty-metre face cut into rock risers and snow ledges (`world.ledgeBox`);
+  the jointed blocks stood about the snowfield are gone. Spruce are ragged (uneven boughs, lopsided crowns,
+  missing tiers). Drifts are shaped by a directional skylight while it snows. The horse is larger in frame.
+
+**Critic scores.** Round 74: 4 / 4 / 4. Round 75: 4 / 4 / 5.

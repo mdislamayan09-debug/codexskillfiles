@@ -136,6 +136,38 @@ export class Sky {
         // storm: a low, flat, blue-grey overcast (also what far clouds fade into)
         // (the breaks between the storm cells are pale, washed sky, not a saturated blue)
         vec3 stormSky(vec3 c){ return mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))) * vec3(0.76, 0.89, 1.06) * (0.95 + 0.2 * uBlizzard) + vec3(0.15, 0.185, 0.24), min(uStorm * 1.05, 1.0)); }
+        // A storm deck in clear air, painted in two layers on the planes they hang at. Each layer: density from
+        // smooth warped noise (great soft billows, no streaks), shaded by which way its surface faces the sun, dark
+        // where it is thick and pale along its torn edges; the bright overcast far above shows through the breaks.
+        // (The ray-marched slab, seen at a low angle from a lookout, kept coming out as streaks on a flat ground.)
+        vec2 deckLayer(vec2 uv, vec2 sd){
+          vec2 w = vec2(vn(uv * 1.1 + 3.1), vn(uv * 1.1 - 7.7)) - 0.5;
+          vec2 q = uv + w * 0.9, q2 = q + sd * 0.22;
+          float den = vn(q * 0.8) * 0.5 + vn(q * 1.9 + 5.0) * 0.3 + vn(q * 4.3 - 2.0) * 0.2;
+          float den2 = vn(q2 * 0.8) * 0.5 + vn(q2 * 1.9 + 5.0) * 0.3 + vn(q2 * 4.3 - 2.0) * 0.2;
+          // (a sum of noises bunches round its mean: stretched, so there are true thick masses and true breaks)
+          return vec2(clamp((den - 0.5) * 2.3 + 0.5, 0.0, 1.0), clamp((den - den2) * 5.0 + 0.5, 0.0, 1.0));
+        }
+        vec3 stormDeck(vec3 d, vec3 s, float day){
+          vec2 sd = normalize(s.xz + 1e-4);
+          float yy = max(d.y, 0.0);
+          vec3 col = vec3(0.6, 0.7, 0.86) * (0.7 + 0.4 * vn(d.xz / (yy + 0.3) * 0.7 + 11.0));
+          {
+            vec2 L = deckLayer(d.xz / (yy + 0.2) * 0.42 + uCloudOffset * 1.2 + 4.0, sd);
+            vec3 c = mix(vec3(0.36, 0.42, 0.52), vec3(0.16, 0.2, 0.28), smoothstep(0.45, 0.8, L.x));
+            c += (L.y - 0.5) * 0.14 * (1.0 - smoothstep(0.55, 0.8, L.x));
+            col = mix(col, c, smoothstep(0.3, 0.46, L.x));
+          }
+          {
+            vec2 L = deckLayer(d.xz / (yy + 0.1) * 0.6 + uCloudOffset * 2.0, sd);
+            vec3 c = mix(vec3(0.24, 0.29, 0.38), vec3(0.055, 0.075, 0.115), smoothstep(0.48, 0.85, L.x));
+            c += (L.y - 0.5) * 0.16 * (1.0 - smoothstep(0.56, 0.85, L.x));
+            c += vec3(0.2, 0.22, 0.25) * (1.0 - smoothstep(0.38, 0.5, L.x));
+            col = mix(col, c, smoothstep(0.38, 0.52, L.x));
+          }
+          col *= 0.25 + 0.75 * day;
+          return mix(col, vec3(0.4, 0.47, 0.58) * (0.25 + 0.75 * day), smoothstep(0.1, 0.0, d.y) * 0.7);
+        }
         void main(){
           vec3 d = normalize(vDir);
           vec3 s = normalize(uSunDir);
@@ -207,6 +239,7 @@ export class Sky {
             float ci = fbm(vec2(uv.x*0.45, uv.y*1.1) + 20.0 + uTime*0.002);
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
+          if (uStorm > 0.01 && uBlizzard < 0.99) col = mix(col, stormDeck(d, s, day), uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.05, d.y));
           // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
           // (right up to the zenith: seen from inside falling snow the deck is a pale, softly mottled ceiling, not the
           // dark slate underside of a dry storm; its cells still show through)

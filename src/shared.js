@@ -30,7 +30,8 @@ export const U = {
   uFogFalloff: { value: 0.022 },
   uFogBase: { value: 0 },   // height the fog layer sits on: the ground under the camera, eased
   uMist: { value: 0 },      // low cloud banks lying in mountain valleys (stormy cold weather)
-  uBankBase: { value: 0 },  // the valley floor ahead of the lens, which the fog bank lies on
+  uBankBase: { value: 0 },
+  uSnowPad: { value: new THREE.Vector4(0, 0, 0, 0) },   // x, z, radius, strength: built ground that keeps its snow whatever its height  // the valley floor ahead of the lens, which the fog bank lies on
   uSnowfall: { value: 0 },
   uCanopy: { value: 0 },
   uCanopySpot: { value: new THREE.Vector4(0, 0, 0, 0) },   // xyz a point the key shaft falls on, w its radius (0 = none)    // under a forest roof: the sun reaches the air and the floor only through its small gaps  // falling snow in the air: everything a few kilometres off dissolves into it
@@ -124,7 +125,7 @@ float canopyGaps(vec3 wp){
   vec3 R = normalize(cross(vec3(0.0, 1.0, 0.0), L)), Up = cross(L, R);
   vec2 q = vec2(dot(wp, R), dot(wp, Up));
   float n = mistN(q / 1.9) * 0.5 + mistN(q / 0.7 + 7.3) * 0.32 + mistN(q / 6.0 - 2.9) * 0.18 + (mistN(q / 19.0 + 4.4) - 0.5) * 0.2;   // (pools a metre or two across, gathered where the roof is thin)
-  float gap = 0.02 + 0.98 * smoothstep(0.52, 0.63, n);   // (about a quarter of the floor in sun: soft-edged shafts, dark air between)
+  float gap = 0.02 + 0.98 * smoothstep(0.545, 0.655, n);   // (about a quarter of the floor in sun: soft-edged shafts, dark air between)
   // a shot's key light: one gap in the roof whose shaft falls on a chosen point (the rider), as a cinematographer
   // would wait for or cut
   if (uCanopySpot.w > 0.0) { vec2 q0 = vec2(dot(uCanopySpot.xyz, R), dot(uCanopySpot.xyz, Up)); gap = max(gap, smoothstep(uCanopySpot.w, uCanopySpot.w * 0.5, length(q - q0))); }
@@ -202,7 +203,6 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   col = mix(col, fogCol * 1.12, uSnowfall * 0.96 * (1.0 - exp(-max(dist - 350.0, 0.0) / 1450.0)));   // (the near walls keep their darks)
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
-    float above = wpos.y - uFogBase;
     // Valley fog as a layer of air, not paint: a bank lies between the valley floor and a ceiling a hundred metres
     // up, and what it hides depends on how far the sight line runs inside it. Looked down into from a height it
     // pools along the floor, thickening with distance, and whatever stands above the ceiling stands clear of it
@@ -219,20 +219,31 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
         vec3 pm = cameraPosition + rd * (tIn + min(Lb, 900.0) * 0.5);
         float bankN = smoothstep(0.42, 0.7, mistN(pm.xz / 620.0 + 1.7) * 0.65 + mistN(pm.xz / 210.0 - 4.1) * 0.35);
         // (thin enough that the floor's timber and river show through it, thick only in its banks)
-        float m = 1.0 - exp(-Lb * uMist * (0.1 + 0.9 * bankN) / 1500.0);
-        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.8));
+        // (seen down into from above, the sight line crosses the layer in a couple of hundred metres, so the banks are
+        // thick and the air between them clear; from inside the layer the same air is a thin veil)
+        float m = 1.0 - exp(-Lb * uMist * (0.02 + 2.6 * bankN * bankN) / mix(800.0, 1500.0, step(yc, h1)));
+        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.7));
       }
     }
-    // low cloud clinging to the mountainsides a few hundred metres up, torn into drifting rags
-    float band = smoothstep(120.0, 260.0, above) * smoothstep(700.0, 420.0, above);
-    // (torn into separate rags with clear air between: a continuous band read as one white sheet over the slopes)
-    float rag = smoothstep(0.52, 0.85, mistN(wpos.xz / 650.0 + vec2(wpos.y / 400.0, 0.0)) * 0.65 + mistN(wpos.xz / 190.0 - 3.7) * 0.35);
-    col = mix(col, mix(vec3(0.74, 0.8, 0.89) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(uMist * band * rag * 0.8 * (1.0 - exp(-dist / 1400.0)), 0.0, 0.8));   // (pale and plain to see, banked against the slopes)
+    // and a thin band of low cloud a few hundred metres up, in torn rags, also a layer the sight line runs through:
+    // it crosses in front of the mountainsides as a level streak of mist with clear air above and below it
+    // (painted onto the slopes by their height it lay on them as airbrushed smears)
+    {
+      float y0 = uBankBase + 240.0, y1 = uBankBase + 330.0, yc = cameraPosition.y, ta, tb, L2 = 0.0, tm = 0.0;
+      if (abs(rd.y) < 1e-4) { if (yc > y0 && yc < y1) { L2 = dist; tm = dist * 0.5; } }
+      else { ta = (y0 - yc) / rd.y; tb = (y1 - yc) / rd.y; float t0 = max(0.0, min(ta, tb)), t1 = min(dist, max(ta, tb)); L2 = max(0.0, t1 - t0); tm = 0.5 * (t0 + t1); }
+      if (L2 > 0.0) {
+        vec3 pm = cameraPosition + rd * tm;
+        float rag = smoothstep(0.5, 0.74, mistN(pm.xz / 780.0 + 6.1) * 0.6 + mistN(pm.xz / 260.0 - 3.7) * 0.4);
+        float m2 = 1.0 - exp(-L2 * uMist * rag / 2600.0);
+        col = mix(col, mix(vec3(0.72, 0.79, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(m2, 0.0, 0.5));
+      }
+    }
     // and the far ranges step back in pale blue-grey layers
     col = mix(col, uFogColor * vec3(0.95, 1.02, 1.15), uMist * 0.16 * (1.0 - exp(-dist / 4200.0)));
     // and past three kilometres or so every range is a flat blue-grey shape, each paler than the one before it (a
     // sunlit snow massif six kilometres off stood as the brightest, whitest thing in the frame)
-    col = mix(col, uFogColor * vec3(1.0, 1.06, 1.18), min(uMist * 1.1, 1.0) * 0.78 * smoothstep(2600.0, 8500.0, dist));
+    col = mix(col, uFogColor * vec3(1.0, 1.06, 1.18), min(uMist * 1.1, 1.0) * 0.72 * smoothstep(3400.0, 9500.0, dist));
   }
   return col;
 }

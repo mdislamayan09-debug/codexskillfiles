@@ -888,6 +888,23 @@ export class World {
     this.heightTex.needsUpdate = true; this.splatTex.needsUpdate = true;
   }
 
+  // Set-building: steep ground inside a box cut into rock risers and snow ledges every `step` metres (the bedding
+  // dipping and wandering a little), as terraceCliffs does for the map's own cliffs.
+  ledgeBox(x0, z0, x1, z1, step = 8, minG = 0.7) {
+    const i0 = Math.max(1, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 2, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(1, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 2, Math.ceil((z1 + HALF) / CELL));
+    const W = i1 - i0 + 1, out = new Float32Array(W * (j1 - j0 + 1)), H = this.heights, n = this.n3;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * RES + i, h = H[k], x = i * CELL - HALF, z = j * CELL - HALF;
+      const g = Math.hypot(H[k + 1] - H[k - 1], H[k + RES] - H[k - RES]) / (2 * CELL);
+      const amt = smoothstep(minG, minG + 0.45, g);
+      const dip = 0.04 * x + 0.025 * z + 2.5 * n.noise(x / 70 + 1.3, z / 70 - 4.1);
+      const u = (h + dip) / step, f = u - Math.floor(u);
+      out[(j - j0) * W + (i - i0)] = lerp(h, (Math.floor(u) + smoothstep(0.36, 0.64, f)) * step - dip, amt);
+    }
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) H[j * RES + i] = out[(j - j0) * W + (i - i0)];
+    this.heightTex.needsUpdate = true;
+  }
   // Set-building: timber. The forest channel of the splat raised to v within r metres of a point (the ground
   // under a planted stand is then shaded as forest floor, not open snow). Call touchSplat() when done.
   paintForest(x, z, r, v = 220) {
