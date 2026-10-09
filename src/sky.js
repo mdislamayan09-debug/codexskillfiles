@@ -46,7 +46,9 @@ vec3 skyColor(vec3 d, vec3 s){
 const float CB = 1500.0, CT = 2900.0;
 float remap(float v, float a, float b, float c, float d){ return c + (clamp(v, a, b) - a) / (b - a) * (d - c); }
 float cloudDen(vec3 p, float cov){
-  float h = (p.y - CB) / (CT - CB);
+  // (a storm deck's base hangs in great lumps and hollows: flat, seen from below at a low angle, it was a row of
+  // grey smears)
+  float h = (p.y - CB - uStorm * 420.0 * (texture(tCloud, vec3(p.xz / 5200.0, 0.61)).r - 0.5)) / (CT - CB);
   if (h < 0.0 || h > 1.0) return 0.0;
   float weather = texture(tCloud, vec3(p.xz / 26000.0, 0.37)).b;
   vec4 lo = texture(tCloud, p / 6200.0 + vec3(weather * 0.35, 0.0, weather * 0.2));
@@ -66,9 +68,9 @@ float cloudDen(vec3 p, float cov){
   float d = remap(lo.r * prof + (texture(tCloud, p / 1900.0).g - 0.5) * 0.06, 1.0 - c, 1.0 - c + 0.22, 0.0, 1.0);
   if (d <= 0.0) return 0.0;
   float det = texture(tCloud, p / 760.0 + vec3(0.0, uTime * 0.0004, 0.0)).g;
-  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * 0.68, 1.0, 0.0, 1.0);
+  d = remap(d, mix(det, 1.0 - det, smoothstep(0.0, 0.3, h)) * mix(0.68, 0.4, uStorm), 1.0, 0.0, 1.0);   // (soft billows in a storm, not crisp fair-weather cauliflower)
   // a finer erosion pass where the cloud is thin: crisp wisps and torn edges instead of a soft, magnified blur
-  if (d > 0.0 && d < 0.6) d = remap(d, texture(tCloud, p / 260.0 + vec3(uTime * 0.0006, 0.0, 0.0)).g * 0.32, 1.0, 0.0, 1.0);
+  if (d > 0.0 && d < 0.6) d = remap(d, texture(tCloud, p / 260.0 + vec3(uTime * 0.0006, 0.0, 0.0)).g * 0.32 * (1.0 - 0.75 * uStorm), 1.0, 0.0, 1.0);
   return d * c;
 }
 float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }
@@ -145,8 +147,8 @@ export class Sky {
           // the sky, and the deck's dark masses stand against it with lit edges
           {
             vec2 huv = d.xz / (max(d.y, 0.0) + 0.2);
-            float hc = fbm(huv * 0.9 + 11.0);
-            vec3 hi = vec3(0.66, 0.72, 0.82) * (0.5 + 0.65 * hc) * (0.3 + 0.7 * day);
+            float hc = vn(huv * 0.8 + 11.0) * 0.65 + vn(huv * 2.1 + 3.0) * 0.35;   // (smooth: six octaves of it were a crunchy pale texture)
+            vec3 hi = vec3(0.6, 0.72, 0.9) * (0.55 + 0.6 * hc) * (0.3 + 0.7 * day);
             col = mix(col, hi, uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.1, d.y) * 0.9);
           }
           // sun disc
@@ -193,8 +195,10 @@ export class Sky {
             // (and its underside modelled in cells: heavier, darker bellies and paler thin places between them)
             {
               vec2 cuv2 = d.xz / (d.y + 0.14) * 0.9 + uCloudOffset * 2.0;
-              float cell = fbm(cuv2 * 1.3) * 0.6 + fbm(cuv2 * 3.1 + 5.2) * 0.4;
-              cl.rgb *= mix(1.0, mix(0.45, 1.05, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
+              float cell = vn(cuv2 * 0.7) * 0.6 + vn(cuv2 * 1.6 + 5.2) * 0.4;
+              cl.rgb *= mix(1.0, mix(0.6, 1.1, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
+              // slate blue, as storm cloud is against a cold sky (ours was a neutral grey)
+              cl.rgb *= mix(vec3(1.0), vec3(0.78, 0.9, 1.1), uStorm * (1.0 - uBlizzard));
             }
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;

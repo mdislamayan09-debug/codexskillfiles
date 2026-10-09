@@ -853,9 +853,22 @@ async function init() {
         {
           const sdr = U.uSunDir.value, sl2 = Math.hypot(sdr.x, sdr.z) || 1;
         }
-        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 12, 1.15, 1]]   /* (a few, well to the sides: more, and nearer the trail, shut the sun out altogether) */) {   // (not hard by the lens: seen from a few metres the needle sprays are plainly cards)
+        // The canopy. The stand of tall boles alone had none in frame: their crowns begin fifteen metres up, and the
+        // upper half of the picture was bare poles in haze. The reference's wood has needle boughs at every height,
+        // dark against the light. So among the old boles stand full-crowned pines and spruce of every age, their
+        // boughs coming down to head height, fifteen metres and more from the lens (nearer, a spray is plainly a
+        // card), with the lane toward the sun left open between them. Inside a stand their crowns do not write the
+        // shadow map, so they hang in the light without shutting it out.
+        const firsC = veg.groups.fir;
+        // (a few, standing back and to the sides: a dozen close in roofed the lane over, hid the shafts behind a wall of
+        // green and took a stop and a half off the frame)
+        if (pines.length) for (const [fw, sd2, sc, v] of [[30, 13, 1.15, 1], [26, -15, 1.45, 3], [38, 15, 1.5, 0], [44, -13, 1.35, 3], [54, -9, 1.6, 0], [58, 14, 1.4, 2], [66, -15, 1.55, 1], [72, 9, 1.5, 3]]) {
           const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
           veg.trees.add(x, world.heightAt(x, z) - 0.2, z, fw * 1.7, sc, pines[v % pines.length]);
+        }
+        if (firsC.length) for (const [fw, sd2, sc] of [[31, -10.5, 0.95], [36, 10, 0.7], [46, -18, 1.1], [50, 13, 0.9], [60, -12, 0.8], [68, 12, 1.0]]) {
+          const x = camX + cf[0] * fw + cr[0] * sd2, z = camZ + cf[1] * fw + cr[1] * sd2;
+          veg.trees.add(x, world.heightAt(x, z) - 0.25, z, fw * 2.9 + sd2, sc, firsC[Math.abs(Math.round(fw * 3 + sd2)) % firsC.length]);
         }
       }
       // the floor the reference rides through: drifts of knee-high shrub, fern and backlit bunchgrass either side of
@@ -964,7 +977,7 @@ async function init() {
               const x = c.x + d0.x * f + rt0.x * r, z = c.z + d0.z * f + rt0.z * r;
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const D = stand(x, z, world.heightAt(x, z));
-              if (D > 0.3 && world.normalAt(x, z).y > 0.6) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
+              if (D > 0.3 && world.normalAt(x, z).y > 0.45) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
@@ -979,7 +992,7 @@ async function init() {
               const st = stand(x, z, h);
               if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.5 + 0.48 * (1 - THREE.MathUtils.smoothstep(h, 320, 500)))) continue;
               const sp = world.splatAt(x, z);
-              if (world.normalAt(x, z).y < 0.6 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
+              if (world.normalAt(x, z).y < 0.5 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
               veg.trees.add(x, h - 0.3, z, pick * 62.8, 0.38 + sc * 1.25, firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants)
               added++;
             }
@@ -1083,7 +1096,7 @@ async function init() {
       const block = (nx, ny, dist, rot, v = 5, wide = 1) => {
         n2.set(nx, ny); rc.setFromCamera(n2, camera);
         const r = rc.ray.direction, x = c.x + r.x * dist, z = c.z + r.z * dist, top = c.y + r.y * dist, g = world.heightAt(x, z);
-        const sc = Math.min(7.5, Math.max(1.3, (top - g) / 0.62)) * wide;
+        const sc = Math.min(11, Math.max(1.3, (top - g) / 0.62)) * wide;
         veg.rocks.add(x, Math.max(g - 0.14 * sc, top - 0.76 * sc), z, rot, sc, v);
         // frosted grass and dead brush rooted in the block's top and shoulders (bare, the outcrop was a quarry face)
         const by = Math.max(g - 0.14 * sc, top - 0.76 * sc) + 0.62 * sc;
@@ -1101,7 +1114,9 @@ async function init() {
         const [r0x, r0z, r0y] = P(4, 5.5, -5.2), [r1x, r1z, r1y] = P(11, 6.5, -6.4);
         world.raiseSpur(r0x, r0z, r0y, r1x, r1z, r1y, { side: 1.5, round: 0.02, top: 3, reach: 30, rough: 0.12, sag: 0 });
       }
-      for (const b of [[-0.96, 0.12, 8.5, 0.4, 6, 1], [-0.72, -0.1, 9.5, 1.9, 7, 1], [-0.5, -0.34, 10, 3.1, 8, 1], [-0.9, -0.4, 6.5, 4.4, 7, 1], [-0.34, -0.6, 8.5, 2.2, 6, 1], [-0.64, -0.7, 6.8, 5.3, 8, 1],
+      // (the outcrop climbs the left edge to two-thirds of the frame's height and steps down toward the middle: lower,
+      // the lens looked straight down on the timbered slope below it, every tree a dot on white)
+      for (const b of [[-1.0, 0.56, 7.2, 5.1, 7, 1], [-0.84, 0.36, 8.3, 2.7, 8, 1], [-0.62, 0.12, 9.4, 0.9, 6, 1], [-0.96, 0.12, 8.5, 0.4, 6, 1], [-0.72, -0.1, 9.5, 1.9, 7, 1], [-0.5, -0.34, 10, 3.1, 8, 1], [-0.9, -0.4, 6.5, 4.4, 7, 1], [-0.34, -0.6, 8.5, 2.2, 6, 1], [-0.64, -0.7, 6.8, 5.3, 8, 1],
         [-0.12, -0.84, 7.5, 0.9, 4, 1.2], [0.16, -0.9, 7.8, 3.7, 5, 1.2], [0.42, -0.84, 8.2, 1.4, 4, 1.1],
         [0.8, -0.52, 9.5, 2.6, 7, 1], [0.98, -0.68, 7.2, 5.9, 6, 1], [0.62, -0.8, 8.6, 4.1, 8, 1]]) block(...b);
       // and loose slabs bedded in whatever of the ledge's own ground still shows between them

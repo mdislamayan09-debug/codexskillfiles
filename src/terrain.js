@@ -320,6 +320,12 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   c = mix(c, grass * 0.85, crown * 0.75);
   c *= 1.0 - rr*0.12*smoothstep(0.6,1.0,sin(xz.x*1.4+xz.y*0.4)*0.5+0.5);
   // a used trail up close: hoofprints pressed into it, stones bedded in the tread, roots snaking across in the woods
+  // a wagon track through the woods: two worn ruts with a paler crown between them, damp dark patches along it
+  if (rr > 0.05 && pineK > 0.01) {
+    float rut = smoothstep(0.05, 0.0, abs(road - 0.78 - 0.04 * (fbm2(xz / 5.0) - 0.5)));
+    c *= 1.0 - 0.3 * rut * rr * pineK;
+    c *= 1.0 - 0.22 * pineK * rr * smoothstep(0.5, 0.75, fbm2(xz / 3.4 + 8.1));
+  }
   if (rr > 0.05 && fp < 0.2) {
     float near = rr * smoothstep(0.2, 0.06, fp) * (1.0 - town);
     vec2 hc = floor(xz / 0.55), hf = fract(xz / 0.55) - 0.5 - (hash22(hc) - 0.5) * 0.4;
@@ -542,7 +548,7 @@ export class Terrain {
             // (the ground in a snow-country stand is snow, a little shaded: the trees themselves are what is dark.
             // Tinted grey under them, a forested mountainside read as grey rock with white patches and specks on it.)
             vec3 gapC = mix(srgb(vec3(170,182,200)), srgb(vec3(62,78,100)), smoothstep(0.55, 0.88, fo));   // (deep in a stand the snow lies in the trees' shade: from afar the stand is one dark mass)
-            vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.6), mix(gapC, crownC, crown * 0.5), res);
+            vec3 snowForest = mix(mix(srgb(vec3(26,38,42)), gapC, 0.45), mix(gapC, crownC, crown * 0.6), res);
             canopy = mix(canopy, snowForest, smoothstep(0.4, 0.8, ccl.r));
           }
           // crown mottling: lit crowns and shaded gaps as organic noise (a dome grid lines up into rows at
@@ -559,7 +565,7 @@ export class Terrain {
           canopyK *= 1.0 - 0.12 * smoothstep(0.4, 0.8, ccl0.r);
           // (and only where timber can stand: on faces too steep for trees the stand's tint lay alone on the snow as a
           // blue-grey smear)
-          canopyK *= mix(1.0, smoothstep(0.55, 0.68, normalAt(vWPos.xz).y), smoothstep(0.4, 0.8, ccl0.r));
+          canopyK *= mix(1.0, smoothstep(0.4, 0.52, normalAt(vWPos.xz).y), smoothstep(0.4, 0.8, ccl0.r));
           diffuseColor.rgb = mix(diffuseColor.rgb, canopy, canopyK);
           tr = mix(tr, 1.0, canopyK);
         }

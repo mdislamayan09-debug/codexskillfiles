@@ -983,7 +983,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       vec3 nrm = normalAt(xz);
       float slope = 1.0 - nrm.y;
       float edgeN = (vnoise(xz * 0.9) - 0.5) * 0.35 + (vnoise(xz * 3.1) - 0.5) * 0.12;
-      float dens = (1.0 - smoothstep(0.2, 0.45, sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
+      float pineRd = smoothstep(-700.0, -1250.0, xz.y);
+      float dens = (1.0 - smoothstep(mix(0.2, 0.42, pineRd), mix(0.45, 0.8, pineRd), sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(700.0, 860.0, h0);
       dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
