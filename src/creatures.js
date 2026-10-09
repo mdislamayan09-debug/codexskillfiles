@@ -126,7 +126,7 @@ const std = (o) => {
       float fres = pow(1.0 - clamp(abs(dot(normalize(vNormal), Vv)), 0.0, 1.0), 3.0);
       vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
       // (a thin edge only: at three times this every hat and strap wore a glowing outline)
-      totalEmissiveRadiance += (diffuseColor.rgb + 0.008) * uSunColor * fres * smoothstep(-0.2, 0.8, dot(-Vv, wsun)) * 0.13;
+      totalEmissiveRadiance += (diffuseColor.rgb + 0.004) * uSunColor * fres * smoothstep(-0.2, 0.8, dot(-Vv, wsun)) * 0.07;
       // (from the sky and the lit air, more on what faces up: laid on evenly it flattened every form into one tone)
       totalEmissiveRadiance += diffuseColor.rgb * uFogColor * uCharFill * (0.3 + 0.9 * smoothstep(-0.7, 0.9, inverseTransformDirection(normal, viewMatrix).y));
       // the key light: where a shot lets a shaft fall on its subject, the figure in it takes the sun on whatever faces
@@ -299,7 +299,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
         {
           vec3 Vv = normalize(vViewPosition);
           // (a coat of hair scatters light at grazing angles: a softer, wider rim on animals)
-          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '3.5'});
+          float fres = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), ${quad ? '3.0' : '2.2'});   // (a broad soft edge on cloth: narrow and bright it was a drawn outline)
           vec3 wsun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           float back = smoothstep(-0.2, 0.8, dot(-Vv, wsun));
           ${quad ? `{
@@ -314,7 +314,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
           // (thin: at 0.6 the rider's whole outline glowed like velvet under a lamp)
-          totalEmissiveRadiance += (diffuseColor.rgb + 0.01) * uSunColor * fres * back * ${quad ? '0.2' : '0.34'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.2' : '0.1'};   // (round 94: between the glowing outline of 0.6 and none at all)
+          totalEmissiveRadiance += (diffuseColor.rgb + 0.01) * uSunColor * fres * back * ${quad ? '0.2' : '0.2'} + diffuseColor.rgb * uFogColor * fres * ${quad ? '0.2' : '0.1'};   // (round 94: between the glowing outline of 0.6 and none at all)
           // light bounced up off the ground and in from the lit air: a figure in shade is dim, not black
           totalEmissiveRadiance += diffuseColor.rgb * uFogColor * uCharFill * (0.3 + 0.9 * smoothstep(-0.7, 0.9, inverseTransformDirection(normal, viewMatrix).y));
       // the key light: where a shot lets a shaft fall on its subject, the figure in it takes the sun on whatever faces

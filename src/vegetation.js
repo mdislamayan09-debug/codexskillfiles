@@ -98,6 +98,9 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
     #ifdef CONIFER_SNOW
     // inside a stand the needles are dark masses against the lit air (one mid green, the canopy was soft green card)
     diffuseColor.rgb *= mix(1.0, 0.62, uCanopy);
+    #else
+    // and the broadleaf scrub under them takes the light bounced about the floor (it stood as black cut-outs)
+    diffuseColor.rgb *= mix(1.0, 1.5, uCanopy);
     #endif
   }`;
 function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false, russet = 0.7 } = {}) {
@@ -1430,7 +1433,7 @@ export class Vegetation {
         // (round 98: inside a stand a bole is a dark shape against the lit air, as the reference's are: lit by the forest's
         // raised exposure they stood orange-brown in their own shade. And both barks now: the grey-brown above had been
         // given to the spruce bark only, and the pine shot's ponderosas stayed cinnamon for six rounds)
-        diffuseColor.rgb *= mix(1.0, 0.5, uCanopy);
+        diffuseColor.rgb *= mix(1.0, 0.72, uCanopy);   // (0.5 took them to black with no bark in them)
         diffuseColor.rgb *= mix(0.4, 1.0, smoothstep(0.0, 1.3, above));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.042, 0.028), smoothstep(0.4, 0.0, above) * 0.65);
         float tone = hash12(floor(vTreePos.xz * 0.37) + 3.0);

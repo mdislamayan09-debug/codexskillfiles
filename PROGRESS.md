@@ -1214,3 +1214,17 @@ step bands on the now-close deck). Snow ride: far walls "washed-out pale-blue bl
   steps as bands. A storm's lit heads are pale grey (sun x0.45), not white.
 - **Conifers in a snowstorm are dark under their snow** (near trees' load 0.5, far billboards lose the frosted
   tint and a third of their albedo). Snowfall haze eased (300 m start, 2600 m scale).
+
+**Critic scores.** Round 98: 4 / 4 / 5. Trunks went from "evenly lit red-orange" to "near-black across the whole
+frame, no bark relief, no warm bounce" (overshot), the rim light I restored is "a toon outline" on hat and arm;
+vista's first item is the forest again ("pepper noise: no clumping, no clearings, no size variation"); snow
+ride's is the left cliff ("lumpy blob", with "a white smear and a dark band" at the frame's left edge).
+
+### Round 99
+- **Vista: meadows and age classes.** Crisp-edged openings a hundred to three hundred metres across are cut into
+  the timber (a quarter of the ground; drainages keep their trees), and whole stands are old timber or young
+  (size x0.62 to x1.32 by a 200 m noise): the forest stands in masses with white between them (`?nomeadows`).
+- **Snow ride cliff**: six tiers of outcrop, a little bigger and less shrunk toward the lens: through the holes
+  between four the bench's own slope showed as flat dark panels with a white stripe across them.
+- **Light**: the rim on cloth is broad and soft at 0.2 (narrow at 0.34 it was "a toon outline"); trunks inside a
+  stand at 0.72 (0.5 took them to black); broadleaf scrub under the canopy lifted x1.5 (black cut-outs).

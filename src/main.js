@@ -743,8 +743,10 @@ async function init() {
             let foot = null, rim = null;
             for (let sd3 = 4; sd3 < 90; sd3 += 1.5) { const [x, z] = P(a, sd3), h = world.heightAt(x, z) - flr; if (foot === null && h > 2.5) foot = sd3; if (h > bh - flr - 4) { rim = sd3; break; } }
             if (foot === null || rim === null) continue;
-            for (const [t, s0, s1] of [[0.02, 13, 5], [0.28, 13, 5], [0.54, 12, 5], [0.8, 11, 4]]) {
-              const sd3 = foot + (rim - foot) * t + (r2() - 0.5) * 3, [x, z] = P(a + (r2() - 0.5) * 6, sd3), sc = (s0 + r2() * s1) * Math.min(1, 0.62 + a / 260);   // (a little smaller toward the lens: full size, the nearest stood over the frame)
+            // (round 99: six tiers, closer and a little bigger: through the holes between four the bench's own slope showed
+            // as flat dark panels with a white stripe across them)
+            for (const [t, s0, s1] of [[0.0, 14, 5], [0.17, 14, 5], [0.34, 14, 5], [0.51, 13, 5], [0.68, 13, 5], [0.85, 12, 4]]) {
+              const sd3 = foot + (rim - foot) * t + (r2() - 0.5) * 3, [x, z] = P(a + (r2() - 0.5) * 6, sd3), sc = (s0 + r2() * s1) * Math.min(1, 0.8 + a / 400);   // (a little smaller toward the lens: full size, the nearest stood over the frame)
               veg.rocks.add(x, world.heightAt(x, z) - 0.2 * sc, z, r2() * 6.28, sc, big[Math.floor(r2() * 3)]);
             }
           }
@@ -1172,7 +1174,11 @@ async function init() {
             const mass = SS(n.noise(x / 300 + 11.3, z / 300 - 4.1) + 0.45 * n.noise(x / 95 - 2.7, z / 95 + 8.2), -0.3, -0.12);
             const lap = (world.heightAt(x + 18, z) + world.heightAt(x - 18, z) + world.heightAt(x, z + 18) + world.heightAt(x, z - 18)) / 4 - h;   // > 0 in a drainage
             const gully = params.has('hightimber') ? 0 : 0.8 * SS(lap, 0.9, 2.4) * (1 - SS(h, 430, 540));   // timber climbs the drainages past the treeline
-            return Math.max(alt * Math.max(mass * (0.6 + 0.4 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0)), gully);
+            // (round 99) meadows: crisp-edged openings a hundred to three hundred metres across cut into the timber, a
+            // quarter of the ground, so the forest stands in masses with white between them (an unbroken carpet was
+            // 'pepper noise' at any density); the drainages keep their trees
+            const open = params.has('nomeadows') ? 0 : SS(n.noise(x / 150 + 31.7, z / 150 + 5.5) + 0.35 * n.noise(x / 52 - 8.3, z / 52 + 2.9), 0.2, 0.3) * (1 - SS(lap, 0.5, 1.4));
+            return Math.max(alt * Math.max(mass * (0.6 + 0.4 * SS(lap, -0.7, 0.8)), 0.95 * SS(lap, 0.7, 2.0)) * (1 - open), gully);
           };
           // the base scatter's lone trees over the same ground are taken out: the stands are planted whole below
           {
@@ -1208,7 +1214,9 @@ async function init() {
               if (world.climateAt(x, z).snow < 0.5 || pick > st * (0.5 + 0.48 * (1 - THREE.MathUtils.smoothstep(h, 320, 500)))) continue;
               const sp = world.splatAt(x, z);
               if (world.normalAt(x, z).y < 0.5 || sp.wet > 0.25 || sp.road > 0.2) continue;   // (spruce hold on ground too steep to walk)
-              veg.trees.add(x, h - 0.3, z, pick * 62.8, (0.75 + sc * 1.9) * (1 - 0.45 * SS(h, 290, 430)), firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants, stunted toward the treeline)
+              // (and in age classes: whole stands of old timber, others of young, as fire and felling leave a forest)
+              const age = 0.62 + 0.7 * SS(n.noise(x / 210 + 9.1, z / 210 - 3.4), -0.35, 0.35);
+              veg.trees.add(x, h - 0.3, z, pick * 62.8, (0.75 + sc * 1.9) * age * (1 - 0.45 * SS(h, 290, 430)), firs[Math.floor(pick * 977) % firs.length]);   // (saplings to old giants, stunted toward the treeline)
               added++;
             }
           }
