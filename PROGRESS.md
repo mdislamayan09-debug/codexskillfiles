@@ -942,3 +942,18 @@ Still: horse "balloon"/"toy", rider "matte blob"/"orange mannequin", cliff "flat
 - **Winter coat** a duller brown (it read as orange).
 - **Pine-belt grass** darker again, straw no longer bleaches in a sun shaft; the fallen log's moss is in
   patches with grey bark between.
+
+**Critic scores.** Round 82: 4 / 3 / 5. Flat. Snow ride's first complaint is now depth ("valley empty, no
+layering; right wall white-on-white; left cliff a mid-grey monolith with no dark anchor"), then the figures
+("rider 25% too small for the horse"). Vista: the strata banding on the right massif "reads as real geology,
+the best single element"; the outcrop is still "melted", cracks "stretched".
+
+### Round 83
+- **Snow ride depth.** Timber scattered up both valley walls from 120 m to a kilometre, in stands and singles of
+  every height with old pines among the spruce (5200 tries, thick where a noise field says so). Cliff bands on
+  moderate snow slopes: in zones a few hundred metres across, the beds' risers stand clear of the snow as dark
+  rock. Storm rock is near black (the frame's dark anchor). Blizzard eased to 0.62 so the cloud deck has
+  structure and the far walls are seen.
+- **The mounted rider is 1.1x**: a big man on his horse.
+- **Outcrop tops** are broken and tilted (a dead-level cut made stumps iced with snow); cracks are hairline and
+  of varied weight; brush and frosted tufts stand on the blocks' tops.

@@ -1133,7 +1133,8 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.62 : 0.9);
       v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.74 : 0.93);
       v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.62 : 0.9);
-      if (big) { const cap = 0.52 + 0.07 * n.noise(v.x * 1.6 + 3.0, v.z * 1.6 - 1.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.12; }
+      // (a broken, tilted top, not a table: cut dead level the blocks were stumps iced with snow, twice as broad in the frame)
+      if (big) { const cap = 0.56 + 0.16 * v.x + 0.09 * v.z + 0.08 * n.noise(v.x * 1.3 + 3.0, v.z * 1.3 - 1.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.14; }
       v.applyMatrix3(jointMi);
       // weathering: faces spalled and pitted a little
       if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
@@ -1309,19 +1310,22 @@ function rockMaterial(surf = {}, bare = false) {
         float kN = smoothstep(48.0, 12.0, camDc), kF = smoothstep(700.0, 120.0, camDc) * smoothstep(8.0, 40.0, camDc);
         float cN = kN > 0.0 ? crackNet(vWPos, wn, 1.45) : 1.0, cF = kF > 0.0 ? crackNet(vWPos + 17.0, wn, 0.24) : 1.0;
         float cN2 = kN > 0.5 ? crackNet(vWPos + 5.0, wn, 4.6) : 1.0;
-        float lineN = smoothstep(0.05, 0.012, cN) * kN, lineF = smoothstep(0.06, 0.015, cF) * kF, line2 = smoothstep(0.05, 0.01, cN2) * smoothstep(0.5, 1.0, kN);
-        base *= 1.0 - 0.6 * lineN - 0.5 * lineF - 0.3 * line2;
+        // (hairline, and not all of one weight: some joints open and dark, most barely a seam. Drawn evenly they were
+        // the veins of a marble slab)
+        float wgt = 0.25 + 0.75 * smoothstep(0.35, 0.7, vnoise(vWPos.xz * 0.55 + vWPos.y * 0.8 + 2.0));
+        float lineN = smoothstep(0.034, 0.008, cN) * kN * wgt, lineF = smoothstep(0.06, 0.015, cF) * kF, line2 = smoothstep(0.04, 0.008, cN2) * smoothstep(0.5, 1.0, kN) * (1.0 - wgt);
+        base *= 1.0 - 0.55 * lineN - 0.5 * lineF - 0.22 * line2;
         // (the stone a shade darker for a hand's width either side of a joint, where water stands)
-        base *= 1.0 - 0.14 * smoothstep(0.3, 0.0, cN) * kN - 0.12 * smoothstep(0.3, 0.0, cF) * kF;
-        gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
+        base *= 1.0 - 0.08 * smoothstep(0.3, 0.0, cN) * kN * wgt - 0.12 * smoothstep(0.3, 0.0, cF) * kF;
+        gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 * wgt + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
       }
       vec4 rcl = climateAt(vWPos.xz);
       // under falling snow the stone is wet and dark, slate blue as the sky that lights it, with rime blown onto its faces
       {
         float stormK = uSnowfall * smoothstep(0.35, 0.75, rcl.r);
-        base = mix(base, base * vec3(0.5, 0.6, 0.76), stormK);
+        base = mix(base, base * vec3(0.34, 0.42, 0.56), stormK);   // (near black: the frame's dark anchor, as the reference's cliff band is)
         float rime = stormK * smoothstep(0.38, 0.72, fbm2(vec2(vWPos.x + vWPos.z, vWPos.y * 2.2) / 3.5) + 0.25 * (vnoise(vWPos.xz * 3.0 + vWPos.y * 2.0) - 0.5));
-        base = mix(base, vec3(0.6, 0.66, 0.76), rime * 0.2);
+        base = mix(base, vec3(0.6, 0.66, 0.76), rime * 0.1);
       }
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);

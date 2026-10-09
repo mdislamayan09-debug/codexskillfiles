@@ -403,7 +403,27 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         float brk = smoothstep(0.46, 0.58, fbm2(vec2(along / 8.0 + bi * 5.0, bi * 1.9)) + 0.12 * (vnoise(vec2(along / 2.2, bi)) - 0.5));
         float ledge = smoothstep(1.0 - w, 1.0 - 0.55 * w, f) * brk * steep * kMid;
         snowAmt = max(snowAmt, ledge * 0.92);
-        float rime = uSnowfall * steep * smoothstep(0.3, 0.75, fbm2(vec2(along, wp.y * 2.2) / 4.5) + 0.2 * (vnoise(vec2(along, wp.y) * 1.3) - 0.5));
+      }
+      // and on slopes too gentle to shed their snow outright, cliff bands: in zones a few hundred metres across the
+      // beds' risers stand clear of the snow as dark rock, band above band, with snow lying on each bed's top
+      // (a mountain wall under even snow is white on white, with nothing in it to give it size)
+      {
+        float band = smoothstep(0.1, 0.24, slope) * sk * (1.0 - steep);
+        if (band > 0.0) {
+          float camDc = length(wp - cameraPosition);
+          float zone = smoothstep(0.46, 0.6, fbm2(xz / 110.0 + 3.7) + 0.5 * (slope - 0.2));
+          float q0 = (wp.y + 0.1 * dot(xz, vec2(0.6, 0.8)) + 5.0 * fbm2(xz / 60.0)) / 9.0;
+          float q = q0 + 0.6 * vnoise(vec2(q0 * 0.6, 5.0)), f = fract(q), bi = floor(q);
+          float along = dot(xz, vec2(0.8, -0.6));
+          float run = smoothstep(0.4, 0.55, fbm2(vec2(along / 40.0 + bi * 5.0, bi * 1.9)));
+          float riser = smoothstep(0.08, 0.2, f) * (1.0 - smoothstep(0.5 + 0.2 * hash12(vec2(bi, 7.0)), 0.78, f));
+          float k = band * zone * run * riser * smoothstep(3200.0, 900.0, camDc);
+          snowAmt *= 1.0 - 0.9 * k;
+          rockAmt = max(rockAmt, k);
+          rock *= mix(1.0, 0.75 + 0.4 * hash12(vec2(bi, 3.0)), k);
+        }
+        float alongR = dot(xz, vec2(0.8, -0.6));
+        float rime = uSnowfall * steep * smoothstep(0.3, 0.75, fbm2(vec2(alongR, wp.y * 2.2) / 4.5) + 0.2 * (vnoise(vec2(alongR, wp.y) * 1.3) - 0.5));
         rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.22);
       }
     }

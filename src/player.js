@@ -44,7 +44,9 @@ export class Player {
   attachRider() {
     if (this.mounted) {
       this.horse.body.add(this.rider.root);
-      this.rider.root.position.set(0, 0.9, -0.1);
+      // (a big man on his horse, as the references' rider is: at life size beside our deep-bodied horse he sat like a boy)
+      this.rider.root.scale.setScalar(1.1);
+      this.rider.root.position.set(0, 0.8, -0.1);
       this.rider.root.rotation.set(0, 0, 0);
     } else {
       this.scene.add(this.rider.root);

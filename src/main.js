@@ -276,7 +276,7 @@ async function init() {
       // from behind with its feet at the bottom edge and the rider's hat just under half way down; ?rideold is the close
       // three-quarter framing of rounds 50-78)
       if (params.has('rideold')) return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true };
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, camRel: [0.5, 2.6, -6.4], lookRel: [-3.6, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, camRel: [0.5, 2.6, -6.4], lookRel: [-3.6, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.62 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -826,6 +826,25 @@ async function init() {
           veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, old ? 0.45 + rr() * 0.55 : 0.3 + rr() * rr() * 1.6, old ? tl[Math.floor(rr() * tl.length)] : firs[Math.floor(rr() * firs.length)]);
         }
       }
+      // (round 83) Timber on the valley's sides, stepping back into the snowfall: stands and single trees of every height
+      // scattered up both walls from 120 m out to a kilometre, thicker in the gullies, with old ragged pines among the
+      // spruce. One row of spruce along one contour was a hedge, and gave the walls behind it no size.
+      if (firs.length) {
+        const tl = veg.groups.tall, n3 = world.n3;
+        let sdt = 5501;
+        const rt3 = () => ((sdt = (sdt * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 5200; i++) {
+          const ahead = 110 + rt3() * rt3() * 1100, side = (rt3() - 0.5) * 2 * (60 + ahead * 0.75);
+          if (Math.abs(side) < 26 + ahead * 0.06) continue;   // the open lane up the floor
+          const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side;
+          const mass = n3.noise(x / 140 + 3.1, z / 140 - 7.7) + 0.5 * n3.noise(x / 45 - 1.2, z / 45 + 4.4);
+          if (rt3() > 0.25 + 0.75 * Math.min(1, Math.max(0, (mass + 0.25) / 0.5))) continue;
+          const nrm = world.normalAt(x, z);
+          if (nrm.y < 0.58 || world.splatAt(x, z).wet > 0.3) continue;
+          const old = tl.length && rt3() < 0.28;
+          veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rt3() * 6.28, old ? 0.45 + rt3() * 0.5 : 0.55 + rt3() * rt3() * 1.5, old ? tl[Math.floor(rt3() * tl.length)] : firs[Math.floor(rt3() * firs.length)]);
+        }
+      }
       // (the boulder groups above are thrown wide enough to land on the bench: taken off its face again)
       if (G.benchBox) {
         const [x0, z0, x1, z1] = G.benchBox, flr = world.heightAt(px, pz) + 3;
@@ -1182,9 +1201,12 @@ async function init() {
         veg.rocks.add(x, Math.max(g - 0.14 * sc, top - 0.76 * sc), z, rot, sc, v);
         // frosted grass and dead brush rooted in the block's top and shoulders (bare, the outcrop was a quarry face)
         const by = Math.max(g - 0.14 * sc, top - 0.76 * sc) + 0.62 * sc;
+        // (round 83: the blocks have level tops now, so what grows there stands on them instead of being buried in a
+        // dome's shoulder: russet brush in low dense clumps and fine frosted tufts, a dozen or so to a block)
         for (let q = 0; q < 5; q++) {
-          const a = rr() * 6.28, rad = rr() * 0.3 * sc, drop = (rad / (0.3 * sc)) ** 2 * 0.22 * sc;
-          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.2 + rr() * 0.3, [9, 9, 7, 8, 9][Math.floor(rr() * 5)]);   // (small: at twice this size they were agave fans)
+          const a = rr() * 6.28, rad = (0.05 + rr() * 0.3) * sc, cx3 = x + Math.cos(a) * rad, cz3 = z + Math.sin(a) * rad, yy = by - 0.05 * sc - (rad / (0.35 * sc)) ** 2 * 0.1 * sc;
+          if (q % 2 === 0) for (let k = 0; k < 3; k++) veg.bushes.add(cx3 + (rr() - 0.5) * 0.5, yy - 0.06, cz3 + (rr() - 0.5) * 0.5, rr() * 6.28, 0.3 + rr() * 0.28, 7 + Math.floor(rr() * 2));
+          else for (let k = 0; k < 5; k++) veg.bushes.add(cx3 + (rr() - 0.5) * 0.8, yy - 0.03, cz3 + (rr() - 0.5) * 0.8, rr() * 6.28, 0.14 + rr() * 0.14, 9);
         }
       };
       // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one
