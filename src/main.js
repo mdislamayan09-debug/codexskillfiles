@@ -698,7 +698,8 @@ async function init() {
         // Three are raised here: left at 330 m, right at 560 m, left again at 820 m.
         // (round 89: their toes carried in to the valley's axis, so they stand one behind another in the gap between the
         // walls, where the lens sees them: ending a hundred metres aside, the first was hidden behind the cliff)
-        const spurs = (params.has('spursold') ? [[520, 520, 190, 330, 115, 26], [770, -560, 240, 560, -95, 30], [1060, 600, 270, 830, 70, 42]] : [[520, 520, 190, 390, 42, 38], [800, -560, 240, 640, -6, 46], [1100, 600, 270, 930, 40, 62]]).map(([a0, s0, h0, a1, s1, h1]) => {
+        // (round 91: nearer, where the falling snow has not yet taken their darks)
+        const spurs = (params.has('spursold') ? [[520, 520, 190, 330, 115, 26], [770, -560, 240, 560, -95, 30], [1060, 600, 270, 830, 70, 42]] : [[430, 470, 170, 255, 46, 34], [640, -520, 220, 430, -12, 42], [920, 560, 260, 660, 40, 58]]).map(([a0, s0, h0, a1, s1, h1]) => {
           const [ax2, az2] = P(a0, s0), [bx2, bz2] = P(a1, s1), fl = world.heightAt(px, pz);
           world.raiseSpur(ax2, az2, fl + h0, bx2, bz2, fl + h1, { side: 1.05, round: 0.0005, top: 16, flat0: 9, reach: 330, rough: 3.2, sag: 0 });
           return [ax2, az2, bx2, bz2];
@@ -890,6 +891,20 @@ async function init() {
           if (world.splatAt(x, z).wet > 0.3 || world.normalAt(x, z).y < 0.8) continue;
           veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rl2() * 6.28, 0.42 + rl2() * 0.4, tl[Math.floor(rl2() * tl.length)]);
         }
+      }
+      // (round 91) the floor ahead opened up: five trees in six taken off the valley's floor between the lens and the
+      // spurs, so what is left stands as single trees and small groups at every distance with the ground and the
+      // ridges seen between them (the band of spruce a hundred metres off was a hedge with a wall behind it)
+      {
+        const L = veg.trees, thin = (it) => {
+          const ax = (it.x - px) * f[0] + (it.z - pz) * f[1], sd3 = (it.x - px) * lt[0] + (it.z - pz) * lt[1];
+          if (ax < 50 || ax > 620 || Math.abs(sd3) > 60 + ax * 0.5) return false;
+          if (sd3 > 26 && ax < 240) return false;   // (the cliff's own timber stays)
+          const h = Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453;
+          return h - Math.floor(h) > 0.17;
+        };
+        for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !thin(it)));
+        L.items = L.items.filter((it) => !thin(it));
       }
       // (the boulder groups above are thrown wide enough to land on the bench: taken off its face again)
       if (G.benchBox) {

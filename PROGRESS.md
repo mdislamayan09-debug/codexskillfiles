@@ -1073,3 +1073,20 @@ Both riding shots: the horse and rider are the first item again ("the same rebui
   tint nearly neutral.
 - **Rock close to**: fine bedding lines and grain at two scales, the fine normal lay at 0.85; hair-thin snow in
   the fine up-facing joints (a hand wide along the big joints it was white lightning: withdrawn).
+
+**Critic scores.** Round 90: 4 / 4 / 5. The vista's foreground rock dropped from first complaint to third, but
+the new plants are "fans of crossed quads in one saturated orange-tan" (over-warmed) and the reworked sky is
+"a flat dark-navy gradient with thin unlit wisps, darker than the sunlit snow" (worse than before). Snow ride:
+"the world ends at one hedge-like band of conifers in front of a pale wall" (the spurs behind it are hidden).
+
+### Round 91
+- **Snow ride: the valley floor opened up.** Five trees in six are taken off the floor between the lens and the
+  spurs, so single trees and small groups stand at every distance with the ground and ridges seen between them;
+  the spurs are nearer (toes at 255, 430 and 660 m) where the snowfall has not yet taken their darks.
+- **Pine tread and duff measured against the reference's floor** (ours was half again as light, and tan): the
+  tread is dark red-brown soil, mottled; duff darker and redder; fallen needles are pale straw on it, twice as
+  many; cones and twigs lie on the tread too (the clutter layers kept off it).
+- **Ledge tufts** are frosted grey-straw, each its own tone (russet is per material now: brush 0.7, tufts 0.22).
+- **Storm sky**: the breaks are bright (the lightest thing in the sky), cloud bellies lighter, masses less merged.
+- (Pitfall again: a comment appended after `.map(` swallowed the arrow function. Never comment a line that
+  continues.)

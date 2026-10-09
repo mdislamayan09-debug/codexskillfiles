@@ -151,12 +151,15 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   forestFloor = mix(forestFloor, mix(srgb(vec3(58,70,34)), srgb(vec3(74,84,40)), micro) * (0.75 + 0.4 * lumi(lA.rgb) / 0.12), smoothstep(0.6, 0.78, fbm2(xz / 9.0 + 12.0)) * pineK * 0.45);
   // the open pine floor: a dry duff the low sun rakes across, mottled darker where it lies thick and damp
   forestFloor *= 1.0 - 0.28 * pineK * smoothstep(0.35, 0.7, fbm2(xz / 6.0 + 2.2));
+  forestFloor = mix(forestFloor, forestFloor * vec3(0.74, 0.66, 0.56), pineK);   // (round 91: a darker, redder duff, as measured on the reference's floor)
   // dirt and roads straight from the scans (slightly graded toward the palette)
   vec3 dirt = mix(srgb(vec3(104,80,56)), dA.rgb * vec3(1.0, 0.95, 0.88), 0.85 * D + 0.15);
   dirt = mix(dirt, dirt * vec3(1.12, 0.9, 0.72), des);
   vec3 roadC = dirt * 1.08;
   // a dry, dusty tread through the pines, brown dirt rather than a pale road
-  roadC = mix(roadC, roadC * vec3(1.0, 0.92, 0.82), pineK);   // (dark, damp woodland dirt: a pale tread read as a sand path)
+  // (round 91: measured against the reference's tread, ours was half again as light and tan where that is a dark
+  // red-brown soil: its needles and stones are paler than it, ours were darker than theirs)
+  roadC = mix(roadC, roadC * vec3(0.52, 0.41, 0.32) * (0.7 + 0.6 * smoothstep(0.3, 0.7, fbm2(xz / 1.7 + 3.0))), pineK);   // (dark, damp woodland dirt: a pale tread read as a sand path)
   if (road > 0.05) {
     vec4 gv = texA(L_GRAVEL, xz, 1.8, 4.3);
     roadC = mix(roadC, gv.rgb * vec3(0.95, 0.88, 0.78), 0.35 * D);
@@ -320,10 +323,11 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
       vec2 dir = vec2(cos(ang), sin(ang));
       vec2 q = gf - (hh.yx - 0.5) * 0.3;
       float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x)) + 0.05 * sin(along * 9.0 + hh.y * 6.0);
-      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : L > 2 ? 0.25 : 0.35, hash12(gc + 5.1));
+      float stick = smoothstep(L == 0 ? 0.03 : 0.06, 0.0, abs(across)) * smoothstep(0.4, 0.3, abs(along)) * step(L == 0 ? 0.5 : L > 2 ? 0.12 : 0.35, hash12(gc + 5.1));
       if (L > 2) stick *= smoothstep(0.02, 0.008, fp);
-      vec3 sc2 = L == 0 ? srgb(vec3(84,68,52)) : L == 1 ? srgb(vec3(104,74,46)) : L == 2 ? srgb(vec3(60,46,34)) : L == 3 ? srgb(vec3(136,96,52)) : srgb(vec3(84,60,36));
-      c = mix(c, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8) * (1.0 - 0.35 * rr));
+      // (fallen needles are pale straw on the dark soil, the twigs grey and brown)
+      vec3 sc2 = L == 0 ? srgb(vec3(96,84,70)) : L == 1 ? srgb(vec3(104,74,46)) : L == 2 ? srgb(vec3(60,46,34)) : L == 3 ? srgb(vec3(196,168,112)) : srgb(vec3(170,140,90));
+      c = mix(c, sc2 * (0.8 + 0.4 * hh.y), stick * nearK * (L == 2 ? 0.55 : 0.8) * (1.0 - (L > 2 ? 0.0 : 0.35) * rr));
     }
   }
   float crown = smoothstep(0.93, 0.995, road) * (1.0 - town) * smoothstep(0.35, 0.6, vnoise(xz * 0.7)) * (1.0 - des) * (1.0 - pineK);

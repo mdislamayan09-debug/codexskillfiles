@@ -59,7 +59,7 @@ float cloudDen(vec3 p, float cov){
   // snow it closes right over)
   // (round 90: in a dry storm the cells run together into great masses where the weather map is thick, leaving the
   // breaks between: evenly spaced cells of one size were cotton puffs)
-  float c = clamp(cov * (0.3 + 0.9 * weather) + uStorm * mix(0.03 + 0.3 * smoothstep(0.3, 0.62, weather), 0.26 + 0.2 * smoothstep(0.2, 0.6, weather), uBlizzard), 0.0, 1.0);
+  float c = clamp(cov * (0.3 + 0.9 * weather) + uStorm * mix(0.03 + 0.16 * smoothstep(0.3, 0.62, weather), 0.26 + 0.2 * smoothstep(0.2, 0.6, weather), uBlizzard), 0.0, 1.0);
   // flat dark bases, towering rounded tops
   // (in a storm the slab flattens into a low deck, a thin lumpy layer seen from beneath, not towering cumulus)
   // (a deck with body: a thin sheet let the sun straight through and its underside came out pale and even)
@@ -231,7 +231,7 @@ export class Sky {
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
             // (a blizzard instead scatters light everywhere: a bright, even grey with no dark undersides)
-            cl.rgb *= mix(1.0, mix(0.46, 0.86, far), uStorm * (1.0 - 0.45 * uBlizzard));
+            cl.rgb *= mix(1.0, mix(0.58, 0.95, far), uStorm * (1.0 - 0.45 * uBlizzard));
             // (and its underside modelled in cells: heavier, darker bellies and paler thin places between them)
             {
               vec2 cuv2 = d.xz / (d.y + 0.14) * 0.9 + uCloudOffset * 2.0;
@@ -246,7 +246,8 @@ export class Sky {
             {
               vec2 vuv = d.xz / (d.y + 0.2) * 0.5 + uCloudOffset;
               float veil = 0.5 + 0.5 * smoothstep(0.3, 0.75, vn(vuv * 0.8) * 0.6 + vn(vuv * 2.1 + 3.0) * 0.4);
-              col = mix(col, vec3(0.72, 0.75, 0.8) * veil * (0.25 + 0.75 * day), uStorm * (1.0 - uBlizzard) * 0.8);
+              // (bright: the breaks are the lightest thing in a storm sky, lighter than the snow under it)
+              col = mix(col, vec3(0.93, 0.94, 0.96) * (0.72 + 0.28 * veil) * (0.25 + 0.75 * day), uStorm * (1.0 - uBlizzard) * 0.85);
             }
             float fade = smoothstep(0.0, 0.05, d.y);
             float dens = (1.0 - cl.a) * fade;

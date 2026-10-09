@@ -87,7 +87,7 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
       diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * FROST_K * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
       // (a plant in two or three is russet: dead heather and willow, the warm note against the snow)
-      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.6, 1.3, 0.62), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * 0.8 * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
+      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.3, 1.25, 0.7), step(0.34, hash12(floor(${pos}.xz * 1.3) + 5.0)) * RUSSET_K * smoothstep(0.4, 0.85, cl.r));   // (two plants in three now, and whatever the frost: the warm note the reference's ledge is full of)
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3 * FROST_K);
       #endif
     }
@@ -96,13 +96,13 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.43, 0.33) * (0.7 + 0.6 * dot(diffuseColor.rgb, vec3(0.33))), cl.a * 0.75);
     #endif
   }`;
-function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false } = {}) {
+function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = false, trans = null, backDark = null, conifer = false, russet = 0.7 } = {}) {
   return patchMaterial(mat, {
     sunShadow: true,
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? `#define FROST_ALL\n#define FROST_K ${(frost === true ? 1 : frost).toFixed(2)}\n` : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + `#define RUSSET_K ${russet.toFixed(2)}\n` + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? `#define FROST_ALL\n#define FROST_K ${(frost === true ? 1 : frost).toFixed(2)}\n` : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -925,7 +925,7 @@ function makeClutter(scene, geo, { spacing, radius, smin, smax, color, roughness
       float dist = length(xz - cam);
       float dens = ${mode === 'stone'
         ? 'max(sp.b * 0.55, max(smoothstep(0.3, 0.8, sp.r) * 0.22, cl.a * 0.5)) * (1.0 - smoothstep(0.4, 0.7, sp.a))'
-        : 'max(smoothstep(0.25, 0.6, sp.b), 0.85 * smoothstep(-700.0, -1250.0, xz.y)) * (1.0 - smoothstep(0.3, 0.62, sp.r)) * (1.0 - cl.a)'};
+        : 'max(smoothstep(0.25, 0.6, sp.b), 0.85 * smoothstep(-700.0, -1250.0, xz.y)) * (1.0 - smoothstep(0.3, 0.62, sp.r) * mix(1.0, 0.5, smoothstep(-700.0, -1250.0, xz.y))) * (1.0 - cl.a)'};   // (cones and twigs lie on a woodland tread too)
       dens *= (1.0 - smoothstep(0.3, 0.6, cl.r)) * smoothstep(0.6, 1.5, heightAt(xz)) * smoothstep(RADIUS, RADIUS * 0.75, dist);
       // gathered in drifts and clusters (under a tree, along a runnel), bare between: never an even sprinkle
       dens *= smoothstep(0.24, 0.66, fbm2(xz / 6.5 + ${(seed * 3.7).toFixed(2)})) * 1.9;
@@ -1581,7 +1581,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.5, 1.42, 1.2) }), 1, leafExtra, { frost: 0.4 });   // (a light frost: straw and ochre still show against the snow)
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4, color: new THREE.Color(1.3, 1.26, 1.18) }), 1, leafExtra, { frost: 0.6, russet: 0.22 });   // (frosted grey-straw, each tuft its own tone: all one orange-tan they were paper fans)   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];
