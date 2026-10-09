@@ -10,6 +10,7 @@ uniform float uNight;
 uniform float uCloudCover;
 uniform float uStorm;
 uniform float uBlizzard;
+uniform float uPano;
 uniform vec3 uHaze;
 uniform vec2 uCloudOffset;
 uniform highp sampler3D tCloud;
@@ -43,7 +44,13 @@ vec3 skyColor(vec3 d, vec3 s){
 }
 
 // ---- raymarched cumulus slab (Perlin-Worley shape eroded by Worley detail)
-const float CB = 1500.0, CT = 2900.0;
+// the cloud slab's base and top, and the lens's own height in it (round 96). By default the lens is taken to stand at
+// sea level under a slab at 1500-2900 m; a shot on a mountain under a low storm sets a lower slab and its own height, so
+// the cloud stands a few kilometres off at eye level and is seen from the side: heaped towers with lit heads and dark
+// bases, where a slab far overhead seen at a grazing angle is only streaks in the haze.
+uniform vec3 uDeck;   // base, top, lens height
+#define CB uDeck.x
+#define CT uDeck.y
 float remap(float v, float a, float b, float c, float d){ return c + (clamp(v, a, b) - a) / (b - a) * (d - c); }
 float cloudDen(vec3 p, float cov){
   // (a storm deck's base hangs in great lumps and hollows: flat, seen from below at a low angle, it was a row of
@@ -82,12 +89,12 @@ float cloudDen(vec3 p, float cov){
 float hgPhase(float g, float mu){ float g2 = g*g; return (1.0 - g2) / pow(1.0 + g2 - 2.0*g*mu, 1.5); }
 // returns in-scattered light (rgb) and transmittance (a)
 vec4 marchClouds(vec3 d, vec3 s, vec3 sunC, vec3 ambTop, vec3 ambBot, float cov){
-  float t0 = CB / d.y, t1 = min(CT / d.y, t0 + 11000.0);
+  float t0 = max(CB - uDeck.z, 0.0) / d.y, t1 = min((CT - uDeck.z) / d.y, t0 + 11000.0);
   if (t0 > 60000.0) return vec4(0.0, 0.0, 0.0, 1.0);
   const int N = CLOUD_STEPS;
   float dt = (t1 - t0) / float(N);
   float t = t0 + dt * h12(gl_FragCoord.xy + fract(uTime * 7.31) * 61.0);
-  vec3 off = vec3(uCloudOffset.x, 0.0, uCloudOffset.y) * 4000.0;
+  vec3 off = vec3(uCloudOffset.x, 0.0, uCloudOffset.y) * 4000.0 + vec3(0.0, uDeck.z, 0.0);
   float mu = dot(d, s);
   float ph = mix(hgPhase(0.55, mu), hgPhase(-0.25, mu), 0.35);
   vec3 L = vec3(0.0); float T = 1.0;
@@ -129,7 +136,7 @@ export class Sky {
     this.timeScale = 1 / 60; // hours per real second (1 day = 24 min)
     this.uniforms = {
       uSunDir: U.uSunDir, uTime: U.uTime, uNight: U.uNight,
-      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 }, uBlizzard: { value: 0 }, uHaze: { value: new THREE.Color() },
+      uCloudCover: { value: 0.5 }, uCloudOffset: { value: new THREE.Vector2() }, uStorm: { value: 0 }, uBlizzard: { value: 0 }, uDeck: { value: new THREE.Vector3(1500, 2900, 0) }, uPano: { value: typeof location !== 'undefined' && /[?&]pano\b/.test(location.search) ? 1 : 0 }, uHaze: { value: new THREE.Color() },
       tCloud: { value: Sky.cloudTexture() },
     };
     const mat = new THREE.ShaderMaterial({
@@ -153,6 +160,57 @@ export class Sky {
           float b = billow(uv * 1.3), b2 = billow((uv + sd * 0.1) * 1.3);
           float den = clamp((mass - 0.5) * 2.4 + 0.5, 0.0, 1.0) + (b - 0.3) * 0.5;
           return vec3(clamp(den, 0.0, 1.0), clamp((b - b2) * 4.0 + 0.5, 0.0, 1.0), b);
+        }
+        // The dry storm's sky near the horizon (round 96), painted in panorama (bearing and elevation), not projected
+        // onto a cloud plane. A lookout sees only the lowest dozen degrees of sky, where any flat layer is drawn out
+        // into horizontal streaks; what stands there in a real storm is cloud seen from the side, in ranks: a dark
+        // deck overhead with a hanging, lumpy edge, a rank of grey cumulus under it with lit heads and flat dark bases,
+        // a paler rank beyond in the haze, and bright sky in the breaks between.
+        vec3 pano1(float x, float y, float day){
+          vec3 sky = vec3(0.8, 0.86, 0.94) * (0.8 + 0.2 * vn(vec2(x * 0.03, y * 0.2) + 3.0));
+          sky = mix(sky, vec3(0.5, 0.57, 0.68), smoothstep(3.0, 0.0, y) * 0.7);
+          vec3 col = sky;
+          // (each cloud is a field crossed at a narrow threshold, its edge broken by noise at two scales: crisp
+          // cauliflower heads. Smooth profiles with soft edges were smears of paint. Its tone runs from a lit rim just
+          // inside the head down to a dark base.)
+          {   // the far rank, pale in the haze
+            float yb = 0.7 + 0.4 * (vn(vec2(x * 0.06, 2.2)) - 0.5);
+            float heap = smoothstep(0.2, 0.7, vn(vec2(x * 0.11, 8.1))) * (0.5 + 0.5 * vn(vec2(x * 0.33, 5.3)));
+            float f = (yb + 0.35 + 1.9 * heap - y) + 0.7 * (fbm(vec2(x * 0.6, y * 1.6) + 1.0) - 0.5);
+            float D = smoothstep(0.0, 0.1, f) * smoothstep(yb - 0.2, yb + 0.05, y);
+            vec3 c = mix(vec3(0.42, 0.46, 0.53), vec3(0.2, 0.235, 0.3), smoothstep(0.0, 1.6, f)) * (0.85 + 0.3 * fbm(vec2(x * 0.9, y * 2.0) + 6.0));
+            col = mix(col, mix(c, vec3(0.5, 0.57, 0.68), 0.4), D);
+          }
+          {   // the middle rank
+            float yb = 2.2 + 0.7 * (vn(vec2(x * 0.045, 6.6)) - 0.5);
+            float heap = smoothstep(0.22, 0.72, vn(vec2(x * 0.06, 1.7))) * (0.55 + 0.45 * vn(vec2(x * 0.19, 4.4)));
+            float f = (yb + 0.7 + 3.4 * heap - y) + 1.3 * (fbm(vec2(x * 0.33, y * 0.9) + 3.0) - 0.5) + 0.35 * (fbm(vec2(x * 1.3, y * 3.2) + 9.0) - 0.5);
+            float D = smoothstep(0.0, 0.14, f) * smoothstep(yb - 0.3, yb + 0.08, y);
+            vec3 c = mix(vec3(0.44, 0.47, 0.53), vec3(0.11, 0.135, 0.18), smoothstep(0.05, 2.6, f));
+            c *= 0.8 + 0.4 * fbm(vec2(x * 0.5, y * 1.2) + 2.0);
+            col = mix(col, c, D);
+          }
+          {   // the deck overhead: dark, with paler billows in it, its hanging edge catching the light of the break below
+            float e0 = 5.6 + 2.2 * (vn(vec2(x * 0.04, 3.1)) - 0.5);
+            float f = (y - e0) + 1.5 * (fbm(vec2(x * 0.2, y * 0.5) + 9.0) - 0.5) + 0.4 * (fbm(vec2(x * 0.8, y * 2.0) + 4.0) - 0.5);
+            float D = smoothstep(0.0, 0.25, f);
+            float hole = smoothstep(0.72, 0.8, vn(vec2(x * 0.028, y * 0.09) + 12.0));
+            float l0 = fbm(vec2(x * 0.12, y * 0.4) + 5.0);
+            vec3 c = mix(vec3(0.075, 0.09, 0.125), vec3(0.24, 0.27, 0.33), smoothstep(0.4, 0.7, l0));
+            c = mix(vec3(0.34, 0.37, 0.43), c, smoothstep(0.0, 1.2, f));
+            col = mix(col, c, D * (1.0 - hole));
+          }
+          return col * (0.25 + 0.75 * day);
+        }
+        vec3 stormPano(vec3 d, float day){
+          float elD = degrees(asin(clamp(d.y, -1.0, 1.0)));
+          // (two copies of the painting with their seams on opposite bearings, cross-faded, so there is none)
+          float az1 = degrees(atan(d.z, d.x)), az2 = degrees(atan(-d.z, -d.x));
+          float w1 = smoothstep(175.0, 120.0, abs(az1));
+          vec3 c = vec3(0.0);
+          if (w1 > 0.0) c += w1 * pano1(az1, elD, day);
+          if (w1 < 1.0) c += (1.0 - w1) * pano1(az2 + 400.0, elD, day);
+          return c;
         }
         vec3 stormDeck(vec3 d, vec3 s, float day){
           vec2 sd = normalize(s.xz + 1e-4);
@@ -226,7 +284,7 @@ export class Sky {
             // and the walls of its breaks blaze: the silver linings a dimmed, even grey deck never had)
             vec4 cl = marchClouds(d, s, sunC * (2.0 * smoothstep(-0.06, 0.1, s.y) + 0.02) * (1.0 - 0.25 * uStorm), ambTop, ambBot, uCloudCover);
             // aerial perspective: far clouds melt into the horizon haze
-            float far = 1.0 - exp(-(CB / max(d.y, 0.02)) / 17000.0);
+            float far = 1.0 - exp(-(max(CB - uDeck.z, 0.0) / max(d.y, 0.02)) / 17000.0);
             vec3 hz = stormSky(skyColor(d, s));
             cl.rgb = mix(cl.rgb, hz * (1.0 - cl.a), far * 0.85);
             // storm decks: heavy slate undersides, with the far horizon left brighter where the light breaks through
@@ -236,7 +294,23 @@ export class Sky {
             {
               vec2 cuv2 = d.xz / (d.y + 0.14) * 0.9 + uCloudOffset * 2.0;
               float cell = vn(cuv2 * 0.7) * 0.6 + vn(cuv2 * 1.6 + 5.2) * 0.4;
-              cl.rgb *= mix(1.0, mix(0.6, 1.1, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.03, 0.2, d.y));
+              cl.rgb *= mix(1.0, mix(0.6, 1.1, smoothstep(0.3, 0.7, cell)), uStorm * (1.0 - uBlizzard) * smoothstep(0.15, 0.35, d.y));
+              // (round 96) near the horizon the cloud is seen from the side, and its body is modelled in panorama: great
+              // billows of paler grey in the dark mass, lit from below by the snow country under it. (The plane-projected
+              // cells above are drawn out into streaks down there, and without them the body was one flat navy.)
+              {
+                float stK = uStorm * (1.0 - uBlizzard) * smoothstep(0.42, 0.2, d.y);
+                float elD = degrees(asin(clamp(d.y, -1.0, 1.0)));
+                float az1 = degrees(atan(d.z, d.x)), az2 = degrees(atan(-d.z, -d.x)) + 400.0, w1 = smoothstep(175.0, 120.0, abs(az1));
+                float azD = mix(az2, az1, step(0.5, w1));
+                float bil = fbm(vec2(azD * 0.1, elD * 0.3) + 5.0), bil2 = fbm(vec2(azD * 0.37, elD * 1.0) + 2.0);
+                float lumK = mix(0.2, 1.75, smoothstep(0.36, 0.66, bil)) * (0.8 + 0.4 * bil2);
+                // (crisper lumps within the billows, and the mass darkest overhead, where it is nearest and thickest)
+                lumK *= 0.82 + 0.36 * smoothstep(0.42, 0.58, fbm(vec2(azD * 0.9, elD * 2.4) + 8.0));
+                lumK *= mix(1.0, 0.5, smoothstep(5.0, 11.5, elD));
+                cl.rgb = mix(cl.rgb, vec3(dot(cl.rgb, vec3(0.3, 0.59, 0.11))) * vec3(0.95, 1.0, 1.07), 0.35 * stK);
+                cl.rgb += (1.0 - cl.a) * vec3(0.1, 0.113, 0.135) * lumK * stK * (0.25 + 0.75 * day);
+              }
               // slate blue, as storm cloud is against a cold sky (ours was a neutral grey)
               cl.rgb *= mix(vec3(1.0), vec3(0.9, 0.95, 1.04), uStorm * (1.0 - uBlizzard));   // (nearly neutral: slate blue, the deck was white puffs on navy)
             }
@@ -257,6 +331,7 @@ export class Sky {
             col = mix(col, sunC*(0.9*day+0.03) + vec3(0.1), smoothstep(0.66, 0.92, ci) * 0.16 * fade * (1.0 - dens));
           }
           if (uStorm > 0.01 && uBlizzard < 0.99) col = mix(col, stormDeck(d, s, day), 0.14 * uStorm * (1.0 - uBlizzard) * smoothstep(-0.02, 0.05, d.y));   // (a grey ground behind the towers)
+          if (uStorm > 0.01 && uBlizzard < 0.99 && d.y > -0.03 && d.y < 0.45 && uPano > 0.5) col = mix(col, stormPano(d, day), min(1.0, uStorm * 1.25) * (1.0 - uBlizzard) * smoothstep(0.42, 0.28, d.y));
           // in a blizzard the sky is the inside of the snow cloud: a bright, even grey
           // (right up to the zenith: seen from inside falling snow the deck is a pale, softly mottled ceiling, not the
           // dark slate underside of a dry storm; its cells still show through)
@@ -387,7 +462,8 @@ export class Sky {
     this.uniforms.uBlizzard.value = W.blizzard;
     U.uSnowfall.value = W.blizzard;
     // (a storm in clear air is a broken deck, a third of the sky open; in falling snow it closes over)
-    this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm * (0.62 + 0.38 * W.blizzard) + 0.12 * W.humid - 0.3 * W.dry, 0.05, 1);
+    { const D = this.deck || [1500, 2900, 0]; this.uniforms.uDeck.value.set(D[0], D[1], D[2]); }
+    this.uniforms.uCloudCover.value = THREE.MathUtils.clamp(0.5 + 0.48 * W.storm * (0.62 + 0.38 * W.blizzard) + 0.12 * W.humid - 0.3 * W.dry + (this.coverAdd || 0), 0.05, 1);
     U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
 
     // (ambientK: under a closed canopy most of the sky is shut out)

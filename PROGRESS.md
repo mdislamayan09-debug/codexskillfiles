@@ -1161,3 +1161,23 @@ perfect torus", horse "picking up none of the blue ambient light").
   implied sun) with 45% more sky light; figures, tack and coat lose a third of their saturation and take the
   light's grey-blue (the bay stood in the storm orange-red, "picking up none of the blue ambient").
 - Coat stains fainter.
+
+**Critic scores.** Round 95: 3.5 / 4 / 5. Pines down half a point (the rider "a clay mannequin", horse ears
+"cat-like spikes", "lasso a perfect torus", in the snow the coil over the dark bag "reads as a tyre"). Vista's
+first item is now the sky: "flat white streaks on saturated navy" (my round 90-91 rework made it worse than
+the heaped cumulus of round 78).
+
+### Round 96: the storm sky, seen from the side
+A lookout sees only the lowest dozen degrees of sky. Our cloud slab stood at 1500-2900 m over a lens taken to be at
+sea level, so down there it was seventeen kilometres off, marched in coarse steps and two-thirds haze: streaks.
+- **The slab's base, top and the lens's height are settable per shot** (`deck: [base, top, lensY]`, uniform
+  `uDeck`; default 1500/2900/0 as before). The vista sets 950/2700/330: the storm stands three to ten
+  kilometres off at eye level and is seen from the side, as heaped towers with lit heads and a dark body
+  (`?highdeck` to compare, `?deck=a,b,c`, `?st=`, `?cv=` to tune). Cover eased by 0.1 so breaks open.
+- **The cloud's body is modelled in panorama** (bearing and elevation, two cross-faded copies so there is no
+  seam): great billows of paler grey in the dark mass, crisper lumps within them, darkest overhead, lit from
+  below by the snow country. The plane-projected cells that did this job higher in the sky are faded out
+  below twenty degrees, where they are drawn out into streaks. Sky tones now p5/50/75/95 = 87/122/136/183
+  before the last contrast pass against the reference's 67/106/134/183 (it was 89/109/128/180 and flat).
+- A painted panorama of cloud ranks (`stormPano`, `?pano`) was tried first and is kept switched off: smooth
+  noise profiles, however thresholded, read as smears of paint beside the marched cloud's real shading.
