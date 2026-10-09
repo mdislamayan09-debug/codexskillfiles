@@ -84,8 +84,10 @@ const CLIMATE_FRAG = (pos) => /* glsl */ `
       #ifdef FROST_ALL
       // hoarfrost furs every twig of the dry brush in the cold country
       // (a light rime, the twigs still dark through it: a heavy coat turned every shrub into a white coral ball)
-      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3);
+      diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.33))), diffuseColor.rgb, 1.0 - 0.45 * FROST_K * smoothstep(0.4, 0.85, cl.r));   // winter-dead, greyed
+      // (a plant in two or three is russet: dead heather and willow, the warm note against the snow)
+      diffuseColor.rgb = mix(diffuseColor.rgb, dot(diffuseColor.rgb, vec3(0.33)) * vec3(2.3, 1.15, 0.6), step(0.58, hash12(floor(${pos}.xz * 1.3) + 5.0)) * 0.7 * FROST_K * smoothstep(0.4, 0.85, cl.r));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), smoothstep(0.4, 0.85, cl.r) * 0.3 * FROST_K);
       #endif
     }
     #ifdef FROST_ALL
@@ -99,7 +101,7 @@ function windMaterial(mat, flutter = 0, extra = {}, { autumn = false, frost = fa
     noFlip: flutter > 0,
     vertexHead: `#define LEAF_FLUTTER ${flutter.toFixed(2)}\n` + WIND_VERT,
     vertexBody: WIND_BODY,
-    fragHead: 'varying vec3 vTreePos;\n' + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? '#define FROST_ALL\n' : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
+    fragHead: 'varying vec3 vTreePos;\n' + (conifer ? '#define CONIFER_SNOW\n' : '') + (autumn ? '#define AUTUMN_LEAVES\n' : '') + (frost ? `#define FROST_ALL\n#define FROST_K ${(frost === true ? 1 : frost).toFixed(2)}\n` : '') + (trans !== null ? `#define LEAF_TRANS ${trans.toFixed(3)}\n` : '') + (backDark !== null ? `#define BACKLIT_DARK ${backDark.toFixed(3)}\n#define UNDERSIDE_DARK 0.6\n` : ''),
     fragColor: CLIMATE_FRAG('vTreePos'),
     ...extra,
   });
@@ -1265,8 +1267,9 @@ function rockMaterial(surf = {}, bare = false) {
       // (and lying on the flat tops, ragged at every scale, thin enough for the stone to show through: clean white
       // facets read as paper laid on the rock)
       float topS = smoothstep(0.8, 0.97, wn.y) * smoothstep(0.34, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.12 * (vnoise(vWPos.xz * 37.0) - 0.5));
-      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.62 * smoothstep(0.35, 0.75, rcl.r) * topS);
-      base *= vec3(1.22, 1.2, 1.17);   // weathered grey ledge granite
+      // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
+      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.5 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.35 + 0.65 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * vec2(7.0, 2.1) + vWPos.y * 3.0))));
+      base *= vec3(1.3, 1.2, 1.04);   // weathered ledge granite, warm against the snow
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif
@@ -1276,7 +1279,7 @@ function rockMaterial(surf = {}, bare = false) {
       float lichen = smoothstep(0.56, 0.6, vnoise(vWPos.xz * 1.7 + vWPos.y * 2.3) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
       base = mix(base, srgbR(vec3(156,160,140)) * (0.85 + 0.3 * n2), lichen * 0.28);
       float ochre = smoothstep(0.66, 0.7, vnoise(vWPos.xz * 2.3 - vWPos.y * 1.9 + 5.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r);
-      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.2);
+      base = mix(base, srgbR(vec3(150,132,92)), ochre * 0.36);
       float blackL = smoothstep(0.64, 0.68, vnoise(vWPos.zy * 2.9 + vWPos.x * 2.1 - 3.0) + crink) * (1.0 - rsnow) * smoothstep(0.2, 0.6, rcl.r) * smoothstep(0.8, 0.4, wn.y);
       base = mix(base, srgbR(vec3(44,44,40)), blackL * 0.3);
       base = mix(base, srgbR(vec3(228,233,240)), rsnow);                      // snow caps
@@ -1433,7 +1436,7 @@ export class Vegetation {
     // bunchgrass tufts (9) that keep their straw and ochre in the snow, and tall frosted dead stalks (10)
     {
       const tuftT = tuftTexture(), stalkT = stalkTexture();
-      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: true });   // (frosted and pale in the snow: bare straw read as cloned orange rosettes)
+      const grassTuftMat = windMaterial(new THREE.MeshStandardMaterial({ map: tuftT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra, { frost: 0.35 });   // (a light frost: straw and ochre still show against the snow)
       const stalkMat = windMaterial(new THREE.MeshStandardMaterial({ map: stalkT, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, vertexColors: true, envMapIntensity: 0.4 }), 1, leafExtra);
       const fan = (seed, n, w, h, tilt) => {
         const rnd = mulberry32(seed), cs = [];

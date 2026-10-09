@@ -26,6 +26,12 @@ try {
 }
 console.log(`ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 for (const s of shots) {
+  // FRESH=1: a new page for every shot, so one shot's set (raised ground, planted timber, painted rivers) never
+  // shows up in another's frame
+  if (process.env.FRESH && s !== shots[0]) {
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 600000, polling: 500 });
+  }
   const t1 = Date.now();
   await page.evaluate((s) => window.__game.setShot(s), s);
   // software-GL 4K frames can take many minutes each

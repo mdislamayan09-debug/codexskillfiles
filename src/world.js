@@ -905,6 +905,19 @@ export class World {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) H[j * RES + i] = out[(j - j0) * W + (i - i0)];
     this.heightTex.needsUpdate = true;
   }
+  // Set-building: the splat's forest channel set (not only raised) within r of a point, and its wet channel cleared in
+  // a box (an old creek line taken off the map before a river is painted)
+  setForest(x, z, r, v) {
+    const i0 = Math.max(0, Math.round((x - r + HALF) / CELL)), i1 = Math.min(RES - 1, Math.round((x + r + HALF) / CELL));
+    const j0 = Math.max(0, Math.round((z - r + HALF) / CELL)), j1 = Math.min(RES - 1, Math.round((z + r + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.splat[(j * RES + i) * 4 + 2] = v;
+  }
+  eraseWet(x0, z0, x1, z1) {
+    const i0 = Math.max(0, Math.floor((x0 + HALF) / CELL)), i1 = Math.min(RES - 1, Math.ceil((x1 + HALF) / CELL));
+    const j0 = Math.max(0, Math.floor((z0 + HALF) / CELL)), j1 = Math.min(RES - 1, Math.ceil((z1 + HALF) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.splat[(j * RES + i) * 4 + 1] = 0;
+    this.splatTex.needsUpdate = true;
+  }
   // Set-building: timber. The forest channel of the splat raised to v within r metres of a point (the ground
   // under a planted stand is then shaded as forest floor, not open snow). Call touchSplat() when done.
   paintForest(x, z, r, v = 220) {

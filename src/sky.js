@@ -140,31 +140,33 @@ export class Sky {
         // smooth warped noise (great soft billows, no streaks), shaded by which way its surface faces the sun, dark
         // where it is thick and pale along its torn edges; the bright overcast far above shows through the breaks.
         // (The ray-marched slab, seen at a low angle from a lookout, kept coming out as streaks on a flat ground.)
-        vec2 deckLayer(vec2 uv, vec2 sd){
-          vec2 w = vec2(vn(uv * 1.1 + 3.1), vn(uv * 1.1 - 7.7)) - 0.5;
-          vec2 q = uv + w * 0.9, q2 = q + sd * 0.22;
-          float den = vn(q * 0.8) * 0.5 + vn(q * 1.9 + 5.0) * 0.3 + vn(q * 4.3 - 2.0) * 0.2;
-          float den2 = vn(q2 * 0.8) * 0.5 + vn(q2 * 1.9 + 5.0) * 0.3 + vn(q2 * 4.3 - 2.0) * 0.2;
-          // (a sum of noises bunches round its mean: stretched, so there are true thick masses and true breaks)
-          return vec2(clamp((den - 0.5) * 2.3 + 0.5, 0.0, 1.0), clamp((den - den2) * 5.0 + 0.5, 0.0, 1.0));
+        // (heaped cloud: rounded lumps with creases between them, in octaves, on great masses with breaks between)
+        float billow(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ s += a * abs(2.0 * vn(p) - 1.0); p = p * 2.07 + vec2(3.1, 1.7); a *= 0.5; } return s * 1.0667; }
+        vec3 deckLayer(vec2 uv, vec2 sd){
+          float mass = vn(uv * 0.45 + 1.3) * 0.65 + vn(uv * 1.0 - 4.2) * 0.35;
+          float b = billow(uv * 1.3), b2 = billow((uv + sd * 0.1) * 1.3);
+          float den = clamp((mass - 0.5) * 2.4 + 0.5, 0.0, 1.0) + (b - 0.3) * 0.5;
+          return vec3(clamp(den, 0.0, 1.0), clamp((b - b2) * 4.0 + 0.5, 0.0, 1.0), b);
         }
         vec3 stormDeck(vec3 d, vec3 s, float day){
           vec2 sd = normalize(s.xz + 1e-4);
           float yy = max(d.y, 0.0);
           vec3 col = vec3(0.6, 0.7, 0.86) * (0.7 + 0.4 * vn(d.xz / (yy + 0.3) * 0.7 + 11.0));
           {
-            vec2 L = deckLayer(d.xz / (yy + 0.2) * 0.42 + uCloudOffset * 1.2 + 4.0, sd);
-            vec3 c = mix(vec3(0.36, 0.42, 0.52), vec3(0.16, 0.2, 0.28), smoothstep(0.45, 0.8, L.x));
-            c += (L.y - 0.5) * 0.14 * (1.0 - smoothstep(0.55, 0.8, L.x));
+            vec3 L = deckLayer(d.xz / (yy + 0.2) * 0.42 + uCloudOffset * 1.2 + 4.0, sd);
+            vec3 c = mix(vec3(0.4, 0.46, 0.56), vec3(0.18, 0.22, 0.3), smoothstep(0.45, 0.8, L.x)) * (0.7 + 0.9 * L.z);
+            c += (L.y - 0.5) * 0.2;
             col = mix(col, c, smoothstep(0.3, 0.46, L.x));
           }
           {
-            vec2 L = deckLayer(d.xz / (yy + 0.1) * 0.6 + uCloudOffset * 2.0, sd);
-            vec3 c = mix(vec3(0.24, 0.29, 0.38), vec3(0.055, 0.075, 0.115), smoothstep(0.48, 0.85, L.x));
-            c += (L.y - 0.5) * 0.16 * (1.0 - smoothstep(0.56, 0.85, L.x));
+            vec3 L = deckLayer(d.xz / (yy + 0.1) * 0.6 + uCloudOffset * 2.0, sd);
+            vec3 c = mix(vec3(0.27, 0.32, 0.41), vec3(0.07, 0.09, 0.135), smoothstep(0.48, 0.85, L.x)) * (0.65 + 1.0 * L.z);
+            c += (L.y - 0.5) * 0.24;
             c += vec3(0.2, 0.22, 0.25) * (1.0 - smoothstep(0.38, 0.5, L.x));
             col = mix(col, c, smoothstep(0.38, 0.52, L.x));
           }
+          // (slate, not navy: storm cloud is grey with a little blue in it)
+          col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 0.55) + 0.035;
           col *= 0.25 + 0.75 * day;
           return mix(col, vec3(0.4, 0.47, 0.58) * (0.25 + 0.75 * day), smoothstep(0.1, 0.0, d.y) * 0.7);
         }
@@ -362,7 +364,7 @@ export class Sky {
     this.sun.intensity *= 1 - (0.62 + 0.16 * W.blizzard) * W.storm;   // a blizzard is lit mostly by the sky: soft, faint shadows
     // a storm deck in clear air is broken: cloud shadows cover most of the land, and the sun in the breaks is strong
     U.uCloudShadow.value = 0.9 * W.storm * (1 - W.blizzard);
-    this.sun.intensity *= 1 + 0.55 * U.uCloudShadow.value;
+    this.sun.intensity *= 1 + 1.0 * U.uCloudShadow.value;
     this.uniforms.uStorm.value = W.storm;
     this.uniforms.uBlizzard.value = W.blizzard;
     U.uSnowfall.value = W.blizzard;

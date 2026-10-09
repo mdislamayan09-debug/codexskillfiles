@@ -54,7 +54,7 @@ export function cloudLight(x, y, z, off = U.uCloudShadowOff.value) {
   const L = U.uSunDir.value, k = Math.max(1800 - y, 200) / Math.max(L.y, 0.15);
   const qx = (x + L.x * k) / 2600 + U.uTime.value * 0.0012 + off.x, qy = (z + L.z * k) / 2600 + U.uTime.value * 0.0005 + off.y;
   const c = N(qx, qy) * 0.6 + N(qx * 2.3 + 7.1, qy * 2.3 + 7.1) * 0.3 + N(qx * 5.1 - 3.3, qy * 5.1 - 3.3) * 0.1;
-  const t = Math.min(1, Math.max(0, (c - 0.46) / 0.24));
+  const t = Math.min(1, Math.max(0, (c - 0.42) / 0.32));
   return t * t * (3 - 2 * t);
 }
 
@@ -141,7 +141,7 @@ float cloudShade(vec3 wp){
   float c = mistN(q) * 0.6 + mistN(q * 2.3 + 7.1) * 0.3 + mistN(q * 5.1 - 3.3) * 0.1;
   // (a broken deck still lets a good part of the sun's light down through its thin places: full-black shade laid
   // dark grey blotches with soft edges over every snow slope, like camouflage)
-  return mix(1.0, 0.6 + 0.4 * smoothstep(0.42, 0.74, c), uCloudShadow);
+  return mix(1.0, 0.36 + 0.64 * smoothstep(0.42, 0.74, c), uCloudShadow);   // (pools of sun and broad shade: evenly lit, a snow landscape has no form)
 }
 
 // Long-range sun occlusion by the heightfield (ridges shadow valleys at golden hour).
@@ -200,7 +200,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
   col = mix(col, fogCol, fogF);
   // falling snow: the far walls and peaks fade out into the snowfall, to the tone of the sky behind them (a range
   // standing behind a nearer crest showed through it as a dark outline hung in the sky)
-  col = mix(col, fogCol * 1.12, uSnowfall * 0.96 * (1.0 - exp(-max(dist - 350.0, 0.0) / 1450.0)));   // (the near walls keep their darks)
+  col = mix(col, fogCol * 1.12, uSnowfall * 0.96 * (1.0 - exp(-max(dist - 500.0, 0.0) / 2500.0)));   // (the near walls keep their darks)
   // mist banks: torn layers of low cloud lying along the valley floors, thickening with distance
   if (uMist > 0.0) {
     // Valley fog as a layer of air, not paint: a bank lies between the valley floor and a ceiling a hundred metres
@@ -222,7 +222,7 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
         // (seen down into from above, the sight line crosses the layer in a couple of hundred metres, so the banks are
         // thick and the air between them clear; from inside the layer the same air is a thin veil)
         float m = 1.0 - exp(-Lb * uMist * (0.02 + 2.6 * bankN * bankN) / mix(800.0, 1500.0, step(yc, h1)));
-        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.7));
+        col = mix(col, mix(vec3(0.74, 0.8, 0.9) * (1.0 - 0.8 * uNight), fogCol, 0.25), clamp(m, 0.0, 0.6));
       }
     }
     // and a thin band of low cloud a few hundred metres up, in torn rags, also a layer the sight line runs through:

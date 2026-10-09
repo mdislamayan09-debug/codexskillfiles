@@ -828,3 +828,23 @@ snow; re-check the nine other shots (not re-run since round 68).
   missing tiers). Drifts are shaped by a directional skylight while it snows. The horse is larger in frame.
 
 **Critic scores.** Round 74: 4 / 4 / 4. Round 75: 4 / 4 / 5.
+
+### Round 77
+**Round 76 critic:** 4 / 4 / 3. The ridge lookout had depth but "no valley: a fog void and a wall", marbled
+backdrop shading, lenticular smudges for a sky. So:
+- **Vista: over the valley's mouth, looking straight up its axis** (`?vistaridge` and `?vistalow` bring back the
+  earlier two). The lens stands on a 150 m knob built in the mouth; the homestead's knoll is 200 m ahead and 60 m
+  below it; the floor runs away between two rocky, timbered flanks to a notch in the ranges, with a fog bank lying
+  across it. The river meanders over the flat floor (the survey's own creek line erased first). The forest
+  channel is *set* in the planting wedge, so no tint is left where no stand is planted. Cloud shade is deeper and
+  the sun in the breaks stronger: pools of light on the flanks. The outcrop is warm ochre granite with thin
+  feathered snow; brush is partly russet; bunchgrass keeps its straw; no stalks; nothing within arm's reach of
+  the lens. Spruce of every height round the yard, a few old pines over them.
+- **Storm sky.** The painted deck's layers are heaped cloud (`billow`: rounded lumps with creases, in octaves) on
+  great masses with breaks, slate rather than navy.
+- **Snow ride: the main valley** (`?canyonride` brings the canyon back): its floor, looking north, timbered
+  flanks with rock on them either side and a notch at its head. Frozen braids are grey-blue ice half drifted
+  over (dark, each was a black pond). The cliff band's rock is slate blue under falling snow. A darker bay with
+  almost no sheen in snowfall; a paler trench under the horse.
+- **Captures use a fresh page per shot** (`FRESH=1`, the default in `snap.sh`): each shot dresses a pristine
+  world, so one shot's raised ground and planted timber never show in another's frame.

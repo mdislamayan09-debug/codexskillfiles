@@ -167,7 +167,8 @@ export class Backdrop {
             g += vec2(dn2.y, -dn2.x) * gl.x + dn2 * gl.y * 0.35;
           }
           float steep = 1.0 - wn.y;
-          vec3 pn = normalize(wn - vec3(g.x, 0.0, g.y) * (0.55 + 1.6 * steep));   // (rock ribs on the gentler faces too)
+          // (fading with distance: under haze its shading was all that showed of a far range, and it read as marbling)
+          vec3 pn = normalize(wn - vec3(g.x, 0.0, g.y) * (0.55 + 1.6 * steep) * mix(1.0, 0.3, smoothstep(2500.0, 7000.0, dist)));   // (rock ribs on the gentler faces too)
           normal = normalize((viewMatrix * vec4(pn, 0.0)).xyz);
           // timber is trees with snow between them: crowns a few pixels across while they can be told apart
           {

@@ -215,7 +215,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   }
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
-  rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);   // (near-black wet rock against the snow, as the reference's faces)
+  rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);
+  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08), uSnowfall * snowC);   // (slate blue under falling snow, as the reference's cliffs)   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
@@ -470,9 +471,10 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float corridor = smoothstep(0.12, 0.4, wet) * (1.0 - smoothstep(0.45, 0.6, wet)) * cold;
   float willow = corridor * smoothstep(0.35, 0.65, fbm2(xz / 14.0 + 8.8) + 0.25 * (vnoise(xz / 3.0) - 0.5));
   c = mix(c, mix(srgb(vec3(46,40,36)), srgb(vec3(84,78,72)), vnoise(xz / 2.3)) * (0.8 + 0.3 * micro), willow * 0.75);
-  float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.22, 0.4, fbm2(xz / 60.0 + 3.3));
+  float openW = smoothstep(0.82, 0.97, wet) * cold * smoothstep(0.5, 0.62, fbm2(xz / 60.0 + 3.3));
   float ice = smoothstep(0.4, 0.65, wet) * cold * (1.0 - openW);    // iced-over braids
-  c = mix(c, mix(srgb(vec3(74,94,112)), snow, 0.3 * smoothstep(0.55, 0.8, vnoise(xz * 0.35))) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);
+  // (grey-blue ice half drifted over with snow: bare and dark, every frozen braid on a valley floor was a black pond)
+  c = mix(c, mix(srgb(vec3(104,124,144)), snow, 0.6 * smoothstep(0.4, 0.7, vnoise(xz * 0.35) * 0.6 + vnoise(xz * 0.11 + 3.0) * 0.4)) * (0.85 + 0.25 * vnoise(xz * 1.3)), ice);
   tn = mix(tn, vec3(0.0, 0.0, 1.0), ice);   // (dark grey-blue ice: paler, the creek vanished into the snow from the saddle)
   // (river ice is scuffed and snow-dusted, not a mirror: glossy, it threw back the bright horizon and a river
   // seen from a height came out paler than the snow round it)

@@ -201,7 +201,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           // (fine flecks melting into the coat, thicker along the top line: broad white blotches read as a pinto's patches)
           // (a soft veil lying on what faces up, thicker in places: as separate flecks it read as noise sprayed on the coat)
           float dust = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r) * smoothstep(0.62, 0.98, wn.y) * (0.3 + 0.7 * smoothstep(0.3, 0.7, 0.6 * vnoise(vRest.xz * 19.0 + vRest.y * 7.0) + 0.4 * vnoise(vRest.xz * 55.0 - vRest.y * 20.0)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.42'});
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), dust * ${kind === 'human' ? '0.55' : '0.3'});
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
         // inside of the legs lie in the body's own shade (lit evenly all round, a body read as a flat cut-out)
@@ -261,7 +261,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             vec3 Ls = normalize((viewMatrix * vec4(normalize(vec3(uSunDir.x * 0.6, 1.0, uSunDir.z * 0.6)), 0.0)).xyz);
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
             float streak = 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0));
-            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - 0.5 * uSnowfall);
+            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - 0.8 * uSnowfall);
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)
@@ -954,7 +954,7 @@ const COATS = {
   pinto: { coat: 0x2e1c12, points: 0x1a120c, mane: 0x100c08, belly: 0x3a2418, pinto: 1 },
   grey: { coat: 0x8a8682, points: 0x4a4644, mane: 0xd0ccc4, belly: 0xa09c98, pinto: 0, dapple: 1 },
   black: { coat: 0x1a1614, points: 0x100c0a, mane: 0x0c0a08, belly: 0x221c18, pinto: 0 },
-  redbay: { coat: 0x56341f, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
+  redbay: { coat: 0x4a2f1f, points: 0x1a120c, mane: 0x110b07, belly: 0x593320, pinto: 0, dapple: 1 },   // a blood bay: red coat, black points
   chestnut: { coat: 0x8a4422, points: 0x6a3418, mane: 0x6a3016, belly: 0x9a5530, pinto: 0 },
   deer: { coat: 0x8a6440, points: 0x5a4430, mane: 0x6a5038, belly: 0xd8ccb8, pinto: 0 },
   sheep: { coat: 0xd2c8b4, points: 0x2a2420, mane: 0xc8bea8, belly: 0xc0b6a0, pinto: 0 },

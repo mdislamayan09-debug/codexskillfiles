@@ -265,7 +265,10 @@ async function init() {
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
       // north-east up the valley with the massif's banded cliffs on the left and the spire standing in the gap
-      const [x, z, yaw] = G.clearNear(-3300, -2700, 1.78) || G.findCanyonRide() || G.alongValley(0.5); // (framed as the reference: the whole horse, its feet near the bottom edge and the rider's hat four-tenths down)
+      // (round 77: the main valley's floor, looking north up it: timbered flanks with rock on them either side and
+      // a notch at its head, where the canyon had sheer pale walls a kilometre off that read as painted slabs;
+      // ?canyonride brings the canyon back)
+      const [x, z, yaw] = (params.has('canyonride') ? G.clearNear(-3300, -2700, 1.78) : G.clearNear(-620, -2700, 2.83)) || G.findCanyonRide() || G.alongValley(0.5); // (framed as the reference: the whole horse, its feet near the bottom edge and the rider's hat four-tenths down)
       return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
@@ -291,7 +294,11 @@ async function init() {
       // (round 76: higher, on the west ridge five hundred metres above the floor, looking north-north-east over the
       // valley's length to the ranges beyond the map: from the shoulder a dome two kilometres off closed the view
       // like a bowl; from here the eye runs down into the valley and out over ridge after ridge to the horizon)
-      const S = params.has('vistalow') ? { cx: -1060, cz: -1990, lift: 85, tx: -600, tz: -3500 } : { cx: -1800, cz: -2500, lift: 6, tx: -620, tz: -4000 }, PITCH0 = params.has('vistalow') ? -0.12 : -0.15, D0 = 1200;
+      // (round 77: over the valley's mouth, looking straight up its axis, as the reference looks up its valley: the
+      // floor and its river run away from below the lens to a notch in the ranges, a flank either side. The ridge
+      // lookout of round 76 (?vistaridge) had depth but no valley in it: a fog void and a wall.)
+      const S = params.has('vistalow') ? { cx: -1060, cz: -1990, lift: 85, tx: -600, tz: -3500 } : params.has('vistaridge') ? { cx: -1800, cz: -2500, lift: 6, tx: -620, tz: -4000 } : { cx: -560, cz: -1980, lift: 150, tx: -760, tz: -4000 };
+      const PITCH0 = params.has('vistalow') ? -0.12 : params.has('vistaridge') ? -0.15 : -0.13, D0 = 1200;
       const az0 = Math.atan2(S.tx - S.cx, S.tz - S.cz), ch0 = world.heightAt(S.cx, S.cz) + S.lift;
       const lx0 = S.cx + Math.sin(az0) * D0, lz0 = S.cz + Math.cos(az0) * D0;
       G.vistaCache = { cx: S.cx, cz: S.cz, ch: ch0, tx: lx0, tz: lz0, th: ch0 + Math.tan(PITCH0) * D0 - world.heightAt(lx0, lz0), home: null, knob: true };
@@ -986,7 +993,9 @@ async function init() {
               const x = c.x + d0.x * f + rt0.x * r, z = c.z + d0.z * f + rt0.z * r;
               if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
               const D = stand(x, z, world.heightAt(x, z));
-              if (D > 0.3 && world.normalAt(x, z).y > 0.45) world.paintForest(x, z, 2.2, Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)));
+              // (set, not only raised: the survey's own forest tint, left where no stand is planted, lay on the open snow
+              // as dark blotches)
+              world.setForest(x, z, 2.2, D > 0.3 && world.normalAt(x, z).y > 0.45 ? Math.round(235 * THREE.MathUtils.smoothstep(D, 0.3, 0.62)) : 0);
             }
           }
           // (close-grown: at one tree to nine metres the stands were a third canopy and read as speckle)
@@ -1012,9 +1021,25 @@ async function init() {
         // the river: the valley's creek widened to a frozen river winding down its floor, as the reference's (a
         // creek a few metres across cannot be seen from a summit)
         {
-          const line = world.valley.filter((q) => q[1] < -1900 && q[1] > -4000).map((q) => [q[0], q[1]]);
+          const axis = world.valley.filter((q) => q[1] < c.z - 260 && q[1] > -4060).map((q) => [q[0], q[1]]).sort((p, q) => q[1] - p[1]);
+          // (it meanders across the flat floor, as a river on a glacial flat does: laid on the survey's own thalweg it
+          // ran as straight as a canal)
+          const line = [];
+          let run = 0;
+          for (let k = 0; k < axis.length - 1; k++) {
+            const [ax2, az2] = axis[k], [bx2, bz2] = axis[k + 1], L = Math.hypot(bx2 - ax2, bz2 - az2), nx = -(bz2 - az2) / L, nz = (bx2 - ax2) / L;
+            for (let t = 0; t < 1; t += 36 / L) {
+              const x0 = ax2 + (bx2 - ax2) * t, z0 = az2 + (bz2 - az2) * t, h0 = world.heightAt(x0, z0);
+              let off = 62 * Math.sin((run + t * L) / 115) + 26 * Math.sin((run + t * L) / 47 + 1.3);
+              while (Math.abs(off) > 4 && world.heightAt(x0 + nx * off, z0 + nz * off) > h0 + 3.5) off *= 0.6;   // (kept on the flat)
+              line.push([x0 + nx * off, z0 + nz * off]);
+            }
+            run += L;
+          }
           if (line.length > 2) {
-            world.paintCreek(line, 13, 1.2);
+            const xs = line.map((q) => q[0]), zs = line.map((q) => q[1]);
+            world.eraseWet(Math.min(...xs) - 260, Math.min(...zs) - 40, Math.max(...xs) + 260, Math.max(...zs) + 40);
+            world.paintCreek(line, 11, 1.2);
             for (const L of [veg.trees, veg.rocks]) { const wetIt = (it) => it.z < -1850 && world.splatAt(it.x, it.z).wet > 0.4; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
           }
         }
@@ -1052,12 +1077,13 @@ async function init() {
         // (to scale with the cabin: at twice this size the buildings were toys under them)
         for (const [f, r, sc, tall] of [[6, -34, 1.5, 0], [-4, -40, 1.15, 0], [14, -44, 1.8, 0], [22, -30, 1.3, 0], [-10, -52, 0.9, 0],
           [2, 33, 1.7, 0], [12, 40, 1.25, 0], [-6, 44, 1.45, 0], [20, 30, 1.0, 0], [-14, 36, 0.8, 0],
-          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 0.6, tall);
+          [36, -12, 1.6, 0], [42, 6, 1.9, 0], [34, 18, 1.2, 0], [48, -24, 1.4, 0], [52, 26, 1.1, 0], [30, 2, 0.9, 0]]) plant(f, r, sc * 0.82, tall);
         // and a broken ring of spruce on the crown itself, close round the buildings on three sides (open toward the lens)
-        for (let i = 0; i < 34; i++) {
-          const a = rk() * 6.28, rr4 = 25 + rk() * 22, f = Math.cos(a) * rr4, r = Math.sin(a) * rr4;
+        // (thick, of every height, a few old pines standing over them: a ring of thin spires round a bald top was a toy)
+        for (let i = 0; i < 80; i++) {
+          const a = rk() * 6.28, rr4 = 24 + rk() * 36, f = Math.cos(a) * rr4, r = Math.sin(a) * rr4;
           if (f < -4 && Math.abs(r) < 24) continue;
-          plant(f, r, 0.55 + rk() * rk() * 0.75, 0);
+          plant(f, r, i % 6 === 0 ? 0.55 + rk() * 0.25 : 0.7 + rk() * rk() * 1.0, i % 6 === 0 ? 1 : 0);
         }
         // the knoll's own slopes broken with rock and brush, so it is ground and not an iced dome
         for (let i = 0; i < 70; i++) {
@@ -1112,7 +1138,7 @@ async function init() {
         const by = Math.max(g - 0.14 * sc, top - 0.76 * sc) + 0.62 * sc;
         for (let q = 0; q < 5; q++) {
           const a = rr() * 6.28, rad = rr() * 0.3 * sc, drop = (rad / (0.3 * sc)) ** 2 * 0.22 * sc;
-          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.35 + rr() * 0.5, [9, 9, 7, 8, 10][Math.floor(rr() * 5)]);
+          veg.bushes.add(x + Math.cos(a) * rad, by - drop - 0.12, z + Math.sin(a) * rad, rr() * 6.28, 0.35 + rr() * 0.5, [9, 9, 7, 8, 9][Math.floor(rr() * 5)]);
         }
       };
       // the ledge itself: the summit's ground built out into a shoulder under the left-hand outcrop and a lower one
@@ -1151,7 +1177,7 @@ async function init() {
         const hit = groundAt(bnx, bny, 24);
         if (!hit) continue;
         const [x, g, z] = hit, k = rr();
-        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : k < 0.92 ? 7 + Math.floor(rr() * 2) : 10);
+        veg.bushes.add(x, g - 0.05, z, rr() * 6.28, (0.4 + rr() * 0.9) * (k < 0.92 ? 1 : 0.6), k < 0.66 ? 9 : 7 + Math.floor(rr() * 2));   // (no dead stalks: they stood about the ledge as stakes)
       }
       // the slope falling away below the lookout: broken rock and frosted brush poking through the snow all the
       // way down the near ground, so it reads as a mountainside rather than a blank white wedge
@@ -1164,6 +1190,8 @@ async function init() {
         else for (let k = 0; k < 3; k++) { const bx = x + (rr() - 0.5) * 2.5, bz = z + (rr() - 0.5) * 2.5; veg.bushes.add(bx, world.heightAt(bx, bz) - 0.05, bz, rr() * 6.28, 0.5 + rr() * 0.6, [9, 9, 7, 8][Math.floor(rr() * 4)]); }
       }
     }
+    // (nothing growing within arm's reach of a lookout's lens: a tuft there is a grey fan across the frame's edge)
+    if (s.foreground && G.camOverride && G.camOverride.pos) G.clearTreesNear(G.camOverride.pos.x, G.camOverride.pos.z, 2.6, veg.bushes);
     veg.refreshImpostors();
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');
