@@ -199,6 +199,8 @@ const GradeShader = {
       col *= mix(vec3(1.0), mix(vec3(0.9, 0.93, 0.98), vec3(0.78, 0.89, 1.03), smoothstep(0.12, 0.7, l)), uStorm);   // (shadows less saturated: the pool under the horse read as dyed blue)
       // and a firmer S-curve, so the storm frame has true darks in rock and timber and bright snow, not one mid band
       col = mix(col, col * col * (3.0 - 2.0 * col) * 1.08, uStorm * 0.25);
+      // (round 87: both storm references measure bluer than ours by about this much)
+      col *= mix(vec3(1.0), vec3(0.95, 1.01, 1.07), uStorm);
       // night: blue shift
       col = mix(col, col * vec3(0.8, 0.92, 1.25) * 1.15, uNight * 0.6);
       // Dead Eye: sepia, high contrast, vignette pulse

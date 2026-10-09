@@ -1358,7 +1358,8 @@ function rockMaterial(surf = {}, bare = false) {
       // scale from a pace to a finger; faded in over a range of slope it lay on the rock as soft white blobs.)
       float sEdge = wn.y + 0.2 * (tnz(vWPos * 2.3) - 0.5) + 0.12 * (tnz(vWPos * 9.0 + 3.0) - 0.5) + 0.08 * (tnz(vWPos * 37.0 + 6.0) - 0.5);
       float patchS = smoothstep(0.4, 0.47, tfb(vWPos * 0.55 + 3.0) + 0.1 * (tnz(vWPos * 6.0) - 0.5));
-      float topS = smoothstep(0.86, 0.895, sEdge) * patchS;
+      // (in a storm it settles on every ledge and top)
+      float topS = smoothstep(0.86, 0.895, sEdge) * mix(patchS, 1.0, min(1.0, uSnowfall * 1.5) * 0.85);
       rsnow = smoothstep(0.35, 0.75, rcl.r) * max(topS * 0.93, 0.5 * fleck * smoothstep(0.5, 0.8, wn.y));
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)

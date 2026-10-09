@@ -157,7 +157,7 @@ function buildBones(spec) {
 // Fabric/hair/skin micro variation driven by rest-pose position so it sticks to the deforming body.
 const ROUGH_HUMAN = '0.52, 0.9, 0.62, 0.6, 0.9, 0.42, 0.85, 0.7, 0.45, 0.85, 0.55, 0.4, 0.8, 0.95, 0.95'; // coat (index 3) is worn leather
 // (a groomed coat has a satin sheen, not a gloss: at 0.6 the horse read as polished plastic)
-const ROUGH_QUAD = '0.74, 0.7, 0.35, 0.55, 0.78, 0.76, 0.72, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
+const ROUGH_QUAD = '0.84, 0.8, 0.35, 0.55, 0.78, 0.76, 0.72, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6';
 function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind = 'human') {
   const m = physical
     ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, sheen: 0.4, sheenRoughness: 0.5, sheenColor: new THREE.Color(0.4, 0.3, 0.22), envMapIntensity: 1.05 })
@@ -221,7 +221,9 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             float cold = smoothstep(0.45, 0.85, climateAt(vWPos.xz).r);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.12, 1.0, 0.9), 0.12 * cold);
             float fl = smoothstep(0.62, 0.8, vnoise(vRest.xz * 140.0 + vRest.y * 60.0) * 0.6 + vnoise(vRest.xz * 47.0 - vRest.y * 20.0) * 0.4) * smoothstep(-0.1, 0.7, wn.y);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), fl * 0.6 * cold);
+            // (a soft dusting lying along the top line, a few flakes below it: sprinkled evenly the coat was salt-and-pepper)
+            float lie = smoothstep(0.45, 0.95, wn.y) * (0.45 + 0.55 * vnoise(vRest.xz * 9.0 + vRest.y * 4.0));
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.87, 0.92), (fl * 0.22 + lie * 0.5) * cold);
           }`}
         }
         // the light comes mostly from above: backs, shoulders and rumps catch it, bellies, flanks turned down and the
@@ -242,6 +244,8 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
           {
             const float RT[15] = float[15](${quad ? ROUGH_QUAD : ROUGH_HUMAN});
             roughnessFactor = RT[clamp(int(vLab + 0.5), 0, 14)];
+            // (a coat matted with melting snow, leather and hide wet and dull: nothing on a figure shines in a snowstorm)
+            roughnessFactor = mix(roughnessFactor, 0.97, min(1.0, uSnowfall * 1.6));
             ${quad ? '' : 'if (int(vLab + 0.5) == 3) roughnessFactor = mix(0.6, 0.9, smoothstep(0.3, 0.72, fbm2(vRest.xy * 31.0 + vRest.z * 23.0) * 0.5 + fbm2(vRest.xy * 9.0 + vRest.z * 7.0) * 0.5));'}
           }`)
         .replace('#include <normal_fragment_maps>', `
@@ -285,7 +289,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
             float sh = pow(max(dot(normal, normalize(Ls + Vv)), 0.0), 11.0);
             // (the streaks fade out as they near a pixel's width: beating against the pixel grid they wove the rump into twill)
             float streak = mix(1.0, 0.55 + 0.9 * vnoise(vec2(vRest.z * 8.0 + vRest.x * 3.0, vRest.y * 64.0 + vRest.x * 52.0)), smoothstep(0.5, 0.18, length(fwidth(vRest)) * 64.0));
-            totalEmissiveRadiance += (diffuseColor.rgb * 2.4 + 0.012) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - min(1.0, uSnowfall * 1.5));
+            totalEmissiveRadiance += (diffuseColor.rgb * 1.5 + 0.008) * (uFogColor * 0.8 + uSunColor * 0.05) * sh * streak * (1.0 - min(1.0, uSnowfall * 1.5));
           }` : ''}
           // (against the light a figure is drawn by its rim: felt, hair and worn cloth all scatter at the edge, however
           // dark they are face on)

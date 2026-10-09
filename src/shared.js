@@ -227,7 +227,10 @@ vec3 applyAtmosphere(vec3 col, vec3 wpos){
         // thick and the air between them clear; from inside the layer the same air is a thin veil)
         float m = 1.0 - exp(-Lb * uMist * (0.02 + 2.6 * bankN * bankN) / mix(1500.0, 1500.0, step(yc, h1)));
         // (a veil the floor's timber and river show through, not a white lid on the valley)
-        col = mix(col, mix(vec3(0.66, 0.73, 0.84) * (1.0 - 0.8 * uNight), fogCol, 0.3), clamp(m, 0.0, 0.42));
+        // (round 87: under falling snow the bank takes the storm air's own tone. Near white whatever the weather, it veiled
+        // every far face pale for a lens standing inside it: the 'white wedge' of the snow ride's walls)
+        vec3 bankC = mix(mix(vec3(0.66, 0.73, 0.84) * (1.0 - 0.8 * uNight), fogCol, 0.3), fogCol * vec3(0.9, 1.0, 1.07), min(1.0, uSnowfall * 1.5));
+        col = mix(col, bankC, clamp(m, 0.0, 0.42));
       }
     }
     // and a thin band of low cloud a few hundred metres up, in torn rags, also a layer the sight line runs through:

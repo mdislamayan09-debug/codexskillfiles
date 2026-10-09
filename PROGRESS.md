@@ -1008,3 +1008,21 @@ noise"; the lone pine on the floor is "a lollipop bare trunk"; the far wall's te
 - **Pine floor dressed across the lens's field** out to thirty metres, off the tread: 26 clumps of leafy scrub
   knee to waist high, 20 pieces of deadfall (limbs and poles), 30 half-sunk stones, all real meshes that cast
   shadows. Satchel strap dark.
+
+**Critic scores.** Round 86: 4 / 3 / 4.5. Showing the horse's head in the pine shot traded "truncated" for
+"undersized head, blue blocky bridle, vinyl toy". Found while chasing the snow ride's pale far wall: its faces
+are steep (slope 0.4-0.85 sampled) and are rock, but the lens stands inside the valley's fog bank, whose colour
+is near white whatever the weather, so every far face is veiled pale. Fixed in round 87.
+
+### Round 87
+- **The fog bank takes the storm air's tone under falling snow** (it was near white whatever the weather, and
+  the snow ride's lens stands inside it): the far faces are no longer veiled pale. Rock under snowfall is dark
+  wet slate (0.9x, was lifted 1.2x), less rime.
+- **Nothing on a figure shines in a snowstorm**: roughness to 0.97 under snowfall for coat, hide and leather;
+  horse coat rougher everywhere (0.84) with a weaker sheen; snow lies as a soft dusting along the horse's top
+  line with a few flakes below (sprinkled evenly it was salt-and-pepper).
+- **Snowfield**: drifts twice as deep and shaded harder under overcast; dark-sided boulders standing out of the
+  snow in the near field; ledge cuts removed from the cliff's foot (a flat pale strip); snow settles on every
+  ledge of the outcrops in a storm.
+- **Snow ride lens** closer (5.4 m), exposure +7%. **Storm grade** bluer by (0.95, 1.01, 1.07): both storm
+  references measured bluer than ours; snow ride now 113/136/169 against 109/141/177.

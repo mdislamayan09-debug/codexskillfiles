@@ -216,7 +216,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
   rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);
-  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08) * 1.2, uSnowfall * snowC);   // (lifted: measured, the reference's storm cliffs are three times as light as ours were)
+  rock = mix(rock, rock * vec3(0.72, 0.86, 1.08) * 0.9, uSnowfall * snowC);   // (round 87: dark wet slate; lifted, the far faces had no rock in them)   // (lifted: measured, the reference's storm cliffs are three times as light as ours were)
   // was: rock * vec3(0.78, 0.9, 1.08)   // (slate blue under falling snow, as the reference's cliffs)   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
@@ -424,7 +424,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         }
         float alongR = dot(xz, vec2(0.8, -0.6));
         float rime = uSnowfall * steep * smoothstep(0.3, 0.75, fbm2(vec2(alongR, wp.y * 2.2) / 4.5) + 0.2 * (vnoise(vec2(alongR, wp.y) * 1.3) - 0.5));
-        rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.22);
+        rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.1);
       }
     }
   }
@@ -452,8 +452,9 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
     {
       float litS = dot(normalize(n + vec3(-dg.x, 0.0, -dg.y) * 0.7), normalize(vec3(0.8, 0.55, 0.28)));
       float shade = smoothstep(0.25, 0.9, litS);
-      c *= mix(1.0, 0.72 + 0.42 * shade, uSnowfall * snowAmt);
-      c = mix(c, c * vec3(0.9, 0.96, 1.08), (1.0 - shade) * 0.5 * uSnowfall * snowAmt);
+      float ovc = min(1.0, uSnowfall * 1.6);
+      c *= mix(1.0, 0.66 + 0.5 * shade, ovc * snowAmt);
+      c = mix(c, c * vec3(0.9, 0.96, 1.08), (1.0 - shade) * 0.5 * ovc * snowAmt);
     }
     // the horse's trail: a churned trough about a metre wide with thrown-up lips and hoof pits, shaded by its walls
     if (uTrailN > 1.5 && fp < 0.5) {

@@ -278,7 +278,7 @@ async function init() {
       // from behind with its feet at the bottom edge and the rider's hat just under half way down; ?rideold is the close
       // three-quarter framing of rounds 50-78)
       if (params.has('rideold')) return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true };
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, camRel: [0.5, 2.6, -6.4], lookRel: [-3.6, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.62 }, snowDress: true }; },
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, expK: 1.07, camRel: [0.45, 2.5, -5.4], lookRel: [-3.4, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.62 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -683,13 +683,14 @@ async function init() {
           const [m0x, m0z] = P(-40, 0), [m1x, m1z] = P(6, 0), mh = world.heightAt(px, pz) + 6.5;
           world.raiseSpur(m0x, m0z, mh - 0.5, m1x, m1z, mh, { side: 0.11, round: 0.0005, top: 16, flat0: 12, reach: 170, rough: 0.25, sag: 0 });
         }
-        world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 0.85);
+        world.sculptDrifts(px + f[0] * 90, pz + f[1] * 90, 240, 1.5);   // (deep enough to see under an overcast)
         const [b0x, b0z] = P(62, 50), [b1x, b1z] = P(215, 66);
         const bh = Math.max(world.heightAt(b0x, b0z), world.heightAt(b1x, b1z)) + 30;
         world.raiseSpur(b0x, b0z, bh, b1x, b1z, bh + 6, { side: 1.5, round: 0, top: 26, flat0: 20, reach: 80, rough: 1.4, sag: 0 });
         // its face cut into rock risers and snow ledges, as the reference's cliff band is (a single smooth ramp shaded
         // as one dark hump, whatever was stood against it)
-        world.ledgeBox(Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90, 7.5);
+        // (only for the bare slope: with the face built of outcrops the cut ledges showed at its foot as a flat pale strip)
+        if (params.has('nocliff')) world.ledgeBox(Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90, 7.5);
         G.benchBox = [Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90];
         // The middle distance. The canyon's own walls stand a kilometre off, pale in the falling snow, with nothing
         // between them and the lens. The reference's valley is closed in by spurs coming down from either side one
@@ -845,6 +846,17 @@ async function init() {
           if (nrm.y < 0.58 || world.splatAt(x, z).wet > 0.3) continue;
           const old = tl.length && rt3() < 0.28;
           veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rt3() * 6.28, old ? 0.45 + rt3() * 0.5 : 0.55 + rt3() * rt3() * 1.5, old ? tl[Math.floor(rt3() * tl.length)] : firs[Math.floor(rt3() * firs.length)]);
+        }
+      }
+      // half-buried boulders under caps of snow in the near field, either side of the horse's line: the dark shapes the
+      // reference's snowfield is broken with
+      {
+        let sdb = 6311;
+        const rb2 = () => ((sdb = (sdb * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 12; i++) {
+          const ahead = 7 + rb2() * 40, side = (i % 2 ? -1 : 1) * (3.5 + ahead * 0.22 + rb2() * (4 + ahead * 0.3));
+          const x = px + f[0] * ahead + lt[0] * side, z = pz + f[1] * ahead + lt[1] * side, sc = 0.7 + rb2() * rb2() * 1.6;
+          veg.rocks.add(x, world.heightAt(x, z) - 0.2 * sc, z, rb2() * 6.28, sc * 1.25, 4 + Math.floor(rb2() * 2));   // (standing well out of the snow, dark-sided: sunk to their caps they were white on white)
         }
       }
       // and single old pines standing out on the floor at every distance, dark boles and ragged crowns against the
