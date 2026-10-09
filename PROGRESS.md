@@ -1298,3 +1298,9 @@ ride "a bright white band against darker cloud, like cut paper". Reshaped in rou
   level top, and with a tooth every four hundred metres the far ones were a saw blade).
 - Still open on the far distance: the backdrop's ranges are pale, with little interior shading under the haze;
   in the snow ride the far ridge stands as a bright band against darker cloud.
+
+### Handing over (2026-10-09)
+The owner asked for the work to be pushed so another Claude account can carry on. This machine is not signed in
+to GitHub, so nothing could be pushed from it. Prepared instead: `scripts/handoff_header.md` rewritten for round
+104, `latest_frames/w104_*`, the all-in-one handoff file regenerated with `scripts/build_handoff.py`, and a
+merge commit on top of the GitHub branch's `37e68cf` ready to push as a fast-forward.
