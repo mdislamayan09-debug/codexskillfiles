@@ -263,7 +263,7 @@ async function init() {
     // (round 79: framed as the reference is: the lens above the rider's shoulder looking down the trail, the rider left of
     // centre with the hat a third down and the frame cutting the horse at the croup, the trail running up to the right;
     // ?pinesold is the level, right-of-centre framing of rounds 50-78)
-    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, stride: 0.16, trailDress: true }; },
+    return { time: 16.35, fov: 35, sunGap: params.has('pinesold') || params.has('nogap') ? null : [62, 170, 4.5], volDensity: params.has('pinesold') ? 0.0036 : 0.0026, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, stride: 0.16, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -1278,6 +1278,19 @@ async function init() {
     }
     // (nothing growing within arm's reach of a lookout's lens: a tuft there is a grey fan across the frame's edge)
     if (s.foreground && G.camOverride && G.camOverride.pos) G.clearTreesNear(G.camOverride.pos.x, G.camOverride.pos.z, 2.6, veg.bushes);
+    // a break in the timber toward the sun (round 84): a lane a few trees wide felled along the sun's bearing, well
+    // ahead of the lens, so the bright sky stands between the trunks where the light comes from and the shafts have
+    // a source. Under an unbroken roof the frame had no highlight in it at all.
+    if (s.sunGap && !G.sunGapCut) {
+      G.sunGapCut = true;
+      sky.time = s.time; sky.update(0, camera.position);
+      const sd = U.uSunDir.value, hh = Math.hypot(sd.x, sd.z) || 1, dx = sd.x / hh, dz = sd.z / hh, [g0, g1, gw] = s.sunGap;
+      // (from the lens, not the horse: three metres aside is the width of the lane)
+      // (worked out from the shot: the camera itself has not been moved to it yet)
+      const cyG = yaw - (s.turn || 0), relG = s.camRel || [0, 0, 0];
+      const cp = { x: px + Math.cos(cyG) * relG[0] + Math.sin(cyG) * relG[2], z: pz - Math.sin(cyG) * relG[0] + Math.cos(cyG) * relG[2] };
+      G.clearTreesAlong(cp.x + dx * g0, cp.z + dz * g0, cp.x + dx * g1, cp.z + dz * g1, gw, 1);
+    }
     veg.refreshImpostors();
     hud.root.classList.toggle('on', !!s.hud);
     document.getElementById('title').classList.remove('show');

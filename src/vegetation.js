@@ -994,7 +994,10 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
       float dens = (1.0 - smoothstep(mix(0.2, 0.42, pineRd), mix(0.45, 0.8, pineRd), sp.r + edgeN)) * (1.0 - smoothstep(0.38, 0.7, sp.a + edgeN * 0.6));
       dens *= smoothstep(0.15, 0.9, h0) * (1.0 - smoothstep(0.3, 0.5, slope));
       dens *= 1.0 - smoothstep(700.0, 860.0, h0);
-      dens *= 1.0 - 0.85*smoothstep(0.3, 0.8, sp.b);
+      // (in the pine belt the grass is let further in under the trees and broken into clumps a few paces across: held
+      // to the strip between the tread and the timber it ran beside the trail as a ruled green stripe)
+      dens *= 1.0 - mix(0.85, 0.5, pineRd) * smoothstep(0.3, 0.8, sp.b);
+      dens *= mix(1.0, smoothstep(0.34, 0.58, fbm2(xz / 5.5 + 5.0)), pineRd * 0.9);
       vec4 gcl = climateAt(xz);
       float snowG = smoothstep(0.3, 0.65, gcl.r);
       float field = fbm2(xz/26.0);

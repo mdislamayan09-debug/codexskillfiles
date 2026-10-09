@@ -957,3 +957,17 @@ the best single element"; the outcrop is still "melted", cracks "stretched".
 - **The mounted rider is 1.1x**: a big man on his horse.
 - **Outcrop tops** are broken and tilted (a dead-level cut made stumps iced with snow); cracks are hairline and
   of varied weight; brush and frosted tufts stand on the blocks' tops.
+
+**Critic scores.** Round 83: 4 / 3 / 5. Three rounds flat (81-83) while the frames changed a good deal: the
+critic's first item on both riding shots is still the horse and rider as assets, then ground detail (pines)
+and mountain depth (snow ride).
+
+### Round 84
+- **Pines: a break in the timber toward the sun** (`sunGap: [62, 170, 4.5]`, `?nogap` to compare): a lane a few
+  trees wide felled along the sun's bearing from 62 m to 170 m ahead of the lens. The bright sky now stands
+  between the trunks where the light comes from, the shafts have a source, and the frame's tone figures sit on
+  the reference's (thirds 103/75/53 against 107/72/50, p95 181 against 179). Haze thinner (0.0026).
+  (Two bugs on the way: measured from the horse the lane missed the lens's line of sight, and the camera has
+  not been moved to the shot yet when the dressing runs, so the lens position is worked out from the shot.)
+- **Pine-belt grass** is let further in under the trees and broken into clumps a few paces across: no ruled
+  green stripe beside the trail.
