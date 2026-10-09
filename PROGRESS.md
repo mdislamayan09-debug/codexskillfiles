@@ -895,3 +895,17 @@ frame; the vista outcrop went from boxes to "melted wax with a spiky silhouette"
 overshot) with snow "smeared into creases instead of sitting on up-facing surfaces"; snow ride's valley walls
 are still a smooth dark mass and a washed pale sheet. Next: outcrop back toward planes and joints with snow on
 its tops; snow-ride walls; horse legs' girth; coat darker and less mottled.
+
+### Round 80
+- **Coats have thickness.** The hero is the scanned human body with clothes pushed off the skin; the coat stood
+  an inch off it all round, which is why it "read as bare skin". The leather jacket now stands 4 cm off the trunk
+  and the shearling 8 cm, sleeves are tubes round the arm, the shoulder line is padded and squared.
+  Patina fainter, leather darker; hat is worn hide with a nearly flat, slightly wavy brim.
+- **Horse legs** got their girth back (cannons with tendons, fuller gaskin).
+- **Snow-country cliffs are bedded rock** (terrain shader): beds of uneven thickness dipping along the valley,
+  each its own shade, upright joints that do not line up from bed to bed, snow on the beds' tops in broken
+  ledges with shade beneath, rime plastered on by a storm; rock under snowfall is 1.75x lighter (measured
+  against the reference's storm cliffs); no green turf shows under the snow line.
+- **Snow ride framing** re-measured: lens 6.4 m back at hat height, nearly level, horse three-quarters on.
+- **Outcrop**: 62% snapped to its joints with a level top (snow lies on what faces up, in patches), then fins
+  and spikes worn off by a relax that acts hardest on what stands proud.

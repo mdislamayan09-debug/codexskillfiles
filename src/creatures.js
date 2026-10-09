@@ -180,7 +180,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
               float p1 = fbm2(vRest.xy * 31.0 + vRest.z * 23.0), p2 = vnoise(vRest.xy * 150.0 - vRest.z * 115.0), p3 = fbm2(vRest.xy * 9.0 + vRest.z * 7.0);
               float scuff = smoothstep(0.42, 0.8, p1 * 0.8 + p2 * 0.2) * (0.3 + 0.7 * smoothstep(0.35, 0.65, p3));
               // (rubbed a shade paler, not painted tan: at twice this the coat was a camouflage of orange blotches)
-              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.6, 1.48, 1.34) + vec3(0.012, 0.01, 0.007), scuff * 0.34);
+              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.5, 1.4, 1.3) + vec3(0.01, 0.008, 0.006), scuff * 0.2);   // (fainter: mottled tan, it read as bare skin)
               diffuseColor.rgb *= 1.0 - 0.3 * smoothstep(0.52, 0.3, p1) * smoothstep(0.62, 0.36, p3);
             }
             // broad rubbed-light wear over the shoulders and hanging folds down the back and skirt
@@ -283,7 +283,7 @@ function skinnedMaterial(extraFrag = '', uniforms = {}, physical = false, kind =
 export const OUTFITS = {
   // the cold-country rig: shearling coat with fur trim, trapper hat and a wool scarf
   winter: { coat: 0x5a3e28, shirt: 0x6a5a4a, vest: 0x4a3828, pants: 0x3a3028, hat: null, fur: 0xd2c2a2, furHat: true, furHatColor: 0x5e4a38, boots: 0x2a1e16, gloves: 0x4a3626, bandana: 0x3a404a, winter: true },
-  arthur: { coat: 0x56402f, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x55483a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
+  arthur: { coat: 0x4c3828, shirt: 0x8696aa, vest: 0x2e2c2a, pants: 0x3e342a, hat: 0x55483a, boots: 0x2a1e16, gloves: 0x5a3e28, bandana: null }, // brown leather coat, as in the references
   outlaw: { coat: 0x4a3e32, shirt: 0x8a7a64, vest: 0x2a2420, pants: 0x403a32, hat: 0x3a3028, boots: 0x261a12, gloves: null, bandana: 0x8a2018 },
   rancher: { coat: null, shirt: 0xb8a888, vest: 0x5a4632, pants: 0x4a5468, hat: 0x7a6a50, boots: 0x3a2a1e, gloves: 0x6a4a30, bandana: 0x6a5a40 },
   gent: { coat: 0x2a2a2e, shirt: 0xd8d4c8, vest: 0x4a3a46, pants: 0x2e2e32, hat: 0x1a1a1c, boots: 0x161210, gloves: null, bandana: null },
@@ -469,15 +469,22 @@ function mhTemplate(outfit, o) {
       const vHalf = 0.035 + Math.max(0, 1.52 - y) * 0.16;
       const front = r === G.torso && fz > 0.04 && Math.abs(x) < vHalf && y > beltY - 0.01;
       const throat = front && y > 1.38 && Math.abs(x) < 0.03 + (1.52 - y) * 0.25;
-      if (o.coat && !(front && !winter)) { L0 = L.coat; push = (winter ? 0.04 : 0.028) * (r === G.torso ? 1.15 : 1); }
+      // (round 80: a coat has thickness. An inch off the skin all round it was the body painted brown: the leather jacket
+      // now stands four centimetres off the trunk and the shearling eight, with sleeves that are tubes round the arm and
+      // a padded, squared shoulder line)
+      if (o.coat && !(front && !winter)) {
+        L0 = L.coat; push = (winter ? 0.075 : 0.04) * (r === G.torso ? 1.15 : 0.8);
+        const sh = Math.min(1, Math.max(0, (y - (MH.rest.neck[1] - 0.17)) / 0.07)) * Math.min(1, Math.max(0, (Math.abs(x) - 0.09) / 0.09));
+        push += (winter ? 0.024 : 0.014) * sh;
+      }
       else if (o.vest && r === G.torso && !throat) { L0 = L.vest; push = 0.012; }
       else { L0 = L.shirt; push = 0.007; }
       if (r === G.farm && y < MH.rest.wrL[1] + 0.05 && o.coat) push *= 1.3;     // cuffs
-    } else if (r === G.belt) { L0 = L.belt; push = 0.016; if (o.coat && (winter || z - MH.rest.spine[2] < 0.04)) { L0 = L.coat; push = winter ? 0.04 : 0.032; } }   // (the coat hangs over the belt at the back and sides)
-    else if (r === G.pelvis) { L0 = o.dress ? L.pants : L.pants; push = 0.008; if (o.coat && z < 0.02) { L0 = L.coat; push = winter ? 0.032 : 0.022; } }
+    } else if (r === G.belt) { L0 = L.belt; push = 0.016; if (o.coat && (winter || z - MH.rest.spine[2] < 0.04)) { L0 = L.coat; push = winter ? 0.07 : 0.04; } }   // (the coat hangs over the belt at the back and sides)
+    else if (r === G.pelvis) { L0 = o.dress ? L.pants : L.pants; push = 0.008; if (o.coat && z < 0.02) { L0 = L.coat; push = winter ? 0.06 : 0.032; } }
     else if (r === G.thigh) {
       L0 = L.pants; push = 0.011;
-      if (o.coat && y > 0.62 && (z < 0.04 || Math.abs(x) > 0.15)) { L0 = L.coat; push = winter ? 0.03 : 0.02; }   // coat skirt over the thighs
+      if (o.coat && y > 0.62 && (z < 0.04 || Math.abs(x) > 0.15)) { L0 = L.coat; push = winter ? 0.05 : 0.026; }   // coat skirt over the thighs
     } else if (r === G.shin) { if (y < 0.4) { L0 = L.boots; push = 0.012; } else { L0 = L.pants; push = 0.007; } }
     else if (r === G.foot) { L0 = L.boots; push = 0.009; }
     else if (r === G.hand) { if (o.gloves) { L0 = L.gloves; push = 0.002; } }
@@ -657,10 +664,10 @@ export class Human {
       const bp = brim.attributes.position;
       // sides curl up, the front dips over the eyes, the back tips up a touch so the brim reads from behind
       // sides roll up, front and back dip slightly: from behind and above the brim reads as a wide ellipse
-      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.12) * 0.75 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.16 * Math.max(0, rr - 0.11); };
+      const brimY = (x, z) => { const rr = Math.hypot(x, z) || 1; return Math.max(0, rr - 0.12) * 0.36 * Math.pow(Math.abs(x) / rr, 3) - Math.abs(z) / rr * 0.16 * Math.max(0, rr - 0.11) + 0.006 * Math.sin(Math.atan2(z, x) * 3 + 1.1) * Math.max(0, rr - 0.1) / 0.11; };   // (a worn brim, a little wavy, its sides only lifted: rolled up seven centimetres it was a cartoon)
       for (let i = 0; i < bp.count; i++) bp.setY(i, brimY(bp.getX(i), bp.getZ(i)));
       brim.computeVertexNormals();
-      const hatM = std({ color: o.hat, roughness: 0.95, side: THREE.DoubleSide });
+      const hatM = std({ map: memoTex('leather', () => leatherTexture(r)), color: new THREE.Color(o.hat).multiplyScalar(2.0), roughness: 0.9, side: THREE.DoubleSide });   // (worn hide with its own mottle: one flat colour was a black paper cut-out)
       const bm = mesh(brim, hatM); bm.position.copy(at(bones.head, 0, HA.hatY, HA.hatZ)); bones.head.add(bm);
       if (MH) {
         // the crown (on the sculpted figures it is part of the body): a pinched, creased felt crown
@@ -1050,7 +1057,7 @@ function quadPrims(kind, QB) {
       add(RC([x * 0.95, 1.3, 0.52], [x, 0.92, 0.53], 0.15 * lw, 0.1 * lw), QL.coat, nb(0), 0.08);
       add(RC([x, 0.92, 0.53], [x, 0.53, 0.53], 0.1 * lw, 0.055 * lw), QL.coat, nb(1), 0.05);
       add(EL([x, 0.51, 0.535], [0.06 * lw, 0.07 * lw, 0.056 * lw]), QL.points, nb(2), 0.03);     // knee (broad and flat, not a ball)
-      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.044 * lw, 0.04 * lw), QL.points, nb(2), 0.02);
+      add(RC([x, 0.5, 0.535], [x, 0.18, 0.54], 0.05 * lw, 0.045 * lw), QL.points, nb(2), 0.02);
     } else {
       // (each thigh its own column, daylight between them from the stifle down: fused, the quarters ran down to
       // the hocks as one pear)
@@ -1059,11 +1066,11 @@ function quadPrims(kind, QB) {
       // and the hamstring runs down from the buttock to the point of the hock)
       add(EL([x * 1.02, 1.13, -0.6], [0.142 * lw * bw, 0.33, 0.26]), QL.coat, nb(0), 0.05);   // thigh
       add(EL([x * 1.02, 1.0, -0.47], [0.1 * lw * bw, 0.15, 0.12]), QL.coat, nb(0), 0.06);   // stifle
-      add(RC([x * 1.02, 0.98, -0.53], [x * 0.97, 0.61, -0.79], 0.112 * lw, 0.056 * lw), QL.coat, nb(1), 0.045);   // gaskin
+      add(RC([x * 1.02, 0.98, -0.53], [x * 0.97, 0.61, -0.79], 0.122 * lw, 0.064 * lw), QL.coat, nb(1), 0.045);   // gaskin
       add(RC([x, 1.04, -0.82], [x * 0.97, 0.67, -0.855], 0.062 * lw, 0.024 * lw), QL.coat, nb(1), 0.05);   // hamstring
-      add(EL([x * 0.96, 0.585, -0.8], [0.043 * lw, 0.085 * lw, 0.082 * lw]), QL.points, nb(2), 0.03);    // hock
+      add(EL([x * 0.96, 0.585, -0.8], [0.05 * lw, 0.088 * lw, 0.086 * lw]), QL.points, nb(2), 0.03);    // hock
       add(EL([x * 0.96, 0.635, -0.868], [0.026 * lw, 0.05 * lw, 0.034 * lw]), QL.points, nb(2), 0.02);       // point of hock
-      add(RC([x * 0.96, 0.57, -0.795], [x * 0.97, 0.18, -0.78], 0.045 * lw, 0.04 * lw), QL.points, nb(2), 0.02);
+      add(RC([x * 0.96, 0.57, -0.795], [x * 0.97, 0.18, -0.78], 0.052 * lw, 0.046 * lw), QL.points, nb(2), 0.02);   // (cannons with their tendons: slimmer, the legs were sticks)
     }
     const zf = front ? 0.54 : -0.78;
     add(EL([x * (front ? 1 : 0.97), 0.17, zf - 0.005], [0.05 * lw, 0.058 * lw, 0.068 * lw]), QL.points, nb(3), 0.025);   // fetlock

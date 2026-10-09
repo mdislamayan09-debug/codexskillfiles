@@ -216,7 +216,8 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
   rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);
-  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08), uSnowfall * snowC);   // (slate blue under falling snow, as the reference's cliffs)   // (near-black wet rock against the snow, as the reference's faces)
+  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08) * 1.75, uSnowfall * snowC);   // (lifted: measured, the reference's storm cliffs are three times as light as ours were)
+  // was: rock * vec3(0.78, 0.9, 1.08)   // (slate blue under falling snow, as the reference's cliffs)   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
   vec3 snowT = texA(L_SNOW, xz, 4.0, 9.7).rgb;
@@ -377,7 +378,36 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   float sandK = max(beach, smoothstep(0.5, -1.0, wp.y) * coastal);
   c = mix(c, sand * mix(1.0, 0.72, smoothstep(0.6, -0.4, wp.y)), sandK); tn = mix(tn, sN, sandK);
   rough = mix(rough, mix(0.9, 0.35, smoothstep(1.0, 0.2, wp.y)), sandK);
-  c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6 * (1.0 - jun) * (1.0 - des) * (1.0 - aut));
+  // Snow-country cliffs (round 80). A steep face up here was one smooth dark wedge with green turf showing at its foot.
+  // It is bedded rock: beds a few metres thick dipping a little along the valley, each a shade of its own, broken by
+  // upright joints that do not line up from bed to bed; snow lies on the beds' tops in broken ledges with shade under
+  // each; and a storm plasters rime onto the face.
+  {
+    float sk = smoothstep(0.55, 0.85, snowC);
+    if (sk > 0.0) {
+      rockAmt = max(rockAmt, sk * 0.92);   // nothing green under the snow line: rock and frozen scree
+      float steep = smoothstep(0.24, 0.48, slope) * sk;
+      if (steep > 0.0) {
+        float camDc = length(wp - cameraPosition);
+        float along = dot(xz, vec2(0.8, -0.6));
+        // (beds of uneven thickness: all one height, a face was a flight of stairs)
+        float q0 = (wp.y + 0.1 * dot(xz, vec2(0.6, 0.8)) + 2.6 * fbm2(xz / 34.0)) / 4.4;
+        float q = q0 + 0.55 * vnoise(vec2(q0 * 0.6, 5.0)) + 0.25 * vnoise(vec2(q0 * 1.7, 9.0)), f = fract(q), bi = floor(q);
+        float kMid = smoothstep(1500.0, 500.0, camDc), kNear = smoothstep(520.0, 140.0, camDc);
+        rock *= mix(1.0, 0.8 + 0.42 * hash12(vec2(bi, 3.0)), steep * kMid);
+        float joint = 1.0 - smoothstep(0.0, 0.045, abs(fract(along / 3.4 + 0.9 * fbm2(vec2(along / 11.0 + bi * 3.7, bi * 1.3)) + bi * 0.37) - 0.5));
+        rock *= 1.0 - 0.5 * joint * steep * kNear;
+        rock *= 1.0 - 0.3 * smoothstep(0.2, 0.0, f) * steep * kMid;   // shade under the bed above
+        float w = 0.14 + 0.14 * hash12(vec2(bi * 1.7, 9.0));
+        float brk = smoothstep(0.38, 0.52, fbm2(vec2(along / 13.0 + bi * 5.0, bi * 1.9)));
+        float ledge = smoothstep(1.0 - w, 1.0 - 0.55 * w, f) * brk * steep * kMid;
+        snowAmt = max(snowAmt, ledge * 0.92);
+        float rime = uSnowfall * steep * smoothstep(0.3, 0.75, fbm2(vec2(along, wp.y * 2.2) / 4.5) + 0.2 * (vnoise(vec2(along, wp.y) * 1.3) - 0.5));
+        rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.34);
+      }
+    }
+  }
+  c = mix(c, srgb(vec3(58,66,40)) * (0.8+0.3*micro), smoothstep(60.0, 140.0, wp.y) * (1.0 - rockAmt) * 0.6 * (1.0 - jun) * (1.0 - des) * (1.0 - aut) * (1.0 - smoothstep(0.4, 0.7, snowC)));
   c = mix(c, rock, rockAmt); tn = mix(tn, rN, rockAmt);
   rough = mix(rough, 0.82, rockAmt);
   // two scales of the snow scan, the second turned 37 degrees, blended by noise so the dimples never tile

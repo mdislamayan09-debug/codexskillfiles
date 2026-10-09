@@ -1127,10 +1127,13 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
       // cracks; at the boulders' spacing a rock six metres tall was three huge boxes)
       // (round 79: the big ones only half way to the lattice, on softer steps: a weathered mass with ledges in it, its
       // joints drawn as cracks by the surface. Three-quarters snapped, an outcrop was a pile of boxes with pointed corners)
-      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 3.6 + 2 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
-      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.46 : 0.9);
-      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.62 : 0.93);
-      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.46 : 0.9);
+      // (round 80: between the two. Three-quarters snapped it was boxes, under half it was melted wax: now planes and
+      // ledges with worn arrises, under a level top where snow can lie)
+      const big = detail > 12, js = big ? 0.6 : 1, kx = big ? 4.6 + 2.4 * n.noise(v.y * 2.1, v.z * 2.1) : 40;
+      v.x = lerp1(v.x, soft(v.x + wob, jstep[0] * js, jo[0], kx), big ? 0.62 : 0.9);
+      v.y = lerp1(v.y, soft(v.y + wob * 0.6, jstep[1] * js, jo[1], kx + 2), big ? 0.74 : 0.93);
+      v.z = lerp1(v.z, soft(v.z - wob, jstep[2] * js, jo[2], kx), big ? 0.62 : 0.9);
+      if (big) { const cap = 0.52 + 0.07 * n.noise(v.x * 1.6 + 3.0, v.z * 1.6 - 1.0); if (v.y > cap) v.y = cap + (v.y - cap) * 0.12; }
       v.applyMatrix3(jointMi);
       // weathering: faces spalled and pitted a little
       if (detail > 12) { const wz = 0.012 * n.fbm(v.x * 6.1 + 3.3, v.y * 6.1 + v.z * 5.3, 3) + 0.004 * n.noise(v.x * 23 + v.y * 17, v.z * 23); v.multiplyScalar(1 + wz); }
@@ -1149,7 +1152,25 @@ function rockGeometry(seed, fractured = false, detail = 5, cutsN = 7, cutDepth =
     g.scale(0.56 / wide, 0.62 / top, 0.56 / wide);   // a block about as tall as it is broad
     // hard edges where the joint planes meet (smoothed across them, a split block shaded as a rounded lump); the fine
     // mesh carries its own rounded edges and takes smooth normals
-    if (detail > 12) { g.computeVertexNormals(); return g; }
+    if (detail > 12) {
+      // (round 80) fins and spikes worn off: where a sliver of the lump crossed a lattice cell it stood up as a blade.
+      // Each vertex that stands well proud of its neighbours' mean is drawn back toward it; ledges and faces keep.
+      const idx = g.index.array, nb = Array.from({ length: p.count }, () => new Set());
+      for (let t = 0; t < idx.length; t += 3) { const a = idx[t], b = idx[t + 1], c = idx[t + 2]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+      const tmp = new Float32Array(p.count * 3);
+      for (let it = 0; it < 4; it++) {
+        for (let i = 0; i < p.count; i++) {
+          let ax = 0, ay = 0, az = 0; const m = nb[i].size || 1;
+          for (const j of nb[i]) { ax += p.getX(j); ay += p.getY(j); az += p.getZ(j); }
+          ax /= m; ay /= m; az /= m;
+          const dx = p.getX(i) - ax, dy = p.getY(i) - ay, dz = p.getZ(i) - az, d = Math.hypot(dx, dy, dz);
+          const k = 0.25 + 0.65 * Math.min(1, Math.max(0, (d - 0.004) / 0.012));   // a light relax everywhere, hard on what sticks out
+          tmp[i * 3] = p.getX(i) - dx * k; tmp[i * 3 + 1] = p.getY(i) - dy * k; tmp[i * 3 + 2] = p.getZ(i) - dz * k;
+        }
+        for (let i = 0; i < p.count; i++) p.setXYZ(i, tmp[i * 3], tmp[i * 3 + 1], tmp[i * 3 + 2]);
+      }
+      g.computeVertexNormals(); return g;
+    }
     return toCreasedNormals(g, 0.7);
   }
   g.computeVertexNormals();
@@ -1313,7 +1334,8 @@ function rockMaterial(surf = {}, bare = false) {
       // (its edge broken into grains and flecks: a clean edge was a white paper cut-out laid on the stone)
       float topS = smoothstep(0.72, 0.95, wn.y) * smoothstep(0.3, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.2 * (vnoise(vWPos.xz * 47.0) - 0.5) + 0.16 * (vnoise(vWPos.xz * 130.0 + vWPos.y * 90.0) - 0.5));
       // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
-      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.5 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.35 + 0.65 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * vec2(7.0, 2.1) + vWPos.y * 3.0))));
+      // (lying on what faces up, in patches: drawn out along one grain it was white streaks smeared into the creases)
+      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.86 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.5 + 0.5 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * 2.7 + 1.9))));
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
       base *= vec3(0.86, 0.9, 0.97) * (0.74 + 0.4 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));
