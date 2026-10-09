@@ -263,7 +263,7 @@ async function init() {
     // (round 79: framed as the reference is: the lens above the rider's shoulder looking down the trail, the rider left of
     // centre with the hat a third down and the frame cutting the horse at the croup, the trail running up to the right;
     // ?pinesold is the level, right-of-centre framing of rounds 50-78)
-    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, trailDress: true }; },
+    return { time: 16.35, fov: 35, volDensity: 0.0036, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, stride: 0.16, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -276,7 +276,7 @@ async function init() {
       // from behind with its feet at the bottom edge and the rider's hat just under half way down; ?rideold is the close
       // three-quarter framing of rounds 50-78)
       if (params.has('rideold')) return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.7, 2.3, -4.6], lookRel: [-2.4, 0.75, 18], turn: -0.56, weather: { storm: 1, blizzard: 0.8 }, snowDress: true };
-      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], camRel: [0.5, 2.6, -6.4], lookRel: [-3.6, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
+      return { time: 13.0, fov: 46, coat: 'redbay', player: [x, z, yaw], stride: 0.16, camRel: [0.5, 2.6, -6.4], lookRel: [-3.6, 1.6, 18], turn: -0.8, weather: { storm: 1, blizzard: 0.8 }, snowDress: true }; },
     // close look at the winter rider and tack from behind (costume detail checks)
     riderback: () => { const [x, z, yaw] = G.findCanyonRide() || G.alongValley(0.5); return { time: 13.0, player: [x, z, yaw], camRel: [0.7, 2.45, -2.9], lookRel: [0, 1.95, 1.5], turn: -0.45, weather: 'snow' }; },
     // the reference frame: a summit lookout high above the valley, looking up its length over the homestead
@@ -630,6 +630,7 @@ async function init() {
     player.spawn(px, pz, yaw);
     player.setOutfit(world.climateAt(px, pz).snow > 0.5 ? 'winter' : 'arthur');
     player.horse.setCoat(s.coat || 'bay');
+    player.horse.pose = s.stride ?? null;
     player.hspeed = s.gallop ? 13 : 0;
     G.forceGallop = !!s.gallop;
     G.camOverride = null;
@@ -713,6 +714,23 @@ async function init() {
         // (in three tiers from foot to rim, standing proud of the face and close enough to hide the ground behind them:
         // buried in the slope, each showed one flat side like a panel let into a smooth dome)
         // (now only talus at the foot: the face itself is rock)
+        // (round 82) The face is built of rock again, now that the big outcrops are weathered masses with level tops and
+        // joints drawn on them: three tiers of them stood up the bench's face from foot to rim, shoulder to shoulder,
+        // each tier's tops carrying snow. The slope alone, however it is shaded, is a smooth ramp with ledges painted on.
+        if (!params.has('nocliff')) {
+          const flr = world.heightAt(px, pz), big = [6, 7, 8];
+          for (let a = 40; a <= 240; a += 8 + r2() * 4) {
+            // the face at this station: where the ground leaves the floor, and where it reaches the rim
+            let foot = null, rim = null;
+            for (let sd3 = 4; sd3 < 90; sd3 += 1.5) { const [x, z] = P(a, sd3), h = world.heightAt(x, z) - flr; if (foot === null && h > 2.5) foot = sd3; if (h > bh - flr - 4) { rim = sd3; break; } }
+            if (foot === null || rim === null) continue;
+            for (const [t, s0, s1] of [[0.02, 13, 5], [0.28, 13, 5], [0.54, 12, 5], [0.8, 11, 4]]) {
+              const sd3 = foot + (rim - foot) * t + (r2() - 0.5) * 3, [x, z] = P(a + (r2() - 0.5) * 6, sd3), sc = (s0 + r2() * s1) * Math.min(1, 0.62 + a / 260);   // (a little smaller toward the lens: full size, the nearest stood over the frame)
+              veg.rocks.add(x, world.heightAt(x, z) - 0.2 * sc, z, r2() * 6.28, sc, big[Math.floor(r2() * 3)]);
+            }
+          }
+          G.cliffBuilt = true;
+        }
         for (const [out, s0, s1, lift] of []) for (let a = 50; a <= 230; a += 9 + r2() * 14) {
           const side = 50 + (a - 62) * 0.105 - out - r2() * 2.5, [x, z] = P(a, side), sc = s0 + r2() * s1;
           veg.crags.add(x, world.heightAt(x, z) - sc * (0.93 - lift), z, r2() * 6.28, sc, Math.floor(r2() * 3));
@@ -811,8 +829,8 @@ async function init() {
       // (the boulder groups above are thrown wide enough to land on the bench: taken off its face again)
       if (G.benchBox) {
         const [x0, z0, x1, z1] = G.benchBox, flr = world.heightAt(px, pz) + 3;
-        const onFace = (it) => it.x > x0 && it.x < x1 && it.z > z0 && it.z < z1 && world.heightAt(it.x, it.z) > flr;
-        for (const L of [veg.rocks, veg.crags]) {
+        const onFace = (it) => it.x > x0 && it.x < x1 && it.z > z0 && it.z < z1 && world.heightAt(it.x, it.z) > flr && !(it.s > 9 && it.v >= 6);   // (the cliff's own outcrops stay)
+        for (const L of [veg.rocks, veg.crags, veg.bushes]) {
           for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !onFace(it)));
           L.items = L.items.filter((it) => !onFace(it));
         }

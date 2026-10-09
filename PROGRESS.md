@@ -930,3 +930,15 @@ what ours lacked.)
   ledges are short broken runs; joints darker and visible further; rock back down to 1.2x under snowfall with
   less rime (the frame had lost its darks).
 - **Outcrop**: cooler stone, fainter rain stains, snow only on what is near level.
+
+**Critic scores.** Round 81: 4 / 3 / 5 (the vista swings a point between runs on near-identical frames).
+Still: horse "balloon"/"toy", rider "matte blob"/"orange mannequin", cliff "flat slab with painted dashes".
+
+### Round 82
+- **The snow ride's cliff is built of rock.** Four tiers of the big outcrop meshes stood up the bench's face from
+  foot to rim, shoulder to shoulder (`?nocliff` leaves the bare slope). Under falling snow rock is wet slate
+  blue with rime blown onto its faces. Loose boulders and brush are cleared off the face after all dressing.
+- **The horse walks.** A shot can hold the horse mid-stride (`stride: 0.16`); both riding shots do.
+- **Winter coat** a duller brown (it read as orange).
+- **Pine-belt grass** darker again, straw no longer bleaches in a sun shaft; the fallen log's moss is in
+  patches with grey bark between.

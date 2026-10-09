@@ -1047,8 +1047,8 @@ function makeGrass(scene, spacing, radius, size, innerCut) {
         // (lighter and yellower in the low sun: dark olive clumps read as tufts stamped on the duff)
         // (round 79: greyer and darker: in a sunlit gap the yellow-green lit up as a strip of lime down the trail)
         vec3 pg = mix(srgbV(vec3(100,114,64)), srgbV(vec3(126,134,80)), aOff.w);   // (pale yellow-green where the sun finds it; its own shade keeps it olive)
-        vec3 ps = mix(srgbV(vec3(176,156,104)), srgbV(vec3(150,138,96)), aOff.w);
-        vec3 pc = mix(pg, ps, clamp(step(0.5, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.8 * (0.75 + 0.5 * midV);
+        vec3 ps = mix(srgbV(vec3(138,124,86)), srgbV(vec3(120,110,80)), aOff.w);   // (cured straw, not bleached: in a shaft of sun the paler clumps burned out white)
+        vec3 pc = mix(pg, ps, clamp(step(0.5, aOff.z) * 0.8 + dryPatch * 0.5, 0.0, 1.0)) * 0.6 * (0.75 + 0.5 * midV);
         vGCol = mix(vGCol, pc, smoothstep(-700.0, -1250.0, xz.y) * (1.0 - gcl.r) * 0.85);
       }
       vGCol = mix(vGCol, mix(srgbV(vec3(150,128,92)), srgbV(vec3(118,100,74)), aOff.z) * 1.15, snowG);            // dry winter grass
@@ -1316,6 +1316,13 @@ function rockMaterial(surf = {}, bare = false) {
         gCrack = smoothstep(0.12, 0.0, cN) * kN * 0.022 + smoothstep(0.14, 0.0, cF) * kF * 0.16 + smoothstep(0.1, 0.0, cN2) * smoothstep(0.5, 1.0, kN) * 0.006;
       }
       vec4 rcl = climateAt(vWPos.xz);
+      // under falling snow the stone is wet and dark, slate blue as the sky that lights it, with rime blown onto its faces
+      {
+        float stormK = uSnowfall * smoothstep(0.35, 0.75, rcl.r);
+        base = mix(base, base * vec3(0.5, 0.6, 0.76), stormK);
+        float rime = stormK * smoothstep(0.38, 0.72, fbm2(vec2(vWPos.x + vWPos.z, vWPos.y * 2.2) / 3.5) + 0.25 * (vnoise(vWPos.xz * 3.0 + vWPos.y * 2.0) - 0.5));
+        base = mix(base, vec3(0.6, 0.66, 0.76), rime * 0.2);
+      }
       float moss = smoothstep(0.55, 0.85, wn.y + (n1-0.5)*0.6) * (1.0 - rcl.a) * (1.0 - smoothstep(0.12, 0.4, rcl.r));   // no green moss in the snow country
       base = mix(base, srgbR(vec3(62,70,38)) * (0.8 + 0.4 * n2), moss * 0.7);
       base = mix(base, base * vec3(1.35, 0.85, 0.62), rcl.a);                 // desert: red sandstone
@@ -1537,7 +1544,8 @@ export class Vegetation {
           float n1 = fbm2(vWPos.xz * 1.6 + vWPos.y * 2.0), n2 = vnoise(vWPos.xz * 9.0 + vWPos.y * 7.0);
           diffuseColor.rgb *= 0.75 + 0.5 * n1;
           float moss = smoothstep(0.25, 0.75, wn.y + (n1 - 0.5) * 0.9) * (1.0 - smoothstep(0.3, 0.6, climateAt(vWPos.xz).r));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.06, 0.085, 0.03) * (0.7 + 0.7 * n2), moss * 0.7);
+          // (in patches along the top, the grey bark showing between: mossed all over, a log was a green wedge)
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.055, 0.07, 0.03) * (0.7 + 0.7 * n2), moss * 0.7 * smoothstep(0.35, 0.6, fbm2(vWPos.xz * 0.9 + vWPos.y * 0.7)));
         }` });
     const logBuilds = [0, 1, 2].map((i) => ({ parts: [{ geometry: buildLog(1100 + i * 13), material: logMat }] }));
     this.logs = new ScatterLayer(scene, logBuilds, 1200, 170 * Math.sqrt(quality));
