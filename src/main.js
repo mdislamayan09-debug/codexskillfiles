@@ -260,10 +260,12 @@ async function init() {
     // beams and lies on the floor in hard patches; low and dead ahead it lit all the air in the lane as one wash)
     // (back to a sun low ahead, as the reference's, now that the roof's gaps break its light into shafts and pools:
     // without them the same sun lit all the air in the lane as one wash)
+    // (round 86: the horse turned further from the lens and the lens lower and level, so its neck, head and ears stand
+    // clear to the right of the rider as in the reference: square behind, the animal ended at the saddle)
     // (round 79: framed as the reference is: the lens above the rider's shoulder looking down the trail, the rider left of
     // centre with the hat a third down and the frame cutting the horse at the croup, the trail running up to the right;
     // ?pinesold is the level, right-of-centre framing of rounds 50-78)
-    return { time: 16.35, fov: 35, sunGap: params.has('pinesold') || params.has('nogap') ? null : [62, 170, 4.5], volDensity: params.has('pinesold') ? 0.0036 : 0.0026, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.5, 2.75, -5.0], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.25, 0.7, 22], turn: params.has('pt') ? +params.get('pt') : params.has('pinesold') ? -0.62 : -0.3, stride: 0.16, trailDress: true }; },
+    return { time: 16.35, fov: 35, sunGap: params.has('pinesold') || params.has('nogap') ? null : [48, 190, 7.5], volDensity: params.has('pinesold') ? 0.0036 : 0.0026, volFalloff: 0.016, expK: params.has('pinesold') ? 1.18 : 1.32, keyShaft: 1.9, player: [x, z, yaw], camRel: params.has('pinesold') ? [1.25, 2.15, -5.0] : [-0.35, 2.3, -4.95], lookRel: params.has('pinesold') ? [-0.45, 1.8, 22] : [-0.35, 2.4, 22], turn: params.has('pt') ? +params.get('pt') : -0.62, stride: 0.16, trailDress: true }; },
     // (a falling-snow storm, not a total white-out: the reference keeps its cloud deck and ridges readable through it)
     snowride: () => {
       // scouted, as a location manager would: the canyon floor below the north-west massif, the lens looking
@@ -917,6 +919,42 @@ async function init() {
       for (let i = 0; i < 14; i++) {
         const [ux, uz] = at(3 + i * 1.3, (i % 2 ? 1 : -1) * (2.4 + (i * 0.37) % 1.6));
         veg.bushes.add(ux, world.heightAt(ux, uz) - 0.05, uz, i * 1.3, 0.4 + (i % 3) * 0.14, i % 4 === 3 ? 7 : i % 4 === 1 ? 9 : i % 3);
+      }
+      // The floor (round 86). Seen from the saddle the reference's floor is never bare: leafy scrub to the knee and waist
+      // in clumps, deadfall lying every few paces, stones half sunk in the duff. Ours had flat litter and a few tufts.
+      // Set across the lens's field out to thirty metres, off the tread, as things with height that cast shadows.
+      {
+        const cyF = yaw - (s.turn || 0), cfF = [Math.sin(cyF), Math.cos(cyF)], clF = [Math.cos(cyF), -Math.sin(cyF)], relF = s.camRel || [0, 0, -5];
+        const cxF = px + clF[0] * relF[0] + cfF[0] * relF[2], czF = pz + clF[1] * relF[0] + cfF[1] * relF[2];
+        let sdF = 4243;
+        const rF = () => ((sdF = (sdF * 16807) % 2147483647) / 2147483647);
+        const spot = (fMin, fMax) => {
+          for (let tries = 0; tries < 8; tries++) {
+            const fwd = fMin + rF() * (fMax - fMin), lat = (rF() - 0.5) * 2 * (1.5 + fwd * 0.52);
+            const x = cxF + cfF[0] * fwd + clF[0] * lat, z = czF + cfF[1] * fwd + clF[1] * lat;
+            if (world.splatAt(x, z).road > 0.22 || Math.hypot(x - px, z - pz) < 2.2) continue;
+            return [x, z];
+          }
+          return null;
+        };
+        for (let i = 0; i < 26; i++) {   // scrub
+          const q = spot(4.5, 32); if (!q) continue;
+          const big = rF() < 0.4;
+          for (let k = 0, n = 3 + Math.floor(rF() * 3); k < n; k++) {
+            const x = q[0] + (rF() - 0.5) * 1.5, z = q[1] + (rF() - 0.5) * 1.5;
+            veg.bushes.add(x, world.heightAt(x, z) - 0.06, z, rF() * 6.28, (big ? 0.7 : 0.4) + rF() * 0.45, Math.floor(rF() * 3));
+          }
+        }
+        for (let i = 0; i < 20; i++) {   // deadfall: limbs and poles a hand or two thick
+          const q = spot(9, 34); if (!q) continue;   // (none under the lens: a snag a pace away was a row of spikes across the frame's corner)
+          const sc = 0.2 + rF() * rF() * 0.34;
+          veg.logs.add(q[0], world.heightAt(q[0], q[1]) + 0.1 * sc, q[1], rF() * 6.28, sc, Math.floor(rF() * 3));
+        }
+        for (let i = 0; i < 30; i++) {   // stones
+          const q = spot(3.5, 28); if (!q) continue;
+          const sc = 0.12 + rF() * rF() * 0.4;
+          veg.rocks.add(q[0], world.heightAt(q[0], q[1]) - 0.3 * sc, q[1], rF() * 6.28, sc, Math.floor(rF() * 2));
+        }
       }
       // two old pines standing close by the lens, one either side, their lower boughs hanging into the top of the
       // frame (the reference is framed under such boughs; ours had bare sky across the top)

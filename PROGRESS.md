@@ -992,3 +992,19 @@ rider/horse first, then ground ("blurred smear, flecks that read as decals"), tr
   old pines stand out on the valley floor at every distance.
 - **Horse in the storm**: flakes caught all over the coat's upper side, sheen off, the trough under it barely
   darker than the field (an overcast casts no shadow pool). Collar fur greyer.
+
+**Critic scores.** Round 85: 4 / 3 / 5. The riding shots stay inside 3-4 and the vista inside 5-6 whatever
+changes: nine rounds (77-85) with totals of 12-13. The critic's lead item moves round to round (rider, floor,
+backdrop, rock) because each frame has several things at the same distance from the reference. Noted from this
+report: ledge snow went from "soft blobs" to "hard-edged decals" (the reference's is a thin granular dusting,
+not patches at all); the rider still reads "child-sized"; my snow flecks on the horse are "salt-and-pepper
+noise"; the lone pine on the floor is "a lollipop bare trunk"; the far wall's terraces are heightmap stair-steps.
+
+### Round 86
+- **Pines framing**: the horse turned further from the lens (turn -0.62) and the lens lower and level
+  (camRel [-0.35, 2.3, -4.95]), so the horse's neck, head and ears stand clear to the right of the rider as in
+  the reference (square behind, "the animal looks truncated"). Sun gap widened for the new line of sight
+  ([48, 190, 7.5]); tone figures 106/80/55, p95 172 (reference 107/72/50, 179).
+- **Pine floor dressed across the lens's field** out to thirty metres, off the tread: 26 clumps of leafy scrub
+  knee to waist high, 20 pieces of deadfall (limbs and poles), 30 half-sunk stones, all real meshes that cast
+  shadows. Satchel strap dark.

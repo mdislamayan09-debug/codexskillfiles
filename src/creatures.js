@@ -801,7 +801,8 @@ export class Human {
         sg.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         sg.setIndex(idx); sg.computeVertexNormals();
         sg.translate(-bones.spine.userData.rest.x, -bones.spine.userData.rest.y, -bones.spine.userData.rest.z);
-        const strapM = std({ color: 0x6e5236, roughness: 0.7, side: THREE.DoubleSide });   // plain dark strap leather (the hide texture stretched along it read as snakeskin)   // lighter than the coat so the diagonal reads
+        const strapM = std({ color: 0x46362a, roughness: 0.8, side: THREE.DoubleSide });   // (dark: paler, the key light turned it into a yellow stripe across the back)
+        // was 0x6e5236   // plain dark strap leather (the hide texture stretched along it read as snakeskin)   // lighter than the coat so the diagonal reads
         bones.spine.add(mesh(sg, strapM));
         // the satchel: a soft flapped bag on the left hip
         const e = pts[pts.length - 1];
