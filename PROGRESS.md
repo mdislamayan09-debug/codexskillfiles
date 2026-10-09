@@ -909,3 +909,24 @@ its tops; snow-ride walls; horse legs' girth; coat darker and less mottled.
 - **Snow ride framing** re-measured: lens 6.4 m back at hat height, nearly level, horse three-quarters on.
 - **Outcrop**: 62% snapped to its joints with a level top (snow lies on what faces up, in patches), then fins
   and spikes worn off by a relax that acts hardest on what stands proud.
+
+**Critic scores.** Round 80: 4 / 3 / **6** (the vista's best: "composition and aerial perspective convincing",
+"cliff banding plausible"). Riding shots unchanged: rider "bare clay", horse "toy", the pair does not sink into
+or disturb the snow; left cliff's stuck-on slabs are "floating bricks"; snow frame has no deep darks.
+(Found while comparing crops: my round-79 measurement of the reference rider's back had sampled forest floor.
+The reference coat is dark leather, median luminance 35 with highlights to 105: contrast, not brightness, was
+what ours lacked.)
+
+### Round 81
+- **Key light on the rider** (`uCanopySpot` doubles as a kicker for figures): inside the pine shot's shaft the
+  hat, shoulders and tack take the sun on whatever faces it. Leather jacket is dark (0x3c2c20) with finger-wide
+  crinkles in its relief; hat is worn hide with a narrower brim and a plaited cord; satchel flat and dark;
+  bedroll dark hide; blanket darker.
+- **Winter rider**: a roll of paler fur turned up round the cap and a broad shearling collar on the shoulders
+  (lumpy tori of fur); snow lies on shoulders, hat and roll (looser up-facing test, 0.7).
+- **Horse in snow**: legs caked white to the knees and hocks, thinning upward; a low haze of kicked powder at
+  each leg and behind.
+- **Snow ride cliff**: the boulder groups that landed on the bench's face are removed (the "floating bricks");
+  ledges are short broken runs; joints darker and visible further; rock back down to 1.2x under snowfall with
+  less rime (the frame had lost its darks).
+- **Outcrop**: cooler stone, fainter rain stains, snow only on what is near level.

@@ -1283,7 +1283,7 @@ function rockMaterial(surf = {}, bare = false) {
         base = mix(base, srgbR(vec3(50,48,46)), smoothstep(0.72, 0.82, sp1) * 0.5 * nearG);
         base = mix(base, srgbR(vec3(188,180,168)), smoothstep(0.74, 0.86, sp2) * 0.4 * nearG);
         float streak = smoothstep(0.45, 0.75, vnoise(vec2(dot(vWPos.xz, vec2(0.7, 0.7)) * 3.2, vWPos.y * 0.45)));
-        base *= 1.0 - 0.28 * streak * smoothstep(0.75, 0.3, wn.y);
+        base *= 1.0 - 0.12 * streak * smoothstep(0.75, 0.3, wn.y);   // (faint: strong, the stains were a texture smeared down the face)
       }
       #endif
       // close to, the stone has grain: crystal-sized speckle and pitting the half-metre scan cannot carry
@@ -1335,10 +1335,11 @@ function rockMaterial(surf = {}, bare = false) {
       float topS = smoothstep(0.72, 0.95, wn.y) * smoothstep(0.3, 0.5, n1 * 0.6 + 0.25 * n2 + 0.15 * vnoise(vWPos.xz * 11.0) + 0.2 * (vnoise(vWPos.xz * 47.0) - 0.5) + 0.16 * (vnoise(vWPos.xz * 130.0 + vWPos.y * 90.0) - 0.5));
       // (thin, feathered along the grain of the rock: a solid cap on every block was white paint)
       // (lying on what faces up, in patches: drawn out along one grain it was white streaks smeared into the creases)
-      rsnow = max(rsnow * max(drift, 0.7 * fleck), 0.86 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.5 + 0.5 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * 2.7 + 1.9))));
+      // (and only on what is near level: on the rounded shoulders it ran down the faces like dripped wax)
+      rsnow = max(rsnow * max(drift, 0.7 * fleck) * smoothstep(0.66, 0.86, wn.y), 0.86 * smoothstep(0.35, 0.75, rcl.r) * topS * (0.5 + 0.5 * smoothstep(0.3, 0.7, vnoise(vWPos.xz * 2.7 + 1.9))));
       // (cool grey stone, darker in broad weathered patches: measured against the reference's ledge ours was a third
       // lighter and tan where that one is blue-grey under the overcast)
-      base *= vec3(0.86, 0.9, 0.97) * (0.74 + 0.4 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));
+      base *= vec3(0.8, 0.87, 0.98) * (0.74 + 0.4 * smoothstep(0.25, 0.75, fbm2(vWPos.xz * 0.23 + vWPos.y * 0.31 + 3.3)));   // (cooler: beige against the blue-grey valley, it belonged to another picture)
       #else
       rsnow *= max(max(drift, 0.7 * fleck), smoothstep(0.8, 0.95, wn.y + 0.1 * (n2 - 0.5)));
       #endif

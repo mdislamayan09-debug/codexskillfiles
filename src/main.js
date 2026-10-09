@@ -687,6 +687,7 @@ async function init() {
         // its face cut into rock risers and snow ledges, as the reference's cliff band is (a single smooth ramp shaded
         // as one dark hump, whatever was stood against it)
         world.ledgeBox(Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90, 7.5);
+        G.benchBox = [Math.min(b0x, b1x) - 90, Math.min(b0z, b1z) - 90, Math.max(b0x, b1x) + 90, Math.max(b0z, b1z) + 90];
         // The middle distance. The canyon's own walls stand a kilometre off, pale in the falling snow, with nothing
         // between them and the lens. The reference's valley is closed in by spurs coming down from either side one
         // behind another, dark rock on their flanks and timber along their crests, each a tone paler than the last.
@@ -701,6 +702,9 @@ async function init() {
         world.paintCreek(creek, 6.5, 0.9);
         G.snowCreek = creek;
         for (const list of before) for (const [it, h0] of list) it.y += world.heightAt(it.x, it.z) - h0;
+        // (and no loose boulders left hanging on the bench's face: lifted with it, each sat on the cliff like a brick stuck on)
+        // (anything standing above the floor goes: on a cut ledge a boulder's own ground is level, so slope does not find it)
+        for (const L of [veg.rocks, veg.crags]) { const [x0, z0, x1, z1] = G.benchBox, flr = world.heightAt(px, pz) + 3, onFace = (it) => it.x > x0 && it.x < x1 && it.z > z0 && it.z < z1 && world.heightAt(it.x, it.z) > flr; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !onFace(it))); L.items = L.items.filter((it) => !onFace(it)); }
         // nothing left standing in the creek's bed
         for (const L of [veg.trees, veg.rocks, veg.bushes]) { const wetIt = (it) => near(it) && world.splatAt(it.x, it.z).wet > 0.35; for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !wetIt(it))); L.items = L.items.filter((it) => !wetIt(it)); }
         // the bench's wall: broken rock standing along its face, and spruce along its rim
@@ -802,6 +806,15 @@ async function init() {
           // (tall, ragged pines of every height among the spruce, not one cone model over and over)
           const tl = veg.groups.tall, old = tl.length && rr() < 0.45;
           veg.trees.add(x, world.heightAt(x, z) - 0.3, z, rr() * 6.28, old ? 0.45 + rr() * 0.55 : 0.3 + rr() * rr() * 1.6, old ? tl[Math.floor(rr() * tl.length)] : firs[Math.floor(rr() * firs.length)]);
+        }
+      }
+      // (the boulder groups above are thrown wide enough to land on the bench: taken off its face again)
+      if (G.benchBox) {
+        const [x0, z0, x1, z1] = G.benchBox, flr = world.heightAt(px, pz) + 3;
+        const onFace = (it) => it.x > x0 && it.x < x1 && it.z > z0 && it.z < z1 && world.heightAt(it.x, it.z) > flr;
+        for (const L of [veg.rocks, veg.crags]) {
+          for (const [k, list] of L.grid) L.grid.set(k, list.filter((it) => !onFace(it)));
+          L.items = L.items.filter((it) => !onFace(it));
         }
       }
       veg.update(player.hpos, true);
@@ -1260,6 +1273,17 @@ async function init() {
     // a ride through deep snow has already ploughed a trench behind the horse
     // (only a few metres of it: run back under a chase camera it reads as a grey board lying in the snow)
     if (world.climateAt(px, pz).snow > 0.5) snowTrail.prefill(px, pz, yaw); else snowTrail.clear();
+    // and the powder it kicks up: a low haze of it round each leg where it goes into the snow, thinning out behind
+    // (clean legs entering a clean surface read as a model stood on a sheet)
+    if (s.snowDress && world.climateAt(px, pz).snow > 0.5) {
+      const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)), rt2 = new THREE.Vector3(fw.z, 0, -fw.x);
+      for (let i = 0; i < 52; i++) {
+        const leg = i % 4, lf = (leg < 2 ? 0.55 : -0.74) + (Math.random() - 0.5) * 0.3, ls = (leg % 2 ? 0.2 : -0.2) + (Math.random() - 0.5) * 0.25;
+        const back = i < 32 ? 0 : Math.random() * 2.4;
+        const p = player.hpos.clone().addScaledVector(fw, lf - back).addScaledVector(rt2, ls).add(new THREE.Vector3(0, 0.04 + Math.random() * 0.26, 0));
+        particles.emit(p, new THREE.Vector3(0, 0.04, 0), { color: [0.86, 0.9, 0.96], alpha: 0.26 * (1 - back / 3.2), size: 0.3 + Math.random() * 0.35 + back * 0.14, life: 5, grow: 0.15, drag: 1 });
+      }
+    }
     G.started = true;
     G.frame = 0;
     G.hold = false;

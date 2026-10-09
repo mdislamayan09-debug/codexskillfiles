@@ -216,7 +216,7 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
   // cold granite reads darker under snow, but keeps its warm grey-brown (a blue-black rock left the storm frame
   // monochrome where the reference sets warm rock against cool snow)
   rock = mix(rock, rock * vec3(0.6, 0.58, 0.58), snowC);
-  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08) * 1.75, uSnowfall * snowC);   // (lifted: measured, the reference's storm cliffs are three times as light as ours were)
+  rock = mix(rock, rock * vec3(0.78, 0.9, 1.08) * 1.2, uSnowfall * snowC);   // (lifted: measured, the reference's storm cliffs are three times as light as ours were)
   // was: rock * vec3(0.78, 0.9, 1.08)   // (slate blue under falling snow, as the reference's cliffs)   // (near-black wet rock against the snow, as the reference's faces)
 
   vec3 snow = srgb(vec3(214,220,230));   // snow is bright but not paper: it should hold detail in sun
@@ -396,14 +396,15 @@ vec3 terrainAlbedo(vec3 wp, vec3 n, out float rough){
         float kMid = smoothstep(1500.0, 500.0, camDc), kNear = smoothstep(520.0, 140.0, camDc);
         rock *= mix(1.0, 0.8 + 0.42 * hash12(vec2(bi, 3.0)), steep * kMid);
         float joint = 1.0 - smoothstep(0.0, 0.045, abs(fract(along / 3.4 + 0.9 * fbm2(vec2(along / 11.0 + bi * 3.7, bi * 1.3)) + bi * 0.37) - 0.5));
-        rock *= 1.0 - 0.5 * joint * steep * kNear;
+        rock *= 1.0 - 0.62 * joint * steep * smoothstep(900.0, 250.0, camDc);
         rock *= 1.0 - 0.3 * smoothstep(0.2, 0.0, f) * steep * kMid;   // shade under the bed above
         float w = 0.14 + 0.14 * hash12(vec2(bi * 1.7, 9.0));
-        float brk = smoothstep(0.38, 0.52, fbm2(vec2(along / 13.0 + bi * 5.0, bi * 1.9)));
+        // (ledges a few paces long with gaps between, not a stripe round the whole face)
+        float brk = smoothstep(0.46, 0.58, fbm2(vec2(along / 8.0 + bi * 5.0, bi * 1.9)) + 0.12 * (vnoise(vec2(along / 2.2, bi)) - 0.5));
         float ledge = smoothstep(1.0 - w, 1.0 - 0.55 * w, f) * brk * steep * kMid;
         snowAmt = max(snowAmt, ledge * 0.92);
         float rime = uSnowfall * steep * smoothstep(0.3, 0.75, fbm2(vec2(along, wp.y * 2.2) / 4.5) + 0.2 * (vnoise(vec2(along, wp.y) * 1.3) - 0.5));
-        rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.34);
+        rock = mix(rock, vec3(0.62, 0.68, 0.78), rime * 0.22);
       }
     }
   }
